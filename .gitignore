@@ -1,3 +1,4 @@
+src/applied_decl.c
 src/bytecode_gen.h
 src/config.h
 src/config.log

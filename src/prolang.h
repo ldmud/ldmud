@@ -49,14 +49,18 @@ extern lpctype_t _lpctype_unknown_array, _lpctype_any_array,    _lpctype_int_flo
                  _lpctype_string_object, _lpctype_string_object_array,
                  _lpctype_lwobject_array,_lpctype_any_object_or_lwobject,
                  _lpctype_any_object_or_lwobject_array,
-                 _lpctype_any_object_or_lwobject_array_array;
+                 _lpctype_any_object_or_lwobject_array_array,
+                 _lpctype_int_or_string, _lpctype_string_or_string_array,
+                 _lpctype_catch_msg_arg;
 extern lpctype_t *lpctype_unknown_array, *lpctype_any_array,    *lpctype_int_float,
                  *lpctype_int_array,     *lpctype_string_array, *lpctype_object_array,
                  *lpctype_bytes_array,   *lpctype_string_bytes, *lpctype_string_or_bytes_array,
                  *lpctype_string_object, *lpctype_string_object_array,
                  *lpctype_lwobject_array,*lpctype_any_object_or_lwobject,
                  *lpctype_any_object_or_lwobject_array,
-                 *lpctype_any_object_or_lwobject_array_array;
+                 *lpctype_any_object_or_lwobject_array_array,
+                 *lpctype_int_or_string, *lpctype_string_or_string_array,
+                 *lpctype_catch_msg_arg;
 
 extern int yychar;
 extern int32 current_id_number;

@@ -82,6 +82,7 @@
 
 #include "prolang.h"
 
+#include "applied_decl.h"
 #include "array.h"
 #include "backend.h"
 #include "closure.h"
@@ -1124,7 +1125,9 @@ lpctype_t _lpctype_unknown_array, _lpctype_any_array,    _lpctype_int_float,
           _lpctype_string_object, _lpctype_string_object_array,
           _lpctype_lwobject_array,_lpctype_any_object_or_lwobject,
           _lpctype_any_object_or_lwobject_array,
-          _lpctype_any_object_or_lwobject_array_array;
+          _lpctype_any_object_or_lwobject_array_array,
+          _lpctype_int_or_string, _lpctype_string_or_string_array,
+          _lpctype_catch_msg_arg;
 lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_any_array     = &_lpctype_any_array,
           *lpctype_int_float     = &_lpctype_int_float,
@@ -1139,7 +1142,10 @@ lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_lwobject_array= &_lpctype_lwobject_array,
           *lpctype_any_object_or_lwobject = &_lpctype_any_object_or_lwobject,
           *lpctype_any_object_or_lwobject_array = &_lpctype_any_object_or_lwobject_array,
-          *lpctype_any_object_or_lwobject_array_array = &_lpctype_any_object_or_lwobject_array_array;
+          *lpctype_any_object_or_lwobject_array_array = &_lpctype_any_object_or_lwobject_array_array,
+          *lpctype_int_or_string = &_lpctype_int_or_string,
+          *lpctype_string_or_string_array = &_lpctype_string_or_string_array,
+          *lpctype_catch_msg_arg = &_lpctype_catch_msg_arg;
 
 
 /*-------------------------------------------------------------------------*/
@@ -8009,6 +8015,104 @@ def:  type L_IDENTIFIER  /* Function definition or prototype */
           $<number>$ = reserve_default_value_block(num_opt, offset);
           if (!$<number>$)
               $5.num_opt = 0;
+
+          /* Check whether this is an applied lfun. */
+          while (pragma_warn_applied_functions)
+          {
+              int hash = mstring_get_hash(def_function_ident->name) & applied_decl_hash_table_mask;
+
+              applied_decl_t** entry;
+              for (entry = applied_decl_hash_table + hash; *entry != NULL; entry = &((*entry)->next))
+              {
+                  if ((*entry)->name == def_function_ident->name) /* Both are tabled. */
+                      break;
+              }
+
+              if (*entry != NULL)
+              {
+                  applied_decl_t *decl = *entry;
+                  lpctype_t **exptype;
+
+                  if (def_function_returntype.t_type == NULL)
+                  {
+                      yywarnf("\"#pragma warn_applied_functions\" requires type for applied lfun '%s'"
+                              , get_txt(decl->name));
+                      break;
+                  }
+
+                  /* Check 1: Visibility */
+                  if ((def_function_returntype.t_flags & decl->visibility) != 0)
+                    yywarnf("Insufficient visibility for applied lfun '%s': '%s' is required"
+                           , get_txt(decl->name), decl->vis_name);
+
+                  /* Check 2: Return type */
+                  if (!has_common_type(def_function_returntype.t_type, decl->returntype)
+                   && (!decl->void_allowed || def_function_returntype.t_type != lpctype_void))
+                  {
+                      yywarnf("Wrong returntype for applied lfun '%s': %s"
+                            , get_txt(decl->name), get_two_lpctypes($1.t_type, decl->returntype));
+                  }
+
+                  /* Check 3: The number of arguments */
+                  if (!decl->varargs && !(def_function_returntype.t_flags & TYPE_MOD_VARARGS))
+                  {
+                      int min_arg = $5.num - $5.num_opt;
+                      int max_arg = $5.num;
+
+                      if (def_function_returntype.t_flags & TYPE_MOD_XVARARGS)
+                      {
+                          min_arg--;
+                          max_arg = INT_MAX;
+                      }
+
+                      if (min_arg > decl->num_arg && !decl->xvarargs)
+                          yywarnf("Too many arguments for applied lfun '%s': Expected %d"
+                                 , get_txt(decl->name), decl->num_arg);
+                      else if (max_arg < decl->num_arg)
+                          yywarnf("Too few arguments for applied lfun '%s': Expected %d"
+                                 , get_txt(decl->name), decl->num_arg);
+                  }
+
+                  /* Check 4: Check the actual argument types. */
+                  exptype = applied_decl_args + decl->arg_index;
+                  for (int i = 0, j = 0; i < decl->num_arg && j < $5.num; i++, j++)
+                  {
+                      lpctype_t *arg = local_variables[j].type.t_type;
+
+                      if (j == $5.num - 1 && (def_function_returntype.t_flags & TYPE_MOD_XVARARGS))
+                      {
+                          lpctype_t *elem_type = exptype[i++], *arr_type;
+
+                          /* We'll collect the remaining arguments here. */
+                          for (; i < decl->num_arg; i++)
+                          {
+                              lpctype_t *temp = get_union_type(elem_type, exptype[i]);
+                              free_lpctype(elem_type);
+                              elem_type = temp;
+                          }
+
+                          arr_type = get_array_type(elem_type);
+
+                          if (!has_common_type(arg, arr_type))
+                              yywarnf("Wrong argument %d type for applied lfun '%s': %s"
+                                     , j+1, get_txt(decl->name)
+                                     , get_two_lpctypes(arg, arr_type));
+
+                          free_lpctype(elem_type);
+                          free_lpctype(arr_type);
+                          break;
+                      }
+                      else if (!has_common_type(arg, exptype[i]))
+                          yywarnf("Wrong argument %d type for applied lfun '%s': %s"
+                                 , j+1, get_txt(decl->name)
+                                 , get_two_lpctypes(arg, *exptype));
+                  }
+
+                  /* Remove it from the table, so we won't check again. */
+                  *entry = (*entry)->next;
+              }
+              break;
+          }
       }
 
       function_body
@@ -18833,6 +18937,8 @@ init_compiler ()
  */
 
 {
+    lpctype_t *temp1, *temp2;
+
     make_static_type(get_array_type(lpctype_unknown),               &_lpctype_unknown_array);
     make_static_type(get_array_type(lpctype_mixed),                 &_lpctype_any_array);
     make_static_type(get_union_type(lpctype_int, lpctype_float),    &_lpctype_int_float);
@@ -18848,6 +18954,20 @@ init_compiler ()
     make_static_type(get_union_type(lpctype_any_object, lpctype_any_lwobject), &_lpctype_any_object_or_lwobject);
     make_static_type(get_array_type(lpctype_any_object_or_lwobject), &_lpctype_any_object_or_lwobject_array);
     make_static_type(get_array_type(lpctype_any_object_or_lwobject_array), &_lpctype_any_object_or_lwobject_array_array);
+    make_static_type(get_union_type(lpctype_int, lpctype_string),   &_lpctype_int_or_string);
+    make_static_type(get_union_type(lpctype_string, lpctype_string_array), &_lpctype_string_or_string_array);
+
+    temp1 = get_union_type(lpctype_any_object_or_lwobject, lpctype_any_struct);
+    temp2 = get_union_type(temp1, lpctype_mapping);
+    make_static_type(get_union_type(temp2, lpctype_any_array), &_lpctype_catch_msg_arg);
+    free_lpctype(temp1);
+    free_lpctype(temp2);
+
+    /* Change the name entries in the applied lfun specifications. */
+    for (applied_decl_t* decl = applied_decl_master; decl->returntype != NULL; decl++)
+        decl->name = new_tabled(decl->cname, STRING_ASCII);
+    for (applied_decl_t* decl = applied_decl_regular; decl->returntype != NULL; decl++)
+        decl->name = new_tabled(decl->cname, STRING_ASCII);
 } /* init_compiler() */
 
 /*-------------------------------------------------------------------------*/
@@ -18968,6 +19088,45 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", local_variables, context_variables 
      */
     call_other_sefun = get_simul_efun_index(STR_CALL_OTHER);
     call_strict_sefun = get_simul_efun_index(STR_CALL_STRICT);
+
+    /* Initialize the hash table for applied lfuns.
+     */
+    for (i = 0; i <= applied_decl_hash_table_mask; i++)
+        applied_decl_hash_table[i] = NULL;
+
+    if (isMasterObj)
+    {
+        for (applied_decl_t* decl = applied_decl_master; decl->returntype != NULL; decl++)
+        {
+            int entry = mstring_get_hash(decl->name) & applied_decl_hash_table_mask;
+            decl->next = applied_decl_hash_table[entry];
+            applied_decl_hash_table[entry] = decl;
+        }
+    }
+    else
+    {
+        for (applied_decl_t* decl = applied_decl_regular; decl->returntype != NULL; decl++)
+        {
+            int entry = mstring_get_hash(decl->name) & applied_decl_hash_table_mask;
+            decl->next = applied_decl_hash_table[entry];
+            applied_decl_hash_table[entry] = decl;
+        }
+
+        for (applied_decl_t* decl = applied_decl_hook; decl->returntype != NULL; decl++)
+        {
+            int entry;
+            string_t *name;
+
+            if (driver_hook[decl->hook].type != T_STRING)
+                continue;
+            name = driver_hook[decl->hook].u.str;
+            entry = mstring_get_hash(name) & applied_decl_hash_table_mask;
+
+            decl->name = name;  /* Not counted. */
+            decl->next = applied_decl_hash_table[entry];
+            applied_decl_hash_table[entry] = decl;
+        }
+    }
 
 } /* prolog() */
 
@@ -19910,6 +20069,9 @@ clear_compiler_refs (void)
     clear_lpctype_ref(lpctype_any_object_or_lwobject);
     clear_lpctype_ref(lpctype_any_object_or_lwobject_array);
     clear_lpctype_ref(lpctype_any_object_or_lwobject_array_array);
+    clear_lpctype_ref(lpctype_int_or_string);
+    clear_lpctype_ref(lpctype_string_or_string_array);
+    clear_lpctype_ref(lpctype_catch_msg_arg);
 }
 
 void
@@ -19939,6 +20101,21 @@ count_compiler_refs (void)
     count_lpctype_ref(lpctype_any_object_or_lwobject);
     count_lpctype_ref(lpctype_any_object_or_lwobject_array);
     count_lpctype_ref(lpctype_any_object_or_lwobject_array_array);
+    count_lpctype_ref(lpctype_int_or_string);
+    count_lpctype_ref(lpctype_string_or_string_array);
+
+    /* lpctype_catch_msg_arg has non-static union members,
+     * we need to handle them explicitly.
+     */
+    count_lpctype_ref(lpctype_catch_msg_arg);
+    count_lpctype_ref(lpctype_catch_msg_arg->t_union.head);
+    count_lpctype_ref(lpctype_catch_msg_arg->t_union.member);
+
+    /* Count names of the applied lfun declarations. */
+    for (applied_decl_t* decl = applied_decl_master; decl->returntype != NULL; decl++)
+        count_ref_from_string(decl->name);
+    for (applied_decl_t* decl = applied_decl_regular; decl->returntype != NULL; decl++)
+        count_ref_from_string(decl->name);
 }
 
 #endif

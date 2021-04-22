@@ -267,17 +267,6 @@ struct instr_s
 typedef uint32 funflag_t;  /* Function flags */
 typedef int32 sfunflag_t;  /* signed version of Function flags */
 
-/* The visiblity is a 4-bit value within the function flags
- * masked by TYPE_MOD_VISIBILITY.
- */
-enum visibility_modifier {
-    VIS_PRIVATE        = 0x100000000,
-    VIS_PROTECTED      = 0x010000000,
-    VIS_STATIC         = 0x400000000,
-    VIS_VISIBLE        = 0x000000000,
-    VIS_PUBLIC         = 0x080000000,
-};
-
 enum function_flags {
     NAME_INHERITED     = 0x80000000,  /* defined by inheritance         */
     TYPE_MOD_STATIC    = 0x40000000,  /* Static function or variable    */

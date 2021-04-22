@@ -141,6 +141,36 @@
  *        'null' is to be used as alternate type when the efun accepts
  *        the number 0 instead of the actual type.
  *---------------------------------------------------------------------------
+ * make_func applied
+ * ----------------
+ *
+ * make_func reads the specifications of all applied lfuns from the file
+ * applied_spec and creates the file applied_decl.c needed to compile
+ * the driver.
+ *
+ * Similar to 'make_func instr', it reads the files 'machine.h' and
+ * 'config.h' to determine active defines. Then reads the file
+ * 'applied_spec' to read the applied lfun specifications.
+ *
+ * applied_spec is divided into several sections, each introduced with its
+ * own %-keyword. The required order and meaning of the sections is this:
+ *
+ *     %master
+ *         Applied lfuns of the master object.
+ *
+ *     %regular
+ *         Applied lfuns for regular objects.
+ *
+ *     %hooks
+ *         Applied lfuns via driver hooks.
+ *
+ * Each section contains a list of function declarations. They follow this
+ * syntax:
+ *
+ *    [visibility] [varargs] return-type lfun-or-hook-name
+ *                                  (argtype-1, ..., argtype-n [, ...] ) ;
+ *
+ *---------------------------------------------------------------------------
  * make_func lang
  * --------------
  *
@@ -226,6 +256,10 @@
    * and efuns.
    */
 
+#define APPLIED_SPEC  "applied_spec"
+  /* The input file with the definition of applied lfuns.
+   */
+
 #define STRING_SPEC  "string_spec"
   /* The input file with the definition of all standard
    * shared strings.
@@ -253,6 +287,10 @@
 
 #define EFUN_DEFS    "efun_defs.c"
   /* The instruction and ctype table definitions to generate.
+   */
+
+#define APPLIED_DEFS "applied_decl.c"
+  /* The applied lfun specification to generate.
    */
 
 #define STDSTRINGS   "stdstrings"
@@ -488,6 +526,39 @@ static int curr_lpc_type_size = 0;
 
 /*-------------------------------------------------------------------------*/
 
+/* Variables used when parsing the lines of APPLIED_SPEC */
+
+static char* master_decl_line[MAX_FUNC];
+static char* regular_decl_line[MAX_FUNC];
+static char* hook_decl_line[MAX_FUNC];
+    /* One entry already formatted as a applied_decl_t initializer.
+     */
+
+static int master_decl_num;
+static int regular_decl_num;
+static int hook_decl_num;
+    /* Number of entries for each category.
+     */
+
+static char** next_decl_line = NULL;
+    /* Next entry to be filled.
+     */
+
+static int* current_decl_num = NULL;
+    /* Points to the number of the current category.
+     */
+
+static bool current_decl_is_hook = false;
+    /* True, when we are parsing driver hooks.
+     */
+
+static const char* current_default_visibility_name = NULL;
+static const char* current_default_visibility_flags = NULL;
+    /* The default visibility in the current category.
+     */
+
+/*-------------------------------------------------------------------------*/
+
 /* Forward declarations */
 
 static void yyerror(const char *) NORETURN;
@@ -645,6 +716,42 @@ check_for_duplicate_string (const char *key, const char *buf)
     return rc;
 }
 
+/*-------------------------------------------------------------------------*/
+static int
+move_to_arg_types ()
+
+/* Moves the types from curr_arg_types to arg_types.
+ * Returns the index into arg_types.
+ */
+
+{
+    int i;
+    for (i = 0; i < last_current_type; i++)
+    {
+        int j;
+        for (j = 0; j+i < last_current_type && j < curr_arg_type_size; j++)
+        {
+            if (curr_arg_types[j] != arg_types[i+j])
+                break;
+        }
+        if (j == curr_arg_type_size)
+            break;
+    }
+
+    if (i == last_current_type)
+    {
+        /* It's a new signature, put it into arg_types[] */
+        for (int j = 0; j < curr_arg_type_size; j++)
+        {
+            arg_types[last_current_type++] = curr_arg_types[j];
+            if (last_current_type == NELEMS(arg_types))
+                yyerror("Array 'arg_types' is too small");
+        }
+    }
+
+    return i;
+} /* move_to_arg_types() */
+
 #if defined(__MWERKS__) && !defined(WARN_ALL)
 #    pragma warn_possunwant off
 #    pragma warn_implicitconv off
@@ -660,18 +767,36 @@ check_for_duplicate_string (const char *key, const char *buf)
 %union {
     int number;
     char *string;
+
+    struct
+    {
+        int type;               /* The type token number.        */
+        bool void_allowed;      /* Whether void is also allowed. */
+    } returntype;
+
+    struct
+    {
+        const char *name;
+        const char *flags;
+    } visibility;
 }
 
-%token PARSE_FUNC_SPEC PARSE_STRING_SPEC
+%token PARSE_FUNC_SPEC PARSE_APPLIED_SPEC PARSE_STRING_SPEC
 
 %token NAME ID
 
 %token VOID INT STRING BYTES BYTES_OR_STRING OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
-%token MIXED UNKNOWN NUL STRUCT LWOBJECT OBJECT_OR_LWOBJECT
+%token MIXED UNKNOWN NUL STRUCT LWOBJECT OBJECT_OR_LWOBJECT INT_OR_STRING STRING_OR_STRING_ARRAY
+%token CATCH_MSG_ARG
 
 %token DEFAULT NO_LIGHTWEIGHT
 
 %token CODES EFUNS TEFUNS END
+
+%token APPLIED_MASTER APPLIED_REGULAR APPLIED_HOOKS
+
+%token VARARGS
+%token PRIVATE PROTECTED STATIC VISIBLE
 
 %token UN_OP BIN_OP TRI_OP
 
@@ -713,10 +838,28 @@ check_for_duplicate_string (const char *key, const char *buf)
 
 %type <number> optional_no_lightweight
 
+%type <number> opt_varargs
+  /* 0: No varargs,
+   * 1: varargs
+   */
+
+%type <visibility> opt_visibility
+
+%type <returntype> applied_rettype
+
+%type <number> applied_argtype
+  /* Value is the type token.
+   */
+
+%type <number> applied_args
+  /* True, when additional arguments can follow.
+   */
+
 %%
 
-all: PARSE_FUNC_SPEC   func_spec
-   | PARSE_STRING_SPEC string_spec
+all: PARSE_FUNC_SPEC    func_spec
+   | PARSE_APPLIED_SPEC applied_spec
+   | PARSE_STRING_SPEC  string_spec
 ;
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -868,32 +1011,7 @@ func: utype ID optional_ID '(' arg_list optional_default ')' optional_no_lightwe
         }
 
         /* Search the function's signature in arg_types[] */
-
-        for (i = 0; i < last_current_type; i++)
-        {
-            int j;
-            for (j = 0; j+i < last_current_type && j < curr_arg_type_size; j++)
-            {
-                if (curr_arg_types[j] != arg_types[i+j])
-                    break;
-            }
-            if (j == curr_arg_type_size)
-                break;
-        }
-
-        if (i == last_current_type)
-        {
-            /* It's a new signature, put it into arg_types[] */
-            int j;
-            for (j = 0; j < curr_arg_type_size; j++)
-            {
-                arg_types[last_current_type++] = curr_arg_types[j];
-                if (last_current_type == NELEMS(arg_types))
-                    yyerror("Array 'arg_types' is too small");
-            }
-        }
-
-        arg_index = i;
+        arg_index = move_to_arg_types();
 
         /* Search the function's signature in lpc_types[].
          * For efuns using a (...) argument the last listed lpc_type is 0,
@@ -1078,6 +1196,109 @@ typel: arg_type              { $$ = (min_arg == -1 && $1 == VOID); }
      ;
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+applied_spec:
+    APPLIED_MASTER applied_lfuns END
+    APPLIED_REGULAR applied_lfuns END
+    APPLIED_HOOKS applied_lfuns ;
+
+applied_lfuns:
+      /* empty */
+    | applied_lfuns applied_lfun
+    ;
+
+applied_lfun:
+    opt_visibility opt_varargs applied_rettype ID '(' applied_args ')' ';'
+    {
+        if (*current_decl_num >= MAX_FUNC)
+            yyerror("Too many functions");
+        else
+        {
+            char buf[1024];
+            ++*current_decl_num;
+
+            snprintf(buf, sizeof(buf), "    { %s, { .%s%s%s }, \"%s\", %s, %d, %d, %s, %s, %s, NULL, NULL },\n"
+                    , lpctypestr($3.type)
+                    , current_decl_is_hook ? "hook = " : "cname = \""
+                    , $4
+                    , current_decl_is_hook ? "" : "\""
+                    , $1.name
+                    , $1.flags
+                    , curr_arg_type_size
+                    , move_to_arg_types()
+                    , $2 ? "true" : "false"
+                    , $6 ? "true" : "false"
+                    , $3.void_allowed ? "true" : "false");
+
+            *next_decl_line = mystrdup(buf);
+            ++next_decl_line;
+
+            curr_arg_type_size = 0;
+        }
+    }
+    ;
+
+/* We return the forbidden flags. */
+opt_visibility:
+      /* empty */ { $$.name  = current_default_visibility_name;
+                    $$.flags = current_default_visibility_flags;                          }
+    | PRIVATE     { $$.name  = "private";
+                    $$.flags = "0";                                                       }
+    | PROTECTED   { $$.name  = "protected";
+                    $$.flags = "TYPE_MOD_PRIVATE";                                        }
+    | STATIC      { $$.name  = "static";
+                    $$.flags = "TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED";                   }
+    | VISIBLE     { $$.name  = "visible";
+                    $$.flags = "TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC"; }
+    ;
+
+opt_varargs:
+      /* none */ { $$ = 0; }
+    | VARARGS    { $$ = 1; }
+    ;
+
+applied_rettype:
+      basic                     { $$.void_allowed = false; $$.type = $1;}
+    | basic '*'                 { $$.void_allowed = false; $$.type = $1 | MF_TYPE_MOD_POINTER; }
+    | STRING '|' STRING '*'     { $$.void_allowed = false; $$.type = STRING_OR_STRING_ARRAY; }
+    | STRING '|' INT            { $$.void_allowed = false; $$.type = INT_OR_STRING; }
+    | INT    '|' STRING         { $$.void_allowed = false; $$.type = INT_OR_STRING; }
+    | VOID   '|' basic          { $$.void_allowed = true;  $$.type = $3;}
+    ;
+
+applied_args:
+      /* empty */                       { $$ = 0; }
+    | '.' '.' '.'                       { $$ = 1; }
+    | applied_args2                     { $$ = 0; }
+    | applied_args2 ',' '.' '.' '.'     { $$ = 1; }
+    ;
+
+applied_args2:
+      applied_arg
+    | applied_args2 ',' applied_arg
+    ;
+
+applied_arg:
+    applied_argtype
+    {
+        if (curr_arg_type_size == NELEMS(curr_arg_types))
+            yyerror("Too many arguments");
+        else
+            curr_arg_types[curr_arg_type_size++] = $1;
+    }
+    ;
+
+applied_argtype:
+      basic                     { $$ = $1; }
+    | basic '*'                 { $$ = $1 | MF_TYPE_MOD_POINTER; }
+    | OBJECT   '|' LWOBJECT     { $$ = OBJECT_OR_LWOBJECT; }
+    | LWOBJECT '|' OBJECT       { $$ = OBJECT_OR_LWOBJECT; }
+    | INT      '|' STRING       { $$ = INT_OR_STRING; }
+    | STRING   '|' INT          { $$ = INT_OR_STRING; }
+    | STRUCT '|' MAPPING '|' OBJECT '|' LWOBJECT '|' MIXED '*'
+                                { $$ = CATCH_MSG_ARG; }
+    ;
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
 string_spec: stringdefs ;
 
@@ -1151,6 +1372,13 @@ static struct type types[]
     , { "unknown",      UNKNOWN }
     , { "struct",       STRUCT }
     , { "lwobject",     LWOBJECT }
+    };
+
+static struct type visibility[]
+  = { { "visible",      VISIBLE }
+    , { "static",       STATIC }
+    , { "protected",    PROTECTED }
+    , { "private",      PRIVATE }
     };
 
 /*-------------------------------------------------------------------------*/
@@ -2173,6 +2401,29 @@ ident (char c)
         if (strcmp(buff, "ternary") == 0)
             return TRI_OP;
     }
+
+    if ( parsetype == PARSE_APPLIED_SPEC )
+    {
+        for (i=0; i < NELEMS(types); i++)
+        {
+            if (strcmp(buff, types[i].name) == 0)
+            {
+                yylval.number = types[i].num;
+                return types[i].num;
+            }
+        }
+        for (i=0; i < NELEMS(visibility); i++)
+        {
+            if (strcmp(buff, visibility[i].name) == 0)
+            {
+                yylval.number = visibility[i].num;
+                return visibility[i].num;
+            }
+        }
+        if (strcmp(buff, "varargs") == 0)
+            return VARARGS;
+    }
+
     yylval.string = mystrdup(buff);
     return ID;
 } /* ident() */
@@ -2340,6 +2591,36 @@ yylex1 (void)
                 if (MATCH("codes"))  { current_code_class=C_CODE;  return CODES;  }
                 if (MATCH("efuns"))  { current_code_class=C_EFUN;  return EFUNS;  }
                 if (MATCH("tefuns")) { current_code_class=C_SEFUN; return TEFUNS; }
+            }
+            if (parsetype == PARSE_APPLIED_SPEC)
+            {
+                if (MATCH("master"))
+                {
+                    next_decl_line = master_decl_line;
+                    current_decl_num = &master_decl_num;
+                    current_decl_is_hook = false;
+                    current_default_visibility_name = "protected";
+                    current_default_visibility_flags = "TYPE_MOD_PRIVATE";
+                    return APPLIED_MASTER;
+                }
+                if (MATCH("regular"))
+                {
+                    next_decl_line = regular_decl_line;
+                    current_decl_num = &regular_decl_num;
+                    current_decl_is_hook = false;
+                    current_default_visibility_name = "visible";
+                    current_default_visibility_flags = "TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC";
+                    return APPLIED_REGULAR;
+                }
+                if (MATCH("hooks"))
+                {
+                    next_decl_line = hook_decl_line;
+                    current_decl_num = &hook_decl_num;
+                    current_decl_is_hook = true;
+                    current_default_visibility_name = "visible";
+                    current_default_visibility_flags = "TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC";
+                    return APPLIED_HOOKS;
+                }
             }
             return '%';
 
@@ -2571,6 +2852,15 @@ lpctypestr (int n)
                     p = "&_lpctype_quoted_array"; break;
       case OBJECT_OR_LWOBJECT:
                     p = "&_lpctype_any_object_or_lwobject";
+                                                  break;
+      case INT_OR_STRING:
+                    p = "&_lpctype_int_or_string";
+                                                  break;
+      case STRING_OR_STRING_ARRAY:
+                    p = "&_lpctype_string_or_string_array";
+                                                  break;
+      case CATCH_MSG_ARG:
+                    p = "&_lpctype_catch_msg_arg";
                                                   break;
 
       case MF_TYPE_MOD_POINTER|MIXED:
@@ -2908,6 +3198,31 @@ read_func_spec (void)
     }
 
 } /* read_func_spec() */
+
+/*-------------------------------------------------------------------------*/
+static void
+read_applied_spec ()
+
+/* Read the file APPLIED_SPEC.
+ */
+
+{
+    fpr = fopen(APPLIED_SPEC, "rt");
+    if (fpr == NULL)
+    {
+        perror(APPLIED_SPEC);
+        exit(1);
+    }
+
+    got_error = 0;
+    current_line = 1;
+    current_file = APPLIED_SPEC;
+    parsetype = PARSE_APPLIED_SPEC;
+    parsetype_sent = MY_FALSE;
+    curr_lpc_type_size = 0;
+    yyparse();
+    fclose(fpr);
+} /* read_applied_spec() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3310,6 +3625,111 @@ create_instrs (void)
 
 /*-------------------------------------------------------------------------*/
 static void
+create_applied_defs ()
+
+/* Create the file APPLIED_DEFS.
+ */
+
+{
+    int tbl_size;
+
+    fpw = fopen(APPLIED_DEFS, "wt");
+    if (fpw == NULL)
+    {
+        perror(APPLIED_DEFS);
+        exit(1);
+    }
+
+    fprintf(fpw,
+"/* DO NOT EDIT!\n"
+" *\n"
+" * This file is created automatically by make_func from the specification\n"
+" * in " APPLIED_SPEC ".\n"
+" */\n"
+"\n"
+"#include \"applied_decl.h\"\n"
+"#include \"prolang.h\"\n"
+"#include \"types.h\"\n"
+"#include \"../mudlib/sys/driver_hook.h\"\n"
+"\n"
+"/*----------------------------------------------------------------------*/\n"
+"\n"
+"/* The applied lfuns for the master object.\n"
+" */\n"
+"\n"
+"applied_decl_t applied_decl_master[] = {\n"
+    );
+
+    for (int i = 0; i < master_decl_num; i++)
+        fprintf(fpw, "%s", master_decl_line[i]);
+
+    fprintf(fpw,
+"    { NULL }\n"
+"};\n"
+"\n"
+"/*----------------------------------------------------------------------*/\n"
+"\n"
+"/* The applied lfuns for regular objects.\n"
+" */\n"
+"\n"
+"applied_decl_t applied_decl_regular[] = {\n"
+    );
+
+    for (int i = 0; i < regular_decl_num; i++)
+        fprintf(fpw, "%s", regular_decl_line[i]);
+
+    fprintf(fpw,
+"    { NULL }\n"
+"};\n"
+"\n"
+"/*----------------------------------------------------------------------*/\n"
+"\n"
+"/* The applied lfuns for driver hooks.\n"
+" */\n"
+"\n"
+"applied_decl_t applied_decl_hook[] = {\n"
+    );
+
+    for (int i = 0; i < hook_decl_num; i++)
+        fprintf(fpw, "%s", hook_decl_line[i]);
+
+    fprintf(fpw,
+"    { NULL }\n"
+"};\n"
+"\n"
+"/*----------------------------------------------------------------------*/\n"
+"\n"
+"/* List of function argument types.\n"
+" * These are referenced by .arg_index from the declarations.\n"
+" */\n"
+"\n"
+"lpctype_t* applied_decl_args[] = {\n"
+    );
+
+    for (int i = 0; i < last_current_type; i++)
+        fprintf(fpw, "    /* %d */ %s,\n", i, lpctypestr(arg_types[i]));
+    fprintf(fpw, "};\n");
+
+    tbl_size = 1;
+    while (tbl_size < (master_decl_num + regular_decl_num + hook_decl_num))
+        tbl_size <<= 1;
+
+    fprintf(fpw, "\n"
+"/*----------------------------------------------------------------------*/\n"
+"\n"
+"/* Uninitialized hash table for use by the compiler.\n"
+" */\n"
+"\n"
+"applied_decl_t* applied_decl_hash_table[%d];\n"
+"int applied_decl_hash_table_mask = %d;\n"
+"\n", tbl_size, tbl_size - 1
+    );
+
+    fclose(fpw);
+} /* create_applied_defs() */
+
+/*-------------------------------------------------------------------------*/
+static void
 create_lang (void)
 
 /* Create the file THE_LANG from PRO_LANG,
@@ -3548,12 +3968,13 @@ main (int argc, char ** argv)
  */
 
 {
-    enum { NONE = 0, MakeInstrs, MakeLang, MakeStrings } action = NONE;
+    enum { NONE = 0, MakeInstrs, MakeApplied, MakeLang, MakeStrings } action = NONE;
 
     /* --- Check what we have to do --- */
     if (argc == 2)
     {
         if (!strcasecmp(argv[1], "instrs")) action = MakeInstrs;
+        else if (!strcasecmp(argv[1], "applied")) action = MakeApplied;
         else if (!strcasecmp(argv[1], "lang")) action = MakeLang;
         else if (!strcasecmp(argv[1], "strings")) action = MakeStrings;
     }
@@ -3561,10 +3982,13 @@ main (int argc, char ** argv)
     if (action == NONE)
     {
         fputs(
-"Usage: make_func instrs|lang|strings\n"
+"Usage: make_func instrs|applied|lang|strings\n"
 "\n"
 "  make_func instrs\n"
 "    creates " EFUN_DEFS " and " THE_INSTRS ", reads " CONFIG " and " FUNC_SPEC ".\n"
+"\n"
+"  make_func applied\n"
+"    creates " APPLIED_DEFS ", reads " CONFIG " and " APPLIED_SPEC ".\n"
 "\n"
 "  make_func lang\n"
 "    creates " THE_LANG " from " PRO_LANG ", reads " CONFIG ".\n"
@@ -3581,6 +4005,9 @@ main (int argc, char ** argv)
     if (action == MakeInstrs)
         read_func_spec();
 
+    if (action == MakeApplied)
+        read_applied_spec();
+
     if (action == MakeStrings)
         read_string_spec();
 
@@ -3593,6 +4020,9 @@ main (int argc, char ** argv)
         create_efun_defs();
         create_instrs();
     }
+    if (action == MakeApplied)
+        create_applied_defs();
+
     if (action == MakeLang)
         create_lang();
 

@@ -101,6 +101,11 @@ DESCRIPTION
                 mudlib code - in general one should fix the warnings,
                 not turn them off.
 
+        warn_applied_functions: If a function is known to be an applied
+                lfun, warn if its declaration differs from the specification.
+        no_warn_applied_functions: Turn of warn_applied_functions
+                (the default).
+
         warn_unused_variables: Warn about variables that are not used.
                 If will warn about variables never written to, variables
                 never read from or variables never used at all.

@@ -254,6 +254,7 @@ extern Bool pragma_warn_dead_code;
 extern Bool pragma_warn_deprecated;
 extern Bool pragma_warn_empty_casts;
 extern Bool pragma_check_overloads;
+extern bool pragma_warn_applied_functions;
 extern Bool pragma_share_variables;
 extern Bool pragma_rtt_checks;
 extern Bool pragma_warn_rtt_checks;

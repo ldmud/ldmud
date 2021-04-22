@@ -94,8 +94,8 @@ LDFLAGS=$(PROFIL) @LDFLAGS@
 #smalloc/slaballoc; this combination is bound to cause crashes.
 MFLAGS = "BINDIR=$(BINDIR)" "MUD_LIB=$(MUD_LIB)"
 #
-SRC = access_check.c actions.c array.c arraylist.c backend.c bitstrings.c \
-      call_out.c closure.c comm.c \
+SRC = access_check.c actions.c applied_decl.c array.c arraylist.c \
+      backend.c bitstrings.c call_out.c closure.c comm.c \
       dumpstat.c ed.c efuns.c files.c gcollect.c hash.c heartbeat.c \
       interpret.c lex.c lwobject.c \
       main.c mapping.c md5.c mempools.c mregex.c mstrings.c object.c \
@@ -106,8 +106,8 @@ SRC = access_check.c actions.c array.c arraylist.c backend.c bitstrings.c \
       port.c ptrtable.c \
       random.c regexp.c sha1.c simulate.c simul_efun.c stdstrings.c \
       strfuns.c structs.c sprintf.c swap.c types.c unidata.c wiz_list.c xalloc.c 
-OBJ = access_check.o actions.o array.o arraylist.o backend.o bitstrings.o \
-      call_out.o closure.o comm.o \
+OBJ = access_check.o actions.o applied_decl.o array.o arraylist.o \
+      backend.o bitstrings.o call_out.o closure.o comm.o \
       dumpstat.o ed.o efuns.o files.o gcollect.o hash.o heartbeat.o \
       interpret.o lex.o lwobject.o \
       main.o mapping.o md5.o mempools.o mregex.o mstrings.o object.o \
@@ -156,6 +156,7 @@ clean:
 	$(RM) make_func.c *.o mkfunc@EXEEXT@
 	$(RM) stdstrings.c stdstrings.h bytecode_gen.h
 	$(RM) efun_defs.c instrs.h lang.y lang.h lang.c y.output tags TAGS
+	$(RM) applied_decl.c
 	$(RM) ldmud@EXEEXT@ core mudlib/core mudlib/debug.log lpmud.log
 	(cd util ; echo "Cleaning in util." ; $(MAKE) clean)
 
@@ -193,6 +194,10 @@ efun_defs.c instrs.h: func_spec mkfunc@EXEEXT@ config.h machine.h
 	$(RM) efun_defs.c
 	./mkfunc@EXEEXT@ instrs
 
+applied_decl.c: applied_spec mkfunc@EXEEXT@ config.h machine.h
+	$(RM) applied_decl.c
+	./mkfunc@EXEEXT@ applied
+
 stdstrings.c stdstrings.h: string_spec mkfunc@EXEEXT@ config.h machine.h
 	$(RM) stdstrings.c
 	$(RM) stdstrings.h
@@ -212,7 +217,7 @@ random.o : random.c config.h driver.h
 
 # Generated source files (overlaps with of SRC) which need to be
 # present for mkdepend to work.
-    GENSRC = make_func.c stdstrings.c lang.c instrs.h
+    GENSRC = make_func.c applied_decl.c stdstrings.c lang.c instrs.h
 
 # Macros for MkDepend:
     SKELETON = $(SRC) mkfunc.c
@@ -249,6 +254,10 @@ actions.o : ../mudlib/sys/commands.h ../mudlib/sys/driver_hook.h actions.h \
     mstrings.h my-alloca.h object.h pkg-gcrypt.h pkg-gnutls.h pkg-openssl.h \
     pkg-tls.h port.h sent.h simulate.h stdstrings.h strfuns.h svalue.h \
     typedefs.h types.h wiz_list.h xalloc.h
+
+applied_decl.o : ../mudlib/sys/driver_hook.h applied_decl.h bytecode.h \
+    bytecode_gen.h config.h driver.h exec.h machine.h port.h prolang.h \
+    svalue.h typedefs.h types.h
 
 array.o : array.h backend.h bytecode.h bytecode_gen.h closure.h config.h \
     driver.h exec.h hash.h i-current_object.h i-svalue_cmp.h iconv_opt.h \
@@ -442,11 +451,11 @@ parse.o : actions.h array.h backend.h bytecode.h bytecode_gen.h config.h \
     machine.h main.h mstrings.h object.h parse.h port.h sent.h simulate.h \
     stdstrings.h strfuns.h svalue.h typedefs.h types.h wiz_list.h xalloc.h
 
-parser.o : ../mudlib/sys/driver_hook.h array.h backend.h bytecode.h \
-    bytecode_gen.h closure.h config.h driver.h exec.h gcollect.h hash.h \
-    i-eval_cost.h iconv_opt.h instrs.h interpret.h lang.c lex.h machine.h \
-    main.h mapping.h mstrings.h my-alloca.h object.h pkg-python.h port.h \
-    prolang.h ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h \
+parser.o : ../mudlib/sys/driver_hook.h applied_decl.h array.h backend.h \
+    bytecode.h bytecode_gen.h closure.h config.h driver.h exec.h gcollect.h \
+    hash.h i-eval_cost.h iconv_opt.h instrs.h interpret.h lang.c lex.h \
+    machine.h main.h mapping.h mstrings.h my-alloca.h object.h pkg-python.h \
+    port.h prolang.h ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h \
     strfuns.h structs.h svalue.h swap.h switch.h typedefs.h types.h \
     wiz_list.h xalloc.h
 

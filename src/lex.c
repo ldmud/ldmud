@@ -167,6 +167,10 @@ Bool pragma_check_overloads;
    * mudlibs.
    */
 
+bool pragma_warn_applied_functions;
+  /* True: Warn about applied lfuns with wrong declaration.
+   */
+
 pragma_cttype_checks_e pragma_strict_types;
   /* Type enforcing mode: PRAGMA_WEAK_TYPES, PRAGMA_STRONG_TYPES
    * and PRAGMA_STRICT_TYPES.
@@ -4016,6 +4020,16 @@ handle_pragma (char *str)
             pragma_check_overloads = MY_FALSE;
             validPragma = MY_TRUE;
         }
+        else if (wordcmp(base, "warn_applied_functions", namelen) == 0)
+        {
+            pragma_warn_applied_functions = true;
+            validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "no_warn_applied_functions", namelen) == 0)
+        {
+            pragma_warn_applied_functions = false;
+            validPragma = MY_TRUE;
+        }
         else if (wordcmp(base, "warn_deprecated", namelen) == 0)
         {
             pragma_warn_deprecated = MY_TRUE;
@@ -6297,6 +6311,7 @@ start_new_file (int fd, const char * fname)
     lex_fatal = MY_FALSE;
 
     pragma_check_overloads = MY_TRUE;
+    pragma_warn_applied_functions = false;
     pragma_strict_types = PRAGMA_WEAK_TYPES;
     instrs[F_CALL_OTHER].ret_type = lpctype_mixed;
     instrs[F_CALL_DIRECT].ret_type = lpctype_mixed;

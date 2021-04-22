@@ -1,0 +1,135 @@
+/*---------------------------------------------------------------------------
+ * Specification of applied lfuns.
+ *---------------------------------------------------------------------------
+ */
+
+/*
+ * This file specifies the argument and return types for applied lfuns.
+ * These are checked when compiling programs.
+ *
+ * The file contains three sections. The first one is for lfuns of the master
+ * object, the second are named lfuns for regular objects, and the third section
+ * is about lfuns that are called via a driver hook.
+ *
+ * The syntax is similar to func_spec. Each entry contains the return type,
+ * name of the function or hook and argument types in parenthesis.
+ * Additionally the can contain visibility flags (private, protected, static,
+ * visible). The default flags are:
+ *  - for master applied lfuns: protected
+ *  - for regular object lfuns: visible
+ *  - for driver hooks:         visible
+ *
+ * Any new type combination must be entered into make_func.y
+ * (either applied_rettype or applied_arg token, and lpctypestr()),
+ * so it can correctly mapped to a static lpctype object.
+ */
+
+/*---------------------------------------------------------------------------
+ * Applied lfuns of the master object.
+ */
+
+%master
+
+object compile_object(string);
+object connect();
+void dangling_lfun_closure();
+void disconnect(object, string);
+string *epilog(int);
+void external_master_reload();
+void flag(string);
+string get_bb_uid();
+string get_ed_buffer_save_file_name(string);
+string get_master_uid();
+string|string* get_simul_efun();
+string get_wiz_name(string);
+int handle_external_signal(int);
+mixed heart_beat_error(object, string, string, string, int, int);
+void inaugurate_master(int);
+mixed include_file(string, string, int);
+mixed inherit_file(string, string);
+void log_error(string, string, int, int);
+void low_memory(int, int, int, int);
+string make_path_absolute(string);
+varargs void notify_shutdown(string);
+
+#ifdef USE_PARSE_COMMAND
+string* parse_command_adjectiv_id_list();
+string  parse_command_all_word();
+string* parse_command_id_list();
+string* parse_command_plural_id_list();
+string* parse_command_prepos_list();
+#endif
+
+void preload(string);
+mixed prepare_destruct(object);
+string printf_obj_name(object);
+int privilege_violation(string, mixed, mixed, mixed, mixed);
+int query_allow_shadow(object);
+void quota_demon();
+void reactivate_destructed_master(int);
+void receive_udp(string, bytes, int);
+void remove_player(object);
+int retrieve_ed_setup(object);
+void runtime_error(string, string, string, int, mixed, int);
+void runtime_warning(string, string, string, int, int);
+int save_ed_setup(object, int);
+void slow_shut_down(int);
+void stale_erq(closure);
+int valid_exec(string, object, object);
+int valid_query_snoop(object);
+string valid_read(string, string, string, object|lwobject);
+int valid_snoop(object, object);
+int valid_trace(string, int|string);
+string valid_write(string, string, string, object|lwobject);
+
+
+/*---------------------------------------------------------------------------
+ * Applied lfuns of regular objects.
+ *
+ * TODO: Make the names configurable via driver hooks.
+ */
+
+%regular
+
+void catch_msg(struct|mapping|object|lwobject|mixed*, object);
+void catch_tell(string);
+private void heart_beat();
+int id(string);
+static varargs int logon(int);
+
+#ifdef USE_PARSE_COMMAND
+string *parse_command_adjectiv_id_list();
+string *parse_command_id_list();
+string *parse_command_plural_id_list();
+#endif
+
+#ifdef USE_DEPRECATED
+int add_weight(int);
+int can_put_and_get();
+varargs int drop(int);
+int get();
+int prevent_insert();
+int query_weight();
+#endif
+
+
+/*---------------------------------------------------------------------------
+ * Applied lfuns of regular objects via driver hooks.
+ */
+
+%hooks
+
+static void|int H_CLEAN_UP(int);
+protected int H_COMMAND(string, object);
+protected void H_CREATE_CLONE(...);
+protected void H_CREATE_LWOBJECT(...);
+protected varargs void H_CREATE_OB();
+protected varargs void H_CREATE_SUPER();
+protected int H_DEFAULT_METHOD(mixed, string, ...);
+static int|string H_MODIFY_COMMAND(string);
+static int|string H_MODIFY_COMMAND_FNAME(string);
+void H_NOECHO(int, object, int);
+void H_PRINT_PROMPT(string);
+protected void H_RESET();
+protected void H_SEND_NOTIFY_FAIL(string, object, object);
+void|mixed H_TELNET_NEG(int, int, int*);
