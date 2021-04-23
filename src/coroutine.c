@@ -149,7 +149,8 @@ create_coroutine (svalue_t *closure)
     else
         result->closure = NULL;
     result->funstart = csp->funstart;
-    result->pc = inter_pc;
+    result->num_variable_names = *(unsigned char*)inter_pc;
+    result->pc = inter_pc + 1 + 2*result->num_variable_names;
     result->function_index_offset = function_index_offset;
     result->variable_index_offset = variable_index_offset;
     reference_prog(result->prog, "create_coroutine");
@@ -253,7 +254,8 @@ suspend_coroutine (coroutine_t *cr, svalue_t *fp)
 #ifdef DEBUG
     cr->num_hidden_variables = csp->num_local_variables - cr->num_variables;
 #endif
-    cr->pc = inter_pc;
+    cr->num_variable_names = *(unsigned char*)inter_pc;
+    cr->pc = inter_pc + 1 + 2*cr->num_variable_names;
     cr->state = CS_SLEEPING;
 
     return true;

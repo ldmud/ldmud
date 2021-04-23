@@ -57,6 +57,12 @@ enum coroutine_state
  * drops to zero, it will not be deallocated if it's in a list with
  * other coroutines that have a non-zero reference count. The list fields
  * (.awaiter and .awaitee) are therefore also not counted references.
+ *
+ * If pragma save_local_names is active, the compiler will store the names
+ * of local variables at each suspension point. The number of those is
+ * saved in .num_variable_names. So to get these names, you'll have to
+ * look at .pc - 2*.num_variable_names to read the indices (short) into
+ * the program's strings.
  */
 struct coroutine_s
 {
@@ -74,6 +80,7 @@ struct coroutine_s
     int variable_index_offset;      /* Same for variables.            */
     int num_variables;              /* Number of local variables.     */
     int num_values;                 /* Number of extra values.        */
+    int num_variable_names;         /* Number of variable names.      */
 #ifdef DEBUG
     int num_hidden_variables;       /* Number of hidden temporary
                                      * variables (eg. in a foreach.

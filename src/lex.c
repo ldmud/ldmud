@@ -180,6 +180,10 @@ Bool pragma_save_types;
   /* True: save argument types after compilation.
    */
 
+bool pragma_save_local_names;
+  /* True: save local variable names in coroutines.
+   */
+
 bool pragma_no_clone;
   /* True: prevent the object from being clone.
    */
@@ -3925,6 +3929,16 @@ handle_pragma (char *str)
             pragma_save_types = MY_TRUE;
             validPragma = MY_TRUE;
         }
+        else if (wordcmp(base, "save_local_names", namelen) == 0)
+        {
+            pragma_save_local_names = true;
+            validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "no_save_local_names", namelen) == 0)
+        {
+            pragma_save_local_names = false;
+            validPragma = MY_TRUE;
+        }
         // the following two pragmas are ignored.
         else if (wordcmp(base, "combine_strings", namelen) == 0)
         {
@@ -6337,6 +6351,7 @@ start_new_file (int fd, const char * fname)
     instrs[F_CALL_STRICT].ret_type = lpctype_mixed;
     instrs[F_CALL_DIRECT_STRICT].ret_type = lpctype_mixed;
     pragma_save_types = MY_FALSE;
+    pragma_save_local_names = false;
     pragma_no_clone = false;
     pragma_no_clone_set = false;
     pragma_no_lightweight = true;

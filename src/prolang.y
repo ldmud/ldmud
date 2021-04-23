@@ -4459,6 +4459,53 @@ check_identifier (ident_t *name)
     }
 } /* check_identifier() */
 
+/*-------------------------------------------------------------------------*/
+static void
+ins_local_names ()
+
+/* Insert the number of local variables into the bytecode when pragma
+ * save_local_names is active.
+ */
+
+{
+    if (pragma_save_local_names)
+    {
+        bytecode_t *p;
+        ident_t *var;
+
+        /* We store the name in the program and put their indices here.
+         */
+        if (!realloc_a_program(1 + 2*current_number_of_locals))
+        {
+            yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
+                    , CURRENT_PROGRAM_SIZE + 1 + 2*current_number_of_locals);
+            return;
+        }
+        PROGRAM_BLOCK[CURRENT_PROGRAM_SIZE++] = current_number_of_locals;
+
+        /* The variables are in reverse order in the all_locals. */
+        CURRENT_PROGRAM_SIZE += 2*current_number_of_locals;
+        p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE;
+        var = all_locals;
+        for (int i = 0; i < max_number_of_locals; i++)
+        {
+            if (!var) /* This shouldn't happen. */
+            {
+                yyerrorf("Missing variable information");
+                break;
+            }
+
+            p -= 2;
+            put_short(p, store_prog_string(ref_mstring(var->name)));
+            var = var->next_all;
+        }
+    }
+    else
+    {
+        /* Just add a zero (no local variables). */
+        ins_byte(0);
+    }
+}
 
 /* ======================   GLOBALS and FUNCTIONS   ====================== */
 
@@ -8247,6 +8294,7 @@ function_body:
           if (def_function_coroutine)
           {
               ins_f_code(F_TRANSFORM_TO_COROUTINE);
+              ins_local_names();
               /* The first call_coroutine() value will be ignored. */
               ins_f_code(F_POP_VALUE);
           }
@@ -8412,6 +8460,7 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
           if ($1)
           {
               ins_f_code(F_TRANSFORM_TO_COROUTINE);
+              ins_local_names();
               ins_f_code(F_POP_VALUE);
           }
       }
@@ -15770,6 +15819,7 @@ coroutine_call:
           free_fulltype($4.type);
 
           ins_f_code(F_AWAIT);
+          ins_local_names();
       }
     | L_YIELD '(' expr0 ',' expr0 ')'
       {
@@ -15790,6 +15840,7 @@ coroutine_call:
           free_fulltype($5.type);
 
           ins_f_code(F_YIELD_TO_COROUTINE);
+          ins_local_names();
       }
     | L_YIELD '(' expr0 ')'
       {
@@ -15804,6 +15855,7 @@ coroutine_call:
           free_fulltype($3.type);
 
           ins_f_code(F_YIELD_RETURN);
+          ins_local_names();
       }
     | L_YIELD '(' ')'
       {
@@ -15814,6 +15866,7 @@ coroutine_call:
 
           ins_f_code(F_CONST0);
           ins_f_code(F_YIELD_RETURN);
+          ins_local_names();
       }
 ; /* coroutine_call */
 

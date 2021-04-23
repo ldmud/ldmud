@@ -933,6 +933,88 @@ remove_gc_object (ldmud_gc_var_t** list, ldmud_gc_var_t* var)
 } /* remove_gc_object() */
 
 /*-------------------------------------------------------------------------*/
+/* Helper functions for all types */
+
+static PyObject *
+get_class_dir (PyObject* self)
+
+/* Return a set as a starting point for __dir__ implementations.
+ */
+
+{
+    PyObject *dict, *cls;
+    PyObject *attrs = NULL;
+
+    /* Get the __dir__ for the class. */
+    cls = PyObject_GetAttrString((PyObject*)self, "__class__");
+    if (cls != NULL)
+    {
+        dict = PyObject_Dir(cls);
+        Py_DECREF(cls);
+    }
+    else
+        dict = NULL;
+    if (dict == NULL)
+        PyErr_Clear();
+    else
+    {
+        attrs = PySet_New(dict);
+        if (attrs == NULL)
+            PyErr_Clear();
+        Py_DECREF(dict);
+    }
+
+    if (attrs == NULL)
+    {
+        attrs = PySet_New(NULL);
+        if (attrs == NULL)
+            return NULL;
+    }
+
+    return attrs;
+}
+
+/*-------------------------------------------------------------------------*/
+static string_t *
+find_tabled_python_string (PyObject* name, const char *msg, bool *error)
+
+/* Search a tabled string that matches the given Python string.
+ * Returns NULL on error (error = true) or when not found (error = false).
+ * <msg> denotes the kind of name for error messages.
+ */
+
+{
+    PyObject *utf8;
+    char* namebuf;
+    ssize_t namelength;
+    string_t* result;
+
+    if (!PyUnicode_Check(name))
+    {
+        PyErr_Format(PyExc_TypeError,
+                     "%s must be string, not '%.200s'",
+                     msg, name->ob_type->tp_name);
+        *error = true;
+        return NULL;
+    }
+
+    utf8 = PyUnicode_AsEncodedString(name, "utf-8", "replace");
+    if (utf8 == NULL)
+    {
+        PyErr_Format(PyExc_ValueError, "undecodable %s", msg);
+        *error = true;
+        return NULL;
+    }
+
+    PyBytes_AsStringAndSize(utf8, &namebuf, &namelength);
+    result = find_tabled_str_n(namebuf, namelength, STRING_UTF8);
+    Py_DECREF(utf8);
+
+    *error = false;
+    return result;
+} /* find_tabled_python_string() */
+
+/*-------------------------------------------------------------------------*/
 /* Programs (Regular and Lightweight Objects) */
 
 /*-------------------------------------------------------------------------*/
@@ -1717,9 +1799,8 @@ ldmud_program_functions_getattro (ldmud_program_t *val, PyObject *name)
  */
 
 {
-    PyObject *result, *utf8;
-    char* namebuf;
-    ssize_t namelength;
+    PyObject *result;
+    bool error;
     string_t* funname;
 
     /* First check real attributes... */
@@ -1733,31 +1814,12 @@ ldmud_program_functions_getattro (ldmud_program_t *val, PyObject *name)
     PyErr_Clear();
 
     /* And now search for a function. */
-    if (!PyUnicode_Check(name))
-    {
-        PyErr_Format(PyExc_TypeError,
-                     "attribute name must be string, not '%.200s'",
-                     name->ob_type->tp_name);
+    funname = find_tabled_python_string(name, "function name", &error);
+    if (error)
         return NULL;
-    }
-
-    utf8 = PyUnicode_AsEncodedString(name, "utf-8", "replace");
-    if (utf8 == NULL)
-    {
-        PyErr_SetString(PyExc_ValueError, "undecodable function name");
-        return NULL;
-    }
-
-    PyBytes_AsStringAndSize(utf8, &namebuf, &namelength);
 
     if (!ldmud_program_check_available(val))
-    {
-        Py_DECREF(utf8);
         return NULL;
-    }
-
-    funname = find_tabled_str_n(namebuf, namelength, STRING_UTF8);
-    Py_DECREF(utf8);
 
     if (funname)
     {
@@ -1797,34 +1859,11 @@ ldmud_program_functions_dir (ldmud_program_t *self)
  */
 
 {
-    PyObject *dict, *cls, *result;
-    PyObject *attrs = NULL;
-
-    /* First add the regular dictionaries. */
-    cls = PyObject_GetAttrString((PyObject*)self, "__class__");
-    if (cls != NULL)
-    {
-        dict = PyObject_Dir(cls);
-        Py_DECREF(cls);
-    }
-    else
-        dict = NULL;
-    if (dict == NULL)
-        PyErr_Clear();
-    else
-    {
-        attrs = PySet_New(dict);
-        if (attrs == NULL)
-            PyErr_Clear();
-        Py_DECREF(dict);
-    }
+    PyObject *result;
+    PyObject *attrs = get_class_dir((PyObject*)self);
 
     if (attrs == NULL)
-    {
-        attrs = PySet_New(NULL);
-        if (attrs == NULL)
-            return NULL;
-    }
+        return NULL;
 
     /* Now add all the functions. */
     if (self->lpc_program)
@@ -2280,9 +2319,8 @@ ldmud_program_variables_getattro (ldmud_program_t *val, PyObject *name)
  */
 
 {
-    PyObject *result, *utf8;
-    char* namebuf;
-    ssize_t namelength;
+    PyObject *result;
+    bool error;
     string_t* varname;
 
     /* First check real attributes... */
@@ -2296,31 +2334,12 @@ ldmud_program_variables_getattro (ldmud_program_t *val, PyObject *name)
     PyErr_Clear();
 
     /* And now search for a function. */
-    if (!PyUnicode_Check(name))
-    {
-        PyErr_Format(PyExc_TypeError,
-                     "attribute name must be string, not '%.200s'",
-                     name->ob_type->tp_name);
+    varname = find_tabled_python_string(name, "variable name", &error);
+    if (error)
         return NULL;
-    }
-
-    utf8 = PyUnicode_AsEncodedString(name, "utf-8", "replace");
-    if (utf8 == NULL)
-    {
-        PyErr_SetString(PyExc_ValueError, "undecodable variable name");
-        return NULL;
-    }
-
-    PyBytes_AsStringAndSize(utf8, &namebuf, &namelength);
 
     if (!ldmud_program_check_available(val))
-    {
-        Py_DECREF(utf8);
         return NULL;
-    }
-
-    varname = find_tabled_str_n(namebuf, namelength, STRING_UTF8);
-    Py_DECREF(utf8);
 
     if (varname)
     {
@@ -2362,34 +2381,11 @@ ldmud_program_variables_dir (ldmud_program_t *self)
  */
 
 {
-    PyObject *dict, *cls, *result;
-    PyObject *attrs = NULL;
-
-    /* First add the regular dictionaries. */
-    cls = PyObject_GetAttrString((PyObject*)self, "__class__");
-    if (cls != NULL)
-    {
-        dict = PyObject_Dir(cls);
-        Py_DECREF(cls);
-    }
-    else
-        dict = NULL;
-    if (dict == NULL)
-        PyErr_Clear();
-    else
-    {
-        attrs = PySet_New(dict);
-        if (attrs == NULL)
-            PyErr_Clear();
-        Py_DECREF(dict);
-    }
+    PyObject *result;
+    PyObject *attrs = get_class_dir((PyObject*)self);
 
     if (attrs == NULL)
-    {
-        attrs = PySet_New(NULL);
-        if (attrs == NULL)
-            return NULL;
-    }
+        return NULL;
 
     /* Now add all the variables. */
     if (self->lpc_program)
@@ -5236,9 +5232,8 @@ ldmud_struct_members_getattro (ldmud_struct_t *self, PyObject *name)
  */
 
 {
-    PyObject *result, *utf8;
-    char* namebuf;
-    ssize_t namelength;
+    PyObject *result;
+    bool error;
     string_t* member_name;
     int idx;
 
@@ -5253,24 +5248,9 @@ ldmud_struct_members_getattro (ldmud_struct_t *self, PyObject *name)
     PyErr_Clear();
 
     /* And now search for a member. */
-    if (!PyUnicode_Check(name))
-    {
-        PyErr_Format(PyExc_TypeError,
-                     "attribute name must be string, not '%.200s'",
-                     name->ob_type->tp_name);
+    member_name = find_tabled_python_string(name, "member name", &error);
+    if (error)
         return NULL;
-    }
-
-    utf8 = PyUnicode_AsEncodedString(name, "utf-8", "replace");
-    if (utf8 == NULL)
-    {
-        PyErr_SetString(PyExc_ValueError, "undecodable member name");
-        return NULL;
-    }
-
-    PyBytes_AsStringAndSize(utf8, &namebuf, &namelength);
-    member_name = find_tabled_str_n(namebuf, namelength, STRING_UTF8);
-    Py_DECREF(utf8);
 
     idx = member_name ? struct_find_member(self->lpc_struct->type, member_name) : -1;
     if (idx < 0)
@@ -5301,34 +5281,11 @@ ldmud_struct_members_dir (ldmud_struct_t *self)
  */
 
 {
-    PyObject *dict, *cls, *result;
-    PyObject *attrs = NULL;
-
-    /* First add the regular dictionaries. */
-    cls = PyObject_GetAttrString((PyObject*)self, "__class__");
-    if (cls != NULL)
-    {
-        dict = PyObject_Dir(cls);
-        Py_DECREF(cls);
-    }
-    else
-        dict = NULL;
-    if (dict == NULL)
-        PyErr_Clear();
-    else
-    {
-        attrs = PySet_New(dict);
-        if (attrs == NULL)
-            PyErr_Clear();
-        Py_DECREF(dict);
-    }
+    PyObject *result;
+    PyObject *attrs = get_class_dir((PyObject*)self);
 
     if (attrs == NULL)
-    {
-        attrs = PySet_New(NULL);
-        if (attrs == NULL)
-            return NULL;
-    }
+        return NULL;
 
     /* Now add all the members. */
     if (self->lpc_struct)
@@ -5635,32 +5592,24 @@ ldmud_struct_init (ldmud_struct_t *self, PyObject *args, PyObject *kwds)
                 }
                 else if (PyUnicode_Check(key))
                 {
-                    PyObject *utf8;
-                    Py_ssize_t member_length;
-                    char * buf;
                     string_t *member_name;
+                    bool error;
 
-                    utf8 = PyUnicode_AsEncodedString(key, "utf-8", "replace");
-                    if (utf8 == NULL)
+                    member_name = find_tabled_python_string(key, "member name", &error);
+                    if (error)
                     {
-                        PyErr_SetString(PyExc_ValueError, "undecodable member name");
                         Py_DECREF(item);
                         break;
                     }
 
-                    PyBytes_AsStringAndSize(utf8, &buf, &member_length);
-                    member_name = find_tabled_str_n(buf, member_length, STRING_UTF8);
                     idx = member_name ? struct_find_member(lpc_struct_type, member_name) : -1;
 
                     if (idx < 0)
                     {
-                        PyErr_Format(PyExc_ValueError, "member '%s' not found", buf);
-                        Py_DECREF(utf8);
+                        PyErr_Format(PyExc_ValueError, "member '%U' not found", key);
                         Py_DECREF(item);
                         break;
                     }
-
-                    Py_DECREF(utf8);
                 }
                 else
                 {
@@ -6339,6 +6288,292 @@ ldmud_coroutine_dealloc (ldmud_coroutine_t* self)
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
+ldmud_coroutine_variables_repr (ldmud_coroutine_t *val)
+
+/* Return a string representation of this coroutine variables.
+ */
+
+{
+    function_t *fun;
+    if (val->lpc_coroutine == NULL)
+        return PyUnicode_FromString("<LPC uninitialized coroutine variables>");
+    if (val->lpc_coroutine->prog == NULL)
+        return PyUnicode_FromString("<LPC destructed coroutine variables>");
+
+    fun = val->lpc_coroutine->prog->function_headers + FUNCTION_HEADER_INDEX(val->lpc_coroutine->funstart);
+
+    switch (val->lpc_coroutine->ob.type)
+    {
+        case T_OBJECT:
+            return PyUnicode_FromFormat("<LPC coroutine variables /%s->%s()>", get_txt(val->lpc_coroutine->ob.u.ob->name), get_txt(fun->name));
+        case T_LWOBJECT:
+            return PyUnicode_FromFormat("<LPC coroutine variables /%s->%s()>", get_txt(val->lpc_coroutine->ob.u.lwob->prog->name), get_txt(fun->name));
+        default:
+            return PyUnicode_FromString("<LPC destructed coroutine variables>");
+    }
+} /* ldmud_coroutine_variables_repr() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_coroutine_variables_getattro (ldmud_coroutine_t *val, PyObject *name)
+
+/* Return the value of a local variable.
+ */
+
+{
+    PyObject *result = PyObject_GenericGetAttr((PyObject *)val, name);
+    if (result || !PyErr_ExceptionMatches(PyExc_AttributeError))
+        return result;
+
+    if (!val->lpc_coroutine || !val->lpc_coroutine->prog
+      || (val->lpc_coroutine->state != CS_SLEEPING && val->lpc_coroutine->state != CS_AWAITING))
+        return NULL;
+    else
+    {
+        string_t* varname;
+        bool error;
+
+        PyErr_Clear();
+
+        /* And now search for the variable. */
+        varname = find_tabled_python_string(name, "variable name", &error);
+        if (error)
+            return NULL;
+
+        if (varname)
+        {
+            int num_names = val->lpc_coroutine->num_variable_names;
+            string_t **strings = val->lpc_coroutine->prog->strings;
+            bytecode_t *p = val->lpc_coroutine->pc - 2*num_names;
+
+            for (int i = 0; i < num_names; i++)
+            {
+                if (varname != strings[get_short(p + 2*i)])
+                    continue;
+
+                return svalue_to_python(val->lpc_coroutine->variables + i);
+            }
+        }
+
+        PyErr_Format(PyExc_AttributeError, "Variable '%U' not found", name);
+        return NULL;
+    }
+} /* ldmud_coroutine_variables_getattro() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_coroutine_variables_setattro (ldmud_coroutine_t *val, PyObject *name, PyObject *value)
+
+/* Set the value of a local variable.
+ */
+
+{
+    int res = PyObject_GenericSetAttr((PyObject*)val, name, value);
+    if (!res || !PyErr_ExceptionMatches(PyExc_AttributeError))
+        return res;
+
+    if (!val->lpc_coroutine || !val->lpc_coroutine->prog
+      || (val->lpc_coroutine->state != CS_SLEEPING && val->lpc_coroutine->state != CS_AWAITING))
+        return -1;
+    else
+    {
+        string_t* varname;
+        bool error;
+
+        PyErr_Clear();
+
+        /* And now search for the variable. */
+        varname = find_tabled_python_string(name, "variable name", &error);
+        if (error)
+            return -1;
+
+        if (varname)
+        {
+            int num_names = val->lpc_coroutine->num_variable_names;
+            string_t **strings = val->lpc_coroutine->prog->strings;
+            bytecode_t *p = val->lpc_coroutine->pc - 2*num_names;
+
+            for (int i = 0; i < num_names; i++)
+            {
+                if (varname != strings[get_short(p + 2*i)])
+                    continue;
+
+                if (value == NULL)
+                    assign_svalue(val->lpc_coroutine->variables + i, &const0);
+                else
+                {
+                    svalue_t sv;
+                    const char* err = python_to_svalue(&sv, value);
+
+                    if (err != NULL)
+                    {
+                        PyErr_SetString(PyExc_ValueError, err);
+                        return -1;
+                    }
+
+                    transfer_svalue(val->lpc_coroutine->variables + i, &sv);
+                }
+                return 0;
+            }
+        }
+
+        PyErr_Format(PyExc_AttributeError, "Variable '%U' not found", name);
+        return -1;
+    }
+
+} /* ldmud_coroutine_variables_setattro() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_variables_dir (ldmud_coroutine_t *val)
+
+/* Return a list of all local variables.
+ */
+
+{
+    PyObject *result;
+    PyObject *attrs = get_class_dir((PyObject*)val);
+
+    if (attrs == NULL)
+        return NULL;
+
+    result = PySequence_List(attrs);
+    Py_DECREF(attrs);
+
+    if (val->lpc_coroutine && val->lpc_coroutine->prog
+      && (val->lpc_coroutine->state == CS_SLEEPING || val->lpc_coroutine->state == CS_AWAITING))
+    {
+        int num_names = val->lpc_coroutine->num_variable_names;
+        string_t **strings = val->lpc_coroutine->prog->strings;
+        bytecode_t *p = val->lpc_coroutine->pc - 2*num_names;
+
+        for (int i = 0; i < num_names; i++)
+        {
+            string_t *var = strings[get_short(p + 2*i)];
+            PyObject *varname = PyUnicode_FromStringAndSize(get_txt(var), mstrsize(var));
+
+            if (varname == NULL)
+            {
+                PyErr_Clear();
+                continue;
+            }
+
+            if (PyList_Append(result, varname) < 0)
+                PyErr_Clear();
+            Py_DECREF(varname);
+        }
+    }
+
+    return result;
+} /* ldmud_coroutine_variables_dir() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_variables_dict (ldmud_coroutine_t *val, void *closure)
+
+/* Returns a list of all variables.
+ */
+
+{
+    PyObject *result, *dict = PyDict_New();
+    if (!dict)
+        return NULL;
+
+    if (val->lpc_coroutine && val->lpc_coroutine->prog
+      && (val->lpc_coroutine->state == CS_SLEEPING || val->lpc_coroutine->state == CS_AWAITING))
+    {
+        int num_names = val->lpc_coroutine->num_variable_names;
+        string_t **strings = val->lpc_coroutine->prog->strings;
+        bytecode_t *p = val->lpc_coroutine->pc - 2*num_names;
+        svalue_t *values = val->lpc_coroutine->variables;
+
+        for (int i = 0; i < num_names; i++)
+        {
+            string_t *var = strings[get_short(p + 2*i)];
+            PyObject *varname = PyUnicode_FromStringAndSize(get_txt(var), mstrsize(var));
+            PyObject *value;
+
+            if (varname == NULL)
+            {
+                PyErr_Clear();
+                continue;
+            }
+
+            value = svalue_to_python(values + i);
+            if (value == NULL)
+            {
+                PyErr_Clear();
+                Py_DECREF(varname);
+                continue;
+            }
+
+            if (PyDict_SetItem(dict, varname, value) < 0)
+                PyErr_Clear();
+            Py_DECREF(varname);
+            Py_DECREF(value);
+        }
+    }
+
+    result = PyDictProxy_New(dict);
+    Py_DECREF(dict);
+    return result;
+} /* ldmud_coroutine_variables_dict() */
+
+/*-------------------------------------------------------------------------*/
+static PyMethodDef ldmud_coroutine_variables_methods[] =
+{
+    {
+        "__dir__",
+        (PyCFunction)ldmud_coroutine_variables_dir, METH_NOARGS,
+        "__dir__() -> List\n\n"
+        "Returns a list of all attributes."
+    },
+
+    {NULL}
+};
+
+static PyGetSetDef ldmud_coroutine_variables_getset[] =
+{
+    {"__dict__", (getter)ldmud_coroutine_variables_dict, NULL, NULL},
+    {NULL}
+};
+
+static PyTypeObject ldmud_coroutine_variables_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.CoroutineVariables",         /* tp_name */
+    sizeof(ldmud_coroutine_t),          /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_coroutine_dealloc,/* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    (reprfunc)ldmud_coroutine_variables_repr, /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    (getattrofunc)ldmud_coroutine_variables_getattro, /* tp_getattro */
+    (setattrofunc)ldmud_coroutine_variables_setattro, /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC coroutine variables",          /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_coroutine_variables_methods,  /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_coroutine_variables_getset,   /* tp_getset */
+};
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
 ldmud_coroutine_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 /* Implmenent __new__ for ldmud_coroutine_t, i.e. allocate and initialize
@@ -6515,6 +6750,92 @@ ldmud_coroutine_get_function_name (ldmud_coroutine_t *val, void *closure)
 } /* ldmud_coroutine_get_function_name() */
 
 /*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_get_file_name (ldmud_coroutine_t *val, void *closure)
+
+/* Return the value for the file_name member.
+ */
+
+{
+    string_t * name;
+    PyObject * result;
+
+    if(!val->lpc_coroutine || !val->lpc_coroutine->prog)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    get_line_number(val->lpc_coroutine->pc, val->lpc_coroutine->prog, &name);
+    if (name == STR_UNDEFINED)
+    {
+        free_mstring(name);
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    result = PyUnicode_FromFormat("/%s", get_txt(name));
+    free_mstring(name);
+    return result;
+} /* ldmud_coroutine_get_file_name() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_get_line_number (ldmud_coroutine_t *val, void *closure)
+
+/* Return the value for the line_number member.
+ */
+
+{
+    string_t * name;
+    int pos;
+
+    if(!val->lpc_coroutine || !val->lpc_coroutine->prog)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    pos = get_line_number(val->lpc_coroutine->pc, val->lpc_coroutine->prog, &name);
+    free_mstring(name);
+
+    if (pos == 0)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    return PyLong_FromLong(pos);
+} /* ldmud_coroutine_get_line_number() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_get_variables (ldmud_coroutine_t *val, void *closure)
+
+/* Return the value for the variables member.
+ */
+
+{
+    ldmud_coroutine_t *result;
+
+    if (!val->lpc_coroutine || !val->lpc_coroutine->prog
+      || (val->lpc_coroutine->state != CS_SLEEPING && val->lpc_coroutine->state != CS_AWAITING))
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    result = (ldmud_coroutine_t*)ldmud_coroutine_variables_type.tp_alloc(&ldmud_coroutine_variables_type, 0);
+    if (result == NULL)
+        return NULL;
+
+    result->lpc_coroutine = ref_coroutine(val->lpc_coroutine);
+    add_gc_object(&gc_coroutine_list, (ldmud_gc_var_t*)result);
+
+    return (PyObject *)result;
+} /* ldmud_coroutine_get_variables() */
+
+/*-------------------------------------------------------------------------*/
 static void
 ldmud_coroutine_call_coroutine (int num_arg, void* data)
 
@@ -6631,6 +6952,9 @@ static PyGetSetDef ldmud_coroutine_getset[] =
     {"object",        (getter)ldmud_coroutine_get_object,        NULL, NULL, NULL},
     {"program_name",  (getter)ldmud_coroutine_get_program_name,  NULL, NULL, NULL},
     {"function_name", (getter)ldmud_coroutine_get_function_name, NULL, NULL, NULL},
+    {"file_name",     (getter)ldmud_coroutine_get_file_name,     NULL, NULL, NULL},
+    {"line_number",   (getter)ldmud_coroutine_get_line_number,   NULL, NULL, NULL},
+    {"variables",     (getter)ldmud_coroutine_get_variables,     NULL, NULL, NULL},
     {NULL}
 };
 
@@ -7206,10 +7530,9 @@ ldmud_lvalue_struct_members_getattro (ldmud_struct_t *self, PyObject *name)
  */
 
 {
-    PyObject *result, *utf8;
-    char* namebuf;
-    ssize_t namelength;
+    PyObject *result;
     string_t* member_name;
+    bool error;
     int idx;
 
     /* First check real attributes... */
@@ -7223,24 +7546,9 @@ ldmud_lvalue_struct_members_getattro (ldmud_struct_t *self, PyObject *name)
     PyErr_Clear();
 
     /* And now search for a member. */
-    if (!PyUnicode_Check(name))
-    {
-        PyErr_Format(PyExc_TypeError,
-                     "attribute name must be string, not '%.200s'",
-                     name->ob_type->tp_name);
+    member_name = find_tabled_python_string(name, "member name", &error);
+    if (error)
         return NULL;
-    }
-
-    utf8 = PyUnicode_AsEncodedString(name, "utf-8", "replace");
-    if (utf8 == NULL)
-    {
-        PyErr_SetString(PyExc_ValueError, "undecodable member name");
-        return NULL;
-    }
-
-    PyBytes_AsStringAndSize(utf8, &namebuf, &namelength);
-    member_name = find_tabled_str_n(namebuf, namelength, STRING_UTF8);
-    Py_DECREF(utf8);
 
     idx = member_name ? struct_find_member(self->lpc_struct->type, member_name) : -1;
     if (idx < 0)
@@ -8676,6 +8984,8 @@ init_ldmud_module ()
     if (PyType_Ready(&ldmud_closure_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_coroutine_type) < 0)
+        return NULL;
+    if (PyType_Ready(&ldmud_coroutine_variables_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_symbol_type) < 0)
         return NULL;

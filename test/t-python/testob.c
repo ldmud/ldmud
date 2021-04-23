@@ -1,4 +1,4 @@
-#pragma save_types, rtt_checks, lightweight, clone
+#pragma save_types, rtt_checks, lightweight, clone, save_local_names
 
 nosave protected int|float testvar = 42;
 
@@ -24,5 +24,6 @@ nomask protected int testfun(<int|float> value, varargs string* args)
 
 async string* testcoroutine(varargs string* args)
 {
-    return args + ({ yield(sizeof(args)) });
+    string local = "X";
+    return args + ({ yield(sizeof(args)), local });
 }

@@ -243,6 +243,7 @@ extern int total_lines;
 extern source_loc_t current_loc;
 extern pragma_cttype_checks_e pragma_strict_types;
 extern Bool pragma_save_types;
+extern bool pragma_save_local_names;
 extern bool pragma_no_clone;
 extern bool pragma_no_lightweight;
 extern Bool pragma_no_inherit;

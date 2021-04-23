@@ -229,6 +229,16 @@ DESCRIPTION
                   function_name
                       The name of the function that defined the coroutine.
 
+                  file_name
+                      The name of the file that contains the definition.
+
+                  line_number
+                      The current line where the coroutine is suspended.
+
+                  variables
+                      Contains all local variables as attributes with
+                      their current value.
+
           - Symbol(name [, quotes])
                 Corresponds to an LPC symbol.
                 On initialization the name of the symbol is required.

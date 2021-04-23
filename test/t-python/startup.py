@@ -527,11 +527,27 @@ class TestCoroutine(unittest.TestCase):
         self.assertEqual(cr.object, self.ob)
         self.assertEqual(cr.program_name, "/testob.c")
         self.assertEqual(cr.function_name, "testcoroutine")
+        self.assertEqual(cr.file_name, "/testob.c")
+        self.assertEqual(cr.line_number, 26)
+        self.assertIn('args', dir(cr.variables))
+        self.assertIn('args', cr.variables.__dict__)
+        self.assertEqual(list(cr.variables.args), [ "A", "B", "C" ])
 
         self.assertTrue(cr)
         self.assertEqual(cr(), 3);
         self.assertTrue(cr)
-        self.assertEqual(list(cr("D")), ["A", "B", "C", "D"])
+        self.assertEqual(cr.file_name, "/testob.c")
+        self.assertEqual(cr.line_number, 28)
+        self.assertIn('args', dir(cr.variables))
+        self.assertIn('args', cr.variables.__dict__)
+        self.assertEqual(list(cr.variables.args), [ "A", "B", "C" ])
+        self.assertIn('local', dir(cr.variables))
+        self.assertIn('local', cr.variables.__dict__)
+        self.assertEqual(cr.variables.local, "X")
+        cr.variables.local = "Y"
+        self.assertEqual(cr.variables.local, "Y")
+
+        self.assertEqual(list(cr("D")), ["A", "B", "C", "D", "Y"])
         self.assertFalse(cr)
 
     def testCRClone(self):
@@ -544,6 +560,11 @@ class TestCoroutine(unittest.TestCase):
         self.assertEqual(cr.object, ob)
         self.assertEqual(cr.program_name, "/testob.c")
         self.assertEqual(cr.function_name, "testcoroutine")
+        self.assertEqual(cr.file_name, "/testob.c")
+        self.assertEqual(cr.line_number, 26)
+        self.assertIn('args', dir(cr.variables))
+        self.assertIn('args', cr.variables.__dict__)
+        self.assertEqual(list(cr.variables.args), [ "A", "B", "C" ])
 
         ldmud.efuns.destruct(ob)
         self.assertFalse(cr)
@@ -561,7 +582,7 @@ class TestCoroutine(unittest.TestCase):
         self.assertTrue(cr)
         self.assertEqual(cr(),3);
         self.assertTrue(cr)
-        self.assertEqual(list(cr("D")), ["A", "B", "C", "D"])
+        self.assertEqual(list(cr("D")), ["A", "B", "C", "D", "X"])
         self.assertFalse(cr)
 
     def testEmpty(self):
