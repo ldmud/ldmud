@@ -271,6 +271,11 @@ dealloc_object ( object_t *ob, const char * file, int line)
               "still has sentences.\n"
              , get_txt(ob->name), ob->ref, ob->flags);
 
+#ifdef USE_PYTHON
+    if (ob->python_dict != NULL)
+        python_free_object(ob);
+#endif
+
     /* If the program is freed, then we can also free the variable
      * declarations.
      */
@@ -421,6 +426,10 @@ static mp_int last_id = 0;
 #ifdef USE_SQLITE
     ob->open_sqlite_db = MY_FALSE;
 #endif
+#ifdef USE_PYTHON
+    ob->python_dict = NULL;
+#endif
+
     ob->variables = ob_vars;
 
     ob->time_cleanup = current_time + time_to_data_cleanup;

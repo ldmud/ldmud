@@ -51,6 +51,12 @@ struct object_s
 #ifdef USE_SQLITE
     Bool open_sqlite_db;   /* does this object have an open sqlite db? */
 #endif 
+#ifdef USE_PYTHON
+    void* python_dict;
+      /* This is a PyObject*, but we don't wand to include the
+       * Python headers here.
+       */
+#endif
     svalue_t *variables;
       /* All variables to this object: an array of svalues, allocated
        * in a separate block.

@@ -160,6 +160,13 @@ void run_test()
                 return sizeof(oblist) == 1 && oblist[0] == this_object();
             :)
         }),
+        ({ "Python GC", 0,
+            (:
+                /* We just start it and see, that it doesn't crash. */
+                python_gc();
+                return 1;
+            :)
+        }),
         ({ "Python test suite", 0,
             (:
                 msg("\n");

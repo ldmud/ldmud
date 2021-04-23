@@ -2460,6 +2460,75 @@ ldmud_object_hash (ldmud_object_t *val)
 } /* ldmud_object_hash() */
 
 /*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_object_getattro (ldmud_object_t *val, PyObject *name)
+
+/* Return an attribute of our object.
+ */
+
+{
+    /* First look at our dictionary. */
+    if (val->lpc_object && val->lpc_object->python_dict)
+    {
+        PyObject *res = PyDict_GetItem((PyObject*) val->lpc_object->python_dict, name);
+        if (res != NULL)
+        {
+            Py_INCREF(res);
+            return res;
+        }
+    }
+
+    /* Forward to the generic function. */
+    return PyObject_GenericGetAttr((PyObject*)val, name);
+
+} /* ldmud_object_getattro() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_object_setattro (ldmud_object_t *val, PyObject *name, PyObject *value)
+
+/* Set an attribute of our object.
+ */
+
+{
+    /* First forward to the generic function. */
+    int res = PyObject_GenericSetAttr((PyObject*)val, name, value);
+
+    /* If unsuccessful, work an our dictionary. */
+    if (res && PyErr_ExceptionMatches(PyExc_AttributeError) && val->lpc_object)
+    {
+        PyObject *extype, *exvalue, *extraceback;
+        PyErr_Fetch(&extype, &exvalue, &extraceback);
+
+        if (value == NULL)
+        {
+            if (val->lpc_object->python_dict)
+                res = PyDict_DelItem((PyObject*)val->lpc_object->python_dict, name);
+        }
+        else
+        {
+            if (!val->lpc_object->python_dict)
+                val->lpc_object->python_dict = PyDict_New();
+            res = PyDict_SetItem((PyObject*)val->lpc_object->python_dict, name, value);
+        }
+
+        if (res)
+        {
+            PyErr_Restore(extype, exvalue, extraceback);
+        }
+        else
+        {
+            Py_XDECREF(extype);
+            Py_XDECREF(exvalue);
+            Py_XDECREF(extraceback);
+        }
+    }
+
+    return res;
+
+} /* ldmud_object_setattro() */
+
+/*-------------------------------------------------------------------------*/
 static bool ldmud_object_check(PyObject *ob);
 
 static PyObject*
@@ -2611,8 +2680,8 @@ static PyTypeObject ldmud_object_type =
     (hashfunc)ldmud_object_hash,        /* tp_hash  */
     0,                                  /* tp_call */
     0,                                  /* tp_str */
-    0,                                  /* tp_getattro */
-    0,                                  /* tp_setattro */
+    (getattrofunc)ldmud_object_getattro,/* tp_getattro */
+    (setattrofunc)ldmud_object_setattro,/* tp_setattro */
     0,                                  /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,                 /* tp_flags */
     "LPC object",                       /* tp_doc */
@@ -7389,6 +7458,56 @@ create_efun_namespace ()
 /*-------------------------------------------------------------------------*/
 /* Module definition for the ldmud builtin module */
 
+static int
+ldmud_traverse (PyObject *self, visitproc visit, void *arg)
+
+/* Garbage collection support for Python.
+ * We visit our global variables here.
+ */
+{
+    for (int i = 0; i < PYTHON_EFUN_TABLE_SIZE; i++)
+        Py_VISIT(python_efun_table[i].callable);
+    for (python_poll_fds_t *cur = poll_fds; cur != NULL; cur = cur->next)
+    {
+        Py_VISIT(cur->eventsfun);
+        Py_VISIT(cur->fun);
+    }
+    for (int i = 0; i < PYTHON_HOOK_COUNT; i++)
+        for (python_hook_t* cur = python_hooks[i]; cur != NULL; cur = cur->next)
+            Py_VISIT(cur->fun);
+#ifdef USE_PYTHON_CONTEXT
+    Py_VISIT(python_contextvar_current_object);
+    Py_VISIT(python_contextvar_command_giver);
+#endif
+
+    return 0;
+} /* ldmud_traverse() */
+
+static int
+ldmud_clear (PyObject *self)
+
+/* Garbage collection support for Python.
+ * We clear our global variables here.
+ */
+{
+    for (int i = 0; i < PYTHON_EFUN_TABLE_SIZE; i++)
+        Py_CLEAR(python_efun_table[i].callable);
+    for (python_poll_fds_t *cur = poll_fds; cur != NULL; cur = cur->next)
+    {
+        Py_CLEAR(cur->eventsfun);
+        Py_CLEAR(cur->fun);
+    }
+    for (int i = 0; i < PYTHON_HOOK_COUNT; i++)
+        for (python_hook_t* cur = python_hooks[i]; cur != NULL; cur = cur->next)
+            Py_CLEAR(cur->fun);
+#ifdef USE_PYTHON_CONTEXT
+    Py_CLEAR(python_contextvar_current_object);
+    Py_CLEAR(python_contextvar_command_giver);
+#endif
+
+    return 0;
+} /* ldmud_clear() */
+
 static PyObject*
 ldmud_get_master (PyObject* self, PyObject* args UNUSED)
 
@@ -7493,10 +7612,16 @@ static PyMethodDef ldmud_methods[] =
 
 static PyModuleDef ldmud_module =
 {
-    PyModuleDef_HEAD_INIT, "ldmud",
+    PyModuleDef_HEAD_INIT,
+    "ldmud",                            /* m_name */
     "This module provides access to the LDMud interpreter.",
-    -1, ldmud_methods,
-    NULL, NULL, NULL, NULL
+                                        /* m_doc */
+    -1,                                 /* m_size */
+    ldmud_methods,                      /* m_methods */
+    NULL,                               /* m_slots */
+    ldmud_traverse,                     /* m_traverse */
+    ldmud_clear,                        /* m_clear */
+    NULL                                /* m_free */
 };
 
 static PyObject*
@@ -8952,6 +9077,18 @@ closure_python_efun_to_string (int type)
 {
     return get_txt(python_efun_table[type - CLOSURE_PYTHON_EFUN].name->name);
 } /* closure_python_efun_to_string() */
+
+/*-------------------------------------------------------------------------*/
+void
+python_free_object (object_t *ob)
+
+/* Free the dictionary from <ob>.
+ */
+
+{
+    if (ob->python_dict != NULL)
+        Py_DECREF((PyObject*) ob->python_dict);
+} /* python_free_object() */
 
 /*-------------------------------------------------------------------------*/
 void

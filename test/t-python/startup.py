@@ -1,4 +1,4 @@
-import sys,unittest
+import sys,unittest,gc
 import ldmud
 
 class TestModule(unittest.TestCase):
@@ -87,6 +87,16 @@ class TestObject(unittest.TestCase):
         ldmud.efuns.destruct(ob)
         self.assertFalse(lfun)
         self.assertFalse(var)
+
+    def testDict(self):
+        ob = ldmud.Object("/testob")
+        ob.testvalue = "42"
+        ob = None
+
+        ob = ldmud.Object("/testob")
+        self.assertEqual(ob.testvalue, "42")
+        with self.assertRaises(AttributeError):
+            ob.doesntExist
 
 class TestArray(unittest.TestCase):
     def testInitEmpty(self):
@@ -560,6 +570,10 @@ def python_error():
     """Make an exception."""
     raise Exception("Testing")
 
+def python_gc():
+    """Do a Python garbage collection."""
+    gc.collect()
+
 def python_typecheck(arg: str, arg2: str, *args: int):
     return arg
 
@@ -587,6 +601,7 @@ ldmud.register_efun("python_return", python_return)
 ldmud.register_efun("python_get", python_get)
 ldmud.register_efun("python_set", python_set)
 ldmud.register_efun("python_error", python_error)
+ldmud.register_efun("python_gc", python_gc)
 ldmud.register_efun("python_typecheck", python_typecheck)
 ldmud.register_efun("python_remember_testob", python_remember_testob)
 ldmud.register_efun("python_check_testob", python_check_testob)
