@@ -1,10 +1,12 @@
 #include "/inc/base.inc"
 #include "/inc/testarray.inc"
+#include "/inc/gc.inc"
 
 #include "/sys/rtlimits.h"
 
 mapping counter = ([:1]);
 int testnum;
+string teststr = "a_disappearing_function";
 
 object compile_object(string filename)
 {
@@ -175,7 +177,32 @@ void run_test()
         }
     }
 
-    shutdown(errors && 1);
+    /* Check that the string is still valid. */
+    if (!errors &&
+        (teststr[0..1] != "a_" || teststr[2..] != "disappearing_function"))
+    {
+        msg("Checking function name string '%Q': FAILED\n", teststr);
+        errors = 1;
+    }
+
+    foreach(string ob: ({"a","b","b2","c","c2","d"}))
+        destruct(find_object(ob));
+    for(int i=1; i <= 13; i++)
+        destruct(find_object(sprintf("d%02d", i)));
+
+    if (errors)
+        shutdown(1);
+    else
+        start_gc(function void(int err)
+        {
+            /* Check the string again. */
+            if (teststr[0..1] != "a_" || teststr[2..] != "disappearing_function")
+            {
+                msg("Checking function name string '%Q': FAILED\n", teststr);
+                err = 1;
+            }
+            shutdown(err);
+        });
     return 0;
 }
 

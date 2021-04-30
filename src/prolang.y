@@ -16881,7 +16881,14 @@ update_duplicate_functions (program_t* from, int first_function_index, inherit_t
             /* No destination but visible, make it undefined. */
             if (!(oldfunp[oldix].flags & NAME_HIDDEN)
              && is_old_inherited_function(from, first_function_index, dupinheritp, oldix, update_existing))
+            {
                 oldfunp[oldix].flags = NAME_UNDEFINED|NAME_HIDDEN|TYPE_MOD_PRIVATE;
+                /* The function will then be part of our program (as undefined),
+                 * so we need a reference to its name.
+                 */
+                if (oldfunp[oldix].name)
+                    ref_mstring(oldfunp[oldix].name);
+            }
 
             continue;
         }
@@ -17248,7 +17255,14 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
                 continue;
 
             if (is_old_inherited_function(from, first_function_index, oldinheritp, *oldix, update_existing))
+            {
                 oldfunp[*oldix].flags = NAME_UNDEFINED|NAME_HIDDEN|TYPE_MOD_PRIVATE;
+                /* The function will now be part of our program (as undefined),
+                 * so we need a reference to its name.
+                 */
+                if (oldfunp[*oldix].name)
+                    ref_mstring(oldfunp[*oldix].name);
+            }
         }
 
         /* Now we have to take care of the remaining functions with names
@@ -18028,16 +18042,25 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
 
                         if ( !(OldFunction->flags & NAME_INHERITED) )
                         {
-                            /* Since inherits are not possible after
-                             * functions have been compiled, the only
-                             * way to get here is when we had a prototype
-                             * for the function.
-                             * It's not fatal, but annoying.
+                            /* Since inherits are not possible after functions
+                             * have been compiled, there are two options:
+                             * 1. We had a prototype for the function.
+                             * 2. Virtual inherit update made an inherited
+                             *    function undefined.
+                             * In both cases we'll cross-define to the new
+                             * function.
                              */
-                            yywarnf(
-                                "Misplaced prototype for %s in %s ignored.\n"
-                                , get_txt(fun.name), current_loc.file->name
-                            );
+                            if (OldFunction->flags & NAME_PROTOTYPE)
+                                yywarnf(
+                                    "Misplaced prototype for %s in %s ignored.\n"
+                                    , get_txt(fun.name), current_loc.file->name
+                                );
+
+                            /* The function name was a counted reference,
+                             * but after cross-definition it shouldn't be.
+                             */
+                            free_mstring(OldFunction->name);
+
                             cross_define( &fun, OldFunction
                                         , current_func_index - n );
                             p->u.global.function = current_func_index;

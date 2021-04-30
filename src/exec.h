@@ -739,7 +739,14 @@ struct function_s
 {
     string_t *name;
        /* Name of function (shared string).
-        * The reference is counted.
+        * The reference is counted in the following instances:
+        *  - During compilation for functions defined in the
+        *    program (not inherited),
+        *  - As part of a program's .function_headers,
+        *  - In simul_efun management.
+        * It is not counted:
+        *  - During compilation for inherited functions.
+        *    (flags & NAME_INHERITED)
         */
 
     union {
