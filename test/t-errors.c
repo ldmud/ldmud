@@ -1,3 +1,5 @@
+#define OWN_PRIVILEGE_VIOLATION
+
 #include "/inc/base.inc"
 #include "/inc/testarray.inc"
 #include "/inc/gc.inc"
@@ -137,6 +139,11 @@ mixed *tests = ({
           return 1;
       :)
    }),
+   ({ "Crash in reentrant SQLite calls.", TF_ERROR,
+      (:
+          unpriv.sl_check1();
+      :)
+   }),
 });
 
 void run_test()
@@ -161,4 +168,27 @@ string *epilog(int eflag)
 {
     run_test();
     return 0;
+}
+
+int privilege_violation(string op, mixed who, mixed arg, mixed arg2)
+{
+    switch (op)
+    {
+        case "sqlite_pragma":
+            who.sl_check2();
+            return 0;
+    }
+    return 1;
+}
+
+void sl_check1()
+{
+    sl_open(__FILE__ + ".db");
+    sl_exec("PRAGMA user_version");
+}
+
+void sl_check2()
+{
+    /* Shouldn't crash or report Valgrind errors. */
+    sl_close();
 }

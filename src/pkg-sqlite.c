@@ -54,18 +54,22 @@ struct sl_exec_cleanup_s
 
     sqlite3_stmt *stmt;
     sqlite_rows_t *rows;
+    sqlite_dbs_t *db;
 };
 
 /* Database connections should be bound to the object which opens 
  * database file. We will store all database connections in a 
- * linked list. 
- */ 
+ * linked list. Also we have a busy flag to prevent reentrant
+ * calls during privilege, error or warning handling.
+ */
 struct sqlite_dbs_s 
 {
     sqlite3 * db;
     object_t * obj;
     sqlite_dbs_t * next;
     sqlite_dbs_t * prev;
+
+    bool busy;
 };
 
 /*-------------------------------------------------------------------------*/
@@ -113,6 +117,7 @@ new_db()
     tmp->obj = NULL;
     tmp->next = NULL;
     tmp->prev = head;
+    tmp->busy = false;
     if (head)
         head->next=tmp;
     head=tmp;
@@ -234,7 +239,8 @@ sl_close (object_t *ob)
 
     if (!db)
         return MY_FALSE;
-   
+
+    db->busy = true;
     sqlite3_close(db->db);
     remove_db(db);
     return MY_TRUE;
@@ -318,6 +324,7 @@ sl_exec_cleanup (error_handler_t * arg)
         pfree(temp);
     }
 
+    data->db->busy = false;
     xfree(data);
 } /* sl_exec_cleanup() */
 
@@ -355,7 +362,10 @@ v_sl_exec (svalue_t * sp, int num_arg)
     db = find_db (current_object);
     if (!db)
         errorf("The current object doesn't have a database open.\n");
-    
+    else if (db->busy)
+        errorf("Reentrant call to the same database.\n");
+
+    db->busy = true;
     err = sqlite3_prepare(db->db, get_txt(argp->u.str), mstrsize(argp->u.str),
         &stmt, &tail);
     if(err)
@@ -363,6 +373,7 @@ v_sl_exec (svalue_t * sp, int num_arg)
         const char* msg = sqlite3_errmsg(db->db);
         if(stmt)
             sqlite3_finalize(stmt);
+        db->busy = false;
         errorf("sl_exec: %s\n", msg);
         /* NOTREACHED */
     }
@@ -374,6 +385,7 @@ v_sl_exec (svalue_t * sp, int num_arg)
         {
         default:
             sqlite3_finalize(stmt);
+            db->busy = false;
             errorf("Bad argument %d to sl_exec(): type %s\n",
                 num+1, typename(argp->type));
             break; /* NOTREACHED */
@@ -413,6 +425,7 @@ v_sl_exec (svalue_t * sp, int num_arg)
     }
     rec_data->rows = NULL;
     rec_data->stmt = stmt;
+    rec_data->db = db;
     
     sp = push_error_handler(sl_exec_cleanup, &(rec_data->head));
     
@@ -555,6 +568,8 @@ f_sl_insert_id (svalue_t * sp)
    
     if (!db)
         errorf("The current object doesn't have a database open.\n");
+    else if (db->busy)
+        errorf("Reentrant call to the same database.\n");
  
     id=sqlite3_last_insert_rowid(db->db);
     sp++;
@@ -575,8 +590,14 @@ f_sl_close (svalue_t * sp)
  */
 
 {
-    if (!sl_close(current_object)) 
+    sqlite_dbs_t *db;
+    db = find_db(current_object);
+    if (!db)
         errorf("The current object doesn't have a database open.\n");
+    else if (db->busy)
+        errorf("Reentrant call to the same database.\n");
+
+    sl_close(current_object);
     return sp;
 } /* f_sl_close() */
 
