@@ -617,7 +617,7 @@ mixed *tests = ({
             return 1;
         :)
     }),
-    ({ "save_/restore_value", 0,
+    ({ "save_/restore_value 1", 0,
         (:
             mixed qa = '''({ 42 });
 
@@ -694,6 +694,24 @@ mixed *tests = ({
                         restore_value(save_value(([val]), 0));
                     }
                 }
+            }
+
+            return 1;
+        :)
+    }),
+    ({ "save_/restore_value 2", 0,
+        (:
+            /* We just check, that it works without throwing an error. */
+            foreach(mixed val:
+            ({
+                function int() : int x = 1234 { return x; },
+            }))
+            {
+                restore_value(save_value(val));
+                restore_value(save_value(({val})));
+                restore_value(save_value(([val])));
+                restore_value(save_value(([val:1;2])));
+                restore_value(save_value((["a":val;2])));
             }
 
             return 1;

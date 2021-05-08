@@ -7600,7 +7600,7 @@ skip_element (char **str)
 
                 case 'c':    /* context closure */
                     /* Skip the name */
-                    pt = strchr(pt, ':');
+                    pt = strchr(pt+3, ':');
                     /* Skip the number of variables */
                     pt = strchr(pt+1, ':');
                     if (pt[1] != '(' || pt[2] != '{')
