@@ -88,6 +88,14 @@ void run_test()
                     && find_call_out(lwo_callouts[0][1]) >= 0;
             }
         }),
+        ({ "call_out() with non-existent function", 0,
+           function int()
+           {
+              last_rt_warning = 0;
+              new_lwobject("/lwo/tests").start_co();
+              return sizeof(last_rt_warning);
+           }
+        }),
         ({ "UID of lightweight objects", 0,
             function int()
             {

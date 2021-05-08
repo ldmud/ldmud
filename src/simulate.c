@@ -3993,6 +3993,20 @@ setup_function_callback ( callback_t *cb, svalue_t ob, string_t * fun
         cb->function.named.ob = const0;
         cb->function.named.name = NULL;
     }
+    else
+    {
+        /* Check whether the function does exist, */
+        switch (ob.type)
+        {
+            case T_OBJECT:
+                warn_missing_function_ob(ob.u.ob, cb->function.named.name);
+                break;
+
+            case T_LWOBJECT:
+                warn_missing_function_lwob(ob.u.lwob, cb->function.named.name);
+                break;
+        }
+    }
 
     return error_index;
 } /* setup_function_callback() */

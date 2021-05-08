@@ -32,6 +32,11 @@ string string_function(string arg)
     return "Hussa, " + arg + "!";
 }
 
+void start_co()
+{
+    call_out("somewhere", 12);
+}
+
 int run_tests()
 {
     return !run_array_without_callback(({

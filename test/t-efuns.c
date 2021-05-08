@@ -231,6 +231,7 @@ mixed *tests = ({
     ({ "call_direct_resolved array 1",  0, (: int* result; return deep_eq(call_direct_resolved(&result, ({clone,clone,object_name(clone),this_object(),0}), "f", 10, ({ 20 })), ({1, 1, 1, 1, 0})) && deep_eq(result, ({ 11, 11, 11, 11, 0})); :) }),
     ({ "call_direct_resolved array 2",  0, (: int* result; return deep_eq(call_direct_resolved(&result, ({clone,clone,object_name(clone),this_object(),0}), "g", 10, ({ 20 })), ({0, 0, 0, 0, 0})) && deep_eq(result, ({  0,  0,  0,  0, 0})); :) }),
     ({ "call_direct_resolved array 3",  0, (: int* result; return deep_eq(call_direct_resolved(&result, ({clone,clone,object_name(clone),this_object(),0}), "h", 10, ({ 20 })), ({0, 0, 0, 0, 0})) && deep_eq(result, ({  0,  0,  0,  0, 0})); :) }),
+    ({ "call_out", 0, (: last_rt_warning = 0; call_out("ThisFunctionDoesNotExist", 10); return sizeof(last_rt_warning); :) }),
     ({ "crypt", TF_ERROR,  (: crypt("ABC", "$$") :) }),
     ({ "ctime", TF_DONTCHECKERROR,  (: ctime(-1) :) }), /* This must be the first ctime call of this test suite. */
     ({ "clone_object 1", 0,

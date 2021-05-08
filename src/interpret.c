@@ -19167,6 +19167,64 @@ call_lwob_function_args (lwobject_t* lwob, int fx, int num_arg)
 } /* call_lwob_function_args() */
 
 /*-------------------------------------------------------------------------*/
+void
+warn_missing_function_ob (object_t* ob, string_t* fun)
+
+/* Check wether the given function exists and give a warning, if it doesn't.
+ * <fun> is assumed to be a tabled string.
+ */
+
+{
+    object_t *cur = ob;
+
+    /* Start with the topmost shadow. */
+    while (cur->flags & O_SHADOW)
+    {
+        object_t *shadow = O_GET_SHADOW(cur)->shadowed_by;
+        if (shadow)
+            cur = shadow;
+        else
+            break;
+    }
+
+    while (cur)
+    {
+        int fx = find_function(fun, cur->prog);
+        if (fx >= 0 && !(cur->prog->functions[fx] &
+            ((cur == get_current_object() ? 0 : TYPE_MOD_STATIC)|TYPE_MOD_PROTECTED|TYPE_MOD_PRIVATE)))
+            break;
+
+        cur = (cur->flags & O_SHADOW) ? O_GET_SHADOW(cur)->shadowing : NULL;
+    }
+
+    if (!cur)
+    {
+        warnf("Function %.50s() not found in /%s.\n"
+            , get_txt(fun)
+            , get_txt(ob->name));
+    }
+} /* warn_missing_function_ob() */
+
+/*-------------------------------------------------------------------------*/
+void
+warn_missing_function_lwob (lwobject_t* lwob, string_t* fun)
+
+/* Check wether the given function exists and give a warning, if it doesn't.
+ * <fun> is assumed to be a tabled string.
+ */
+
+{
+    int fx = find_function(fun, lwob->prog);
+    if (fx >= 0 && !(lwob->prog->functions[fx] &
+        ((lwob == get_current_lwobject() ? 0 : TYPE_MOD_STATIC)|TYPE_MOD_PROTECTED|TYPE_MOD_PRIVATE)))
+        return;
+
+    warnf("Function %.50s() not found in /%s.\n"
+        , get_txt(fun)
+        , get_txt(lwob->prog->name));
+} /* warn_missing_function_lwob() */
+
+/*-------------------------------------------------------------------------*/
 int
 get_line_number (bytecode_p p, program_t *progp, string_t **namep)
 
