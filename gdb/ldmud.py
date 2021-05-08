@@ -18,7 +18,7 @@ def unwind_ptr(val):
     return (type, val)
 
 def print_ptr(val):
-    return "0x%x" % (val.cast(gdb.lookup_type('int')))
+    return "0x%x" % (val,)
 
 class MStringPrinter:
     "Print an mstring"
