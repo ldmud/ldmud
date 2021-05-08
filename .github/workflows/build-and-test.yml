@@ -11,7 +11,9 @@ jobs:
         continue-on-error: ${{ matrix.coverage }}
         steps:
             - name: Install dependencies
-              run: sudo apt-get install -y --no-install-recommends ${{ matrix.cc }} bison autoconf autogen libgcrypt20-dev libgnutls28-dev libsqlite3-dev libpq-dev libmysqlclient-dev python3-dev libjson-c-dev libxml2-dev zlib1g-dev ${{ (matrix.cc == 'gcc' && matrix.coverage) && 'lcov python3-pip' || ''}} ${{ (matrix.cc == 'clang' && matrix.coverage) && 'llvm' || ''}}
+              run: |
+                sudo apt-get update -y
+                sudo apt-get install -y --no-install-recommends ${{ matrix.cc }} bison autoconf autogen libgcrypt20-dev libgnutls28-dev libsqlite3-dev libpq-dev libmysqlclient-dev python3-dev libjson-c-dev libxml2-dev zlib1g-dev ${{ (matrix.cc == 'gcc' && matrix.coverage) && 'lcov python3-pip' || ''}} ${{ (matrix.cc == 'clang' && matrix.coverage) && 'llvm' || ''}}
             - name: Checkout sources
               uses: actions/checkout@v2
             - name: Generate build files
