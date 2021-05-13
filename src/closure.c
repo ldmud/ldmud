@@ -1879,7 +1879,7 @@ insert_value_push (svalue_t *value)
         realloc_code();
 
     offset = current.value_max - current.values_left;
-    if (offset < 0xff)
+    if (offset < 0x100)
     {
     	/* Less than 255 values: the short instruction */
     	
@@ -1887,23 +1887,15 @@ insert_value_push (svalue_t *value)
         STORE_CODE(current.codep, F_LAMBDA_CCONSTANT);
         STORE_UINT8(current.codep, (unsigned char)offset);
     }
-    else
+    else if (offset < 0x10000)
     {
     	/* More than 254 values: the long instruction */
-    	
-        if (offset == 0xff)
-        {
-            /* Offset #0xff will be used to hold the actual
-             * number of values.
-             */
-            current.values_left--;
-            offset++;
-            (--current.valuep)->type = T_INVALID;
-        }
         current.code_left -= 3;
         STORE_CODE(current.codep, F_LAMBDA_CONSTANT);
         STORE_SHORT(current.codep, offset);
     }
+    else
+        lambda_error("Too many values in lambda()\n");
 
     if (--current.values_left < 0)
         realloc_values();
