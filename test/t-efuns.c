@@ -5,6 +5,7 @@
 #include "/sys/tls.h"
 #include "/sys/configuration.h"
 #include "/sys/lpctypes.h"
+#include "/sys/object_info.h"
 #include "/sys/regexp.h"
 
 #define TESTFILE "/log/testfile"
@@ -27,6 +28,8 @@ string dhe_testdata =
   "gSJfIqbdAdQr7v25rrFowz/ClEMRH0IXM10h8shzr3Cx4e552Z2saV9SRPOgrlcD\n"
   "VxyEwepMIUNDCOCPNP2nwwBXav10bGmZ0wIBBQ==\n"
   "-----END DH PARAMETERS-----\n";
+
+mixed global_var;
 
 int f(int arg);
 
@@ -136,7 +139,12 @@ mixed *tests = ({
      * can't be a part of the regular test array. But they
      * should not crash and should not leak any memory.
      */
-    ({ "allocate 6a", TF_ERROR, (: allocate(0x1000000, ({ 1 })) :) }),
+    ({ "allocate 6a", TF_ERROR,
+        (:
+            configure_driver(DC_MEMORY_LIMIT, ({ 0x10000000, 0x20000000 }));
+            allocate(0x1000000, ({ 1 }));
+         :)
+    }),
     ({ "allocate 6b", TF_ERROR, (: allocate( ({0x100, 0x100, 0x100}), ({ 1 })); :) }),
 #endif
     ({ "asin 1", 0,        (: asin(0.0) == 0 :) }),
@@ -257,6 +265,33 @@ mixed *tests = ({
     ({ "map mapping 4", 0, (: deep_eq(map(([1,2,3]), (: $1 + $3 :), 1), ([1:2,2:3,3:4])) :) }),
     ({ "map mapping 5", 0, (: deep_eq(map(([1,2,3]), "f"), ([1:2,2:3,3:4])) :) }),
     ({ "map mapping 6", TF_ERROR, (: map(([]), unbound_lambda(0,0), ([1,2,3])) :) }),
+
+    ({ "lambda with many values", 0,
+      (:
+          mixed *prog = ({ #', });
+          foreach(int i: 65535)
+              prog += ({ sprintf("%04x", i) });
+          closure cl = lambda(0, prog);
+
+          /* This shouldn't crash. */
+          global_var = cl;
+          object_info(this_object(), OI_DATA_SIZE);
+
+          return funcall(cl) == "fffe";
+      :)
+    }),
+    ({ "lambda with too many values", TF_ERROR,
+      (:
+          mixed *prog = ({ #', });
+
+          configure_driver(DC_MEMORY_LIMIT, ({ 0, 0 }));
+
+          foreach(int i: 1048576) /* Lambdas can only have up to 65535 values. */
+              prog += ({ sprintf("%05x", i) });
+          closure cl = lambda(0, prog);
+          return 0;
+      :)
+    }),
 
     ({ "regmatch 1", 0, (: regmatch("abcd", "abc") == "abc" :) }),
     ({ "regmatch 2", 0, (: regmatch("abcd", "abcdef") == 0 :) }),
@@ -399,6 +434,7 @@ mixed *tests = ({
            return deep_eq(a, b) && deep_eq(a, ({0,1,2,3,4,5,6}) );
         :)
     }),
+
 #ifdef __JSON__
     ({ "json_parse/_serialize 1", 0,
         (: json_parse(json_serialize(1) ) == 1:) }),
@@ -495,8 +531,6 @@ void run_test()
 
 string *epilog(int eflag)
 {
-    configure_driver(DC_MEMORY_LIMIT, ({ 0x10000000, 0x20000000 }));
-
     run_test();
     return 0;
 }
