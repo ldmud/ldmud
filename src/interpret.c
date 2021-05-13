@@ -2936,35 +2936,25 @@ inter_add_array (vector_t *q, vector_t **vpp)
 
     /* Allocate the result vector and copy p into it.
      */
-    if (!(p->ref-1))
+    if (p->ref == 1)
     {
-        /* p will be deallocated completely - try to optimize a bit */
-
-        /* We try to expand the existing memory for p (without moving)
-         * instead of allocating a completely new vector.
+        /* p is not needed anymore, we can reuse it.
+         * We will expand the existing memory for p. If this is
+         * not possible, the allocator will move the memory block.
          */
-        d = malloc_increment_size(p, q_size * sizeof(svalue_t));
-        if ( NULL != d)
+        r = rexalloc(p, sizeof(vector_t) + sizeof(svalue_t) * (p_size + q_size));
+        if (!r)
         {
-            /* We got the additional memory */
-            r = p;
-            r->ref = 1;
-            r->size = p_size + q_size;
-
-            r->user->size_array -= p_size;
-            r->user = current_object->user;
-            r->user->size_array += p_size + q_size;
-        } else
-        /* Just allocate a new vector and memcopy p into it. */
-        {
-            r = allocate_uninit_array((p_int)(p_size + q_size));
-            deref_array(p);
-            d = r->item;
-            for (cnt = (mp_int)p_size; --cnt >= 0; )
-            {
-                *d++ = *s++;
-            }
+            inter_sp += 2;
+            errorf("Out of memory: array of size: %zu.\n", p_size + q_size);
         }
+
+        r->size = p_size + q_size;
+        d = r->item + p_size;
+
+        r->user->size_array -= p_size;
+        r->user = current_object->user;
+        r->user->size_array += p_size + q_size;
     }
     else
     {
@@ -3005,9 +2995,6 @@ inter_add_array (vector_t *q, vector_t **vpp)
 
         deref_array(q);
     }
-
-    if (!p->ref && p != q)
-        free_empty_vector(p);
 
     return r;
 } /* inter_add_array() */

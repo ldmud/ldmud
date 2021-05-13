@@ -710,43 +710,6 @@ prexalloc_traced (void * p, size_t size MTRACE_DECL)
 
 /*-------------------------------------------------------------------------*/
 void *
-malloc_increment_size (void *vp, size_t size)
-
-/* Try to extent the allocation block for <vp> in place to hold <size> more
- * bytes. If this is not possible, return NULL, otherwise return a pointer
- * to the start of the block extension.
- */
-{
-    word_t * block = (word_t*)vp - XM_OVERHEAD;
-#ifndef NO_MEM_BLOCK_SIZE
-    size_t old_size;
-#endif
-    void * rc;
-
-    if (going_to_exit) /* A recursive call while we're exiting */
-        exit(3);
-
-#ifndef NO_MEM_BLOCK_SIZE
-    old_size = mem_block_size(block);
-#endif
-
-    rc = mem_increment_size(block, size);
-
-#ifndef NO_MEM_BLOCK_SIZE
-    if (rc != NULL)
-    {
-        count_back(&xalloc_stat, old_size);
-        count_up(&xalloc_stat, mem_block_size(block));
-        if (check_max_malloced())
-            return NULL;
-    }
-#endif
-
-    return rc;
-} /* malloc_increment_size() */
-
-/*-------------------------------------------------------------------------*/
-void *
 rexalloc_traced (void * p, size_t size MTRACE_DECL
 #ifndef MALLOC_SBRK_TRACE
                                                     UNUSED
@@ -799,9 +762,19 @@ rexalloc_traced (void * p, size_t size MTRACE_DECL
 
 #ifndef NO_MEM_BLOCK_SIZE
     old_size = mem_block_size(block);
-    t = malloc_increment_size(p, size - old_size);
-    if (t)
+    if (old_size >= size)
         return p;
+
+    t = mem_increment_size(block, size - old_size);
+    if (t)
+    {
+        count_back(&xalloc_stat, old_size);
+        count_up(&xalloc_stat, mem_block_size(block));
+        if (check_max_malloced())
+            return NULL;
+
+        return p;
+    }
 #endif
 
     do {
