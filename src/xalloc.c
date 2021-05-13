@@ -741,56 +741,6 @@ prexalloc_traced (void * p, size_t size MTRACE_DECL)
 
 /*-------------------------------------------------------------------------*/
 void *
-malloc_increment_size (void *vp, size_t size)
-
-/* Try to extent the allocation block for <vp> in place to hold <size> more
- * bytes. If this is not possible, return NULL, otherwise return a pointer
- * to the start of the block extension.
- */
-{
-    word_t * block = (word_t*)vp - XM_OVERHEAD;
-#ifndef NO_MEM_BLOCK_SIZE
-    size_t old_size;
-#endif
-    void * rc;
-
-    if (going_to_exit) /* A recursive call while we're exiting */
-        exit(3);
-
-#ifndef NO_MEM_BLOCK_SIZE
-    old_size = mem_block_size(block);
-#endif
-
-    rc = mem_increment_size(block, size);
-
-    if (rc != NULL)
-    {
-        rc -= sizeof(word_t)*VALGRIND_REDZONE;
-
-#ifndef NO_MEM_BLOCK_SIZE
-        count_back(&xalloc_stat, old_size);
-        count_up(&xalloc_stat, mem_block_size(block));
-        if (check_max_malloced())
-            return NULL;
-
-        if (size)
-        {
-            /* Additional bytes if we round up to full words. */
-            size_t remainder = ((size + sizeof(word_t) - 1) & ~(sizeof(word_t) - 1)) - size;
-
-            VALGRIND_RESIZEINPLACE_BLOCK((char*)vp, old_size - XM_OVERHEAD_SIZE - sizeof(word_t)*VALGRIND_REDZONE, old_size + size + remainder - XM_OVERHEAD_SIZE - sizeof(word_t)*VALGRIND_REDZONE, sizeof(word_t)*VALGRIND_REDZONE);
-            VALGRIND_MAKE_MEM_DEFINED((char*)rc - GRANULARITY + 1, GRANULARITY - 1);
-            VALGRIND_MAKE_MEM_UNDEFINED((char*)rc, size);
-            VALGRIND_MAKE_MEM_NOACCESS(((char*)vp) + old_size + size - XM_OVERHEAD_SIZE - sizeof(word_t)*VALGRIND_REDZONE, remainder);
-        }
-#endif
-    }
-
-    return rc;
-} /* malloc_increment_size() */
-
-/*-------------------------------------------------------------------------*/
-void *
 rexalloc_traced (void * p, size_t size MTRACE_DECL
 #ifndef MALLOC_SBRK_TRACE
                                                     UNUSED
@@ -843,9 +793,29 @@ rexalloc_traced (void * p, size_t size MTRACE_DECL
 
 #ifndef NO_MEM_BLOCK_SIZE
     old_size = mem_block_size(block);
-    t = malloc_increment_size(p, size - old_size);
-    if (t)
+    if (old_size >= size)
         return p;
+
+    t = mem_increment_size(block, size - old_size);
+    if (t)
+    {
+        t -= VALGRIND_REDZONE;
+
+        count_back(&xalloc_stat, old_size);
+        count_up(&xalloc_stat, mem_block_size(block));
+        if (check_max_malloced())
+            return NULL;
+
+        /* Additional bytes if we round up to full words. */
+        size_t remainder = ((size + sizeof(word_t) - 1) & ~(sizeof(word_t) - 1)) - size;
+
+        VALGRIND_RESIZEINPLACE_BLOCK((char*)p, old_size - XM_OVERHEAD_SIZE - sizeof(word_t)*VALGRIND_REDZONE, size + remainder - XM_OVERHEAD_SIZE - sizeof(word_t)*VALGRIND_REDZONE, sizeof(word_t)*VALGRIND_REDZONE);
+        VALGRIND_MAKE_MEM_DEFINED((char*)t - GRANULARITY + 1, GRANULARITY - 1);
+        VALGRIND_MAKE_MEM_UNDEFINED((char*)t, size - old_size);
+        VALGRIND_MAKE_MEM_NOACCESS(((char*)p) + size - XM_OVERHEAD_SIZE - sizeof(word_t)*VALGRIND_REDZONE, remainder);
+
+        return p;
+    }
 #endif
 
     VALGRIND_MAKE_MEM_DEFINED(block, XM_OVERHEAD_SIZE);

@@ -158,8 +158,6 @@ extern void * prexalloc_traced(void *, size_t size MTRACE_DECL)
        MALLOC __attribute__((warn_unused_result));
 
 extern void    pfree(void *);
-extern void  * malloc_increment_size (void *vp, size_t size)
-                                __attribute__((nonnull(1)));
 
 #ifdef GC_SUPPORT
 extern void x_clear_ref (void * p)  __attribute__((nonnull(1)));
