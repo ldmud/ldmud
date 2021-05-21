@@ -6198,7 +6198,7 @@ save_closure (svalue_t *cl, Bool writable)
                 L_PUTC_PROLOG
                 char * source, c;
 
-                source = get_txt(simul_efunp[type - CLOSURE_SIMUL_EFUN].name);
+                source = get_txt(simul_efun_table[type - CLOSURE_SIMUL_EFUN].function.name);
 
                 L_PUTC('#');
                 L_PUTC('s');

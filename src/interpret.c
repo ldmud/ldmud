@@ -14998,7 +14998,8 @@ again:
          * through the ap pointer; otherwise the code assumes that the
          * compiler left the proper number of arguments on the stack.
          *
-         * <code> is an ushort and indexes the function list *simul_efunp.
+         * <code> is an ushort and indexes the function list
+         * simul_efun_table[].
          */
 
         unsigned short      code;      /* the function index */
@@ -15011,11 +15012,13 @@ again:
 
         /* Get the sefun code and the number of arguments on the stack */
         LOAD_SHORT(code, pc);
-        def_narg = simul_efunp[code].num_arg;
+
+        entry = &simul_efun_table[code];
+        def_narg = entry->function.num_arg;
 
         if (use_ap
-         || (simul_efunp[code].flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
-         || simul_efunp[code].num_opt_arg
+         || (entry->function.flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
+         || entry->function.num_opt_arg
            )
         {
             use_ap = MY_FALSE;  /* Reset the flag */
@@ -15025,14 +15028,14 @@ again:
             num_arg = def_narg;
 
         /* Correct the number of arguments on the stack */
-        if (num_arg != def_narg && !(simul_efunp[code].flags & TYPE_MOD_VARARGS))
+        if (num_arg != def_narg && !(entry->function.flags & TYPE_MOD_VARARGS))
         {
             /* If it's an XVARARGS, we don't require the last argument. */
-            if (simul_efunp[code].flags & TYPE_MOD_XVARARGS)
+            if (entry->function.flags & TYPE_MOD_XVARARGS)
                 def_narg--;
 
             /* Add eventually missing arguments */
-            while (num_arg < def_narg - simul_efunp[code].num_opt_arg)
+            while (num_arg < def_narg - entry->function.num_opt_arg)
             {
                 sp++;
                 put_number(sp, 0);
@@ -15040,7 +15043,7 @@ again:
             }
 
             /* Remove extraneous arguments */
-            if (!(simul_efunp[code].flags & TYPE_MOD_XVARARGS))
+            if (!(entry->function.flags & TYPE_MOD_XVARARGS))
             {
                 while (num_arg > def_narg)
                 {
@@ -15075,9 +15078,6 @@ again:
                 errorf("Couldn't load simul_efun object.\n");
             }
         }
-
-        /* Get the function code information */
-        entry = &simul_efun_table[code];
 
         if ( NULL != (funstart = entry->funstart) )
         {
@@ -18693,7 +18693,10 @@ call_simul_efun (unsigned int code, object_t *ob, int num_arg)
 {
     string_t *function_name;
 
-    function_name = simul_efunp[code].name;
+    assert(code != I_GLOBAL_SEFUN_BY_NAME);
+    assert(code < SEFUN_TABLE_SIZE);
+
+    function_name = simul_efun_table[code].function.name;
 
     /* First, try calling the function in the given object */
     if (!int_apply(function_name, ob, num_arg, MY_FALSE, MY_FALSE))

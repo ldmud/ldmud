@@ -531,10 +531,10 @@ regexp.o : backend.h bytecode.h bytecode_gen.h config.h driver.h exec.h \
 
 sha1.o : config.h driver.h machine.h my-stdint.h port.h sha1.h
 
-simul_efun.o : array.h backend.h bytecode.h bytecode_gen.h config.h \
-    driver.h exec.h gcollect.h hash.h iconv_opt.h interpret.h lex.h \
-    machine.h main.h mstrings.h my-alloca.h object.h pkg-python.h port.h \
-    prolang.h ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h \
+simul_efun.o : array.h backend.h bytecode.h bytecode_gen.h closure.h \
+    config.h driver.h exec.h gcollect.h hash.h iconv_opt.h interpret.h \
+    lex.h machine.h main.h mstrings.h my-alloca.h object.h pkg-python.h \
+    port.h prolang.h ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h \
     strfuns.h svalue.h swap.h typedefs.h types.h xalloc.h
 
 simulate.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_hook.h \

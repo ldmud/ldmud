@@ -69,11 +69,17 @@ Memory management
 
 Language
 ========
-* maximum number of simul-efuns: 2048
-  Only values 0xf800-0xffff in .x.closure_type of
-  a T_CLOSURE svalue are reserved for simul-efuns.
-  F_SIMUL_EFUN however takes a short int, so there 65536
-  simul-efuns would be possible.
+* maximum number of simul-efuns: unlimited
+  But only 65534 simul-efuns are managed in a table. Simul-efuns with
+  an index above 65533 have therefore some restrictions:
+   - Lookups will be done by name at runtime (these calls are
+     slower).
+   - If the simul-efun vanishes, there will be no lookups in any
+     other simul-efun object (either backup simul-efun or
+     primary simul-efun with a different object name).
+  Currently only closures for the first 2048 simul-efuns can be
+  created (only values 0xf800-0xffff in .x.closure_type of a
+  T_CLOSURE svalue are reserved for simul-efuns).
 
 * maximum number of python efuns: 2048
   Only values 0xe800-0xefff in .x.closure_type of

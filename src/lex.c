@@ -1710,7 +1710,7 @@ undefined_function:
          * Check it with a privilege violation.
          */
         if (!privileged && efun_override == OVERRIDE_EFUN && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-         && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK)
+         && get_simul_efun_header(p)->flags & TYPE_MOD_NO_MASK)
         {
             svalue_t *res;
 
@@ -4832,7 +4832,7 @@ closure (char *in_yyp)
      */
     if (efun_override == OVERRIDE_EFUN
      && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-     && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
+     && (get_simul_efun_header(p)->flags & TYPE_MOD_NO_MASK)
      && (p->u.global.efun != I_GLOBAL_EFUN_OTHER
 #ifdef USE_PYTHON
       || is_python_efun(p)

@@ -4822,9 +4822,11 @@ compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_va
      */
 
     int simul_efun = type - CLOSURE_SIMUL_EFUN;
-    function_t *funp = &simul_efunp[simul_efun];
+    function_t *funp = &simul_efun_table[simul_efun].function;
     bool needs_ap = false;
-    bool needs_call_direct = (simul_efun >= SEFUN_TABLE_SIZE);
+
+    assert(simul_efun != I_GLOBAL_SEFUN_BY_NAME);
+    assert(simul_efun < SEFUN_TABLE_SIZE);
 
     /* First check the arguments. */
     if (num_arg > funp->num_arg
@@ -4850,24 +4852,8 @@ compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_va
         }
     }
 
-    if (needs_call_direct)
-    {
-    	/* We have to call the sefun by name */
-        static svalue_t string_sv = { T_STRING };
-
-        if (current.code_left < 1)
-            realloc_code();
-        current.code_left -= 1;
-        STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
-        needs_ap = true;
-
-        string_sv.u.str = query_simul_efun_file_name();
-        compile_value(&string_sv, 0);
-        string_sv.u.str = funp->name;
-        compile_value(&string_sv, 0);
-    }
-    else if (0 != (funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
-          || funp->num_opt_arg > 0)
+    if (0 != (funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
+     || funp->num_opt_arg > 0)
     {
         /* varargs efuns need the arg frame */
 
@@ -4890,47 +4876,29 @@ compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_va
     if (current.code_left < 4)
         realloc_code();
 
-    if (needs_call_direct)
+    if (!needs_ap)
     {
-        /* We need the call_direct */
-        if (instrs[F_CALL_DIRECT].prefix)
+        /* The function takes fixed number of args:
+         * push 0s onto the stack for missing args
+         */
+        int i = funp->num_arg - num_arg;
+        if (i > 1 && current.code_left < i + 4)
+            realloc_code();
+        current.code_left -= i;
+        while ( --i >= 0 )
         {
-            STORE_CODE(current.codep, instrs[F_CALL_DIRECT].prefix);
-            current.code_left--;
+            STORE_CODE(current.codep, F_CONST0);
         }
-        STORE_CODE(current.codep, instrs[F_CALL_DIRECT].opcode);
-        current.code_left--;
-
-        if (num_arg + 1 > 0xff)
-            lambda_error("Argument number overflow\n");
     }
-    else
+
+    STORE_CODE(current.codep, F_SIMUL_EFUN);
+    STORE_SHORT(current.codep, (short)simul_efun);
+    current.code_left -= 3;
+
+    if (needs_ap)
     {
-    	/* We can call by index */
-    	
-        if (!needs_ap)
-        {
-            /* The function takes fixed number of args:
-             * push 0s onto the stack for missing args
-             */
-            int i = funp->num_arg - num_arg;
-            if (i > 1 && current.code_left < i + 4)
-                realloc_code();
-            current.code_left -= i;
-            while ( --i >= 0 ) {
-                STORE_CODE(current.codep, F_CONST0);
-            }
-        }
-
-        STORE_CODE(current.codep, F_SIMUL_EFUN);
-        STORE_SHORT(current.codep, (short)simul_efun);
-        current.code_left -= 3;
-
-        if (needs_ap)
-        {
-            STORE_UINT8(current.codep, F_RESTORE_ARG_FRAME);
-            current.code_left--;
-        }
+        STORE_UINT8(current.codep, F_RESTORE_ARG_FRAME);
+        current.code_left--;
     }
 
     if(!(opt_flags & LEAVE_LVALUE))
@@ -6271,7 +6239,7 @@ closure_to_string (svalue_t * sp, Bool compact)
 
             case CLOSURE_SIMUL_EFUN:
                 strcat(buf, "sefun::");
-                strcat(buf, get_txt(simul_efunp[type - CLOSURE_SIMUL_EFUN].name));
+                strcat(buf, get_txt(simul_efun_table[type - CLOSURE_SIMUL_EFUN].function.name));
                 break;
             }
             break;

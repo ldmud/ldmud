@@ -15,26 +15,30 @@
  */
 struct simul_efun_table_s
 {
+    function_t function;
+        /* Copy from the function table.
+         */
     bytecode_p  funstart;
         /* The function pointer, NULL for discarded sefuns.
          */
     program_t *program;
     p_int      function_index_offset;
     p_int      variable_index_offset;
-      /* Copies from the function_t structure.
-       */
 };
 
 /* --- Defines --- */
 
-#define SEFUN_TABLE_SIZE (65536UL)
-  /* The number of entries in the sefun table, directly callable.
+#define SEFUN_TABLE_SIZE (65534UL)
+  /* The number of entries in the sefun table.
+   *
+   * The size mirrors the range of the .sim_efun index in ident_t.
+   * (And considerung that I_GLOBAL_SEFUN_OTHER and
+   * I_GLOBAL_SEFUN_BY_NAME are reserved indices.)
    */
 
 /* --- Variables --- */
 
 extern int num_simul_efun;
-extern function_t *simul_efunp;
 extern object_t *simul_efun_object;
 extern vector_t *simul_efun_vector;
 extern simul_efun_table_t simul_efun_table[];
@@ -45,6 +49,7 @@ extern ident_t *all_simul_efuns;
 extern void invalidate_simul_efuns (void);
 extern Bool assert_simul_efun_object(void);
 extern string_t *query_simul_efun_file_name(void);
+extern function_t *get_simul_efun_header(ident_t* name) __attribute__((nonnull));
 
 #ifdef GC_SUPPORT
 extern void clear_simul_efun_refs(void);

@@ -14244,10 +14244,7 @@ function_call:
               /* It's a real simul-efun */
 
               $<function_call_head>$.simul_efun = real_name->u.global.sim_efun;
-              /* real_name->u.global.sim_efun is also unsigned, so it can
-               * be casted to unsigned long before comparison (SEFUN_TABLE_SIZE
-               * is unsigned long) */
-              if ((unsigned long)real_name->u.global.sim_efun >= SEFUN_TABLE_SIZE)
+              if (real_name->u.global.sim_efun == I_GLOBAL_SEFUN_BY_NAME)
               {
                   /* The simul-efun has to be called by name:
                    * prepare the extra args for the call_other
@@ -14323,9 +14320,7 @@ function_call:
 
                   PREPARE_INSERT(6)
 
-                  function_t *funp;
-
-                  funp = &simul_efunp[simul_efun];
+                  function_t *funp = get_simul_efun_header($1.real);
 
                   if (!(funp->flags & TYPE_MOD_VARARGS))
                   {
@@ -14360,13 +14355,12 @@ function_call:
                   if (funp->offset.argtypes != NULL)
                       check_function_call_types(get_argument_types_start($4), $4, funp, funp->offset.argtypes);
 
-                  /* simul_efun is >= 0, see above) */
-                  if ((unsigned long)simul_efun >= SEFUN_TABLE_SIZE)
+                  if (simul_efun == I_GLOBAL_SEFUN_BY_NAME)
                   {
                       /* call-other: the number of arguments will be
                        * corrected at runtime.
                        */
-                      add_f_code(F_CALL_DIRECT);
+                      add_f_code(F_CALL_DIRECT_STRICT);
                       CURRENT_PROGRAM_SIZE++;
                       ap_needed = MY_TRUE;
                   }
@@ -14839,9 +14833,7 @@ function_call:
            */
 
           sefun = $2.strict_member ? call_strict_sefun : call_other_sefun;
-          if (!disable_sefuns
-           && sefun >= 0
-           && (unsigned long)sefun >= SEFUN_TABLE_SIZE)
+          if (!disable_sefuns && sefun == I_GLOBAL_SEFUN_BY_NAME)
           {
               /* The simul-efun has to be called by name:
                * insert the extra args for the call_other
@@ -14920,33 +14912,32 @@ function_call:
           {
               /* SIMUL EFUN */
 
-              function_t *funp;
-              int num_arg;
-
-              num_arg = $6 + 2; /* Don't forget the obj and the fun! */
-
-              funp = &simul_efunp[sefun];
-              if (num_arg > funp->num_arg
-               && !(funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
-               && !has_ellipsis)
-                  yyerrorf("Too many arguments to simul_efun %s"
-                          , get_txt(funp->name));
-
-              if (funp->offset.argtypes != NULL)
-                  check_function_call_types(get_argument_types_start(num_arg), num_arg, funp, funp->offset.argtypes);
+              int num_arg = $6 + 2; /* Don't forget the obj and the fun! */
 
               /* sefun is >= 0 (see above) */
-              if ((unsigned long)sefun >= SEFUN_TABLE_SIZE)
+              if (sefun == I_GLOBAL_SEFUN_BY_NAME)
               {
                   /* call-other: the number of arguments will be
                    * detected and corrected at runtime.
                    */
-                  add_f_code(F_CALL_DIRECT);
+                  add_f_code(F_CALL_DIRECT_STRICT);
                   CURRENT_PROGRAM_SIZE++;
+
+                  $$.type = get_fulltype(lpctype_mixed);
               }
               else
               {
                   /* Direct call */
+                  function_t *funp = &simul_efun_table[sefun].function;
+                  if (num_arg > funp->num_arg
+                   && !(funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
+                   && !has_ellipsis)
+                      yyerrorf("Too many arguments to simul_efun %s"
+                              , get_txt(funp->name));
+
+                  if (funp->offset.argtypes != NULL)
+                      check_function_call_types(get_argument_types_start(num_arg), num_arg, funp, funp->offset.argtypes);
+
                   if (!(funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
                    && !has_ellipsis)
                   {
@@ -14988,8 +14979,9 @@ function_call:
                   add_f_code(F_SIMUL_EFUN);
                   add_short(sefun);
                   CURRENT_PROGRAM_SIZE += 3;
+
+                  $$.type = get_fulltype(funp->type);
               }
-              $$.type = get_fulltype(funp->type);
 
               pop_arg_stack(2); /* For sefun call_other there are two more arguments. */
           }
@@ -15157,7 +15149,7 @@ function_name:
           if ( !strcmp($1, "efun")
            && fun->type == I_TYPE_GLOBAL
            && fun->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-           && simul_efunp[fun->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
+           && (get_simul_efun_header(fun)->flags & TYPE_MOD_NO_MASK)
            && master_ob
            && (!EVALUATION_TOO_LONG())
              )

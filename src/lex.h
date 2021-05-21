@@ -218,6 +218,7 @@ struct ident_s
 #define I_GLOBAL_VARIABLE_FUN    (USHRT_MAX - 1)
 #define I_GLOBAL_EFUN_OTHER      (USHRT_MAX)
 #define I_GLOBAL_SEFUN_OTHER     (USHRT_MAX)
+#define I_GLOBAL_SEFUN_BY_NAME   (USHRT_MAX - 2)        /* Has no entry in the table. */
 #define I_GLOBAL_STRUCT_NONE     (USHRT_MAX)
 #ifdef USE_PYTHON
 #  define I_GLOBAL_PYTHON_EFUN_OTHER (USHRT_MAX)

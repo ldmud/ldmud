@@ -12,15 +12,25 @@ void run_test()
     msg("\nRunning test for simul-efuns:\n"
           "-----------------------------\n");
 
-    run_array(({
+    return run_array(({
         ({ "Calling sefun0000", 0,
             (:
                 return sefun0000() == 0;
             :)
         }),
-        ({ "Calling sefunFFF0", 0,
+        ({ "Calling sefunF000", 0,
             (:
-                return sefunFFF0() == 0xfff0;
+                return sefunF000() == 0xf000;
+            :)
+        }),
+        ({ "Calling sefunFFFF", 0,
+            (:
+                return sefunFFFF() == 0xffff;
+            :)
+        }),
+        ({ "Calling #'sefun0000", 0,
+            (:
+                return funcall(#'sefun0000) == 0;
             :)
         }),
         ({ "Calling increment()", 0,
