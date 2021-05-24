@@ -33,6 +33,16 @@ void run_test()
                 return funcall(#'sefun0000) == 0;
             :)
         }),
+        ({ "Calling #'sefunF000", 0,
+            (:
+                return funcall(#'sefunF000) == 0xf000;
+            :)
+        }),
+        ({ "Calling #'sefunFFFF", 0,
+            (:
+                return funcall(#'sefunFFFF) == 0xffff;
+            :)
+        }),
         ({ "Calling increment()", 0,
             (:
                 return increment(100) == 102;

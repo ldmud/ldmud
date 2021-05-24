@@ -4755,6 +4755,13 @@ closure (char *in_yyp)
                     , super_name, wordstart);
             ix = CLOSURE_EFUN_OFFS;
         }
+        if (ix >= CLOSURE_IDENTIFIER_OFFS)
+        {
+            yyerrorf("Too high function index of %.50s::%.50s for #'"
+                    , super_name, wordstart);
+            ix = CLOSURE_EFUN_OFFS;
+        }
+
         *yyp = c;
         *(wordstart-2) = ':';
 
@@ -4886,12 +4893,14 @@ closure (char *in_yyp)
             int i;
 
             i = p->u.global.function;
-            yylval.closure.number = i;
             if (i >= CLOSURE_IDENTIFIER_OFFS)
-                yyerrorf(
-                  "Too high function index of %s for #'",
-                  get_txt(p->name)
-                );
+            {
+                yyerrorf("Too high function index of %s for #'"
+                        , get_txt(p->name));
+                i = CLOSURE_EFUN_OFFS;
+            }
+
+            yylval.closure.number = i;
             break;
         }
 
@@ -4899,9 +4908,8 @@ closure (char *in_yyp)
         if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_SEFUN)
          && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER && !disable_sefuns)
         {
-            yylval.closure.number =
-              p->u.global.sim_efun + CLOSURE_SIMUL_EFUN_OFFS;
-            break;
+            yylval.ident = p;
+            return L_SIMUL_EFUN_CLOSURE;
         }
 
 #ifdef USE_PYTHON
@@ -4909,7 +4917,14 @@ closure (char *in_yyp)
         if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_EFUN)
          && is_python_efun(p))
         {
-            yylval.closure.number = p->u.global.python_efun + CLOSURE_PYTHON_EFUN_OFFS;
+            if (p->u.global.python_efun >= CLOSURE_EFUN_OFFS - CLOSURE_PYTHON_EFUN_OFFS)
+            {
+                yyerrorf("Too high python efun index of %s for #'"
+                        , get_txt(p->name));
+                yylval.closure.number = CLOSURE_EFUN_OFFS;
+            }
+            else
+                yylval.closure.number = p->u.global.python_efun + CLOSURE_PYTHON_EFUN_OFFS;
             break;
         }
 #endif
@@ -4947,9 +4962,18 @@ closure (char *in_yyp)
                 yylval.closure.number = CLOSURE_IDENTIFIER_OFFS;
                 break;
             }
-            yylval.closure.number =
-              p->u.global.variable + num_virtual_variables +
-              CLOSURE_IDENTIFIER_OFFS;
+#ifdef USE_PYTHON
+            if (p->u.global.variable + num_virtual_variables >= CLOSURE_PYTHON_EFUN_OFFS - CLOSURE_IDENTIFIER_OFFS)
+#else
+            if (p->u.global.variable + num_virtual_variables >= CLOSURE_EFUN_OFFS - CLOSURE_IDENTIFIER_OFFS)
+#endif
+            {
+                yyerrorf("Too high variable index of %s for #'"
+                        , get_txt(p->name));
+                yylval.closure.number = CLOSURE_IDENTIFIER_OFFS;
+            }
+            else
+                yylval.closure.number = p->u.global.variable + num_virtual_variables + CLOSURE_IDENTIFIER_OFFS;
             break;
         }
 

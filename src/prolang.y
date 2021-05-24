@@ -7421,6 +7421,7 @@ delete_prog_string (void)
 %token L_RETURN
 %token L_RSH
 %token L_RSHL
+%token L_SIMUL_EFUN_CLOSURE
 %token L_STATIC
 %token L_STATUS
 %token L_STRING
@@ -7763,7 +7764,7 @@ delete_prog_string (void)
 %type <closure>      L_CLOSURE
 %type <symbol>       L_SYMBOL
 %type <number>       L_QUOTED_AGGREGATE
-%type <ident>        L_IDENTIFIER
+%type <ident>        L_IDENTIFIER L_SIMUL_EFUN_CLOSURE
 %type <typeflags>    type_modifier type_modifier_list
 
 %type <number>       optional_stars
@@ -12566,6 +12567,40 @@ expr4:
           ins_short(ix);
           ins_short(inhIndex);
           $$.type = get_fulltype_flags(lpctype_closure, TYPE_MOD_LITERAL);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | L_SIMUL_EFUN_CLOSURE
+      {
+          int sefun = $1->u.global.sim_efun;
+          function_t *fun = get_simul_efun_header($1);
+
+          if (fun->flags & TYPE_MOD_DEPRECATED)
+          {
+              yywarnf("Creating closure to deprecated simul-efun %s"
+                     , get_txt(fun->name));
+          }
+
+          $$.start = CURRENT_PROGRAM_SIZE;
+          $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
+          $$.type = get_fulltype_flags(lpctype_closure, TYPE_MOD_LITERAL);
+
+          if (sefun == I_GLOBAL_SEFUN_OTHER
+           || sefun > USHRT_MAX - CLOSURE_SIMUL_EFUN_OFFS)
+          {
+              /* We'll compile this as a F_SYMBOL_FUNCTION call. */
+              ins_prog_string(ref_mstring($1->name));
+              ins_prog_string(ref_mstring(query_simul_efun_file_name()));
+              ins_f_code(F_SYMBOL_FUNCTION);
+          }
+          else
+          {
+              /* This can be called as a F_CLOSURE call. */
+              ins_f_code(F_CLOSURE);
+              ins_short(sefun + CLOSURE_SIMUL_EFUN_OFFS);
+              ins_short(0);
+          }
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
