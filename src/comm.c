@@ -5124,13 +5124,20 @@ telnet_neg (interactive_t *ip)
                             *command_to++ = ch;
                             break;
 
+                        case '\0':
+                            /* This is a NOP in line mode.
+                             * In charmode we pass it on.
+                             */
+                            if (is_charmode(ip))
+                                *command_to++ = ch;
+                            break;
+
                         /* Handle line endings:
                          * In Charmode we pass them as they are.
-                         * In Linemode we handle combinations of CR, NL and NUL
-                         * (usually CR LF, but also CR NUL or single LF or NUL)
-                         * as the end of the command.
+                         * In Linemode the Telnet protocol mandates CR LF
+                         * and CR NUL as line endings. We also accept single
+                         * CR or LF bytes.
                          */
-                        case '\0':
                         case '\r':
                         case '\n':
                         {
