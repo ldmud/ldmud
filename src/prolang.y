@@ -2125,6 +2125,22 @@ check_unknown_type (lpctype_t* t)
 } /* check_unknown_type() */
 
 /*-------------------------------------------------------------------------*/
+static void
+check_double_condition (lpctype_t* t)
+
+/* A condition yields the type <t>. Check that is not exclusively double.
+ * If so and pragma warn_deprecated is in effect, warn about it.
+ */
+
+{
+    if (pragma_warn_deprecated && t == lpctype_float)
+    {
+        yywarn("float value used in a boolean context");
+    }
+} /* check_double_condition() */
+
+
+/*-------------------------------------------------------------------------*/
 /* Operator type table for assignment with addition.
  */
 binary_op_types_t types_add_assignment[] = {
@@ -9526,6 +9542,7 @@ while:
 
           use_variable($4.name, VAR_USAGE_READ);
           check_unknown_type($4.type.t_type);
+          check_double_condition($4.type.t_type);
 
           /* Take the <cond> code, add the BBRANCH instruction and
            * store all of it outside the program. After the <body>
@@ -9706,6 +9723,7 @@ do:
 
           use_variable($7.name, VAR_USAGE_READ);
           check_unknown_type($7.type.t_type);
+          check_double_condition($7.type.t_type);
 
           current = CURRENT_PROGRAM_SIZE;
           if (!realloc_a_program(3))
@@ -10111,6 +10129,7 @@ for_cond_expr:
       {
           use_variable($1.name, VAR_USAGE_READ);
           check_unknown_type($1.type.t_type);
+          check_double_condition($1.type.t_type);
           free_fulltype($1.type);
       }
 ; /* for_cond_expr */
@@ -10836,6 +10855,7 @@ condStart:
 
           use_variable($3.name, VAR_USAGE_READ);
           check_unknown_type($3.type.t_type);
+          check_double_condition($3.type.t_type);
 
           /* Turn off the case labels */
 
@@ -11098,6 +11118,7 @@ expr0:
       {
           if ($2 == F_LAND_EQ || $2 == F_LOR_EQ)
           {
+              check_double_condition($1.type);
               if (!add_lvalue_code($1.lvalue, F_MAKE_PROTECTED))
               {
                   free_lpctype($1.type);
@@ -11346,6 +11367,7 @@ expr0:
       {
           use_variable($1.name, VAR_USAGE_READ);
           check_unknown_type($1.type.t_type);
+          check_double_condition($1.type.t_type);
 
           /* Insert the branch to the :-part and remember this address */
           ins_f_code(F_BRANCH_WHEN_ZERO);
@@ -11464,6 +11486,7 @@ expr0:
       {
           use_variable($1.name, VAR_USAGE_READ);
           check_unknown_type($1.type.t_type);
+          check_double_condition($1.type.t_type);
 
           /* Insert the LOR and remember the position */
 
@@ -11498,6 +11521,7 @@ expr0:
       {
           use_variable($1.name, VAR_USAGE_READ);
           check_unknown_type($1.type.t_type);
+          check_double_condition($1.type.t_type);
 
           /* Insert the LAND and remember the position */
 
@@ -12148,6 +12172,7 @@ expr0:
     | L_NOT expr0
       {
           check_unknown_type($2.type.t_type);
+          check_double_condition($2.type.t_type);
 
           $$ = $2;
           last_expression = CURRENT_PROGRAM_SIZE;
