@@ -102,8 +102,10 @@
 "["     index     binary
 "[<"    rindex    binary
 "[>"    aindex    binary
-"[,]"   map_index ternary
-"."     s_index   binary
+"[,]"   map_index  ternary
+"[,<]"  map_rindex ternary
+"[,>]"  map_aindex ternary
+"."     s_index    binary
 "->"    sx_index   binary
 "[..]"     range     ternary
 "[..<]"    nr_range  ternary
@@ -117,6 +119,18 @@
 "[.."      nx_range  binary
 "[<.."     rx_range  binary
 "[>.."     ax_range  binary
+"[,..]"    map_range     quaternary
+"[,..<]"   map_nr_range  quaternary
+"[,<..]"   map_rn_range  quaternary
+"[,<..<]"  map_rr_range  quaternary
+"[,..>]"   map_na_range  quaternary
+"[,<..>]"  map_ra_range  quaternary
+"[,>..]"   map_an_range  quaternary
+"[,>..<]"  map_ar_range  quaternary
+"[,>..>]"  map_aa_range  quaternary
+"[,.."     map_nx_range  ternary
+"[,<.."    map_rx_range  ternary
+"[,>.."    map_ax_range  ternary
 "(void)+=" void_add_eq
 "+="    add_eq
 "-="    sub_eq
@@ -197,6 +211,20 @@
         rx_range_lvalue
         ax_range_lvalue
         map_index_lvalue
+        map_rindex_lvalue
+        map_aindex_lvalue
+        map_range_lvalue
+        map_nr_range_lvalue
+        map_rn_range_lvalue
+        map_rr_range_lvalue
+        map_na_range_lvalue
+        map_ra_range_lvalue
+        map_an_range_lvalue
+        map_ar_range_lvalue
+        map_aa_range_lvalue
+        map_nx_range_lvalue
+        map_rx_range_lvalue
+        map_ax_range_lvalue
         make_protected
         make_rvalue
         push_virtual_variable_vlvalue
@@ -210,6 +238,8 @@
         s_index_vlvalue
         sx_index_vlvalue
         map_index_vlvalue
+        map_rindex_vlvalue
+        map_aindex_vlvalue
         simul_efun
 "({"    aggregate
         m_aggregate

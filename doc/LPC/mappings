@@ -139,6 +139,11 @@ DESCRIPTION
     If there is no <key> (and <n> is equal to 0 or  not specified at all) a
   new one will be added automatically.
 
+    Multiple values for a single key can be modified with range access:
+
+      map[key, n1..n2] = ({ valuen1, ..., valuen2 });
+      map[key, 0..<1] = ({ value0, ..., valuen });
+
     Deletion   of a key    is  done with    the  -=  operator or  the  efun
   m_delete(). A mapping can only be substracted by one without any values:
 
@@ -169,6 +174,12 @@ DESCRIPTION
     If there is no  <key> in the mapping  and <n> is  0 or not specified at
   all (which is the same) a 0 will be returned or if <n>  is greater than 0
   an "Illegal index" error will be reported.
+
+    Multiple values for a single key can be accessed by:
+
+      arr = map[key, n1..n2];
+
+    The values are returned in an array.
 
 
   6. How can I test for the existance of a key?

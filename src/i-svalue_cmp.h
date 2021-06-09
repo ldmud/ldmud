@@ -7,6 +7,8 @@
 #ifndef I_SVALUE_CMP__
 #define I_SVALUE_CMP__
 
+#include <assert.h>
+
 #include "driver.h"
 
 #include "closure.h" /* closure_eq(), closure_cmp() */
@@ -89,56 +91,89 @@ rvalue_cmp (svalue_t *left, svalue_t *right)
     if (left_rv == NULL && right_rv == NULL)
     {
         /* Both are ranges. */
-        struct protected_range_lvalue *lr = left->u.protected_range_lvalue, *rr = right->u.protected_range_lvalue;
-        register p_int d;
+        assert(left->type == T_LVALUE);
+        assert(right->type == T_LVALUE);
 
-        if (lr->vec.type != rr->vec.type)
+        if (left->x.lvalue_type != right->x.lvalue_type)
+            return left->x.lvalue_type - right->x.lvalue_type;
+
+        switch (left->x.lvalue_type)
         {
-            if (lr->vec.type == T_POINTER)
-                return left->type - rr->vec.type;
-            else if (rr->vec.type == T_POINTER)
-                return lr->vec.type - right->type;
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *lr = left->u.protected_range_lvalue, *rr = right->u.protected_range_lvalue;
+                register p_int d;
+
+                if (lr->vec.type != rr->vec.type)
+                {
+                    if (lr->vec.type == T_POINTER)
+                        return left->type - rr->vec.type;
+                    else if (rr->vec.type == T_POINTER)
+                        return lr->vec.type - right->type;
+                }
+
+                if (lr->vec.type != T_POINTER)
+                {
+                    /* String ranges */
+                    if ((d = (lr->vec.type - rr->vec.type)) != 0)
+                        return d;
+
+                    if ((d = (lr->index2 - lr->index1) - (rr->index2 - rr->index1)) != 0)
+                        return d;
+
+                    return memcmp(get_txt(lr->vec.u.str) + lr->index1, get_txt(rr->vec.u.str) + rr->index1, lr->index2 - lr->index1);
+                }
+                else
+                {
+                    /* Array ranges */
+                    return lr - rr;
+                }
+            }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+                return left->u.protected_map_range_lvalue - right->u.protected_map_range_lvalue;
+
+            default:
+                fatal("Illegal lvalue type %d\n", left->x.lvalue_type);
+                break;
         }
 
-        if (lr->vec.type != T_POINTER)
-        {
-            /* String ranges */
-            if ((d = (lr->vec.type - rr->vec.type)) != 0)
-                return d;
-
-            if ((d = (lr->index2 - lr->index1) - (rr->index2 - rr->index1)) != 0)
-                return d;
-
-            return memcmp(get_txt(lr->vec.u.str) + lr->index1, get_txt(rr->vec.u.str) + rr->index1, lr->index2 - lr->index1);
-        }
-        else
-        {
-            /* Array ranges */
-            return lr - rr;
-        }
     }
     else if (left_rv == NULL || right_rv == NULL)
     {
-        struct protected_range_lvalue *r = ((left_rv == NULL) ? left : right)->u.protected_range_lvalue;
-        svalue_t *sv = (left_rv == NULL) ? right_rv : left_rv;
-        size_t len;
-        register p_int d;
+        switch (((left_rv == NULL) ? left : right)->x.lvalue_type)
+        {
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = ((left_rv == NULL) ? left : right)->u.protected_range_lvalue;
+                svalue_t *sv = (left_rv == NULL) ? right_rv : left_rv;
+                size_t len;
+                register p_int d;
 
-        if (r->vec.type == T_POINTER)
-            return left->type - right->type;
+                if (r->vec.type == T_POINTER)
+                    return left->type - right->type;
 
-        if (sv->type != r->vec.type)
-            return ((sv->type < r->vec.type) == (left_rv == NULL)) ? 1 : -1;
+                if (sv->type != r->vec.type)
+                    return ((sv->type < r->vec.type) == (left_rv == NULL)) ? 1 : -1;
 
-        len = mstrsize(sv->u.str);
-        if ((d = (len - (r->index2 - r->index1))) != 0)
-            return ((d < 0) == (left_rv == NULL)) ? 1 : -1;
+                len = mstrsize(sv->u.str);
+                if ((d = (len - (r->index2 - r->index1))) != 0)
+                    return ((d < 0) == (left_rv == NULL)) ? 1 : -1;
 
-        d = memcmp(get_txt(sv->u.str), get_txt(r->vec.u.str) + r->index1, len);
-        if (left_rv == NULL)
-            return -d;
-        else
-            return d;
+                d = memcmp(get_txt(sv->u.str), get_txt(r->vec.u.str) + r->index1, len);
+                if (left_rv == NULL)
+                    return -d;
+                else
+                    return d;
+            }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+                return left->type - right->type;
+
+            default:
+                fatal("Illegal lvalue type %d\n", ((left_rv == NULL) ? left : right)->x.lvalue_type);
+                break;
+        }
     }
 
     return svalue_cmp(left_rv, right_rv);
@@ -211,38 +246,70 @@ rvalue_eq (svalue_t *left, svalue_t *right)
     if (left_rv == NULL && right_rv == NULL)
     {
         /* Both are ranges. */
-        struct protected_range_lvalue *lr = left->u.protected_range_lvalue, *rr = right->u.protected_range_lvalue;
-        if (lr->vec.type != rr->vec.type)
+        assert(left->type == T_LVALUE);
+        assert(right->type == T_LVALUE);
+
+        if (left->x.lvalue_type != right->x.lvalue_type)
             return -1;
 
-        if (lr->vec.type != T_POINTER)
+        switch (left->x.lvalue_type)
         {
-            /* String ranges */
-            if ((lr->index2 - lr->index1) != (rr->index2 - rr->index1))
-                return -1;
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *lr = left->u.protected_range_lvalue, *rr = right->u.protected_range_lvalue;
+                if (lr->vec.type != rr->vec.type)
+                    return -1;
 
-            return (memcmp(get_txt(lr->vec.u.str) + lr->index1, get_txt(rr->vec.u.str) + rr->index1, lr->index2 - lr->index1) == 0) ? 0 : -1;
-        }
-        else
-        {
-            /* Array ranges */
-            return (lr == rr) ? 0 : -1;
+                if (lr->vec.type != T_POINTER)
+                {
+                    /* String ranges */
+                    if ((lr->index2 - lr->index1) != (rr->index2 - rr->index1))
+                        return -1;
+
+                    return (memcmp(get_txt(lr->vec.u.str) + lr->index1, get_txt(rr->vec.u.str) + rr->index1, lr->index2 - lr->index1) == 0) ? 0 : -1;
+                }
+                else
+                {
+                    /* Array ranges */
+                    return (lr == rr) ? 0 : -1;
+                }
+            }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+                return (left->u.protected_map_range_lvalue == right->u.protected_map_range_lvalue) ? 0 : -1;
+
+            default:
+                fatal("Illegal lvalue type %d\n", left->x.lvalue_type);
+                break;
         }
     }
     else if (left_rv == NULL || right_rv == NULL)
     {
-        struct protected_range_lvalue *r = ((left_rv == NULL) ? left : right)->u.protected_range_lvalue;
-        svalue_t *sv = (left_rv == NULL) ? right_rv : left_rv;
-        size_t len;
+        switch (((left_rv == NULL) ? left : right)->x.lvalue_type)
+        {
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = ((left_rv == NULL) ? left : right)->u.protected_range_lvalue;
+                svalue_t *sv = (left_rv == NULL) ? right_rv : left_rv;
+                size_t len;
 
-        if (r->vec.type == T_POINTER || sv->type == T_POINTER || r->vec.type != sv->type)
-            return -1;
+                if (r->vec.type == T_POINTER || sv->type == T_POINTER || r->vec.type != sv->type)
+                    return -1;
 
-        len = mstrsize(sv->u.str);
-        if (len != r->index2 - r->index1)
-            return -1;
+                len = mstrsize(sv->u.str);
+                if (len != r->index2 - r->index1)
+                    return -1;
 
-        return (memcmp(get_txt(sv->u.str), get_txt(r->vec.u.str) + r->index1, len) == 0) ? 0 : -1;
+                return (memcmp(get_txt(sv->u.str), get_txt(r->vec.u.str) + r->index1, len) == 0) ? 0 : -1;
+            }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+                return -1;
+
+            default:
+                fatal("Illegal lvalue type %d\n", ((left_rv == NULL) ? left : right)->x.lvalue_type);
+                break;
+        }
     }
 
     return svalue_eq(left_rv, right_rv);

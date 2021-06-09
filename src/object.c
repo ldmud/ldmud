@@ -6695,6 +6695,37 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
                 MY_PUTC(')')
                 break;
             }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                /* Format: <1>=&(<2>=map,key,index1..index2-1) */
+                struct protected_map_range_lvalue *r = v->u.protected_map_range_lvalue;
+
+                if(recall_pointer(r))
+                    break;
+
+                {
+                    L_PUTC_PROLOG
+                    L_PUTC('&')
+                    L_PUTC('(')
+                    L_PUTC_EPILOG
+                }
+
+                save_mapping(r->map);
+
+                MY_PUTC(',')
+
+                if (!save_svalue(&(r->key), ',', MY_FALSE))
+                    return MY_FALSE;
+
+                save_number(r->index1);
+                MY_PUTC('.')
+                MY_PUTC('.')
+                save_number(r->index2 - 1);
+
+                MY_PUTC(')')
+                break;
+            }
         } /* switch() */
     }
 
@@ -6751,6 +6782,38 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
                     save_number(0);
                 else
                     return save_svalue(item + e->index, delimiter, writable);
+                break;
+            }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                /* Save this as an array. */
+                struct protected_map_range_lvalue *r = v->u.protected_map_range_lvalue;
+                svalue_t *item;
+
+                if(recall_pointer(r))
+                    break;
+
+                MY_PUTC('(')
+                MY_PUTC('{')
+
+                item = get_map_value(r->map, &(r->key));
+                if (item == &const0)
+                {
+                    for (mp_int i = r->index1; i < r->index2; i++)
+                    {
+                        MY_PUTC('0');
+                        MY_PUTC(',');
+                    }
+                }
+                else
+                {
+                    for (mp_int i = r->index1; i < r->index2; i++)
+                        save_svalue(item + i, ',', MY_FALSE);
+                }
+
+                MY_PUTC('}')
+                MY_PUTC(')')
                 break;
             }
         } /* switch() */
@@ -7094,10 +7157,18 @@ register_svalue (svalue_t *svp)
         {
             /* For older format, just do the recursion.
              * And treat ranges as normal arrays. */
-            if (svp->x.lvalue_type == LVALUE_PROTECTED)
-                register_svalue(&(svp->u.protected_lvalue->val));
-            else if (svp->x.lvalue_type == LVALUE_PROTECTED_RANGE)
-                register_pointer(ptable, svp->u.protected_range_lvalue);
+            switch (svp->x.lvalue_type)
+            {
+                case LVALUE_PROTECTED:
+                    register_svalue(&(svp->u.protected_lvalue->val));
+                    break;
+                case LVALUE_PROTECTED_RANGE:
+                    register_pointer(ptable, svp->u.protected_range_lvalue);
+                    break;
+                case LVALUE_PROTECTED_MAP_RANGE:
+                    register_pointer(ptable, svp->u.protected_map_range_lvalue);
+                    break;
+            }
             break;
         }
 
@@ -7146,6 +7217,18 @@ register_svalue (svalue_t *svp)
                 {
                     register_mapping(e->map);
                     register_svalue(&(e->key));
+                }
+                break;
+            }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                struct protected_map_range_lvalue *r = svp->u.protected_map_range_lvalue;
+
+                if (register_pointer(ptable, r) != NULL)
+                {
+                    register_mapping(r->map);
+                    register_svalue(&(r->key));
                 }
                 break;
             }
@@ -9164,6 +9247,7 @@ restore_lvalue (svalue_t *svp, char **str)
         svalue_t key;
         int idx;
         char * cp;
+        bool fail = false;
 
         if (!restore_svalue(&key, str, ','))
         {
@@ -9174,16 +9258,45 @@ restore_lvalue (svalue_t *svp, char **str)
 
         cp = *str;
         idx = strtol(*str, str, 10);
-        if (cp == *str || *((*str)++) != ')')
+        if (cp == *str || idx < 0)
         {
-            free_svalue(&key);
+            fail = true;
+        }
+        else if (**str == ')')
+        {
+            /* Mapping entry. */
+            (*str)++;
+
+            if (idx >= val->u.map->num_values)
+                fail = true;
+            else
+                assign_protected_mapentry_lvalue_no_free(&dummy, val->u.map, &key, idx);
+        }
+        else if (*((*str)++) == '.' && *((*str)++) == '.')
+        {
+            /* Mapping range. */
+            int idx2;
+
+            cp = *str;
+            idx2 = strtol(*str, str, 10);
+            if (cp == *str || *((*str)++) != ')'
+             || idx > val->u.map->num_values
+             || idx2 < -1 || idx2 >= val->u.map->num_values
+             || idx > idx2 + 1)
+                fail = true;
+            else
+                assign_protected_map_range_lvalue_no_free(&dummy, val->u.map, &key, idx, idx2+1);
+        }
+        else
+            fail = true;
+
+        free_svalue(&key);
+        if (fail)
+        {
             free_svalue(svp);
             *svp = const0;
             return false;
         }
-
-        assign_protected_mapentry_lvalue_no_free(&dummy, val->u.map, &key, idx);
-        free_svalue(&key);
     }
     else
     {
@@ -9225,7 +9338,7 @@ restore_lvalue (svalue_t *svp, char **str)
                 return false;
         }
 
-        if (idx1 < 0 || idx1 > size || idx2 <= -1 || idx2 >= size || idx1 > idx2 + 1)
+        if (idx1 < 0 || idx1 > size || idx2 < -1 || idx2 >= size || idx1 > idx2 + 1)
         {
             free_svalue(svp);
             *svp = const0;

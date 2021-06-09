@@ -161,6 +161,35 @@ struct protected_mapentry_lvalue
     int        index;                   /* Column of the lvalue.  */
 };
 
+/* -- struct protected_map_range_lvalue: An range lvalue into a mapping.
+ * This is for assignments to mapping ranges. The indices are guaranteed
+ * to be valid.
+ */
+struct protected_map_range_lvalue
+{
+    p_int      ref;                     /* Number of references.  */
+    mapping_t *map;                     /* The (counted) mapping. */
+    svalue_t   key;                     /* The key of the entry.  */
+    mp_int     index1, index2;          /* first and last (excl.) *
+                                         * column of the range.   */
+};
+
+/* -- struct range_iterator: Structure for iterating over a range.
+ * This is only meant for read access and doesn't keep the range
+ * alive (so no counted references).
+ */
+struct range_iterator
+{
+    /* Public members */
+    svalue_t* (*next_value)(struct range_iterator* range);
+                                        /* Function to get the next value. */
+    p_int size;                         /* Number of values in the range.  */
+
+    /* Private members */
+    void* current;                      /* Current position.               */
+    p_int remaining;                    /* Remaining values/bytes.         */
+    svalue_t temp;                      /* For temporary use.              */
+};
 
 
 /* --- Constants --- */
@@ -233,9 +262,12 @@ extern void assign_protected_lvalue(svalue_t *dest, svalue_t *src);
 extern void assign_protected_char_lvalue_no_free(svalue_t *dest, struct protected_lvalue *var, string_t *src, char *charp);
 extern void assign_protected_range_lvalue_no_free(svalue_t *dest, struct protected_lvalue *var, svalue_t *vec, mp_int index1, mp_int index2);
 extern void assign_protected_mapentry_lvalue_no_free(svalue_t *dest, mapping_t *map, svalue_t *key, int index);
+extern void assign_protected_map_range_lvalue_no_free(svalue_t *dest, mapping_t *map, svalue_t *key, mp_int index1, mp_int index2);
 
 extern svalue_t *get_rvalue(svalue_t *v, bool *last_reference);
 extern svalue_t *get_rvalue_no_collapse(svalue_t *v, bool *last_reference);
+extern bool get_iterator(svalue_t *v, struct range_iterator* it, bool no_strings);
+extern void get_iterator_for_vector(svalue_t *vec, p_int size, struct range_iterator* it);
 
 extern void put_c_string (svalue_t *sp, const char *p);
 extern void put_c_n_string (svalue_t *sp, const char *p, size_t len);

@@ -338,6 +338,24 @@ struct TestCase* cases = ({
         test:           function int(mixed result) { return result == 842 && deep_eq(global_var, (["X":0;842])); },
     ),
     (<TestCase>
+        name:           "#'= (2 args, mapping reverse index)",
+        flags:          0,
+        vars:           0,
+        expr:           ({#'=, ({#'[,<], ({#'global_var}), "X", 2}), 842}),
+        args:           0,
+        setup:          function void() { global_var = ([:5]); },
+        test:           function int(mixed result) { return result == 842 && deep_eq(global_var, (["X":0;0;0;842;0])); },
+    ),
+    (<TestCase>
+        name:           "#'= (2 args, mapping arithmetic index)",
+        flags:          0,
+        vars:           0,
+        expr:           ({#'=, ({#'[,>], ({#'global_var}), "X", -4}), 842}),
+        args:           0,
+        setup:          function void() { global_var = ([:5]); },
+        test:           function int(mixed result) { return result == 842 && deep_eq(global_var, (["X":0;842;0;0;0])); },
+    ),
+    (<TestCase>
         name:           "#'= (2 args, strict struct access)",
         flags:          0,
         vars:           0,
@@ -462,6 +480,114 @@ struct TestCase* cases = ({
         args:           0,
         setup:          function void() { global_var = ({-1,-2,-3,-4,-5}); },
         test:           function int(mixed result) { return deep_eq(result, ({1,2,3})) && deep_eq(global_var, ({-1,1,2,3})); },
+    ),
+    (<TestCase>
+        name:           "#'= (2 args, mapping[,..])",
+        flags:          0,
+        vars:           0,
+        expr:           ({#'=, ({#'[,..], ({#'global_var}), "X", 1, 2}), '({11,22}) }),
+        args:           0,
+        setup:          function void() { global_var = ([:5]); },
+        test:           function int(mixed result) { return deep_eq(result, ({11,22})) && deep_eq(global_var, (["X":0;11;22;0;0])); },
+    ),
+    (<TestCase>
+        name:           "#'= (2 args, mapping[,..<])",
+        flags:          0,
+        vars:           0,
+        expr:           ({#'=, ({#'[,..<], ({#'global_var}), "X", 1, 3}), '({11,22}) }),
+        args:           0,
+        setup:          function void() { global_var = ([:5]); },
+        test:           function int(mixed result) { return deep_eq(result, ({11,22})) && deep_eq(global_var, (["X":0;11;22;0;0])); },
+    ),
+    (<TestCase>
+        name:           "#'= (2 args, mapping[,..>])",
+        flags:          0,
+        vars:           0,
+        expr:           ({#'=, ({#'[,..>], ({#'global_var}), "X", 1, -3}), '({11,22}) }),
+        args:           0,
+        setup:          function void() { global_var = ([:5]); },
+        test:           function int(mixed result) { return deep_eq(result, ({11,22})) && deep_eq(global_var, (["X":0;11;22;0;0])); },
+    ),
+    (<TestCase>
+        name:           "#'= (2 args, mapping[,..)",
+        flags:          0,
+        vars:           0,
+        expr:           ({#'=, ({#'[,.., ({#'global_var}), "X", 1}), '({11,22,33,44}) }),
+        args:           0,
+        setup:          function void() { global_var = ([:5]); },
+        test:           function int(mixed result) { return deep_eq(result, ({11,22,33,44})) && deep_eq(global_var, (["X":0;11;22;33;44])); },
+    ),
+    (<TestCase>
+        name:           "#'= (2 args, mapping[,<..])",
+        flags:          0,
+        vars:           0,
+        expr:           ({#'=, ({#'[,<..], ({#'global_var}), "X", 4, 2}), '({11,22}) }),
+        args:           0,
+        setup:          function void() { global_var = ([:5]); },
+        test:           function int(mixed result) { return deep_eq(result, ({11,22})) && deep_eq(global_var, (["X":0;11;22;0;0])); },
+    ),
+    (<TestCase>
+        name:           "#'= (2 args, mapping[,<..<])",
+        flags:          0,
+        vars:           0,
+        expr:           ({#'=, ({#'[,<..<], ({#'global_var}), "X", 4, 3}), '({11,22}) }),
+        args:           0,
+        setup:          function void() { global_var = ([:5]); },
+        test:           function int(mixed result) { return deep_eq(result, ({11,22})) && deep_eq(global_var, (["X":0;11;22;0;0])); },
+    ),
+    (<TestCase>
+        name:           "#'= (2 args, mapping[,<..>])",
+        flags:          0,
+        vars:           0,
+        expr:           ({#'=, ({#'[,<..>], ({#'global_var}), "X", 4, -3}), '({11,22}) }),
+        args:           0,
+        setup:          function void() { global_var = ([:5]); },
+        test:           function int(mixed result) { return deep_eq(result, ({11,22})) && deep_eq(global_var, (["X":0;11;22;0;0])); },
+    ),
+    (<TestCase>
+        name:           "#'= (2 args, mapping[,<..)",
+        flags:          0,
+        vars:           0,
+        expr:           ({#'=, ({#'[,<.., ({#'global_var}), "X", 4}), '({11,22,33,44}) }),
+        args:           0,
+        setup:          function void() { global_var = ([:5]); },
+        test:           function int(mixed result) { return deep_eq(result, ({11,22,33,44})) && deep_eq(global_var, (["X":0;11;22;33;44])); },
+    ),
+    (<TestCase>
+        name:           "#'= (2 args, mapping[,>..])",
+        flags:          0,
+        vars:           0,
+        expr:           ({#'=, ({#'[,>..], ({#'global_var}), "X", -4, 2}), '({11,22}) }),
+        args:           0,
+        setup:          function void() { global_var = ([:5]); },
+        test:           function int(mixed result) { return deep_eq(result, ({11,22})) && deep_eq(global_var, (["X":0;11;22;0;0])); },
+    ),
+    (<TestCase>
+        name:           "#'= (2 args, mapping[,>..<])",
+        flags:          0,
+        vars:           0,
+        expr:           ({#'=, ({#'[,>..<], ({#'global_var}), "X", -4, 3}), '({11,22}) }),
+        args:           0,
+        setup:          function void() { global_var = ([:5]); },
+        test:           function int(mixed result) { return deep_eq(result, ({11,22})) && deep_eq(global_var, (["X":0;11;22;0;0])); },
+    ),
+    (<TestCase>
+        name:           "#'= (2 args, mapping[,>..>])",
+        flags:          0,
+        vars:           0,
+        expr:           ({#'=, ({#'[,>..>], ({#'global_var}), "X", -4, -3}), '({11,22}) }),
+        args:           0,
+        setup:          function void() { global_var = ([:5]); },
+        test:           function int(mixed result) { return deep_eq(result, ({11,22})) && deep_eq(global_var, (["X":0;11;22;0;0])); },
+    ),
+    (<TestCase>
+        name:           "#'= (2 args, mapping[,>..)",
+        flags:          0,
+        vars:           0,
+        expr:           ({#'=, ({#'[,>.., ({#'global_var}), "X", -4}), '({11,22,33,44}) }),
+        args:           0,
+        setup:          function void() { global_var = ([:5]); },
+        test:           function int(mixed result) { return deep_eq(result, ({11,22,33,44})) && deep_eq(global_var, (["X":0;11;22;33;44])); },
     ),
     (<TestCase>
         name:           "#'= (2 args, &var)",
@@ -1668,6 +1794,30 @@ closure make_array_filter(closure f)
     };
 }
 
+void filter_svalue(mixed expr, closure f)
+{
+    funcall(f, &expr);
+
+    if (pointerp(expr))
+    {
+        foreach (mixed subexpr: &expr)
+            filter_svalue(&subexpr, f);
+    }
+}
+
+closure make_svalue_filter(closure f)
+{
+    return function struct TestCase (struct TestCase test)
+    {
+        struct TestCase t = copy(test);
+
+        t.expr = deep_copy(test.expr);
+        filter_svalue(&(t.expr), f);
+
+        return t;
+    };
+}
+
 void run_test()
 {
     msg("\nRunning test for lambda():\n"
@@ -1704,6 +1854,25 @@ void run_test()
 
         m_add(storage, arr, &result);
         return &result;
+    }));
+    //  - Make every array a mapping range
+    errors += run_test_with_filter(" with mapping ranges", make_array_filter(function mixed*(int size) : mapping storage = ([:1])
+    {
+        mapping m = ([:size+5]);
+        mixed result = &(m["*"+size,2..1+size]);
+
+        m_add(storage, m, &result);
+        return &result;
+    }));
+    //  - Make every string a string range
+    errors += run_test_with_filter(" with string ranges", make_svalue_filter(function void(mixed expr) : mapping storage = ([:2])
+    {
+        if (stringp(expr))
+        {
+            string str = "**" + expr + "***";
+            expr = &(str[2..<4]);
+            m_add(storage, str, &str, &expr);
+        }
     }));
 
     if (errors)

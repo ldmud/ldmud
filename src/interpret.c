@@ -676,6 +676,16 @@ struct unprotected_mapentry
    * time here, that an entry will appear.
    */
 
+  /* --- struct unprotected_map_range: a range of a mapping */
+struct unprotected_map_range
+{
+    mapping_t *map;               /* The mapping that'll get the entry.   *
+                                   * (not refcounted).                    */
+    svalue_t   key;               /* The key (refcounted)                 */
+    mp_int     index1, index2;    /* The column range.                    */
+} current_unprotected_map_range = /* Static buffer, because there is only */
+  { NULL, { T_INVALID }, 0, 0};   /* one unprotected lvalue at a time.    */
+
 static svalue_t indexing_quickfix = { T_NUMBER };
   /* When indexing arrays and mappings with just one ref, especially
    * for the purpose of getting a lvalue, the indexed item is copied
@@ -1007,6 +1017,12 @@ is_sto_context (void)
  * get_rvalue_no_collapse(v, &last_ref): Same as get_rvalue(), but don't
  *                        collapse any singular lvalues.
  *
+ * get_iterator(v, &it, ns): Builds an iterator over <v> if it is a range
+ *                           (array,string,bytes or range lvalue).
+ *
+ * get_iterator_for_vector(vec, size, &it, ns): Builds an iterator over
+ *                            <size> consecutive elements pointed to by <vec>.
+ *
  * link_protected_lvalue(dest, lv): Assign the lvalue <lv> to the lvalue <dest>.
  *
  * assign_svalue(dest,v): assign <v> to <dest>, freeing <dest> first.
@@ -1035,6 +1051,9 @@ is_sto_context (void)
 static void transfer_pointer_range(svalue_t *source);
 static void transfer_protected_pointer_range(
     struct protected_range_lvalue *dest, svalue_t *source);
+static void transfer_map_range(svalue_t *source);
+static void transfer_protected_map_range(
+    struct protected_map_range_lvalue *dest, svalue_t *source);
 static void assign_string_range(svalue_t *source, Bool do_free);
 static void assign_protected_string_range(
     struct protected_range_lvalue *dest,svalue_t *source, Bool do_free);
@@ -1236,6 +1255,7 @@ int_free_svalue (svalue_t *v)
         case LVALUE_UNPROTECTED_CHAR:
         case LVALUE_UNPROTECTED_RANGE:
         case LVALUE_UNPROTECTED_MAPENTRY:
+        case LVALUE_UNPROTECTED_MAP_RANGE:
             NOOP;
             break;
 
@@ -1315,6 +1335,19 @@ int_free_svalue (svalue_t *v)
             }
             break;
 
+        case LVALUE_PROTECTED_MAP_RANGE:
+            if (--(v->u.protected_map_range_lvalue->ref) <= 0)
+            {
+                struct protected_map_range_lvalue *r = v->u.protected_map_range_lvalue;
+
+                free_mapping(r->map);
+                free_svalue(&(r->key));
+                xfree(r);
+
+                num_protected_lvalues--;
+            }
+            break;
+
         } /* switch (v->x.lvalue_type) */
         break; /* case T_LVALUE */
 
@@ -1387,6 +1420,10 @@ free_svalue (svalue_t *v)
 
         case LVALUE_PROTECTED_MAPENTRY:
             needs_deserializing = (v->u.protected_mapentry_lvalue->ref == 1);
+            break;
+
+        case LVALUE_PROTECTED_MAP_RANGE:
+            needs_deserializing = (v->u.protected_map_range_lvalue->ref == 1);
             break;
         }
         break;
@@ -1687,6 +1724,10 @@ internal_assign_svalue_no_free (svalue_t *to, svalue_t *from)
             to->u.protected_mapentry_lvalue->ref++;
             break;
 
+        case LVALUE_PROTECTED_MAP_RANGE:
+            to->u.protected_map_range_lvalue->ref++;
+            break;
+
         } /* switch */
         break;
     }
@@ -1854,6 +1895,31 @@ internal_assign_rvalue_no_free ( svalue_t *to, svalue_t *from )
             }
             break;
 
+        case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                struct protected_map_range_lvalue *r = from->u.protected_map_range_lvalue;
+                svalue_t *val = get_map_value(r->map, &(r->key));
+                vector_t *arr;
+
+                if (val == &const0)
+                    arr = allocate_array(r->index2 - r->index1);
+                else
+                {
+                    arr = allocate_uninit_array(r->index2 - r->index1);
+                    if (arr != NULL)
+                    {
+                        for (mp_int i = 0, j = r->index1; j < r->index2; i++, j++)
+                            assign_rvalue_no_free(arr->item + i, val + j);
+                    }
+                }
+
+                if (arr == NULL)
+                    errorf("Out of memory: map[k,%"PRIdMPINT"..%"PRIdMPINT"].\n", r->index1, r->index2 - 1);
+                else
+                    put_array(to, arr);
+            }
+            break;
+
         } /* switch (from->x.lvalue_type) */
 
         break;
@@ -1994,6 +2060,13 @@ normalize_svalue (svalue_t *svp, bool collapse_lvalues)
                     continue;
                 }
             }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+                /* Map ranges are special as they only allow assignments
+                 * of the same length. So there is no alternative to
+                 * collapse them into.
+                 */
+                break;
         }
         break;
     } /* switch */
@@ -2134,6 +2207,12 @@ inl_get_rvalue (svalue_t *v, bool *last_reference, bool collapse_lvalues)
 
                 return &const0;
             }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+                if (last_reference != NULL && v->u.protected_map_range_lvalue->ref == 1)
+                    *last_reference = true;
+
+                return NULL;
         } /* switch (v->x.lvalue_type) */
     }
     else
@@ -2151,6 +2230,236 @@ svalue_t * get_rvalue_no_collapse (svalue_t *v, bool *last_reference)
 
 #define get_rvalue(v, last_reference) inl_get_rvalue(v, last_reference, true)
 #define get_rvalue_no_collapse(v, last_reference) inl_get_rvalue(v, last_reference, false)
+
+/*-------------------------------------------------------------------------*/
+static svalue_t*
+vector_iterator_next_value(struct range_iterator* it)
+
+/* Returns the next value when iterating over an vector.
+ * (Also used for map entry ranges.)
+ */
+
+{
+    if (it->remaining > 0)
+    {
+        svalue_t *result = (svalue_t*)it->current;
+
+        it->remaining--;
+        it->current = result+1;
+
+        return result;
+    }
+
+    return NULL;
+} /* vector_iterator_next_value() */
+
+/*-------------------------------------------------------------------------*/
+static svalue_t*
+string_iterator_next_value(struct range_iterator* it)
+
+/* Returns the next value when iterating over a unicode string (range).
+ */
+
+{
+    if (it->remaining > 0)
+    {
+        char* str = (char*)it->current;
+        p_int ch;
+        size_t chlen = utf8_to_unicode(str, it->remaining, &ch);
+
+        if (!chlen)
+        {
+            ch = *(unsigned char*)str;
+            chlen = 1;
+        }
+
+        it->remaining -= chlen;
+        it->current = str + chlen;
+        put_number(&(it->temp), ch);
+
+        return &(it->temp);
+    }
+
+    return NULL;
+} /* string_iterator_next_value() */
+
+/*-------------------------------------------------------------------------*/
+static svalue_t*
+bytes_iterator_next_value(struct range_iterator* it)
+
+/* Returns the next value when iterating over a bytes sequence
+ * or ASCII string (range).
+ */
+
+{
+    if (it->remaining > 0)
+    {
+        unsigned char *result = (unsigned char*)it->current;
+
+        it->remaining--;
+        it->current = result+1;
+        put_number(&(it->temp), *result);
+
+        return &(it->temp);
+    }
+
+    return NULL;
+} /* bytes_iterator_next_value() */
+
+/*-------------------------------------------------------------------------*/
+static svalue_t*
+zero_iterator_next_value(struct range_iterator* it)
+
+/* Returns just zeroes (the value of it->temp).
+ */
+
+{
+    if (it->remaining > 0)
+        return &(it->temp);
+
+    return NULL;
+} /* zero_iterator_next_value() */
+
+/*-------------------------------------------------------------------------*/
+void
+get_iterator_for_vector (svalue_t *vec, p_int size, struct range_iterator* it)
+
+/* Create an interator for iterating over <size> consecutive elements with
+ * the first element being <vec>.
+ */
+
+{
+    it->next_value = &vector_iterator_next_value;
+    it->remaining = it->size = size;
+    it->current = vec;
+} /* get_iterator_for_vector() */
+
+/*-------------------------------------------------------------------------*/
+
+bool
+get_iterator (svalue_t *v, struct range_iterator* it, bool no_strings)
+
+/* If <v> is a range (vector, string, bytes, protected range lvalue,
+ * protected map entry range) fill the <it> structure with an iterator
+ * function and the length of the range and return true.
+ * Otherwise set the iterator function to NULL and return false.
+ * If <no_strings> is true, also for strings, bytes and range lvalues
+ * of strings and bytes false will be returned and the function
+ * set to NULL.
+ *
+ * Note that this iterator function is only for read access, because
+ * for strings and string ranges it makes additional transformations.
+ * For the same reasons the result pointer of a iterator call may point
+ * to a temporary storage and will only be valid until the next call.
+ *
+ * The iterator function will return NULL when out of bounds.
+ */
+
+{
+    svalue_t *rv = get_rvalue_no_collapse(v, NULL);
+
+    if (rv == NULL)
+    {
+        assert(v->type == T_LVALUE);
+        switch (v->x.lvalue_type)
+        {
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = v->u.protected_range_lvalue;
+                switch (r->vec.type)
+                {
+                    case T_POINTER:
+                        get_iterator_for_vector(r->vec.u.vec->item + r->index1, r->index2 - r->index1, it);
+                        return true;
+
+                    case T_STRING:
+                        if (no_strings)
+                            break;
+                        if (r->vec.u.str->info.unicode == STRING_UTF8)
+                        {
+                            it->next_value = &string_iterator_next_value;
+                            it->remaining = r->index2 - r->index1;
+                            it->current = get_txt(r->vec.u.str) + r->index1;
+                            it->size = byte_to_char_index(get_txt(r->vec.u.str) + r->index1, it->remaining, NULL);
+                            return true;
+                        }
+                        /* FALLTHROUGH */
+
+                    case T_BYTES:
+                        if (no_strings)
+                            break;
+                        it->next_value = &bytes_iterator_next_value;
+                        it->remaining = it->size = r->index2 - r->index1;
+                        it->current = get_txt(r->vec.u.str) + r->index1;
+                        return true;
+
+                    default:
+                        break;
+                }
+                break;
+            }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                struct protected_map_range_lvalue *r = v->u.protected_map_range_lvalue;
+                svalue_t *items = get_map_value(r->map, &(r->key));
+
+                if (items == &const0)
+                {
+                    /* Not existing entries, we have a dedicated iterator,
+                     * returning zeroes.
+                     */
+                    it->next_value = &zero_iterator_next_value;
+                    it->remaining = it->size = r->index2 - r->index1;
+                    put_number(&(it->temp), 0);
+                    return true;
+                }
+
+                get_iterator_for_vector(items + r->index1, r->index2 - r->index1, it);
+                return true;
+            }
+
+            default:
+                break;
+        }
+    }
+    else
+    {
+        switch (rv->type)
+        {
+            case T_POINTER:
+                get_iterator_for_vector(rv->u.vec->item, VEC_SIZE(rv->u.vec), it);
+                return true;
+
+            case T_STRING:
+                if (no_strings)
+                    break;
+                if (rv->u.str->info.unicode == STRING_UTF8)
+                {
+                    it->next_value = &string_iterator_next_value;
+                    it->remaining = mstrsize(rv->u.str);
+                    it->current = get_txt(rv->u.str);
+                    it->size = byte_to_char_index(get_txt(rv->u.str), it->remaining, NULL);
+                    return true;
+                }
+                /* FALLTHROUGH */
+
+            case T_BYTES:
+                if (no_strings)
+                    break;
+                it->next_value = &bytes_iterator_next_value;
+                it->remaining = it->size = mstrsize(rv->u.str);
+                it->current = get_txt(rv->u.str);
+                return true;
+
+            default:
+                break;
+        }
+    }
+
+    it->next_value = NULL;
+    return false;
+} /* get_iterator() */
 
 /*-------------------------------------------------------------------------*/
 static bool
@@ -2230,6 +2539,7 @@ link_protected_lvalue (svalue_t *dest, svalue_t *lv)
                     return false; /* For now. */
 
                 case LVALUE_PROTECTED_RANGE:
+                case LVALUE_PROTECTED_MAP_RANGE:
                     /* char and range are incompatible. */
                     return false;
 
@@ -2358,6 +2668,64 @@ link_protected_lvalue (svalue_t *dest, svalue_t *lv)
                     /* range and non-existent entry are incompatible. */
                     return false;
 
+                case LVALUE_PROTECTED_MAP_RANGE:
+                {
+                    struct protected_map_range_lvalue *lvrange = lv->u.protected_map_range_lvalue;
+                    struct protected_range_lvalue *destrange = dest->u.protected_range_lvalue;
+                    svalue_t *lventry;
+
+                    if (destrange->vec.type != T_POINTER)
+                        return false;
+
+                    lventry = get_map_lvalue(lvrange->map, &(lvrange->key));
+                    if (lventry == NULL)
+                        errorf("Out of memory when creating mapping entry.\n");
+
+                    if (lvrange->index2 - lvrange->index1 != destrange->index2 - destrange->index1)
+                    {
+                        /* Let's make them the same size, first.
+                         * We need to update all ranges in the linked list of dest.
+                         */
+                        vector_t *oldvec = destrange->vec.u.vec;
+                        vector_t *vec = allocate_array(VEC_SIZE(oldvec) + lvrange->index2 - lvrange->index1 + destrange->index1 - destrange->index2);
+                        svalue_t *srcitem = oldvec->item;
+                        svalue_t *dstitem = vec->item;
+
+                        for (int i = destrange->index1; i > 0; i--)
+                            assign_svalue_no_free(dstitem++, srcitem++);
+
+                        srcitem = lventry + lvrange->index1;
+                        for (int i = lvrange->index1; i < lvrange->index2; i++)
+                            assign_protected_lvalue_no_free(dstitem++, srcitem++);
+
+                        srcitem = oldvec->item + destrange->index2;
+                        for (int i = VEC_SIZE(oldvec) - destrange->index2; i > 0; i--)
+                            assign_svalue_no_free(dstitem++, srcitem++);
+
+                        if (destrange->var != NULL
+                         && destrange->var->val.type == T_POINTER
+                         && destrange->var->val.u.vec == oldvec)
+                        {
+                            destrange->var->val.u.vec = ref_array(vec);
+                            free_array(oldvec);
+                        }
+                        destrange->index2 = destrange->index1 + lvrange->index2 - lvrange->index1;
+                        destrange->vec.u.vec = vec;
+                        free_array(oldvec);
+                    }
+                    else
+                    {
+                        /* Link the elements together. */
+                        svalue_t *srcitem = lventry + lvrange->index1;
+                        svalue_t *dstitem = destrange->vec.u.vec->item + destrange->index1;
+
+                        for (int i = lvrange->index2 - lvrange->index1; i > 0; i--)
+                            assign_protected_lvalue(dstitem++, srcitem++);
+                    }
+
+                    return true;
+                }
+
             } /* switch (lv->x.lvalue_type) */
             break;
 
@@ -2374,6 +2742,92 @@ link_protected_lvalue (svalue_t *dest, svalue_t *lv)
             internal_assign_svalue_no_free(dest, lv);
             free_svalue(&temp);
             break;
+        }
+
+        case LVALUE_PROTECTED_MAP_RANGE:
+        {
+            struct protected_map_range_lvalue *dest_range = dest->u.protected_map_range_lvalue;
+            mp_int dest_length = dest_range->index2 - dest_range->index1;
+            svalue_t *dest_item, *src_item;
+
+            switch (lv->x.lvalue_type)
+            {
+                default:
+                    fatal("(link_protected_lvalue) Illegal lvalue %p type %d\n", lv, lv->x.lvalue_type);
+                    /* NOTREACHED */
+                    break;
+
+                case LVALUE_PROTECTED:
+                {
+                    /* So hopefully this points to an array.
+                     * Then we can link the elements together.
+                     */
+                    struct protected_lvalue *src_lval = lv->u.protected_lvalue;
+
+                    if (src_lval->val.type != T_POINTER)
+                        return false;
+
+                    /* The array needs to have the same length. */
+                    if (dest_length != VEC_SIZE(src_lval->val.u.vec))
+                        return false;
+
+                    src_item = src_lval->val.u.vec->item;
+                    break;
+                }
+
+                case LVALUE_PROTECTED_CHAR:
+                    /* char and range are incompatible. */
+                    return false;
+
+                case LVALUE_PROTECTED_RANGE:
+                {
+                    struct protected_range_lvalue *src_range = lv->u.protected_range_lvalue;
+
+                    if (src_range->vec.type != T_POINTER)
+                        return false;
+
+                    if (src_range->index2 - src_range->index1 !=dest_length)
+                        return false;
+
+                    src_item = src_range->vec.u.vec->item + src_range->index1;
+                    break;
+                }
+
+                case LVALUE_PROTECTED_MAPENTRY:
+                    /* range and non-existent entry are incompatible. */
+                    return false;
+
+                case LVALUE_PROTECTED_MAP_RANGE:
+                {
+                    struct protected_map_range_lvalue *src_range = lv->u.protected_map_range_lvalue;
+                    svalue_t *src_entry;
+
+                     /* Are they the same? */
+                    if (src_range == dest_range)
+                        return true;
+
+                    if (src_range->index2 - src_range->index1 != dest_length)
+                        return false;
+
+                    src_entry = get_map_lvalue(src_range->map, &(src_range->key));
+                    if (src_entry == NULL)
+                        errorf("Out of memory when creating mapping entry.\n");
+
+                    src_item = src_entry + src_range->index1;
+                    break;
+                }
+
+            } /* switch (lv->x.lvalue_type) */
+
+            dest_item = get_map_lvalue(dest_range->map, &(dest_range->key));
+            if (!dest_item)
+                errorf("Out of memory when creating mapping entry.\n");
+            dest_item += dest_range->index1;
+
+            for (mp_int i = dest_range->index1; i < dest_range->index2; i++)
+                assign_protected_lvalue(dest_item++, src_item++);
+
+            return true;
         }
 
     } /* switch (dest->x.lvalue_type) */
@@ -2468,6 +2922,14 @@ assign_svalue (svalue_t *dest, svalue_t *v)
                 break;
             }
 
+        case LVALUE_UNPROTECTED_MAP_RANGE:
+            if (v->type == T_POINTER)
+            {
+                ref_array(v->u.vec);
+                transfer_map_range(v);
+            }
+            return;
+
         case LVALUE_PROTECTED:
             if (v->type == T_LVALUE)
             {
@@ -2541,6 +3003,23 @@ assign_svalue (svalue_t *dest, svalue_t *v)
                 dest = get_map_lvalue(e->map, &(e->key)) + e->index;
                 continue;
             }
+
+        case LVALUE_PROTECTED_MAP_RANGE:
+            if (v->type == T_LVALUE)
+            {
+                normalize_svalue(dest, false);
+                link_protected_lvalue(dest, v);
+                return;
+            }
+            else if (v->type == T_POINTER)
+            {
+                struct protected_map_range_lvalue *r = dest->u.protected_map_range_lvalue;
+
+                ref_array(v->u.vec);
+                transfer_protected_map_range(r, v);
+                return;
+            }
+            return;
 
         } /* switch() */
 
@@ -2684,6 +3163,10 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
                 break;
             }
 
+        case LVALUE_UNPROTECTED_MAP_RANGE:
+            transfer_map_range(v);
+            return;
+
         case LVALUE_PROTECTED:
             if (v->type == T_LVALUE)
             {
@@ -2762,6 +3245,23 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
                 dest = get_map_lvalue(e->map, &(e->key)) + e->index;
                 continue;
             }
+
+        case LVALUE_PROTECTED_MAP_RANGE:
+            if (v->type == T_LVALUE)
+            {
+                normalize_svalue(dest, false);
+                link_protected_lvalue(dest, v);
+                free_svalue(v);
+                return;
+            }
+            else if (v->type == T_POINTER)
+            {
+                transfer_protected_map_range(dest->u.protected_map_range_lvalue, v);
+            }
+            else
+                free_svalue(v);
+            return;
+
         } /* switch() */
 
         break;
@@ -3027,6 +3527,108 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
     }
 
 } /* transfer_protected_pointer_range() */
+
+/*-------------------------------------------------------------------------*/
+static void
+transfer_map_range (svalue_t *source)
+
+/* Transfer the vector <source> to the range defined by
+ * <current_unprotected_map_range>, modifying the target mapping accordingly.
+ * <source> is freed once in the call.
+ *
+ * If <source> is not a vector, it is just freed.
+ */
+
+{
+    if (source->type == T_POINTER)
+    {
+        svalue_t *dstitem, *srcitem;
+        vector_t *sv = source->u.vec;
+
+        if (VEC_SIZE(sv) != current_unprotected_map_range.index2 - current_unprotected_map_range.index1)
+            errorf("Assignment to mapping range of different width: %"PRIdMPINT" vs. %"PRIdMPINT".\n",
+                (mp_int) VEC_SIZE(sv),
+                current_unprotected_map_range.index2 - current_unprotected_map_range.index1);
+
+        dstitem = get_map_lvalue(current_unprotected_map_range.map, &(current_unprotected_map_range.key));
+        if (dstitem == NULL)
+            errorf("Out of memory when creating mapping entry.\n");
+
+        dstitem += current_unprotected_map_range.index1;
+        srcitem = sv->item;
+
+        /* In case the mapping is only referenced from a value that we will overwrite now. */
+        (void)ref_mapping(current_unprotected_map_range.map);
+
+        if (sv->ref == 1)
+        {
+            /* We can move the values to the mapping. */
+            for (mp_int i = current_unprotected_map_range.index1; i < current_unprotected_map_range.index2; i++)
+                transfer_svalue(dstitem++, srcitem++);
+            free_empty_vector(sv);
+        }
+        else
+        {
+            for (mp_int i = current_unprotected_map_range.index1; i < current_unprotected_map_range.index2; i++)
+                assign_svalue(dstitem++, srcitem++);
+            free_array(sv);
+        }
+
+        free_mapping(current_unprotected_map_range.map);
+    }
+    else
+        /* Not a pointer: just free it */
+        free_svalue(source);
+} /* transfer_map_range() */
+
+/*-------------------------------------------------------------------------*/
+static void
+transfer_protected_map_range (struct protected_map_range_lvalue *dest, svalue_t *source)
+
+/* Transfer the vector <source> to the range defined by <dest>, modifying the
+ * target mapping of <dest> accordingly. <source> is freed once in the call.
+ *
+ * If <source> is not a vector, it is just freed.
+ */
+
+{
+    if (source->type == T_POINTER)
+    {
+        svalue_t *dstitem, *srcitem;
+        vector_t *sv = source->u.vec;
+
+        if (VEC_SIZE(sv) != dest->index2 - dest->index1)
+            errorf("Assignment to mapping range of different width: %"PRIdMPINT" vs. %"PRIdMPINT".\n",
+                (mp_int) VEC_SIZE(sv), dest->index2 - dest->index1);
+
+        dstitem = get_map_lvalue(dest->map, &(dest->key));
+        if (dstitem == NULL)
+            errorf("Out of memory when creating mapping entry.\n");
+
+        dstitem += dest->index1;
+        srcitem = sv->item;
+
+        if (sv->ref == 1)
+        {
+            /* We can move the values to the mapping. */
+            for (mp_int i = dest->index1; i < dest->index2; i++)
+                transfer_svalue(dstitem++, srcitem++);
+            free_empty_vector(sv);
+        }
+        else
+        {
+            for (mp_int i = dest->index1; i < dest->index2; i++)
+                assign_svalue(dstitem++, srcitem++);
+            free_array(sv);
+        }
+    }
+    else
+    {
+        /* Not a pointer */
+        free_svalue(source);
+    }
+
+} /* transfer_protected_map_range() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE mp_int
@@ -4095,11 +4697,22 @@ push_error_handler(void (*errorhandler)(error_handler_t *), error_handler_t *arg
  *     Return &(v[i1..i2]), unprotected, using current_unprotected_range.
  *     Supports all range-index types.
  *
+ *   push_map_range_lvalue(mapping m, mixed key, int i1, int i2)
+ *     Return &(m[k,i1..i2]), unprotected, using current_unprotected_map_range.
+ *     Supports all range-index types.
+ *
  *   push_index_value(vector|string|mapping|struct v, int|mixed i)
  *     Return v[i]
  *
+ *   push_map_index_value(mapping m, mixed k, int i)
+ *     Return m[k,i]
+ *
  *   push_range_value(vector|string v, int i1, int i2)
  *     Return v[i1..i2]
+ *
+ *   push_map_range_value(mapping m, mixed k, int i1, int i2)
+ *     Return m[k,i1..i2]
+ *
  */
 
 enum index_type { REGULAR_INDEX, REVERSE_INDEX, ARITHMETIC_INDEX };
@@ -4211,6 +4824,87 @@ get_vector_range_item (vector_t * vec, mp_int index1, mp_int index2, svalue_t * 
 {
     return get_vector_item_extended(vec, index2 - index1, index1, i, sp, pc, itype);
 } /* get_vector_range_item() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+get_map_range_item (struct protected_map_range_lvalue *r, svalue_t *i, svalue_t *sp, bytecode_p pc, enum index_type itype, mp_int *column)
+
+/* Index the map range <r> with index <i> and return the pointer to the indexed item.
+ * If the index is invalid, throw an error. If the map range points to an entry
+ * that doesn't exist in the mapping, return &const0.
+ * In <column> we return the column number of the resulting item (if not NULL).
+ */
+
+{
+    mp_int size, ind;
+    svalue_t *item;
+
+    if (i->type != T_NUMBER)
+    {
+        ERRORF(("Illegal index for []: got %s, expected number.\n", typename(i->type)));
+        return NULL;
+    }
+
+    size = r->index2 - r->index1;
+    ind = i->u.number;
+
+    switch (itype)
+    {
+        case REGULAR_INDEX:
+            if (ind < 0)
+            {
+                ERROR("Illegal index for []: not a positive number.\n");
+                /* NOTREACHED */
+                return NULL;
+            }
+            if (ind >= size)
+            {
+                ERRORF(("Index for [] out of bounds: %"PRIdMPINT", vector size: %"PRIdMPINT"\n"
+                       , ind, size));
+                /* NOTREACHED */
+                return NULL;
+            }
+            break;
+
+        case REVERSE_INDEX:
+            if (ind <= 0)
+            {
+                ERROR("Illegal index for [<]: not a positive number.\n");
+                return NULL;
+            }
+
+            if (ind > size)
+            {
+                ERRORF(("Index out of bounds for [<]: %"PRIdMPINT", vector size: %"PRIdMPINT".\n"
+                       , i->u.number, size));
+                return NULL;
+            }
+
+            ind = size - ind;
+            break;
+
+        case ARITHMETIC_INDEX:
+            if (ind < 0)
+                ind = size + ind;
+
+            if (ind < 0 || ind >= size)
+            {
+                ERRORF(("Index out of bounds for [>]: %"PRIdMPINT", vector size: %"PRIdMPINT".\n"
+                       , i->u.number, size));
+                return NULL;
+            }
+            break;
+    }
+
+    ind += r->index1;
+
+    if (column)
+        *column = ind;
+    item = get_map_value(r->map, &(r->key));
+    if (item == &const0)
+        return item;
+    return item + ind;
+} /* get_map_range_item() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
@@ -4707,7 +5401,7 @@ assign_mapentry_lvalue_no_free (svalue_t *dest, mapping_t *map, svalue_t *key, i
     free_svalue(&(current_unprotected_mapentry.key));
     internal_assign_svalue_no_free(&(current_unprotected_mapentry.key), key);
     current_unprotected_mapentry.index = index;
-} /* assign_protected_mapentry_lvalue_no_free() */
+} /* assign_mapentry_lvalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
 INLINE void
@@ -4841,7 +5535,7 @@ assign_protected_lvalue (svalue_t *dest, svalue_t *src)
         free_svalue(dest);
         assign_protected_lvalue_no_free(dest, src);
     }
-} /* assign_protected_lvalue_no() */
+} /* assign_protected_lvalue() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -4868,6 +5562,33 @@ assign_protected_mapentry_lvalue_no_free (svalue_t *dest, mapping_t *map, svalue
 
     num_protected_lvalues++;
 } /* assign_protected_mapentry_lvalue_no_free() */
+
+/*-------------------------------------------------------------------------*/
+void
+assign_protected_map_range_lvalue_no_free (svalue_t *dest, mapping_t *map, svalue_t *key, mp_int index1, mp_int index2)
+
+/* Put a protected map range lvalue to <map>[key,index1..index2-1] into <dest>.
+ * <dest> is considered empty at the time of call.
+ */
+{
+    struct protected_map_range_lvalue *lval;
+
+    memsafe(lval = xalloc(sizeof(*lval)), sizeof(*lval)
+           , "protected map range lvalue");
+
+    lval->ref = 1;
+    lval->map = ref_mapping(map);
+    lval->index1 = index1;
+    lval->index2 = index2;
+
+    assign_svalue_no_free(&(lval->key), key);
+
+    dest->type = T_LVALUE;
+    dest->x.lvalue_type = LVALUE_PROTECTED_MAP_RANGE;
+    dest->u.protected_map_range_lvalue = lval;
+
+    num_protected_lvalues++;
+} /* assign_protected_map_range_lvalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
@@ -4922,10 +5643,20 @@ push_protected_lvalue (svalue_t *sp)
             free_svalue(&(current_unprotected_mapentry.key));
             break;
 
+        case LVALUE_UNPROTECTED_MAP_RANGE:
+            assign_protected_map_range_lvalue_no_free(sp,
+                current_unprotected_map_range.map,
+                &(current_unprotected_map_range.key),
+                current_unprotected_map_range.index1,
+                current_unprotected_map_range.index2);
+            free_svalue(&(current_unprotected_map_range.key));
+            break;
+
         case LVALUE_PROTECTED:
         case LVALUE_PROTECTED_CHAR:
         case LVALUE_PROTECTED_RANGE:
         case LVALUE_PROTECTED_MAPENTRY:
+        case LVALUE_PROTECTED_MAP_RANGE:
             NOOP;
             break;
     }
@@ -4977,6 +5708,7 @@ get_unprotected_lvalue (svalue_t *lval)
         case LVALUE_UNPROTECTED_CHAR:
         case LVALUE_UNPROTECTED_RANGE:
         case LVALUE_UNPROTECTED_MAPENTRY:
+        case LVALUE_UNPROTECTED_MAP_RANGE:
             return lval;
 
         case LVALUE_PROTECTED:
@@ -5006,6 +5738,22 @@ get_unprotected_lvalue (svalue_t *lval)
             free_svalue(&(current_unprotected_mapentry.key));
             internal_assign_svalue_no_free(&(current_unprotected_mapentry.key), &(e->key));
             current_unprotected_mapentry.index = e->index;
+            return &unprotected_lvalue;
+        }
+
+        case LVALUE_PROTECTED_MAP_RANGE:
+        {
+            struct protected_map_range_lvalue *r = lval->u.protected_map_range_lvalue;
+
+            unprotected_lvalue.type = T_LVALUE;
+            unprotected_lvalue.x.lvalue_type = LVALUE_UNPROTECTED_MAP_RANGE;
+            current_unprotected_map_range.map = r->map;
+            current_unprotected_map_range.index1 = r->index1;
+            current_unprotected_map_range.index2 = r->index2;
+
+            free_svalue(&(current_unprotected_map_range.key));
+            internal_assign_svalue_no_free(&(current_unprotected_map_range.key), &(r->key));
+
             return &unprotected_lvalue;
         }
     }
@@ -5051,64 +5799,112 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool rese
 
     if (vec == NULL) /* It's a protected range lvalue */
     {
-        struct protected_range_lvalue *r;
-
         vec = sp - 1;
-        assert(vec->type == T_LVALUE && vec->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-        r = vec->u.protected_range_lvalue;
+        assert(vec->type == T_LVALUE);
 
-        switch (r->vec.type)
+        switch (vec->x.lvalue_type)
         {
-            case T_POINTER:
+            case LVALUE_PROTECTED_RANGE:
             {
-                item = get_vector_range_item(r->vec.u.vec, r->index1, r->index2, idx, sp, pc, itype);
+                struct protected_range_lvalue *r = vec->u.protected_range_lvalue;
 
-                if (last_reference)
-                    last_reference = (r->vec.u.vec->ref == 1);
+                switch (r->vec.type)
+                {
+                    case T_POINTER:
+                    {
+                        item = get_vector_range_item(r->vec.u.vec, r->index1, r->index2, idx, sp, pc, itype);
+
+                        if (last_reference)
+                            last_reference = (r->vec.u.vec->ref == 1);
+                        break;
+                    }
+
+                    case T_STRING:
+                    case T_BYTES:
+                    {
+                        svalue_t temp;
+                        string_t * orig = r->vec.u.str;
+                        char * cp = get_string_range_item(&(r->vec), r->index1, r->index2, idx, MY_TRUE, MY_FALSE, sp, pc, itype);
+
+                        /* Update the original variable. */
+                        if (r->vec.u.str != orig
+                         && r->var != NULL
+                         && r->var->val.type == r->vec.type
+                         && r->var->val.u.str == orig)
+                        {
+                            free_mstring(orig);
+                            r->var->val.u.str = ref_mstring(r->vec.u.str);
+                        }
+
+                        if (last_reference && vec->u.str->info.ref == 1)
+                        {
+                            /* The string will go away, store the number. */
+                            free_svalue(&indexing_quickfix);
+                            put_number(&indexing_quickfix, *(unsigned char*)cp);
+
+                            free_svalue(sp--);
+                            free_svalue(sp);
+
+                            assign_lvalue_no_free(sp, &indexing_quickfix);
+                            return sp;
+                        }
+
+                        assign_char_lvalue_no_free(&temp, r->var, r->vec.u.str, cp);
+                        free_svalue(sp--);
+                        free_svalue(sp);
+                        *sp = temp;
+
+                        return sp;
+                    }
+
+                    default:
+                        fatal("(index_lvalue)Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                }
                 break;
             }
 
-            case T_STRING:
-            case T_BYTES:
+            case LVALUE_PROTECTED_MAP_RANGE:
             {
-                svalue_t temp;
-                string_t * orig = r->vec.u.str;
-                char * cp = get_string_range_item(&(r->vec), r->index1, r->index2, idx, MY_TRUE, MY_FALSE, sp, pc, itype);
+                mp_int col;
+                struct protected_map_range_lvalue *r = vec->u.protected_map_range_lvalue;
 
-                /* Update the original variable. */
-                if (r->vec.u.str != orig
-                 && r->var != NULL
-                 && r->var->val.type == r->vec.type
-                 && r->var->val.u.str == orig)
+                if (last_reference)
+                    last_reference = (r->map->ref == 1);
+
+                item = get_map_range_item(r, idx, sp, pc, itype, &col);
+                if (item == &const0)
                 {
-                    free_mstring(orig);
-                    r->var->val.u.str = ref_mstring(r->vec.u.str);
-                }
+                    /* The key doesn't exist, we create a mapentry lvalue. */
+                    if (last_reference)
+                    {
+                        /* The mapping is going away... */
+                        free_svalue(&indexing_quickfix);
+                        assign_svalue_no_free(&indexing_quickfix, item);
 
-                if (last_reference && vec->u.str->info.ref == 1)
-                {
-                    /* The string will go away, store the number. */
-                    free_svalue(&indexing_quickfix);
-                    put_number(&indexing_quickfix, *(unsigned char*)cp);
+                        free_svalue(sp--);
+                        free_svalue(sp);
 
-                    free_svalue(sp--);
-                    free_svalue(sp);
+                        assign_var_lvalue_no_free(sp, &indexing_quickfix);
+                    }
+                    else
+                    {
+                        svalue_t temp;
 
-                    assign_lvalue_no_free(sp, &indexing_quickfix);
+                        assign_mapentry_lvalue_no_free(&temp, r->map, &(r->key), col);
+                        free_svalue(sp--);
+                        free_svalue(sp);
+                        *sp = temp;
+                    }
                     return sp;
                 }
-
-                assign_char_lvalue_no_free(&temp, r->var, r->vec.u.str, cp);
-                free_svalue(sp--);
-                free_svalue(sp);
-                *sp = temp;
-
-                return sp;
+                break;
             }
 
             default:
-                fatal("(index_lvalue)Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                fatal("Illegal lvalue type %d\n", vec->x.lvalue_type);
+                break;
         }
+
     }
     else
     {
@@ -5257,12 +6053,20 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool rese
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-push_map_index_lvalue (svalue_t *sp, bytecode_p pc, bool reseating)
+push_map_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool reseating)
 
-/* Operator F_MAP_INDEX_LVALUE(  mapping m=sp[-2]
- *                             , mixed i=sp[-1], int j=sp[0])
- *          F_MAP_INDEX_VLVALUE( mapping m=sp[-2]
- *                             , mixed i=sp[-1], int j=sp[0])
+/* Operator F_MAP_INDEX_LVALUE(   mapping m=sp[-2]
+ *                              , mixed i=sp[-1], int j=sp[0])
+ *          F_MAP_RINDEX_LVALUE(  mapping m=sp[-2]
+ *                              , mixed i=sp[-1], int j=sp[0])
+ *          F_MAP_AINDEX_LVALUE(  mapping m=sp[-2]
+ *                              , mixed i=sp[-1], int j=sp[0])
+ *          F_MAP_INDEX_VLVALUE(  mapping m=sp[-2]
+ *                              , mixed i=sp[-1], int j=sp[0])
+ *          F_MAP_RINDEX_VLVALUE( mapping m=sp[-2]
+ *                              , mixed i=sp[-1], int j=sp[0])
+ *          F_MAP_AINDEX_VLVALUE( mapping m=sp[-2]
+ *                              , mixed i=sp[-1], int j=sp[0])
  *
  * Compute the lvalue &(m[i,j]) and push it into the stack. If v has
  * just one ref left, the indexed item is stored in indexing_quickfix
@@ -5289,10 +6093,36 @@ push_map_index_lvalue (svalue_t *sp, bytecode_p pc, bool reseating)
 
     m = sp[-2].u.map;
     n = sp->u.number;
-    if (n < 0 || n >= m->num_values)
+    switch (itype)
     {
-        ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
-                PRIdPINT".\n", n, m->num_values));
+        case REGULAR_INDEX:
+            if (n < 0 || n >= m->num_values)
+            {
+                ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
+                        PRIdPINT".\n", n, m->num_values));
+            }
+            break;
+
+        case REVERSE_INDEX:
+            if (n <= 0 || n > m->num_values)
+            {
+                ERRORF(("Illegal sub-index <%"PRIdMPINT", mapping width is %"
+                        PRIdPINT".\n", n, m->num_values));
+            }
+
+            n = m->num_values - n;
+            break;
+
+        case ARITHMETIC_INDEX:
+            if (n < 0)
+                n += m->num_values;
+
+            if (n < 0 || n >= m->num_values)
+            {
+                ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
+                        PRIdPINT".\n", n, m->num_values));
+            }
+            break;
     }
 
     sp--; /* the key */
@@ -5344,7 +6174,7 @@ push_map_index_lvalue (svalue_t *sp, bytecode_p pc, bool reseating)
 
 
 /*-------------------------------------------------------------------------*/
-/* Code values used by push_range_lvalue() and push_range_value()
+/* Code values used by push_(map_)range_lvalue() and push_(map_)range_value()
  */
 
 enum range_type
@@ -5414,19 +6244,39 @@ push_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
     if (vec == NULL)
     {
         /* It must be a protected range. */
-        struct protected_range_lvalue *r;
-
         vec = sp - 2;
-        assert(vec->type == T_LVALUE && vec->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-        r = vec->u.protected_range_lvalue;
 
-        vec = &(r->vec);
-        offset = r->index1;
-        size = r->index2 - r->index1;
-        var = r->var;
+        assert(vec->type == T_LVALUE);
+        switch (vec->x.lvalue_type)
+        {
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = vec->u.protected_range_lvalue;
 
-        if (vec->type != T_POINTER && vec->type != T_STRING && vec->type != T_BYTES)
-            fatal("(range_lvalue)Illegal type for range lvalue '%s'.\n", typename(vec->type));
+                vec = &(r->vec);
+                offset = r->index1;
+                size = r->index2 - r->index1;
+                var = r->var;
+
+                if (vec->type != T_POINTER && vec->type != T_STRING && vec->type != T_BYTES)
+                    fatal("(range_lvalue)Illegal type for range lvalue '%s'.\n", typename(vec->type));
+                break;
+            }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                struct protected_map_range_lvalue *r = vec->u.protected_map_range_lvalue;
+
+                offset = r->index1;
+                size = r->index2 - r->index1;
+                var = NULL;
+                break;
+            }
+
+            default:
+                fatal("Illegal lvalue type %d\n", vec->x.lvalue_type);
+                break;
+        }
     }
     else
     {
@@ -5580,20 +6430,177 @@ push_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
 
     /* Save information to the current_unprotected_range structure.
      */
-    current_unprotected_range.var = var;
-    current_unprotected_range.vec = vec;
-    current_unprotected_range.index1 = offset+ind1;
-    current_unprotected_range.index2 = offset+ind2+1;
+    if (vec->type == T_LVALUE && vec->x.lvalue_type == LVALUE_PROTECTED_MAP_RANGE)
+    {
+        /* Indexing a map range will produce a map range. */
+        struct protected_map_range_lvalue *r = vec->u.protected_map_range_lvalue;
 
-    /* Drop the arguments and return the result. */
-    pop_n_elems(3);
-    sp++;
+        current_unprotected_map_range.map = r->map;
+        current_unprotected_map_range.index1 = offset + ind1;
+        current_unprotected_map_range.index2 = offset + ind2 + 1;
 
-    sp->type = T_LVALUE;
-    sp->x.lvalue_type = LVALUE_UNPROTECTED_RANGE;
+        free_svalue(&(current_unprotected_map_range.key));
+        internal_assign_svalue_no_free(&(current_unprotected_map_range.key), &(r->key));
+
+        /* Drop the arguments and return the result. */
+        pop_n_elems(3);
+        sp++;
+
+        sp->type = T_LVALUE;
+        sp->x.lvalue_type = LVALUE_UNPROTECTED_MAP_RANGE;
+    }
+    else
+    {
+        current_unprotected_range.var = var;
+        current_unprotected_range.vec = vec;
+        current_unprotected_range.index1 = offset+ind1;
+        current_unprotected_range.index2 = offset+ind2+1;
+
+        /* Drop the arguments and return the result. */
+        pop_n_elems(3);
+        sp++;
+
+        sp->type = T_LVALUE;
+        sp->x.lvalue_type = LVALUE_UNPROTECTED_RANGE;
+    }
 
     return sp;
 } /* push_range_lvalue() */
+
+/*-------------------------------------------------------------------------*/
+static svalue_t *
+push_map_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
+
+/* Operator F_MAP_RANGE_LVALUE (mapping mv=sp[-3], mixed k=sp[-2], int i1=sp[-1], i2=sp[0])
+ * and the operators F_MAP_??_RANGE_LVALUE.
+ *
+ * Compute the range &(m[k,i1..i2]) and push it onto the stack.
+ * The value pushed is a lvalue pointing to <special_lvalue>.
+ * <special_lvalue> then is a MAP_RANGE_LVALUE.
+ *
+ * <code> is a four-bit flag determining whether the indexes are counted
+ * from the beginning ('[i1..' and '..i2]'), the end of the vector
+ * or string ('[<i1..' and '..<i2]'), or depending on the sign of the
+ * index either from the beginning or end ('[>i1..' and '..>i2]').
+ * <code>&NX_MASK determines the mode for the lower index (NN_RANGE,
+ * RN_RANGE or AN_RANGE), <code>&XN_MASK the upper index (NN_RANGE,
+ * NR_RANGE or NA_RANGE).
+ */
+
+{
+    mp_int ind1, ind2, width;
+    mapping_t *map;
+
+    if (sp[-3].type != T_MAPPING)
+    {
+        ERRORF(("Indexing on illegal type: %s, expected mapping.\n"
+               , typename(sp[-3].type)
+              ));
+    }
+    if (sp[-1].type != T_NUMBER)
+    {
+        ERRORF(("Illegal sub-index start interval type: %s, expected int.\n"
+               , typename(sp[-1].type)
+              ));
+    }
+    if (sp[-0].type != T_NUMBER)
+    {
+        ERRORF(("Illegal sub-index end interval type: %s, expected int.\n"
+               , typename(sp[0].type)
+              ));
+    }
+
+    map = sp[-3].u.map;
+    ind1 = sp[-1].u.number;
+    ind2 = sp[0].u.number;
+    width = map->num_values;
+
+    switch (code & NX_MASK)
+    {
+        case NN_RANGE:
+            // Nothing to do.
+            break;
+
+        case RN_RANGE:
+            ind1 = width - ind1;
+            break;
+
+        case AN_RANGE:
+            if (ind1 < 0)
+                ind1 = width + ind1;
+            break;
+
+        default:
+            fatal("(range_value)Illegal index type %d.\n", code);
+            break;
+    }
+
+    switch (code & XN_MASK)
+    {
+        case NN_RANGE:
+            // Nothing to do.
+            break;
+
+        case NR_RANGE:
+            ind2 = width - ind2;
+            break;
+
+        case NA_RANGE:
+            if (ind2 < 0)
+                ind2 = width + ind2;
+            break;
+
+        default:
+            fatal("(range_value)Illegal index type %d.\n", code);
+            break;
+    }
+
+    if (ind1 < 0 || ind1 > width)
+    {
+        if (ind2 < -1 || ind2 >= width)
+            ERRORF(("Mapping range limits are out of bounds: [%"PRIdMPINT"..%"PRIdMPINT"], mapping width is %"PRIdMPINT".\n"
+                  , ind1, ind2, width));
+        else
+            ERRORF(("Mapping lower range limit is out of bounds: %"PRIdMPINT", mapping width is %"PRIdMPINT".\n"
+                  , ind1, width));
+    }
+    else if (ind2 < -1 || ind2 >= width)
+    {
+        ERRORF(("Mapping upper range limit is out of bounds: %"PRIdMPINT", mapping width is %"PRIdMPINT".\n"
+              , ind2, width));
+    }
+    else if (ind1 > ind2 + 1)
+    {
+        ERRORF(("Mapping range of negative length: [%"PRIdMPINT"..%"PRIdMPINT"].\n"
+              , ind1, ind2));
+    }
+
+    /* Everything is fine, create the lvalue.
+     * We don't need to do the actual lookup.
+     */
+    if (map->ref == 1)
+    {
+        /* Rescue the mapping as it will go away */
+        svalue_t temp = indexing_quickfix;
+        assign_svalue_no_free(&indexing_quickfix, sp-3);
+        free_svalue(&temp);
+    }
+
+    current_unprotected_map_range.map = map;
+    current_unprotected_map_range.index1 = ind1;
+    current_unprotected_map_range.index2 = ind2+1;
+
+    free_svalue(&(current_unprotected_map_range.key));
+    internal_assign_svalue_no_free(&(current_unprotected_map_range.key), sp-2);
+
+    pop_n_elems(4);
+    sp++;
+
+    sp->type = T_LVALUE;
+    sp->x.lvalue_type = LVALUE_UNPROTECTED_MAP_RANGE;
+
+    return sp;
+} /* push_map_range_lvalue() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
@@ -5625,48 +6632,64 @@ push_index_value (svalue_t *sp, bytecode_p pc, bool ignore_error, enum index_typ
 
     if (vec == NULL) /* It's a protected range lvalue */
     {
-        struct protected_range_lvalue *r;
-
         vec = sp - 1;
-        assert(vec->type == T_LVALUE && vec->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-        r = vec->u.protected_range_lvalue;
+        assert(vec->type == T_LVALUE);
 
-        switch (r->vec.type)
+        switch (vec->x.lvalue_type)
         {
-            case T_POINTER:
+            case LVALUE_PROTECTED_RANGE:
             {
-                item = get_vector_range_item(r->vec.u.vec, r->index1, r->index2, idx, sp, pc, itype);
+                struct protected_range_lvalue *r = vec->u.protected_range_lvalue;
+
+                switch (r->vec.type)
+                {
+                    case T_POINTER:
+                    {
+                        item = get_vector_range_item(r->vec.u.vec, r->index1, r->index2, idx, sp, pc, itype);
+                        break;
+                    }
+
+                    case T_STRING:
+                    case T_BYTES:
+                    {
+                        char *cp = get_string_range_item(&(r->vec), r->index1, r->index2, idx, MY_FALSE, MY_TRUE, sp, pc, itype);
+                        p_int c;
+
+                        if (r->vec.u.str->info.unicode == STRING_UTF8)
+                        {
+                            if (!utf8_to_unicode(cp, 4, &c))
+                            {
+                                inter_sp = sp;
+                                inter_pc = pc;
+                                errorf("(index_value)Invalid character in string.\n");
+                                return NULL;
+                            }
+                        }
+                        else
+                            c = *((unsigned char*)cp);
+
+                        free_svalue(sp--);
+                        free_svalue(sp);
+
+                        put_number(sp, c);
+                        return sp;
+                    }
+
+                    default:
+                        fatal("(index_value)Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                }
                 break;
             }
 
-            case T_STRING:
-            case T_BYTES:
+            case LVALUE_PROTECTED_MAP_RANGE:
             {
-                char *cp = get_string_range_item(&(r->vec), r->index1, r->index2, idx, MY_FALSE, MY_TRUE, sp, pc, itype);
-                p_int c;
-
-                if (r->vec.u.str->info.unicode == STRING_UTF8)
-                {
-                    if (!utf8_to_unicode(cp, 4, &c))
-                    {
-                        inter_sp = sp;
-                        inter_pc = pc;
-                        errorf("(index_value)Invalid character in string.\n");
-                        return NULL;
-                    }
-                }
-                else
-                    c = *((unsigned char*)cp);
-
-                free_svalue(sp--);
-                free_svalue(sp);
-
-                put_number(sp, c);
-                return sp;
+                item = get_map_range_item(vec->u.protected_map_range_lvalue, idx, sp, pc, itype, NULL);
+                break;
             }
 
             default:
-                fatal("(index_value)Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                fatal("Illegal lvalue type %d\n", vec->x.lvalue_type);
+                break;
         }
     }
     else
@@ -5774,6 +6797,91 @@ push_index_value (svalue_t *sp, bytecode_p pc, bool ignore_error, enum index_typ
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
+push_map_index_value (svalue_t *sp, bytecode_p pc, enum index_type itype)
+
+/* Operator F_MAP_INDEX  (mapping m=sp[-2], mixed k=sp[-1], int i=sp[0])
+ *          F_MAP_RINDEX (mapping m=sp[-2], mixed k=sp[-1], int i=sp[0])
+ *          F_MAP_AINDEX (mapping m=sp[-2], mixed k=sp[-1], int i=sp[0])
+ *
+ * Compute the value (m[k,i]) and push it onto the stack.
+ * If the value would be a destructed object, 0 is pushed onto the stack
+ * and the ref to the object is removed from the vector/mapping.
+ * <ignore_error> will just be passed to get_struct_item() and
+ * results in returning 0, when a struct member is not found.
+ */
+
+{
+    mapping_t *m;
+    mp_int n;
+    svalue_t *data;
+
+    if (sp[-2].type != T_MAPPING)
+    {
+        ERRORF(("(value) Indexing on illegal type: %s, expected mapping.\n"
+               , typename(sp[-2].type)
+              ));
+    }
+    if (sp[0].type != T_NUMBER)
+    {
+        ERRORF(("Illegal sub-index type: %s, expected number.\n"
+               , typename(sp[0].type)
+              ));
+    }
+
+    m = sp[-2].u.map;
+    n = sp->u.number;
+
+    switch (itype)
+    {
+        case REGULAR_INDEX:
+            if (n < 0 || n >= m->num_values)
+            {
+                ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
+                        PRIdPINT".\n", n, m->num_values));
+            }
+            break;
+
+        case REVERSE_INDEX:
+            if (n <= 0 || n > m->num_values)
+            {
+                ERRORF(("Illegal sub-index <%"PRIdMPINT", mapping width is %"
+                        PRIdPINT".\n", n, m->num_values));
+            }
+
+            n = m->num_values - n;
+            break;
+
+        case ARITHMETIC_INDEX:
+            if (n < 0)
+                n += m->num_values;
+
+            if (n < 0 || n >= m->num_values)
+            {
+                ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
+                        PRIdPINT".\n", n, m->num_values));
+            }
+            break;
+    }
+
+    sp--; /* the sub-index */
+
+    data = get_map_value(m, sp);
+    pop_stack(); /* the key */
+
+    if (data == &const0)
+    {
+        put_number(sp, 0);
+    }
+    else
+    {
+        assign_rvalue_no_free(sp, data + n);
+    }
+    free_mapping(m);
+    return sp;
+} /* push_map_index_value() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
 push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
 
 /* Operator F_RANGE (string|vector &v=sp[-2], int i1=sp[-1], i2=sp[0])
@@ -5815,18 +6923,37 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
     if (vec == NULL)
     {
         /* It must be a protected range. */
-        struct protected_range_lvalue *r;
-
         vec = sp - 2;
-        assert(vec->type == T_LVALUE && vec->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-        r = vec->u.protected_range_lvalue;
 
-        vec = &(r->vec);
-        offset = r->index1;
-        size = r->index2 - r->index1;
+        assert(vec->type == T_LVALUE);
+        switch (vec->x.lvalue_type)
+        {
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = vec->u.protected_range_lvalue;
 
-        if (vec->type != T_POINTER && vec->type != T_STRING && vec->type != T_BYTES)
-            fatal("(range_value)Illegal type for range lvalue '%s'.\n", typename(vec->type));
+                vec = &(r->vec);
+                offset = r->index1;
+                size = r->index2 - r->index1;
+
+                if (vec->type != T_POINTER && vec->type != T_STRING && vec->type != T_BYTES)
+                    fatal("(range_value)Illegal type for range lvalue '%s'.\n", typename(vec->type));
+                break;
+            }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                struct protected_map_range_lvalue *r = vec->u.protected_map_range_lvalue;
+
+                offset = r->index1;
+                size = r->index2 - r->index1;
+                break;
+            }
+
+            default:
+                fatal("Illegal lvalue type %d\n", vec->x.lvalue_type);
+                break;
+        }
     }
     else
     {
@@ -5901,7 +7028,8 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
             break;
     }
 
-    if (runtime_array_range_check && vec->type == T_POINTER)
+    if ((runtime_array_range_check && vec->type == T_POINTER)
+      || vec->type == T_LVALUE)
     {
         if (ind1 < 0 || ind1 >= length)
         {
@@ -5989,10 +7117,174 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
             return sp;
         }
 
+        case T_LVALUE:
+        {
+            struct protected_map_range_lvalue *r;;
+            svalue_t *src;
+            vector_t *v;
+
+            assert(vec->x.lvalue_type == LVALUE_PROTECTED_MAP_RANGE);
+
+            r = vec->u.protected_map_range_lvalue;
+            src = get_map_value(r->map, &(r->key));
+
+            if (src == &const0)
+                v = allocate_array(ind2 - ind1 + 1);
+            else
+            {
+                v = allocate_uninit_array(ind2 - ind1 + 1);
+                if (v)
+                {
+                    svalue_t *dest = v->item;
+                    src += offset + ind1;
+
+                    for (mp_int i = ind1; i <= ind2; i++)
+                        assign_rvalue_no_free(dest++, src++);
+                }
+            }
+
+            pop_n_elems(3);
+            if (v)
+                push_array(sp, v);
+            else
+                push_number(sp, 0);
+            return sp;
+        }
+
         default:
             fatal("(range_value)Illegal type for range lvalue '%s'.\n", typename(vec->type));
     }
 }
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+push_map_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
+
+/* Operator F_MAP_RANGE (mapping m=sp[-3], mixed k=sp[-2], int i1=sp[-1], i2=sp[0])
+ * and the operators F_MAP_??_RANGE.
+ *
+ * Compute the value m[k,i1..i2] and push it onto the stack.
+ *
+ * <code> is a four-bit flag determining whether the indexes are counted
+ * from the beginning ('[i1..' and '..i2]'), the end ('[<i1..' and '..<i2]'),
+ * or depending on the sign of the index either from the beginning or
+ * end ('[>i1..' and '..>i2]').
+ *
+ * <code>&NX_MASK determines the mode for the lower index (NN_RANGE,
+ * RN_RANGE or AN_RANGE), <code>&XN_MASK the upper index (NN_RANGE,
+ * NR_RANGE or NA_RANGE).
+ */
+
+{
+    svalue_t      *msv;         /* the mapping as an svalue */
+    mapping_t     *m;           /* the indexed mapping */
+    svalue_t      *k;           /* the mapping key */
+    mp_int         ind1, ind2;  /* Lower and upper range index */
+    mp_int         width;       /* Mapping width */
+    svalue_t      *data;        /* The requested elements. */
+    vector_t      *v;           /* The resulting array */
+
+    /* get the arguments */
+    msv = get_rvalue(sp-3, NULL);
+    if (msv == NULL || msv->type != T_MAPPING)
+        ERRORF(("Bad argument to [,..] operand: got %s, expected mapping.\n"
+              , typename(msv ? msv->type : sp[-3].type))
+              );
+    m = msv->u.map;
+
+    k = sp-2;
+
+    if (sp[-1].type != T_NUMBER)
+        ERRORF(("Bad type '%s' of start interval to [,..] range.\n"
+               , typename(sp[-1].type)
+               ));
+    if (sp[0].type != T_NUMBER)
+        ERRORF(("Bad type '%s' of end interval to [,..] range.\n"
+               , typename(sp[0].type)
+               ));
+    ind1 = sp[-1].u.number;
+    ind2 = sp[0].u.number;
+
+    width = m->num_values;
+
+    switch (code & NX_MASK)
+    {
+        case NN_RANGE:
+            // Nothing to do.
+            break;
+
+        case RN_RANGE:
+            ind1 = width - ind1;
+            break;
+
+        case AN_RANGE:
+            if (ind1 < 0)
+                ind1 = width + ind1;
+            break;
+
+        default:
+            fatal("(range_value)Illegal index type %d.\n", code);
+            break;
+    }
+
+    switch (code & XN_MASK)
+    {
+        case NN_RANGE:
+            // Nothing to do.
+            break;
+
+        case NR_RANGE:
+            ind2 = width - ind2;
+            break;
+
+        case NA_RANGE:
+            if (ind2 < 0)
+                ind2 = width + ind2;
+            break;
+
+        default:
+            fatal("(range_value)Illegal index type %d.\n", code);
+            break;
+    }
+
+    if (ind1 < 0 || ind1 >= width)
+    {
+        if (ind2 < 0 || ind2 >= width)
+            ERRORF(("Mapping range limits are out of bounds: [%"PRIdMPINT"..%"PRIdMPINT"], mapping width is %"PRIdMPINT".\n"
+                  , ind1, ind2, width));
+        else
+            ERRORF(("Mapping lower range limit is out of bounds: %"PRIdMPINT", mapping width is %"PRIdMPINT".\n"
+                  , ind1, width));
+    }
+    else if (ind2 < 0 || ind2 >= width)
+    {
+        ERRORF(("Mapping upper range limit is out of bounds: %"PRIdMPINT", mapping width is %"PRIdMPINT".\n"
+              , ind2, width));
+    }
+    else if (ind1 > ind2 + 1)
+    {
+        ERRORF(("Mapping range of negative length: [%"PRIdMPINT"..%"PRIdMPINT"].\n"
+              , ind1, ind2));
+    }
+
+    data = get_map_value(m, k);
+    if (data == &const0)
+        v = allocate_array(ind2 - ind1 + 1);
+    else
+    {
+        svalue_t *item;
+
+        v = allocate_uninit_array(ind2 - ind1 + 1);
+        item = v->item;
+
+        for (mp_int i = ind1; i <= ind2; i++, item++)
+            assign_rvalue_no_free(item, data + i);
+    }
+
+    pop_n_elems(4);
+    push_array(sp, v);
+    return sp;
+} /* push_map_range_value() */
 
 /*=========================================================================*/
 /*-------------------------------------------------------------------------*/
@@ -6694,8 +7986,14 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
 
     if (bsvp == NULL)
     {
-        assert(svp->type == T_LVALUE && svp->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-        bsvp = &(svp->u.protected_range_lvalue->vec);
+        assert(svp->type == T_LVALUE);
+
+        // For string/byte ranges we can use the target value.
+        // otherwise we need to handle the range explicitly to not look at hidden values.
+        if (svp->x.lvalue_type == LVALUE_PROTECTED_RANGE && svp->u.protected_range_lvalue->vec.type != T_POINTER)
+            bsvp = &(svp->u.protected_range_lvalue->vec);
+        else
+            bsvp = svp;
     }
 
     // No type saved? Anything is possible...
@@ -6723,7 +8021,6 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
         case T_ERROR_HANDLER:
         case T_BREAK_ADDR:
         case T_ARG_FRAME:
-        case T_LVALUE:
             if (svptype)
                 *svptype = lpctype_unknown;
             return MY_FALSE;
@@ -6736,6 +8033,7 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
             valuetype = lpctype_bytes;
             break;
 
+        case T_LVALUE:
         case T_POINTER:
         {
             // We have to look into it...
@@ -6743,6 +8041,18 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
             // In the later case we have to check both cases independently.
             lpctype_t* head = formaltype;
             lpctype_t* svpelement = NULL;
+            struct range_iterator start;
+
+            if (!get_iterator(bsvp, &start, true))
+                fatal("Illegal lvalue type %d\n", bsvp->x.lvalue_type);
+
+            if (start.next_value == &zero_iterator_next_value)
+            {
+                // Shortcut: The iterator would give us just zeroes.
+                // So we don't need to look at the elements, we know the type.
+                valuetype = lpctype_any_array;
+                break;
+            }
 
             while (true)
             {
@@ -6751,15 +8061,17 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
                 if (member->t_class == TCLASS_ARRAY)
                 {
                     lpctype_t *element = member->t_array.element;
-                    vector_t *vec = bsvp->u.vec;
-                    size_t i, size = VEC_SIZE(vec);
                     Bool correct = MY_TRUE;
 
-                    for (i=0; i < size; i++)
+                    for (struct range_iterator it = start;;)
                     {
                         lpctype_t *svpresult;
+                        svalue_t *item = it.next_value(&it);
 
-                        if(!check_rtt_compatibility_inl(element, vec->item + i, svptype ? &svpresult : NULL))
+                        if (!item)
+                            break;
+
+                        if(!check_rtt_compatibility_inl(element, item, svptype ? &svpresult : NULL))
                             correct = MY_FALSE;
 
                         // mixed is returned when the element is '0'.
@@ -6799,7 +8111,7 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
                     {
                         *svptype = get_array_type(svpelement ? svpelement : lpctype_mixed);
                         free_lpctype(svpelement);
-                    }
+                }
 
                     return MY_FALSE; // No valid type found.
                 }
@@ -8324,6 +9636,7 @@ free_interpreter_temporaries (void)
     free_svalue(&struct_member_temporary);
     struct_member_temporary.type = T_NUMBER;
     free_svalue(&current_unprotected_mapentry.key);
+    free_svalue(&current_unprotected_map_range.key);
 
 #ifdef TRACE_CODE
     {
@@ -12577,6 +13890,10 @@ again:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
                 free_svalue(&(current_unprotected_mapentry.key));
                 break;
+
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+                ERRORF(("Bad argument to +=: Addition to a mapping range is not allowed.\n"));
+                break; /* NOTREACHED */
         }
 
         if(argp == NULL) /* Already handled. */
@@ -12893,6 +14210,10 @@ again:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
                 free_svalue(&(current_unprotected_mapentry.key));
                 break;
+
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+                ERRORF(("Bad argument to -=: Subtraction from a mapping range is not allowed.\n"));
+                break; /* NOTREACHED */
         }
 
         if(argp == NULL) /* Already handled. */
@@ -13167,6 +14488,10 @@ again:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
                 free_svalue(&(current_unprotected_mapentry.key));
                 break;
+
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+                ERRORF(("Bad argument to *=: Multiplicating a mapping range is not allowed.\n"));
+                break; /* NOTREACHED */
         }
 
         if(argp == NULL) /* Already handled. */
@@ -13438,6 +14763,7 @@ again:
                 break;
 
             case LVALUE_UNPROTECTED_RANGE:
+            case LVALUE_UNPROTECTED_MAP_RANGE:
                 OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, T_POINTER);
                 break; /* NOTREACHED */
 
@@ -13591,6 +14917,7 @@ again:
                 break;
 
             case LVALUE_UNPROTECTED_RANGE:
+            case LVALUE_UNPROTECTED_MAP_RANGE:
                 OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
                 break; /* NOTREACHED */
 
@@ -13693,6 +15020,10 @@ again:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
                 free_svalue(&(current_unprotected_mapentry.key));
                 break;
+
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+                ERRORF(("Bad argument to &=: Intersecting a mapping range is not allowed.\n"));
+                break; /* NOTREACHED */
         }
 
         if(argp == NULL) /* Already handled. */
@@ -13858,6 +15189,10 @@ again:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
                 free_svalue(&(current_unprotected_mapentry.key));
                 break;
+
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+                ERRORF(("Bad argument to |=: Joining a mapping range is not allowed.\n"));
+                break; /* NOTREACHED */
         }
 
         if(argp == NULL) /* Already handled. */
@@ -13970,6 +15305,10 @@ again:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
                 free_svalue(&(current_unprotected_mapentry.key));
                 break;
+
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+                ERRORF(("Bad argument to ^=: Symmetric difference with a mapping range is not allowed.\n"));
+                break; /* NOTREACHED */
         }
 
         if(argp == NULL) /* Already handled. */
@@ -14076,6 +15415,7 @@ again:
                 break;
 
             case LVALUE_UNPROTECTED_RANGE:
+            case LVALUE_UNPROTECTED_MAP_RANGE:
                 OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
                 break; /* NOTREACHED */
 
@@ -14169,6 +15509,7 @@ again:
                 break;
 
             case LVALUE_UNPROTECTED_RANGE:
+            case LVALUE_UNPROTECTED_MAP_RANGE:
                 OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
                 break; /* NOTREACHED */
 
@@ -14262,6 +15603,7 @@ again:
                 break;
 
             case LVALUE_UNPROTECTED_RANGE:
+            case LVALUE_UNPROTECTED_MAP_RANGE:
                 OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
                 break; /* NOTREACHED */
 
@@ -15030,7 +16372,29 @@ again:
          * just one ref left, the indexed item is stored in indexing_quickfix
          * and the lvalue refers to that variable.
          */
-        sp = push_map_index_lvalue(sp, pc, false);
+        sp = push_map_index_lvalue(sp, pc, REGULAR_INDEX, false);
+        break;
+
+    CASE(F_MAP_RINDEX_LVALUE);      /* --- map_rindex_lvalue  --- */
+        /* Operator F_MAP_RINDEX_LVALUE( mapping m=sp[-2]
+         *                             , mixed i=sp[-1], int j=sp[0])
+         *
+         * Compute the lvalue &(m[i,<j]) and push it into the stack. If v has
+         * just one ref left, the indexed item is stored in indexing_quickfix
+         * and the lvalue refers to that variable.
+         */
+        sp = push_map_index_lvalue(sp, pc, REVERSE_INDEX, false);
+        break;
+
+    CASE(F_MAP_AINDEX_LVALUE);      /* --- map_aindex_lvalue  --- */
+        /* Operator F_MAP_AINDEX_LVALUE( mapping m=sp[-2]
+         *                             , mixed i=sp[-1], int j=sp[0])
+         *
+         * Compute the lvalue &(m[i,>j]) and push it into the stack. If v has
+         * just one ref left, the indexed item is stored in indexing_quickfix
+         * and the lvalue refers to that variable.
+         */
+        sp = push_map_index_lvalue(sp, pc, ARITHMETIC_INDEX, false);
         break;
 
     CASE(F_INDEX_LVALUE);           /* --- index_lvalue       --- */
@@ -15326,6 +16690,162 @@ again:
         sp = push_range_lvalue(AR_RANGE, sp, pc);
         break;
 
+    CASE(F_MAP_RANGE_LVALUE);          /* --- map_range_lvalue    --- */
+        /* Operator F_MAP_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                            , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,i1..i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(NN_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_NR_RANGE_LVALUE);       /* --- map_nr_range_lvalue --- */
+        /* Operator F_MAP_NR_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,i1..<i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(NR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RN_RANGE_LVALUE);       /* --- map_rn_range_lvalue --- */
+        /* Operator F_MAP_RN_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,<i1..i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(RN_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RR_RANGE_LVALUE);       /* --- map_rr_range_lvalue --- */
+        /* Operator F_MAP_RR_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,<i1..<i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(RR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_NA_RANGE_LVALUE);       /* --- map_na_range_lvalue --- */
+        /* Operator F_MAP_NA_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,i1..>i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(NA_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_AN_RANGE_LVALUE);       /* --- map_an_range_lvalue --- */
+        /* Operator F_MAP_AN_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,>i1..i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(AN_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RA_RANGE_LVALUE);       /* --- map_ra_range_lvalue --- */
+        /* Operator F_MAP_RA_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,<i1..>i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(RA_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_AR_RANGE_LVALUE);       /* --- map_ar_range_lvalue --- */
+        /* Operator F_MAP_AR_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,>i1..<i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(AR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_AA_RANGE_LVALUE);       /* --- map_aa_range_lvalue --- */
+        /* Operator F_MAP_AA_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,>i1..>i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(AA_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_NX_RANGE_LVALUE);       /* --- map_nx_range_lvalue --- */
+        /* Operator F_MAP_NX_RANGE_LVALUE (mapping m=sp[-2], mixed k=sp[-1]
+         *                               , int i1=sp[0])
+         *
+         * Compute the range &(m[k,i1..]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         *
+         * We implement this by pushing '1' onto the stack and then
+         * call F_MAP_NR_RANGE_LVALUE, effectively computing &(m[k,i1..<1]).
+         */
+
+        push_number(sp, 1);  /* 'Push' the 1 for the upper bound */
+        sp = push_map_range_lvalue(NR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RX_RANGE_LVALUE);       /* --- map_rx_range_lvalue --- */
+        /* Operator F_MAP_RX_RANGE_LVALUE (mapping m=sp[-2], mixed k=sp[-1]
+         *                               , int i1=sp[0])
+         *
+         * Compute the range &(m[k,<i1..]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         *
+         * We implement this by pushing '1' onto the stack and then
+         * call F_MAP_RR_RANGE_LVALUE, effectively computing &(m[k,<i1..<1]).
+         */
+
+        push_number(sp, 1);  /* 'Push' the 1 for the upper bound */
+        sp = push_map_range_lvalue(RR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_AX_RANGE_LVALUE);       /* --- map_ax_range_lvalue --- */
+        /* Operator F_MAP_AX_RANGE_LVALUE (mapping m=sp[-2], mixed k=sp[-1]
+         *                               , int i1=sp[0])
+         *
+         * Compute the range &(m[k,>i1..]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         *
+         * We implement this by pushing '1' onto the stack and then
+         * call F_MAP_AR_RANGE_LVALUE, effectively computing &(m[k,>i1..<1]).
+         */
+
+        push_number(sp, 1);  /* 'Push' the 1 for the upper bound */
+        sp = push_map_range_lvalue(AR_RANGE, sp, pc);
+        break;
+
     CASE(F_MAKE_PROTECTED);
         /* Operator &(ref=sp[0])
          *
@@ -15506,7 +17026,37 @@ again:
          * so the entry can be changed without respecting any existing
          * stack. The computed index is a lvalue itself.
          */
-        sp = push_map_index_lvalue(sp, pc, true);
+        sp = push_map_index_lvalue(sp, pc, REGULAR_INDEX, true);
+        break;
+
+    CASE(F_MAP_RINDEX_VLVALUE);     /* --- map_rindex_vlvalue  --- */
+        /* Operator F_MAP_RINDEX_VLVALUE( mapping m=sp[-2]
+         *                              , mixed i=sp[-1], int j=sp[0])
+         *
+         * Compute the lvalue &(m[i,<j]) and push it into the stack. If v has
+         * just one ref left, the indexed item is stored in indexing_quickfix
+         * and the lvalue refers to that variable.
+         *
+         * This'll create an unprotected lvalue directly to the entry,
+         * so the entry can be changed without respecting any existing
+         * stack. The computed index is a lvalue itself.
+         */
+        sp = push_map_index_lvalue(sp, pc, REVERSE_INDEX, true);
+        break;
+
+    CASE(F_MAP_AINDEX_VLVALUE);     /* --- map_aindex_vlvalue  --- */
+        /* Operator F_MAP_AINDEX_VLVALUE( mapping m=sp[-2]
+         *                              , mixed i=sp[-1], int j=sp[0])
+         *
+         * Compute the lvalue &(m[i,>j]) and push it into the stack. If v has
+         * just one ref left, the indexed item is stored in indexing_quickfix
+         * and the lvalue refers to that variable.
+         *
+         * This'll create an unprotected lvalue directly to the entry,
+         * so the entry can be changed without respecting any existing
+         * stack. The computed index is a lvalue itself.
+         */
+        sp = push_map_index_lvalue(sp, pc, ARITHMETIC_INDEX, true);
         break;
 
 
@@ -16035,54 +17585,80 @@ again:
     }
 
     CASE(F_MAP_INDEX);              /* --- map_index           --- */
-    {
         /* Operator F_MAP_INDEX( mapping m=sp[-2], mixed i=sp[-1], int j=sp[0])
          *
          * Compute m[i,j] and push it onto the stack.
          */
-
-        mapping_t *m;
-        mp_int n;
-        svalue_t *data;
-
-        if (sp[-2].type != T_MAPPING)
-        {
-            ERRORF(("(value) Indexing on illegal type: %s, expected mapping.\n"
-                   , typename(sp[-2].type)
-                  ));
-        }
-        if (sp[0].type != T_NUMBER)
-        {
-            ERRORF(("Illegal sub-index type: %s, expected number.\n"
-                   , typename(sp[0].type)
-                  ));
-        }
-
-        m = sp[-2].u.map;
-        n = sp->u.number;
-
-        if (n < 0 || n >= m->num_values)
-        {
-            ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
-                    PRIdPINT".\n", n, m->num_values));
-        }
-
-        sp--; /* the key */
-
-        data = get_map_value(m, sp);
-        pop_stack();
-
-        if (data == &const0)
-        {
-            put_number(sp, 0);
-        }
-        else
-        {
-            assign_rvalue_no_free(sp, data + n);
-        }
-        free_mapping(m);
+        sp = push_map_index_value(sp, pc, REGULAR_INDEX);
         break;
-    }
+
+    CASE(F_MAP_RINDEX);             /* --- map_rindex          --- */
+        /* Operator F_MAP_RINDEX( mapping m=sp[-2], mixed i=sp[-1], int j=sp[0])
+         *
+         * Compute m[i,<j] and push it onto the stack.
+         */
+        sp = push_map_index_value(sp, pc, REVERSE_INDEX);
+        break;
+
+    CASE(F_MAP_AINDEX);             /* --- map_aindex          --- */
+        /* Operator F_MAP_AINDEX( mapping m=sp[-2], mixed i=sp[-1], int j=sp[0])
+         *
+         * Compute m[i,>j] and push it onto the stack.
+         */
+        sp = push_map_index_value(sp, pc, ARITHMETIC_INDEX);
+        break;
+
+    CASE(F_MAP_NX_RANGE);           /* --- map_nx_range        --- */
+        /* Push '1' onto the stack to make up for the missing
+         * upper range bound, then fall through to the normal
+         * range handling.
+         */
+        sp++;
+        put_number(sp, 1);
+        /* FALLTHROUGH */
+    CASE(F_MAP_NR_RANGE);           /* --- map_nr_range        --- */
+        sp = push_map_range_value(NR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RX_RANGE);           /* --- map_rx_range        --- */
+        sp++;
+        put_number(sp, 1);
+        /* FALLTHROUGH */
+    CASE(F_MAP_RR_RANGE);           /* --- map_rr_range        --- */
+        sp = push_map_range_value(RR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_AX_RANGE);           /* --- map_ax_range        --- */
+        sp++;
+        put_number(sp, 1);
+        /* FALLTHROUGH */
+    CASE(F_MAP_AR_RANGE);           /* --- map_ar_range        --- */
+        sp = push_map_range_value(AR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RANGE);              /* --- map_range           --- */
+        sp = push_map_range_value(NN_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RN_RANGE);           /* --- map_rn_range        --- */
+        sp = push_map_range_value(RN_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_NA_RANGE);           /* --- map_na_range        --- */
+        sp = push_map_range_value(NA_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_AN_RANGE);           /* --- map_an_range        --- */
+        sp = push_map_range_value(AN_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RA_RANGE);           /* --- map_ra_range        --- */
+        sp = push_map_range_value(RA_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_AA_RANGE);           /* --- map_aa_range        --- */
+        sp = push_map_range_value(AA_RANGE, sp, pc);
+        break;
 
     CASE(F_FOREACH);       /* --- foreach       <nargs> <offset> --- */
     CASE(F_FOREACH_REF);   /* --- foreach_ref   <nargs> <offset> --- */
@@ -16170,26 +17746,75 @@ again:
                 /* This is a range lvalue, take that string/vector
                  * But set start and count accordingly.
                  */
-                struct protected_range_lvalue *r;
+                assert(sp->type == T_LVALUE);
 
-                assert(sp->type == T_LVALUE && sp->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-                r = sp->u.protected_range_lvalue;
+                switch (sp->x.lvalue_type)
+                {
+                    case LVALUE_PROTECTED_RANGE:
+                    {
+                        struct protected_range_lvalue *r = sp->u.protected_range_lvalue;
 
-                arg = &(r->vec);
+                        arg = &(r->vec);
 
-                start = r->index1;
-                count = r->index2 - r->index1;
-                if (count < 0)
-                    count = 0;
+                        start = r->index1;
+                        count = r->index2 - r->index1;
+                        if (count < 0)
+                            count = 0;
 
-                /* Remember the variable, if it is a string,
-                 * because we might need to update it.
-                 */
-                if ((arg->type == T_STRING || arg->type == T_BYTES)
-                 && r->var != NULL
-                 && r->var->val.type == arg->type
-                 && r->var->val.u.str == arg->u.str )
-                    argvar = r->var;
+                        /* Remember the variable, if it is a string,
+                         * because we might need to update it.
+                         */
+                        if ((arg->type == T_STRING || arg->type == T_BYTES)
+                         && r->var != NULL
+                         && r->var->val.type == arg->type
+                         && r->var->val.u.str == arg->u.str )
+                            argvar = r->var;
+                        break;
+                    }
+
+                    case LVALUE_PROTECTED_MAP_RANGE:
+                    {
+                        /* We'll replace it with a vector containing those entries. */
+                        struct protected_map_range_lvalue *r = sp->u.protected_map_range_lvalue;
+                        vector_t *vec = allocate_uninit_array(r->index2 - r->index1);
+                        svalue_t *item = get_map_value(r->map, &(r->key));
+
+                        if (vec == NULL)
+                            ERRORF(("Out of memory when iterating over mapping values.\n"));
+
+                        if (item == &const0)
+                        {
+                            /* We'll use map entry lvalues. This is a bit more expensive,
+                             * as each access will lookup the key again, but it will prevent
+                             * the entries from being generated without an assignment.
+                             */
+                            svalue_t *dest = vec->item;
+
+                            for (mp_int i = r->index1; i < r->index2; i++)
+                                assign_protected_mapentry_lvalue_no_free(dest++, r->map, &(r->key), i);
+                        }
+                        else
+                        {
+                            /* Create an array of lvalues to item + r->index1 ... item + r->index2. */
+                            svalue_t *dest = vec->item;
+
+                            for (mp_int i = r->index1; i < r->index2; i++)
+                                assign_protected_lvalue_no_free(dest++, item + i);
+                        }
+
+                        free_svalue(sp);
+                        put_array(sp, vec);
+                        arg = sp;
+
+                        start = 0;
+                        count = r->index2 - r->index1;
+                        break;
+                    }
+
+                    default:
+                        fatal("Illegal lvalue type %d\n", sp->x.lvalue_type);
+                        break;
+                }
             }
             else if (sp->x.lvalue_type == LVALUE_PROTECTED
                   && (arg->type == T_STRING || arg->type == T_BYTES))
@@ -17183,6 +18808,10 @@ again:
 
                 case LVALUE_PROTECTED_MAPENTRY:
                     i = (sp->u.protected_mapentry_lvalue->ref > 2);
+                    break;
+
+                case LVALUE_PROTECTED_MAP_RANGE:
+                    i = (sp->u.protected_map_range_lvalue->ref > 2);
                     break;
             } /* switch (sp->x.lvalue_type) */
         }
@@ -21786,6 +23415,7 @@ expand_argument (svalue_t *sp)
     svalue_t *val = sp;
     p_int start = 0, size = 0;
     bool make_ref = false;
+    bool is_map_range = false;
 
     while (val->type == T_LVALUE)
     {
@@ -21834,6 +23464,10 @@ expand_argument (svalue_t *sp)
             case LVALUE_UNPROTECTED_MAPENTRY:
                 /* Non-existent entry cannot be an array. */
                 push_protected_lvalue(val);
+                break;
+
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+                is_map_range = true;
                 break;
 
             case LVALUE_PROTECTED:
@@ -21888,6 +23522,12 @@ expand_argument (svalue_t *sp)
                 }
                 break;
             }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+                get_unprotected_lvalue(val);
+                is_map_range = true;
+                break;
+
         } /* switch */
         break;
     }
@@ -21945,6 +23585,33 @@ expand_argument (svalue_t *sp)
         }
 
         return size;
+    }
+    else if (is_map_range)
+    {
+        /* The mapping range is in current_unprotected_map_range. */
+        svalue_t *item;
+
+        /* We keep a reference to the mapping. */
+        (void)ref_mapping(current_unprotected_map_range.map);
+        free_svalue(sp--);
+
+        item = get_map_value(current_unprotected_map_range.map, &(current_unprotected_map_range.key));
+        if (item == &const0)
+        {
+            /* The key doesn't exist. Create map-entry lvalues. */
+            for (mp_int i = current_unprotected_map_range.index1; i < current_unprotected_map_range.index2; i++)
+                assign_protected_mapentry_lvalue_no_free(++sp, current_unprotected_map_range.map, &(current_unprotected_map_range.key), i);
+        }
+        else
+        {
+            for (mp_int i = current_unprotected_map_range.index1; i < current_unprotected_map_range.index2; i++)
+                assign_protected_lvalue_no_free(++sp, item + i);
+        }
+
+        free_mapping(current_unprotected_map_range.map);
+        free_svalue(&(current_unprotected_map_range.key));
+
+        return current_unprotected_map_range.index2 - current_unprotected_map_range.index1;
     }
     else
         return 1;

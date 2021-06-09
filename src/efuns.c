@@ -1056,7 +1056,12 @@ f_regexp (svalue_t *sp)
 
             if (item == NULL)
             {
-                struct protected_range_lvalue *r = v->item[i].u.protected_range_lvalue;
+                struct protected_range_lvalue *r;
+
+                if (v->item[i].x.lvalue_type != LVALUE_PROTECTED_RANGE)
+                    continue;
+
+                r = v->item[i].u.protected_range_lvalue;
                 if (r->vec.type != T_STRING)
                     continue;
 
@@ -5440,6 +5445,60 @@ v_present_clone (svalue_t *sp, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 static svalue_t *
+get_min_max_rvalue (svalue_t *valuep, svalue_t *tmp)
+
+/* Return the rvalue for <valuep> to use for comparison in max() and min().
+ * In contrast for get_rvalue() this function will also handle ranges by
+ * shortcutting array and map ranges to the null vector and returning
+ * the substring in <tmp> for string/bytes ranges. If <tmp> is NULL,
+ * the original string will be returned instead of a substring.
+ * <tmp> must be freed by the caller.
+ */
+
+{
+    static svalue_t error_vector = { T_POINTER, {}, {.vec = &null_vector} };
+    svalue_t *rvaluep = get_rvalue(valuep, NULL);
+    if (rvaluep == NULL)
+    {
+        switch (valuep->x.lvalue_type)
+        {
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = valuep->u.protected_range_lvalue;
+                if (r->vec.type == T_POINTER)
+                {
+                    /* We only need this for error messages. */
+                    rvaluep = &error_vector;
+                }
+                else
+                {
+                    if (tmp)
+                    {
+                        rvaluep = tmp;
+                        assign_rvalue_no_free(rvaluep, valuep);
+                    }
+                    else
+                        rvaluep = &(r->vec);
+                }
+                break;
+            }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+                /* We only need this for error messages. */
+                rvaluep = &error_vector;
+                break;
+
+            default:
+                fatal("Illegal lvalue type %d\n", valuep->x.lvalue_type);
+                break;
+        }
+    }
+
+    return rvaluep;
+} /* get_min_max_rvalue() */
+
+/*-------------------------------------------------------------------------*/
+static svalue_t *
 x_min_max (svalue_t *sp, int num_arg, Bool bMax)
 
 /* Implementation of VEFUNs max() and min().
@@ -5474,22 +5533,7 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
         }
     }
 
-    rvaluep = get_rvalue(valuep, NULL);
-    if (rvaluep == NULL)
-    {
-        struct protected_range_lvalue *r = valuep->u.protected_range_lvalue;
-        if (r->vec.type == T_POINTER)
-        {
-            /* We only need this for error messages. */
-            rvaluep = &(r->vec);
-        }
-        else
-        {
-            rvaluep = &tmp_str;
-            assign_rvalue_no_free(rvaluep, valuep);
-        }
-    }
-
+    rvaluep = get_min_max_rvalue(valuep, &tmp_str);
     if (rvaluep->type == T_STRING || rvaluep->type == T_BYTES)
     {
         result = rvaluep;
@@ -5497,26 +5541,13 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
         for (valuep++, left--; left > 0; valuep++, left--)
         {
             int cmp;
-            svalue_t *item = get_rvalue(valuep, NULL);
             svalue_t item_str = { T_NUMBER };
-            if (item == NULL)
-            {
-                struct protected_range_lvalue *r = valuep->u.protected_range_lvalue;
-                if (r->vec.type != T_STRING)
-                {
-                    /* We only need this for error messages. */
-                    item = &(r->vec);
-                }
-                else
-                {
-                    item = &item_str;
-                    assign_rvalue_no_free(item, valuep);
-                }
-            }
+            svalue_t *item = get_min_max_rvalue(valuep, &item_str);
 
             if (item->type != rvaluep->type)
             {
                 free_svalue(&tmp_str);
+                free_svalue(&item_str);
                 if (gotArray)
                     errorf("Bad argument to %s(): array[%d] is a '%s', "
                           "expected '%s'.\n"
@@ -5550,9 +5581,7 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
 
         for (valuep++, left--; left > 0; valuep++, left--)
         {
-            svalue_t *item = get_rvalue(valuep, NULL);
-            if (item == NULL)
-                item = &(valuep->u.protected_range_lvalue->vec);
+            svalue_t *item = get_min_max_rvalue(valuep, NULL);
 
             if (item->type != T_FLOAT && item->type != T_NUMBER)
             {
@@ -7497,6 +7526,42 @@ copy_svalue (svalue_t *dest, svalue_t *src
 
                 break;
             }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                struct protected_map_range_lvalue *r = src->u.protected_map_range_lvalue;
+                struct pointer_record *rec = find_add_pointer(ptable, r, MY_TRUE);
+
+                if (rec->ref_count++ < 0)
+                {
+                    svalue_t origmap = { T_MAPPING, {}, {.map = r->map} };
+                    svalue_t copymap;
+                    svalue_t copykey;
+
+#if defined(DYNAMIC_COSTS)
+                    add_eval_cost((depth+1) / 10);
+#endif
+
+                    copy_svalue(&copykey, &(r->key), ptable, depth+1);
+                    copy_svalue(&copymap, &origmap, ptable, depth+1);
+                    assign_protected_map_range_lvalue_no_free(dest, copymap.u.map, &(copykey), r->index1, r->index2);
+                    free_svalue(&(copykey));
+                    free_svalue(&(copymap));
+
+                    rec->data = dest->u.protected_map_range_lvalue;
+                }
+                else
+                {
+                    svalue_t sv;
+                    sv.type = T_LVALUE;
+                    sv.x.lvalue_type = LVALUE_PROTECTED_MAP_RANGE;
+                    sv.u.protected_map_range_lvalue = (struct protected_map_range_lvalue *) rec->data;
+
+                    assign_svalue_no_free(dest, &sv);
+                }
+
+                break;
+            }
         }
         break;
 
@@ -7671,6 +7736,22 @@ process_copy_svalue (svalue_t *src, struct pointer_table *ptable)
                     rec->data = NULL;
                     oldmap.u.map = e->map;
                     process_copy_svalue(&(e->key), ptable);
+                    process_copy_svalue(&oldmap, ptable);
+                    break;
+                }
+
+                case LVALUE_PROTECTED_MAP_RANGE:
+                {
+                    struct protected_map_range_lvalue *r = src->u.protected_map_range_lvalue;
+                    struct pointer_record *rec = find_add_pointer(ptable, r, false);
+                    svalue_t oldmap = { T_MAPPING, {}, {.map = r->map} };
+
+                    if (!rec || !rec->data)
+                        break;
+
+                    rec->data = NULL;
+
+                    process_copy_svalue(&(r->key), ptable);
                     process_copy_svalue(&oldmap, ptable);
                     break;
                 }
@@ -8203,9 +8284,14 @@ v_member (svalue_t *sp, int num_arg)
                     svalue_t *item = get_rvalue(entry, NULL);
                     if (item == NULL)
                     {
-                        struct protected_range_lvalue* r = entry->u.protected_range_lvalue;
+                        struct protected_range_lvalue* r;
                         size_t len;
 
+                        assert(entry->type == T_LVALUE);
+                        if (entry->x.lvalue_type != LVALUE_PROTECTED_RANGE)
+                            continue;
+
+                        r = entry->u.protected_range_lvalue;
                         if (r->vec.type != sp->type)
                             continue;
 
@@ -8499,9 +8585,14 @@ v_rmember (svalue_t *sp, int num_arg)
                 item = get_rvalue(entry, NULL);
                 if (item == NULL)
                 {
-                    struct protected_range_lvalue* r = entry->u.protected_range_lvalue;
+                    struct protected_range_lvalue* r;
                     size_t len;
 
+                    assert(entry->type == T_LVALUE);
+                    if (entry->x.lvalue_type != LVALUE_PROTECTED_RANGE)
+                        continue;
+
+                    r = entry->u.protected_range_lvalue;
                     if (r->vec.type != sp->type)
                         continue;
 
@@ -8844,6 +8935,7 @@ f_reverse(svalue_t *sp)
     bool changeInPlace = false;
     mp_int index1, index2;
     svalue_t *data, *var = NULL;
+    svalue_t *items = NULL;
 
     /* If the argument is passed in by reference, make sure that it is
      * an array, note the fact, and place it directly into the stack.
@@ -8856,15 +8948,40 @@ f_reverse(svalue_t *sp)
         if (data == NULL)
         {
             /* This is a range. */
-            struct protected_range_lvalue *r;
+            switch (sp->x.lvalue_type)
+            {
+                case LVALUE_PROTECTED_RANGE:
+                {
+                    struct protected_range_lvalue *r = sp->u.protected_range_lvalue;
 
-            assert(sp->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-            r = sp->u.protected_range_lvalue;
+                    index1 = r->index1;
+                    index2 = r->index2;
+                    data = &(r->vec);
+                    var = &(r->var->val);
+                    break;
+                }
 
-            index1 = r->index1;
-            index2 = r->index2;
-            data = &(r->vec);
-            var = &(r->var->val);
+                case LVALUE_PROTECTED_MAP_RANGE:
+                {
+                    struct protected_map_range_lvalue *r = sp->u.protected_map_range_lvalue;
+
+                    items = get_map_value(r->map, &(r->key));
+                    if (items == &const0)
+                    {
+                        /* Not existing entries are all zeroes, no need to reverse. */
+                        return sp;
+                    }
+
+                    data = NULL;
+                    index1 = r->index1;
+                    index2 = r->index2;
+                    break;
+                }
+
+                default:
+                    fatal("Illegal lvalue type %d\n", sp->x.lvalue_type);
+                    break;
+            }
         }
         else if (data->type == T_POINTER)
         {
@@ -8904,7 +9021,7 @@ f_reverse(svalue_t *sp)
     else
         data = sp;
 
-    if (data->type == T_NUMBER)
+    if (data != NULL && data->type == T_NUMBER)
     {
         p_int res;
 
@@ -8978,7 +9095,7 @@ f_reverse(svalue_t *sp)
 
         put_number(sp, res);
     }
-    else if (data->type == T_STRING || data->type == T_BYTES)
+    else if (data != NULL && (data->type == T_STRING || data->type == T_BYTES))
     {
         size_t len = mstrsize(data->u.str);
 
@@ -9075,25 +9192,30 @@ f_reverse(svalue_t *sp)
             }
         }
     }
-    else if (data->type == T_POINTER)
+    else if (data == NULL || data->type == T_POINTER)
     {
         mp_int r_size;
-        vector_t *vec = NULL;
+        vector_t *vec = NULL;   /* Only used when !changeInPlace */
 
         /* If we change in place, the 'new' vector is the old one
          * that lies already on the stack.
          */
-        if (changeInPlace
-         || data->u.vec->ref == 1
+        if (data == NULL)
+        {
+            /* In case of map ranges, nothing to do here. */
+        }
+        else if (changeInPlace)
+        {
+            items = data->u.vec->item;
+        }
+        else if (data->u.vec->ref == 1
          || data->u.vec == &null_vector)
         {
-            vec = data->u.vec;
-            if (!changeInPlace)
-            {
-                changeInPlace = true;
-                index1 = 0;
-                index2 = (mp_int)VEC_SIZE(vec);
-            }
+            /* Last array, change it to in-place reversal. */
+            changeInPlace = true;
+            items = data->u.vec->item;
+            index1 = 0;
+            index2 = (mp_int)VEC_SIZE(data->u.vec);
         }
         else
         {
@@ -9109,6 +9231,7 @@ f_reverse(svalue_t *sp)
             for (i = 0; i < size; i++)
                 assign_svalue_no_free(&vec->item[i], &old->item[i]);
 
+            items = vec->item;
             index1 = 0;
             index2 = size;
         }
@@ -9126,10 +9249,9 @@ f_reverse(svalue_t *sp)
             i2 = index2 - 1;
             while (i1 < i2)
             {
-                svalue_t tmp;
-                tmp   = *(vec->item + i1);
-                *(vec->item + i1) = *(vec->item + i2);
-                *(vec->item + i2) = tmp;
+                svalue_t tmp = items[i1];
+                items[i1]    = items[i2];
+                items[i2]    = tmp;
                 i1++;
                 i2--;
             }

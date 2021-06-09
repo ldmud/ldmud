@@ -7972,7 +7972,7 @@ delete_prog_string (void)
 %type <lvalue>       lvalue name_lvalue name_var_lvalue local_name_lvalue foreach_var_lvalue lvalue_reference
 %type <foreach_variables> foreach_vars
 %type <foreach_expression> foreach_expr
-%type <index>        index_range index_expr
+%type <index>        index_range index_map_range index_expr index_map_expr
 %type <case_label>   case_label
 %type <else_block>   optional_else
 %type <string>       anchestor
@@ -13587,7 +13587,7 @@ expr4:
       } /* expr4 index_range */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 '[' expr0 ',' expr0 ']' %prec '['
+    | expr4 index_map_expr %prec '['
       {
 %line
           /* Generate MAP_INDEX/PUSH_INDEXED_MAP_LVALUE */
@@ -13598,37 +13598,58 @@ expr4:
            * a mapping, or a runtime error will occur.
            * Therefore we don't need its lvalue.
            */
-          free_lvalue_block($5.lvalue);
-          free_lvalue_block($3.lvalue);
           free_lvalue_block($1.lvalue);
-          $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, F_MAP_INDEX_LVALUE);
+          $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, $2.lvalue_inst);
           $$.type = get_fulltype(lpctype_mixed);
           $$.name = NULL;
           $$.needs_use = true;
 
-          ins_f_code(F_MAP_INDEX);
+          ins_f_code($2.rvalue_inst);
 
           /* Check and compute types */
-          if ($3.type.t_flags & TYPE_MOD_REFERENCE
-           || $5.type.t_flags & TYPE_MOD_REFERENCE)
-              yyerror("Reference used as index");
-
           check_unknown_type($1.type.t_type);
 
           if (exact_types && !lpctype_contains(lpctype_mapping, $1.type.t_type))
               fulltype_error("Bad type to indexed lvalue", $1.type);
 
-          if (exact_types && !lpctype_contains(lpctype_int, $5.type.t_type))
-              fulltype_error("Bad type of index", $5.type);
+          if (exact_types && !lpctype_contains(lpctype_int, $2.type1.t_type))
+              fulltype_error("Bad type of index", $2.type1);
 
           use_variable($1.name, VAR_USAGE_READ);
-          use_variable($3.name, VAR_USAGE_READ);
-          use_variable($5.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
-          free_fulltype($3.type);
-          free_fulltype($5.type);
+          free_fulltype($2.type1);
       }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | expr4 index_map_range %prec '['
+      {
+%line
+          /* Generate a range expression */
+          $$.start = $1.start;
+
+          free_lvalue_block($1.lvalue);
+          $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, $2.lvalue_inst);
+          $$.type = get_fulltype(lpctype_any_array);
+          $$.name = NULL;
+
+          ins_f_code($2.rvalue_inst);
+
+          use_variable($1.name, VAR_USAGE_READ);
+
+          /* Check the types */
+
+          if (!lpctype_contains(lpctype_mapping, $1.type.t_type))
+              fulltype_error("Bad type to mapping range expression", $1.type);
+          if (!lpctype_contains(lpctype_int, $2.type1.t_type))
+              fulltype_error("Bad type of index", $2.type1);
+          if (!lpctype_contains(lpctype_int, $2.type2.t_type))
+              fulltype_error("Bad type of index", $2.type2);
+
+          free_fulltype($1.type);
+          free_fulltype($2.type1);
+          free_fulltype($2.type2);
+      } /* expr4 index_map_range */
 ; /* expr4 */
 
 
@@ -13783,7 +13804,7 @@ lvalue:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 '[' expr0 ',' expr0 ']' %prec '['
+    | expr4 index_map_expr %prec '['
       {
           /* Generate/add an PUSH_INDEXED_MAP_LVALUE */
 
@@ -13793,14 +13814,12 @@ lvalue:
            * a mapping, or a runtime error will occur.
            * Therefore we don't need its lvalue.
            */
-          free_lvalue_block($5.lvalue);
-          free_lvalue_block($3.lvalue);
           free_lvalue_block($1.lvalue);
-          $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, F_MAP_INDEX_LVALUE);
+          $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, $2.lvalue_inst);
           $$.type = lpctype_mixed;
           $$.name = NULL;
 
-          $$.vlvalue_inst = F_MAP_INDEX_VLVALUE;
+          $$.vlvalue_inst = $2.vlvalue_inst;
           $$.num_arg = 0;
 
           /* Remove the code from the program block. */
@@ -13808,23 +13827,16 @@ lvalue:
           last_expression = -1;
 
           /* Check and compute types */
-          if ($3.type.t_flags & TYPE_MOD_REFERENCE
-           || $5.type.t_flags & TYPE_MOD_REFERENCE)
-              yyerror("Reference used as index");
-
           if (exact_types && !lpctype_contains(lpctype_mapping, $1.type.t_type))
               fulltype_error("Bad type to indexed lvalue", $1.type);
 
-          if (exact_types && !lpctype_contains(lpctype_int, $5.type.t_type))
-              fulltype_error("Bad type of index", $5.type);
+          if (exact_types && !lpctype_contains(lpctype_int, $2.type1.t_type))
+              fulltype_error("Bad type of index", $2.type1);
 
           use_variable($1.name, VAR_USAGE_READ);
-          use_variable($3.name, VAR_USAGE_READ);
-          use_variable($5.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
-          free_fulltype($3.type);
-          free_fulltype($5.type);
+          free_fulltype($2.type1);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13875,6 +13887,40 @@ lvalue:
           free_fulltype($2.type1);
           free_fulltype($2.type2);
       }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | expr4 index_map_range %prec '['
+      {
+%line
+          /* Generate a range expression for a mapping */
+
+          /* We don't need the mapping as an lvalue. */
+          free_lvalue_block($1.lvalue);
+
+          $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, $2.lvalue_inst);
+          $$.type = lpctype_any_array;
+          $$.name = NULL;
+          $$.vlvalue_inst = 0;
+          $$.num_arg = 0;
+
+          /* Remove the code from the program block. */
+          CURRENT_PROGRAM_SIZE = $1.start;
+          last_expression = -1;
+
+          /* Check the types */
+          if (!lpctype_contains(lpctype_mapping, $1.type.t_type))
+              fulltype_error("Bad type to mapping range expression", $1.type);
+          if (!lpctype_contains(lpctype_int, $2.type1.t_type))
+              fulltype_error("Bad type of index", $2.type1);
+          if (!lpctype_contains(lpctype_int, $2.type2.t_type))
+              fulltype_error("Bad type of index", $2.type2);
+
+          use_variable($1.name, VAR_USAGE_READ);
+
+          free_fulltype($1.type);
+          free_fulltype($2.type1);
+          free_fulltype($2.type2);
+      } /* expr4 index_map_range */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr4 member_operator struct_member_name %prec L_ARROW
@@ -14381,10 +14427,6 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '<' expr0 L_RANGE           ']'
       {
-          /* Simulate an expression yielding <1 for the upper bound.
-           * We pretend that it's part of the lower bound expr.
-           */
-
           if (pragma_range_check)
               ins_byte(F_ARRAY_RANGE_CHECK);
 
@@ -14403,10 +14445,6 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '>' expr0 L_RANGE           ']'
       {
-          /* Simulate an expression yielding <1 for the upper bound.
-           * We pretend that it's part of the lower bound expr.
-           */
-
           if (pragma_range_check)
               ins_byte(F_ARRAY_RANGE_CHECK);
 
@@ -14422,6 +14460,442 @@ index_range :
           free_lvalue_block($3.lvalue);
       }
 ; /* index_range */
+
+index_map_range:
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+      '[' expr0 ',' L_RANGE expr0 ']'
+
+      {
+          free_fulltype($2.type);
+
+          /* Simulate an expression yielding 0 for the lower bound.
+           * We pretend that it's part of the upper bound expr.
+           */
+
+          if (!realloc_a_program(1))
+          {
+              yyerrorf("Out of memory: program size %"PRIdPINT"\n", CURRENT_PROGRAM_SIZE+1);
+              free_fulltype($5.type);
+              YYACCEPT;
+          }
+
+          memmove(PROGRAM_BLOCK + $5.start + 1, PROGRAM_BLOCK + $5.start, CURRENT_PROGRAM_SIZE - $5.start);
+          PUT_CODE(PROGRAM_BLOCK + $5.start, F_CONST0);
+          CURRENT_PROGRAM_SIZE++;
+
+          /* Return the data */
+
+          $$.rvalue_inst  = F_MAP_RANGE;
+          $$.lvalue_inst  = F_MAP_RANGE_LVALUE;
+          $$.start        = $2.start;
+          $$.end          = CURRENT_PROGRAM_SIZE;
+          $$.type1        = get_fulltype(lpctype_int);
+          $$.type2        = $5.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' L_RANGE '<' expr0 ']'
+
+      {
+          free_fulltype($2.type);
+
+          /* Simulate an expression yielding 0 for the lower bound.
+           * We pretend that it's part of the upper bound expr.
+           */
+
+          if (!realloc_a_program(1))
+          {
+              yyerrorf("Out of memory: program size %"PRIdPINT"\n", CURRENT_PROGRAM_SIZE+1);
+              free_fulltype($6.type);
+              YYACCEPT;
+          }
+
+          memmove(PROGRAM_BLOCK + $6.start + 1, PROGRAM_BLOCK + $6.start, CURRENT_PROGRAM_SIZE - $6.start);
+          PUT_CODE(PROGRAM_BLOCK + $6.start, F_CONST0);
+          CURRENT_PROGRAM_SIZE++;
+
+          /* Return the data */
+
+          $$.rvalue_inst = F_MAP_NR_RANGE;
+          $$.lvalue_inst = F_MAP_NR_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = get_fulltype(lpctype_int);
+          $$.type2       = $6.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($6.name, VAR_USAGE_READ);
+
+          free_lvalue_block($6.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' L_RANGE '>' expr0 ']'
+
+      {
+          free_fulltype($2.type);
+
+          /* Simulate an expression yielding 0 for the lower bound.
+           * We pretend that it's part of the upper bound expr.
+           */
+
+          if (!realloc_a_program(1))
+          {
+              yyerrorf("Out of memory: program size %"PRIdPINT"\n", CURRENT_PROGRAM_SIZE+1);
+              free_fulltype($6.type);
+              YYACCEPT;
+          }
+
+          memmove(PROGRAM_BLOCK + $6.start + 1, PROGRAM_BLOCK + $6.start, CURRENT_PROGRAM_SIZE - $6.start);
+          PUT_CODE(PROGRAM_BLOCK + $6.start, F_CONST0);
+          CURRENT_PROGRAM_SIZE++;
+
+          /* Return the data */
+
+          $$.rvalue_inst = F_MAP_NA_RANGE;
+          $$.lvalue_inst = F_MAP_NA_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = get_fulltype(lpctype_int);
+          $$.type2       = $6.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($6.name, VAR_USAGE_READ);
+
+          free_lvalue_block($6.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' expr0 L_RANGE expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_RANGE;
+          $$.lvalue_inst = F_MAP_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $4.type;
+          $$.type2       = $6.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($4.name, VAR_USAGE_READ);
+          use_variable($6.name, VAR_USAGE_READ);
+
+          free_lvalue_block($6.lvalue);
+          free_lvalue_block($4.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' expr0 L_RANGE '<' expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_NR_RANGE;
+          $$.lvalue_inst = F_MAP_NR_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $4.type;
+          $$.type2       = $7.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($4.name, VAR_USAGE_READ);
+          use_variable($7.name, VAR_USAGE_READ);
+
+          free_lvalue_block($7.lvalue);
+          free_lvalue_block($4.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '<' expr0 L_RANGE expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_RN_RANGE;
+          $$.lvalue_inst = F_MAP_RN_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = $7.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+          use_variable($7.name, VAR_USAGE_READ);
+
+          free_lvalue_block($7.lvalue);
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '<' expr0 L_RANGE '<' expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_RR_RANGE;
+          $$.lvalue_inst = F_MAP_RR_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = $8.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+          use_variable($8.name, VAR_USAGE_READ);
+
+          free_lvalue_block($8.lvalue);
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' expr0 L_RANGE '>' expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_NA_RANGE;
+          $$.lvalue_inst = F_MAP_NA_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $4.type;
+          $$.type2       = $7.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($4.name, VAR_USAGE_READ);
+          use_variable($7.name, VAR_USAGE_READ);
+
+          free_lvalue_block($7.lvalue);
+          free_lvalue_block($4.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '>' expr0 L_RANGE expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_AN_RANGE;
+          $$.lvalue_inst = F_MAP_AN_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = $7.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+          use_variable($7.name, VAR_USAGE_READ);
+
+          free_lvalue_block($7.lvalue);
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '<' expr0 L_RANGE '>' expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_RA_RANGE;
+          $$.lvalue_inst = F_MAP_RA_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = $8.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+          use_variable($8.name, VAR_USAGE_READ);
+
+          free_lvalue_block($8.lvalue);
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '>' expr0 L_RANGE '<' expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_AR_RANGE;
+          $$.lvalue_inst = F_MAP_AR_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = $8.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+          use_variable($8.name, VAR_USAGE_READ);
+
+          free_lvalue_block($8.lvalue);
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '>' expr0 L_RANGE '>' expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_AA_RANGE;
+          $$.lvalue_inst = F_MAP_AA_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = $8.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+          use_variable($8.name, VAR_USAGE_READ);
+
+          free_lvalue_block($8.lvalue);
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' expr0 L_RANGE ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_NX_RANGE;
+          $$.lvalue_inst = F_MAP_NX_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $4.type;
+          $$.type2       = get_fulltype(lpctype_int);
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($4.name, VAR_USAGE_READ);
+
+          free_lvalue_block($4.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '<' expr0 L_RANGE ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_RX_RANGE;
+          $$.lvalue_inst = F_MAP_RX_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = get_fulltype(lpctype_int);
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '>' expr0 L_RANGE ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_AX_RANGE;
+          $$.lvalue_inst = F_MAP_AX_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = get_fulltype(lpctype_int);
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+; /* index_map_range */
+
+index_map_expr:
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+      '[' expr0 ',' expr0 ']'
+
+      {
+          if ($2.type.t_flags & TYPE_MOD_REFERENCE
+           || $4.type.t_flags & TYPE_MOD_REFERENCE)
+              yyerror("Reference used as index");
+
+          free_fulltype($2.type);
+
+          $$.rvalue_inst  = F_MAP_INDEX;
+          $$.lvalue_inst  = F_MAP_INDEX_LVALUE;
+          $$.vlvalue_inst = F_MAP_INDEX_VLVALUE;
+          $$.start        = $2.start;
+          $$.end          = CURRENT_PROGRAM_SIZE;
+          $$.type1        = $4.type;
+          $$.type2.t_type = NULL;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($4.name, VAR_USAGE_READ);
+
+          free_lvalue_block($4.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '<' expr0 ']'
+
+      {
+          if ($2.type.t_flags & TYPE_MOD_REFERENCE
+           || $5.type.t_flags & TYPE_MOD_REFERENCE)
+              yyerror("Reference used as index");
+
+          free_fulltype($2.type);
+
+          $$.rvalue_inst  = F_MAP_RINDEX;
+          $$.lvalue_inst  = F_MAP_RINDEX_LVALUE;
+          $$.vlvalue_inst = F_MAP_RINDEX_VLVALUE;
+          $$.start        = $2.start;
+          $$.end          = CURRENT_PROGRAM_SIZE;
+          $$.type1        = $5.type;
+          $$.type2.t_type = NULL;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '>' expr0 ']'
+
+      {
+          if ($2.type.t_flags & TYPE_MOD_REFERENCE
+           || $5.type.t_flags & TYPE_MOD_REFERENCE)
+              yyerror("Reference used as index");
+
+          free_fulltype($2.type);
+
+          $$.rvalue_inst  = F_MAP_AINDEX;
+          $$.lvalue_inst  = F_MAP_AINDEX_LVALUE;
+          $$.vlvalue_inst = F_MAP_AINDEX_VLVALUE;
+          $$.start        = $2.start;
+          $$.end          = CURRENT_PROGRAM_SIZE;
+          $$.type1        = $5.type;
+          $$.type2.t_type = NULL;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+; /* index_map_expr */
 
 
 /* The following rules are used to construct array and

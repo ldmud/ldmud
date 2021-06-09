@@ -544,6 +544,47 @@ svalue_size (svalue_t *v, mp_int * pTotal)
                     return 0;
             }
 
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                struct protected_map_range_lvalue *lv = v->u.protected_map_range_lvalue;
+
+                if (lv->ref)
+                {
+                    struct pointer_record* record = find_add_pointer(ptable, lv, MY_TRUE);
+                    if (record->ref_count < 0)
+                    {
+                        /* New entry, determine the size. */
+                        svalue_t m = { T_MAPPING };
+                        mp_int total2;
+
+                        record->ref_count = 1;
+                        record->id_number = 0;
+
+                        m.u.map = lv->map;
+
+                        overhead = sizeof *lv;
+                        composite = svalue_size(&(lv->key), &total);
+                        composite += svalue_size(&m, &total2);
+
+                        *pTotal = total + total2 + overhead;
+
+                        /* Record it for later occurrences. */
+                        record->id_number = overhead + composite;
+                        return record->id_number * record->ref_count / lv->ref;
+                    }
+                    else
+                    {
+                        /* We have seen it. Don't need to add to the total,
+                         * but the the shared result.
+                         */
+                        record->ref_count++;
+                        return record->id_number / lv->ref;
+                    }
+                }
+                else
+                    return 0;
+            }
+
         } /* switch */
 
     default:

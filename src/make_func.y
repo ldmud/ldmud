@@ -93,10 +93,10 @@
  *        will be called F_<ID>. If <name> is specified, it will be used
  *        in tracedumps instead of the plain <id>.
  *
- *        If the instruction is an operator which can be used as a operator
+ *        If the instruction is an operator which can be used as a efun
  *        closure (like +), the optional <op-type> specifies how many operands
  *        the operator takes. <op-type> must be one of the keywords 'unary',
- *        'binary' and 'ternary'.
+ *        'binary', 'ternary' and 'quaternary'.
  *
  *
  * An efun is defined this way:
@@ -799,7 +799,7 @@ move_to_arg_types ()
 %token VARARGS
 %token PRIVATE PROTECTED STATIC VISIBLE
 
-%token UN_OP BIN_OP TRI_OP
+%token UN_OP BIN_OP TRI_OP QUAT_OP
 
 %token LVALUE
 
@@ -829,7 +829,7 @@ move_to_arg_types ()
 
 %type <number>optional_optype
   /* 0: No op-type given
-   * 1: UN_OP, 2: BIN_OP, 3: TRI_OP
+   * 1: UN_OP, 2: BIN_OP, 3: TRI_OP, 4: QUAT_OP
    * Or in other words: the number of operands :-)
    */
 
@@ -883,6 +883,7 @@ optional_optype: /* empty */ { $$ = 0; }
                | UN_OP       { $$ = 1; }
                | BIN_OP      { $$ = 2; }
                | TRI_OP      { $$ = 3; }
+               | QUAT_OP     { $$ = 4; }
                ;
 
 code:     optional_name ID optional_optype
@@ -2358,8 +2359,8 @@ ident (char c)
  * string "default" returns DEFAULT (both only when currently parsing
  * for EFUN class identifiers in FUNC_SPEC).
  *
- * When parsing CODEs in FUNC_SPEC, the strings "unary", "binary" and
- * "ternary" return UN_OP, BIN_OP and TRI_OP respectively.
+ * When parsing CODEs in FUNC_SPEC, the strings "unary", "binary", "ternary"
+ * and "quaternary" return UN_OP, BIN_OP, TRI_OP and QUAT_OP respectively.
  *
  * Other identifiers are stored in yylval.string and return ID.
  */
@@ -2406,6 +2407,8 @@ ident (char c)
             return BIN_OP;
         if (strcmp(buff, "ternary") == 0)
             return TRI_OP;
+        if (strcmp(buff, "quaternary") == 0)
+            return QUAT_OP;
     }
 
     if ( parsetype == PARSE_APPLIED_SPEC )

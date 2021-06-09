@@ -100,8 +100,13 @@ union u {
        */
 
     struct protected_mapentry_lvalue *protected_mapentry_lvalue;
-      /* T_LVALUE/LVALUE_MAPENTRY: Contains a mapping, key, index
+      /* T_LVALUE/LVALUE_PROTECTED_MAPENTRY: Contains a mapping, key, index
        * and a reference counter.
+       */
+
+    struct protected_map_range_lvalue *protected_map_range_lvalue;
+      /* T_LVALUE/LVALUE_PROTECTED_MAP_RANGE: Contains a mapping, key,
+       * indices and a reference counter.
        */
 
     error_handler_t *error_handler;
@@ -358,6 +363,11 @@ struct svalue_s
    * stored in <current_unprotected_mapentry>
    */
 
+#define LVALUE_UNPROTECTED_MAP_RANGE        0x04
+  /* Doesn't have a value. The mapping, key and indices are
+   * stored in <current_unprotected_map_range>.
+   */
+
 #define LVALUE_PROTECTED                    0x10
   /* .u.protected_lvalue points to the reference counted svalue. */
 
@@ -365,10 +375,13 @@ struct svalue_s
   /* .u.protected_char_lvalue contains the referenced string and index. */
 
 #define LVALUE_PROTECTED_RANGE              0x12
-  /* .u.protected_range contains the referenced vector and indices. */
+  /* .u.protected_range_lvalue contains the referenced vector and indices. */
 
 #define LVALUE_PROTECTED_MAPENTRY           0x13
- /* .u.protected_mapentry contains the referenced mapping and key. */
+ /* .u.protected_mapentry_lvalue contains the referenced mapping and key. */
+
+#define LVALUE_PROTECTED_MAP_RANGE          0x14
+ /* .u.protected_map_range_lvalue contains the referenced mapping, key and indices. */
 
 
 #define LVALUE_IS_UNPROTECTED(l)        ((l) < LVALUE_PROTECTED)

@@ -835,6 +835,79 @@ svalue_to_string ( fmt_state_t *st
             case LVALUE_PROTECTED_MAPENTRY:
                 return svalue_to_string(st, get_rvalue(obj, NULL), str, indent, trailing, quoteStrings, compact, prefixed);
 
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                struct protected_map_range_lvalue *r = obj->u.protected_map_range_lvalue;
+                size_t size = r->index2 - r->index1;
+                if (!size)
+                {
+                    stradd(st, &str, compact ? "({})" : "({ })");
+                }
+                else
+                {
+                    struct pointer_record *prec;
+
+                    prec = find_add_pointer(st->ptable, r, MY_TRUE);
+                    if (!prec->id_number)
+                    {
+                        /* New range */
+
+                        svalue_t *item = get_map_value(r->map, &(r->key));
+
+                        prec->id_number = st->pointer_id++;
+                        if (compact)
+                        {
+                            stradd(st, &str, "({#");
+                            numadd(st, &str, prec->id_number);
+                            stradd(st, &str, " ");
+                        }
+                        else
+                        {
+                            stradd(st, &str, "({ /* #");
+                            numadd(st, &str, prec->id_number);
+                            stradd(st, &str, ", size: ");
+                            numadd(st, &str, size);
+                            stradd(st, &str, " */\n");
+                        }
+
+                        if (item == &const0)
+                        {
+                            /* Just print some zeroes... */
+                            for (i = r->index1; i < r->index2-1; i++)
+                            {
+                                if (!compact)
+                                    add_indent(st, &str, indent);
+                                stradd(st, &str, compact ? "0," : "0,\n");
+                            }
+                            if (!compact)
+                                add_indent(st, &str, indent);
+                            stradd(st, &str, "0");
+                        }
+                        else
+                        {
+                            for (i = r->index1; i < r->index2-1; i++)
+                                str = svalue_to_string(st, item + i, str, indent+2, MY_TRUE, quoteStrings, compact, MY_FALSE);
+                            str = svalue_to_string(st, item + i, str, indent+2, MY_FALSE, quoteStrings, compact, MY_FALSE);
+                        }
+
+                        if (!compact)
+                        {
+                            stradd(st, &str, "\n");
+                            add_indent(st, &str, indent);
+                        }
+                        stradd(st, &str, "})");
+                    }
+                    else
+                    {
+                        /* We printed that before. */
+                        stradd(st, &str, compact ? "({#" : "({ #");
+                        numadd(st, &str, prec->id_number);
+                        stradd(st, &str, compact ? "})" : " })");
+                    }
+                }
+
+            }
+
         } /* switch (obj->x.lvalue_type) */
 
         break;

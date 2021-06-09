@@ -674,9 +674,13 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
         if (elem == NULL)
         {
             /* This is a range. */
-            struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
-            if (r->vec.type == stringtype)
-                size += (mp_int)del_len + r->index2 - r->index1;
+            assert(svp->type == T_LVALUE);
+            if (svp->x.lvalue_type == LVALUE_PROTECTED_RANGE)
+            {
+                struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
+                if (r->vec.type == stringtype)
+                    size += (mp_int)del_len + r->index2 - r->index1;
+            }
         }
         else if (elem->type == stringtype)
             size += (mp_int)del_len + mstrsize(elem->u.str);
@@ -711,22 +715,26 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
         if (elem == NULL)
         {
             /* This is a range. */
-            struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
-            if (r->vec.type == stringtype)
+            assert(svp->type == T_LVALUE);
+            if (svp->x.lvalue_type == LVALUE_PROTECTED_RANGE)
             {
-                if (first)
-                    first = false;
-                else
+                struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
+                if (r->vec.type == stringtype)
                 {
-                    memcpy(p, deltxt, del_len);
-                    p += del_len;
+                    if (first)
+                        first = false;
+                    else
+                    {
+                        memcpy(p, deltxt, del_len);
+                        p += del_len;
+                    }
+
+                    memcpy(p, get_txt(r->vec.u.str) + r->index1, r->index2 - r->index1);
+                    if (!isutf8 && stringtype == T_STRING && r->vec.u.str->info.unicode == STRING_UTF8 && !is_ascii(p, r->index2 - r->index1))
+                        isutf8 = true;
+
+                    p += r->index2 - r->index1;
                 }
-
-                memcpy(p, get_txt(r->vec.u.str) + r->index1, r->index2 - r->index1);
-                if (!isutf8 && stringtype == T_STRING && r->vec.u.str->info.unicode == STRING_UTF8 && !is_ascii(p, r->index2 - r->index1))
-                    isutf8 = true;
-
-                p += r->index2 - r->index1;
             }
         }
         else if (elem->type == stringtype)
@@ -2411,6 +2419,7 @@ v_sort_array (svalue_t * sp, int num_arg)
 {
     vector_t   *data;
     svalue_t   *arg;
+    svalue_t   *items = NULL;
     callback_t *cb;
     int         error_index;
     mp_int      step, halfstep, offset, size;
@@ -2442,24 +2451,50 @@ v_sort_array (svalue_t * sp, int num_arg)
         if (svp == NULL)
         {
             /* This is a range. */
-            struct protected_range_lvalue *r;
-
-            assert(arg->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-            r = arg->u.protected_range_lvalue;
-
-            if (r->vec.type != T_POINTER)
+            switch (arg->x.lvalue_type)
             {
-                inter_sp = sp;
-                errorf("Bad arg 1 to sort_array(): got '%s[..] &', "
-                       "expected 'mixed * / mixed *&'.\n"
-                       , typename(r->vec.type));
-                // NOTREACHED
-                return sp;
-            }
+                case LVALUE_PROTECTED_RANGE:
+                {
+                    struct protected_range_lvalue *r = arg->u.protected_range_lvalue;
 
-            offset = r->index1;
-            size = r->index2 - r->index1;
-            data = r->vec.u.vec;
+                    if (r->vec.type != T_POINTER)
+                    {
+                        inter_sp = sp;
+                        errorf("Bad arg 1 to sort_array(): got '%s[..] &', "
+                               "expected 'mixed * / mixed *&'.\n"
+                               , typename(r->vec.type));
+                        // NOTREACHED
+                        return sp;
+                    }
+
+                    offset = r->index1;
+                    size = r->index2 - r->index1;
+                    data = r->vec.u.vec;
+                    break;
+                }
+
+                case LVALUE_PROTECTED_MAP_RANGE:
+                {
+                    struct protected_map_range_lvalue *r = arg->u.protected_map_range_lvalue;
+
+                    items = get_map_value(r->map, &(r->key));
+                    if (items == &const0)
+                    {
+                        /* Not existing entries are all zeroes, so they are sorted. */
+                        pop_stack();
+                        return arg;
+                    }
+
+                    data = NULL;
+                    offset = r->index1;
+                    size = r->index2 - r->index1;
+                    break;
+                }
+
+                default:
+                    fatal("Illegal lvalue type %d\n", arg->x.lvalue_type);
+                    break;
+            }
         }
         else if (svp->type == T_POINTER)
         {
@@ -2490,12 +2525,22 @@ v_sort_array (svalue_t * sp, int num_arg)
         data = arg->u.vec;
     }
 
+    if (data)
+        check_for_destr(data);
+    else
+    {
+        for (i = 0; i < size; i++)
+        {
+            if (destructed_object_ref(items + offset + i))
+                assign_svalue(items + offset + i, &const0);
+        }
+    }
+
     /* Get the array. Since the sort sorts in-place, we have
      * to make a shallow copy of arrays with more than one
      * ref. Exception is, if the array is given as reference/lvalue, then we
      * always sort in-place.
      */
-    check_for_destr(data);
 
     if (!inplace && data->ref != 1)
     {
@@ -2507,6 +2552,11 @@ v_sort_array (svalue_t * sp, int num_arg)
         arg->u.vec = data;
     }
 
+    if (data)
+        items = data->item;
+    /* Otherwise it was already initialized
+     * (LVALUE_PROTECTED_MAP_RANGE case).
+     */
 
     /* Easiest case: nothing to sort */
     if (size <= 1)
@@ -2520,9 +2570,6 @@ v_sort_array (svalue_t * sp, int num_arg)
      * possible. Thus, it would be not a good idea to use it as scrap
      * space.
      */
-
-    temp = data->item;
-
     source = alloca(size*sizeof(svalue_t));
     dest = alloca(size*sizeof(svalue_t));
     if (!source || !dest)
@@ -2533,7 +2580,7 @@ v_sort_array (svalue_t * sp, int num_arg)
     }
 
     for (i = 0; i < size; i++)
-        source[i] = temp[offset+i];
+        source[i] = items[offset+i];
 
     step = 2;
     halfstep = 1;
@@ -2585,9 +2632,8 @@ v_sort_array (svalue_t * sp, int num_arg)
         dest = temp;
     }
 
-    temp = data->item;
     for (i = size; --i >= 0; )
-      temp[offset+i] = source[i];
+      items[offset+i] = source[i];
 
     pop_stack();
     return arg;
@@ -2922,10 +2968,28 @@ f_transpose_array (svalue_t *sp)
         if (entry == NULL)
         {
             /* This is a range lvalue. */
-            struct protected_range_lvalue *r = srcitem->u.protected_range_lvalue;
-            if (r->vec.type == T_POINTER)
-                entrylen = (mp_int) r->index2 - r->index1;
+            assert(srcitem->type == T_LVALUE);
+            switch (srcitem->x.lvalue_type)
+            {
+                case LVALUE_PROTECTED_RANGE:
+                {
+                    struct protected_range_lvalue *r = srcitem->u.protected_range_lvalue;
+                    if (r->vec.type == T_POINTER)
+                        entrylen = (mp_int) r->index2 - r->index1;
+                    break;
+                }
 
+                case LVALUE_PROTECTED_MAP_RANGE:
+                {
+                    struct protected_map_range_lvalue *r = srcitem->u.protected_map_range_lvalue;
+                    entrylen = r->index2 - r->index1;
+                    break;
+                }
+
+                default:
+                    fatal("Illegal lvalue type %d\n", srcitem->x.lvalue_type);
+                    break;
+            }
         }
         else
         {
@@ -2967,20 +3031,53 @@ f_transpose_array (svalue_t *sp)
         bool last_reference = false;
         svalue_t *srcentry = get_rvalue(srcitem, &last_reference);
         mp_int srcentrylen;
-        svalue_t *srcentryitem;
+        svalue_t *srcentryitem = NULL;
 
         destitem = dest->item;
 
         if (srcentry == NULL)
         {
             /* This is a range lvalue. */
-            struct protected_range_lvalue *r = srcitem->u.protected_range_lvalue;
-            if (r->vec.type != T_POINTER)
+            assert(srcitem->type == T_LVALUE);
+            switch (srcitem->x.lvalue_type)
+            {
+                case LVALUE_PROTECTED_RANGE:
+                {
+                    struct protected_range_lvalue *r = srcitem->u.protected_range_lvalue;
+                    if (r->vec.type != T_POINTER)
+                        break;
+                    srcentryitem = r->vec.u.vec->item + r->index1;
+                    srcentrylen = (mp_int) r->index2 - r->index1;
+                    if (r->vec.u.vec->ref != 1)
+                        last_reference = false;
+                    break;
+                }
+
+                case LVALUE_PROTECTED_MAP_RANGE:
+                {
+                    struct protected_map_range_lvalue *r = srcitem->u.protected_map_range_lvalue;
+                    srcentryitem = get_map_value(r->map, &(r->key));
+                    srcentrylen = r->index2 - r->index1;
+
+                    /* The array is already initialized to zero,
+                     * no need to do anything if the key is not found.
+                     */
+                    if (srcentryitem == &const0)
+                        continue;
+
+                    srcentryitem += r->index1;
+                    if (r->map->ref != 1)
+                        last_reference = false;
+                    break;
+                }
+
+                default:
+                    fatal("Illegal lvalue type %d\n", srcitem->x.lvalue_type);
+                    break;
+            }
+
+            if (!srcentryitem)
                 break;
-            srcentryitem = r->vec.u.vec->item + r->index1;
-            srcentrylen = (mp_int) r->index2 - r->index1;
-            if (r->vec.u.vec->ref != 1)
-                last_reference = false;
         }
         else
         {

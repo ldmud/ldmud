@@ -363,6 +363,9 @@ class TestMapping(unittest.TestCase):
         self.assertEqual(m['One'], 1)
         self.assertEqual(m['Three'], 3)
 
+        with self.assertRaises(RuntimeError):
+            del m["One",1]
+
     def testGetSetWide(self):
         m = ldmud.Mapping(width=2)
         self.assertIsNotNone(m)
@@ -393,6 +396,33 @@ class TestMapping(unittest.TestCase):
             m['Hi','There'] = 'Me'
         with self.assertRaises(IndexError):
             m['Hi',2] = 0
+
+    def testGetSetRange(self):
+        m = ldmud.Mapping((( "K", 0, 1, 2, 3, 4, 5, 6, 7 ),))
+
+        self.assertIsNotNone(m)
+        self.assertEqual(len(m), 1)
+        self.assertEqual(m.width, 8)
+
+        self.assertEqual(list(m["K",3:5]), [3,4])
+        self.assertEqual(list(m["K",5:3:-1]), [5,4])
+        self.assertEqual(list(m["K",::-2]), list(range(7,0,-2)))
+
+        m["K",::-1] = ldmud.Array(range(8))
+        self.assertEqual(list(m["K",:]), list(range(7,-1,-1)))
+
+        m["K",5:6] = ldmud.Array([10])
+        self.assertEqual(list(m["K",:]), [7, 6, 5, 4, 3, 10, 1, 0])
+
+        m["K",4:2:-1] = ldmud.Array([100,101])
+        self.assertEqual(list(m["K",:]), [7, 6, 5, 101, 100, 10, 1, 0])
+
+        with self.assertRaises(ValueError):
+            m["K",1:2] = ldmud.Array([-1,-2])
+        with self.assertRaises(ValueError):
+            m["K",1:2] = ldmud.Array([])
+        with self.assertRaises(RuntimeError):
+            del m["K",1:2]
 
     def testIterator(self):
         m = ldmud.Mapping( { "One": 1, "Two": 2, "Three": 3 } );
@@ -711,6 +741,49 @@ class TestLvalue(unittest.TestCase):
         self.assertEqual(len(m), 1)
         self.assertEqual(m[3], 9)
         self.assertEqual(item.value, 9)
+
+    def testLvalueMappingRange(self):
+        m = ldmud.Mapping(((1,11,12,13,14,15), (2,21,22,23,24,25), (3,31,32,33,34,35),))
+        lv = ldmud.Lvalue(m);
+
+        lvr1 = lv[1,1:3]
+        self.assertEqual(list(lvr1.value), [12,13])
+        self.assertEqual(list(lvr1[:].value), [12,13])
+        self.assertEqual(lvr1[0].value, 12)
+        self.assertEqual(len(lvr1), 2)
+        lvr1[0].value = 112
+        self.assertEqual(m[1,1], 112)
+
+        lvr2 = lv[2,2:0:-1]
+        self.assertEqual(list(lvr2.value), [23,22])
+        self.assertEqual(list(lvr2[:].value), [23,22])
+        self.assertEqual(lvr2[0].value, 23)
+        self.assertEqual(len(lvr2), 2)
+        lvr2[0].value = 223
+        self.assertEqual(m[2,2], 223)
+
+    def testLvalueMappingNewRange(self):
+        m = ldmud.Mapping(width = 5)
+        lv = ldmud.Lvalue(m);
+
+        lvr1 = lv[1,1:3]
+        self.assertEqual(list(lvr1.value), [0,0])
+        self.assertEqual(list(lvr1[:].value), [0,0])
+        self.assertEqual(lvr1[0].value, 0)
+        self.assertEqual(len(lvr1), 2)
+        self.assertEqual(len(m), 0)
+        lvr1[0].value = 112
+        self.assertEqual(len(m), 1)
+        self.assertEqual(list(m[1,:]), [0,112,0,0,0])
+
+        lvr2 = lv[2,2:0:-1]
+        self.assertEqual(list(lvr2.value), [0,0])
+        self.assertEqual(list(lvr2[:].value), [0,0])
+        self.assertEqual(lvr2[0].value, 0)
+        self.assertEqual(len(lvr2), 2)
+        lvr2[0].value = 223
+        self.assertEqual(len(m), 2)
+        self.assertEqual(list(m[2,:]), [0,0,223,0,0])
 
     def testLvalueStructItem(self):
         s = ldmud.Struct(ldmud.get_master(), "test_struct", (10,))

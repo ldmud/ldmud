@@ -293,15 +293,15 @@ write_xml_node(svalue_t * vnode, mp_int vsize, xmlTextWriterPtr writer)
  * The contents element may contain other tags, so recursion may occur.
  */
 {
-    struct protected_range_lvalue *range = NULL;
+    struct range_iterator it;
     svalue_t *element;
     char *name;
     int rc;
 
-    if (vsize != 3)
+    if (vsize != XML_TAG_SIZE)
     {
-        errorf("Bad arg 1 to xml_generate(): tag is not an array with 3 "
-               "elements.\n");
+        errorf("Bad arg 1 to xml_generate(): tag is not an array with %d "
+               "elements.\n", XML_TAG_SIZE);
 
         /* NOTREACHED */
         return;
@@ -348,44 +348,37 @@ write_xml_node(svalue_t * vnode, mp_int vsize, xmlTextWriterPtr writer)
     }
 
     /* now check, if the node has a contents */
-    element = get_rvalue(vnode + XML_TAG_CONTENTS, NULL);
-    if (element == NULL)
+    if (!get_iterator(vnode + XML_TAG_CONTENTS, &it, true))
     {
-        range = vnode[XML_TAG_CONTENTS].u.protected_range_lvalue;
-        element = &(range->vec);
+        element = get_rvalue(vnode + XML_TAG_CONTENTS, NULL);
+        if (element == NULL
+         || element->type != T_NUMBER
+         || element->u.number != 0)
+        {
+            errorf("Bad arg 1 to xml_generate(): third element of tag array "
+                   "not NULL/array.\n");
+            /* NOTREACHED */
+        }
     }
-
-    /* this might even be absent */
-    if (element->type == T_POINTER)
+    else
     {
-        int size;
-        int i;
-        svalue_t *contents;
-
-        /* get the vector */
-        contents = element->u.vec->item;
-
-        /* get its size */
-        if (range == NULL)
+        while (true)
         {
-            size = (mp_int)VEC_SIZE(element->u.vec);
-        }
-        else
-        {
-            size = range->index2 - range->index1;
-            contents += range->index1;
-        }
+            svalue_t* rvalue;
 
-        for (i = 0; i < size; i++)
-        {
-            element = get_rvalue(contents + i, NULL);
-            if (element == NULL)
+            element = it.next_value(&it);
+            if (!element)
+                break;
+
+            rvalue = get_rvalue(element, NULL);
+            if (rvalue == NULL)
             {
-                struct protected_range_lvalue *cr = contents[i].u.protected_range_lvalue;
-                if (cr->vec.type == T_STRING)
+                if (element->type == T_LVALUE
+                 && element->x.lvalue_type == LVALUE_PROTECTED_RANGE
+                 && element->u.protected_range_lvalue->vec.type == T_STRING)
                 {
                     svalue_t tmp_content;
-                    assign_rvalue_no_free(&tmp_content, contents + i);
+                    assign_rvalue_no_free(&tmp_content, element);
 
                     rc = xmlTextWriterWriteString(writer, (xmlChar *) get_txt(element->u.str));
 
@@ -395,29 +388,41 @@ write_xml_node(svalue_t * vnode, mp_int vsize, xmlTextWriterPtr writer)
                 }
                 else
                 {
-                    write_xml_node(cr->vec.u.vec->item + cr->index1, cr->index2 - cr->index1, writer);
+                    svalue_t subvalues[XML_TAG_SIZE];
+                    struct range_iterator subit;
+
+                    if (!get_iterator(element, &subit, true))
+                        fatal("Illegal lvalue type %d\n", element->x.lvalue_type);
+
+                    if (subit.size != XML_TAG_SIZE)
+                        errorf("Bad arg 1 to xml_generate(): tag is not an "
+                               "array with %d elements.\n", XML_TAG_SIZE);
+
+                    for (int i = 0; i < XML_TAG_SIZE; i++)
+                    {
+                        svalue_t *subvalue = subit.next_value(&subit);
+                        if (!subvalue)
+                            break;
+
+                        subvalues[i] = *subvalue;
+                    }
+
+                    write_xml_node(subvalues, XML_TAG_SIZE, writer);
                 }
             }
-            else if (element->type == T_STRING)
+            else if (rvalue->type == T_STRING)
             {
                 /* found content */
                 rc = xmlTextWriterWriteString(writer, (xmlChar *) get_txt(element->u.str));
                 if (rc < 0)
                     errorf("(xml_generate) Error writing plain text.\n");
             }
-            else if (element->type == T_POINTER)
+            else if (rvalue->type == T_POINTER)
             {
                 /* found a sub tag */
                 write_xml_node(element->u.vec->item, (mp_int) VEC_SIZE(element->u.vec), writer);
             }
         }
-    }
-    else if (element->type != T_NUMBER || element->u.number != 0)
-    {
-        errorf("Bad arg 1 to xml_generate(): third element of tag array not "
-               "NULL/array.\n");
-
-        /* NOTREACHED */
     }
 
     rc = xmlTextWriterEndElement(writer);

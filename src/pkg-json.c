@@ -502,19 +502,35 @@ ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key)
     case T_LVALUE:
     {
         /* Must be a range, all other would have been handled by get_rvalue(). */
-        struct protected_range_lvalue* r = sp->u.protected_range_lvalue;
-        if (r->vec.type == T_STRING)
+        if (sp->x.lvalue_type == LVALUE_PROTECTED_RANGE
+         && sp->u.protected_range_lvalue->vec.type == T_STRING)
         {
+            struct protected_range_lvalue* r = sp->u.protected_range_lvalue;
             jobj = json_object_new_string_len(get_txt(r->vec.u.str) + r->index1, r->index2 - r->index1);
             if (parent) ldmud_json_attach(parent, key, jobj);
         }
+        else if (sp->x.lvalue_type == LVALUE_PROTECTED_RANGE
+             && sp->u.protected_range_lvalue->vec.type == T_BYTES)
+        {
+            errorf("json_serialize(): can't serialize LPC type %s\n",
+                   typename(T_BYTES));
+        }
         else
         {
+            struct range_iterator it;
+            if (!get_iterator(sp, &it, true))
+                fatal("Illegal lvalue type %d\n", sp->x.lvalue_type);
+
             jobj = json_object_new_array();
             if (parent) ldmud_json_attach(parent, key, jobj);
 
-            for (mp_int i = r->index1; i < r->index2; ++i)
-                ldmud_json_serialize(r->vec.u.vec->item + i, jobj, NULL);
+            while (true)
+            {
+                svalue_t *item = it.next_value(&it);
+                if (!item)
+                    break;
+                ldmud_json_serialize(item, jobj, NULL);
+            }
         }
         break;
     }

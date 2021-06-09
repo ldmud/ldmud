@@ -4724,24 +4724,78 @@ ldmud_mapping_subscript (ldmud_mapping_t *val, PyObject *key)
         }
 
         second = PyTuple_GetItem(key, 1);
-        if (second==NULL || !PyIndex_Check(second))
+        if (second==NULL)
+            return NULL;
+        else if (PyIndex_Check(second))
+        {
+            idx = PyNumber_AsSsize_t(second, PyExc_IndexError);
+            if (idx == -1 && PyErr_Occurred())
+                return NULL;
+
+            if (idx < 0 || idx >= val->lpc_mapping->num_values)
+            {
+                PyErr_SetString(PyExc_IndexError, "index out of range");
+                return NULL;
+            }
+
+            if(python_to_svalue(&sv, PyTuple_GetItem(key, 0)))
+                return PyLong_FromLong(0);
+        }
+        else if (PySlice_Check(second))
+        {
+            Py_ssize_t start, stop, step, slicelength;
+
+            if (PySlice_GetIndicesEx(second, val->lpc_mapping->num_values,
+                             &start, &stop, &step, &slicelength) < 0)
+                return NULL;
+
+            if (slicelength <= 0)
+                return ldmud_array_create(&null_vector);
+            else
+            {
+                void (*save_handler)(const char *, ...);
+                PyObject *arr_result;
+                vector_t *vec;
+
+                save_handler = allocate_array_error_handler;
+                allocate_array_error_handler = python_error_handler;
+                vec = allocate_array_unlimited(slicelength);
+                allocate_array_error_handler = save_handler;
+
+                if (vec == NULL)
+                    return PyErr_NoMemory();
+
+                arr_result = ldmud_array_create(vec);
+                free_array(vec);
+
+                if (arr_result == NULL)
+                    return NULL;
+
+                if(python_to_svalue(&sv, PyTuple_GetItem(key, 0)))
+                    values = NULL;
+                else
+                {
+                    values = get_map_value(val->lpc_mapping, &sv);
+                    free_svalue(&sv);
+                }
+
+                /* The array is zero-initialized, so nothing to do,
+                 * when the key isn't found.
+                 */
+                if (values != NULL && values != &const0)
+                {
+                    for (Py_ssize_t cur = start, i = 0; i < slicelength; cur += step, i++)
+                        assign_svalue(vec->item + i, values + cur);
+                }
+
+                return arr_result;
+            }
+        }
+        else
         {
             PyErr_Format(PyExc_IndexError, "second index should be an integer, not %.200s", second->ob_type->tp_name);
             return NULL;
         }
-
-        idx = PyNumber_AsSsize_t(second, PyExc_IndexError);
-        if (idx == -1 && PyErr_Occurred())
-            return NULL;
-
-        if (idx < 0 || idx >= val->lpc_mapping->num_values)
-        {
-            PyErr_SetString(PyExc_IndexError, "index out of range");
-            return NULL;
-        }
-
-        if(python_to_svalue(&sv, PyTuple_GetItem(key, 0)))
-            return PyLong_FromLong(0);
     }
     else if (python_to_svalue(&sv, key) != NULL)
         /* If we can't convert, it's probably not in the mapping. */
@@ -4789,24 +4843,75 @@ ldmud_mapping_ass_sub (ldmud_mapping_t *val, PyObject *key, PyObject *value)
             return -1;
         }
 
+        if (value == NULL)
+        {
+            PyErr_SetString(PyExc_RuntimeError, "cannot delete sub-key");
+            return -1;
+        }
+
         second = PyTuple_GetItem(key, 1);
-        if (second==NULL || !PyIndex_Check(second))
+        if (second==NULL)
+            return -1;
+        else if (PyIndex_Check(second))
+        {
+            idx = PyNumber_AsSsize_t(second, PyExc_IndexError);
+            if (idx == -1 && PyErr_Occurred())
+                return -1;
+
+            if (idx < 0 || idx >= val->lpc_mapping->num_values)
+            {
+                PyErr_SetString(PyExc_IndexError, "index out of range");
+                return -1;
+            }
+
+            err = python_to_svalue(&skey, PyTuple_GetItem(key, 0));
+        }
+        else if (PySlice_Check(second))
+        {
+            Py_ssize_t start, stop, step, slicelength;
+            vector_t *source;
+            svalue_t *dest;
+
+            if (PySlice_GetIndicesEx(second, val->lpc_mapping->num_values,
+                             &start, &stop, &step, &slicelength) < 0)
+                return -1;
+
+            if (!ldmud_array_check(value))
+            {
+                PyErr_Format(PyExc_TypeError, "can assign ldmud.Array (not \"%.200s\") to an ldmud.Mapping slice",
+                    Py_TYPE(value)->tp_name);
+                return -1;
+            }
+
+            source = ((ldmud_array_t*)value)->lpc_array;
+            if (VEC_SIZE(source) != slicelength)
+            {
+                PyErr_Format(PyExc_ValueError, "attempt to assign array of size %zd to an ldmud.Mapping slice of size %zd",
+                    (Py_ssize_t)VEC_SIZE(source), slicelength);
+                return -1;
+            }
+
+            err = python_to_svalue(&skey, PyTuple_GetItem(key, 0));
+            if (err != NULL)
+            {
+                PyErr_SetString(PyExc_ValueError, err);
+                return -1;
+            }
+
+            dest = get_map_lvalue_unchecked(val->lpc_mapping, &skey);
+            free_svalue(&skey);
+
+            for (Py_ssize_t cur = start, i = 0; i < slicelength; cur += step, i++)
+                assign_svalue(dest + cur, source->item + i);
+
+            return 0;
+        }
+        else
         {
             PyErr_Format(PyExc_IndexError, "second index should be an integer, not %.200s", second->ob_type->tp_name);
             return -1;
         }
 
-        idx = PyNumber_AsSsize_t(second, PyExc_IndexError);
-        if (idx == -1 && PyErr_Occurred())
-            return -1;
-
-        if (idx < 0 || idx >= val->lpc_mapping->num_values)
-        {
-            PyErr_SetString(PyExc_IndexError, "index out of range");
-            return -1;
-        }
-
-        err = python_to_svalue(&skey, PyTuple_GetItem(key, 0));
     }
     else
         err = python_to_svalue(&skey, key);
@@ -7812,7 +7917,7 @@ ldmud_lvalue_length (ldmud_lvalue_t *self)
  */
 
 {
-    svalue_t *vec;
+    struct range_iterator it;
 
     if (self->lpc_lvalue.type == T_INVALID)
     {
@@ -7822,54 +7927,13 @@ ldmud_lvalue_length (ldmud_lvalue_t *self)
 
     assert(self->lpc_lvalue.type == T_LVALUE);
 
-    vec = get_rvalue_no_collapse(&(self->lpc_lvalue), NULL);
-
-    if (vec != NULL
-     && vec->type != T_POINTER
-     && vec->type != T_STRING
-     && vec->type != T_BYTES)
+    if (!get_iterator(&(self->lpc_lvalue), &it, false))
     {
         PyErr_SetString(PyExc_TypeError, "lvalue has no length");
         return -1;
     }
 
-    if (vec == NULL)
-    {
-        /* We have a range lvalue. */
-        struct protected_range_lvalue *r;
-        Py_ssize_t len;
-
-        assert(self->lpc_lvalue.x.lvalue_type == LVALUE_PROTECTED_RANGE);
-        r = self->lpc_lvalue.u.protected_range_lvalue;
-
-        len = r->index2 - r->index1;
-        if (len <= 0)
-            return 0;
-
-        if (r->vec.type == T_STRING && r->vec.u.str->info.unicode == STRING_UTF8)
-            return (Py_ssize_t)byte_to_char_index(get_txt(r->vec.u.str) + r->index1, len, NULL);
-        else
-            return len;
-    }
-    else
-    {
-        switch (vec->type)
-        {
-            case T_POINTER:
-                return VEC_SIZE(vec->u.vec);
-                break;
-
-            case T_STRING:
-            case T_BYTES:
-                if (vec->u.str->info.unicode == STRING_UTF8)
-                    return byte_to_char_index(get_txt(vec->u.str), mstrsize(vec->u.str), NULL);
-                else
-                    return mstrsize(vec->u.str);
-                break;
-        }
-    }
-
-    return 0; /* Never reached. */
+    return it.size;
 } /* ldmud_lvalue_length() */
 
 /*-------------------------------------------------------------------------*/
@@ -7897,75 +7961,113 @@ ldmud_lvalue_item (ldmud_lvalue_t *self, Py_ssize_t idx)
     vec = get_rvalue_no_collapse(&(self->lpc_lvalue), NULL);
     if (vec == NULL)
     {
-        /* We have a range lvalue. */
-        struct protected_range_lvalue *r;
-        Py_ssize_t len;
-
-        assert(self->lpc_lvalue.x.lvalue_type == LVALUE_PROTECTED_RANGE);
-        r = self->lpc_lvalue.u.protected_range_lvalue;
-        len = r->index2 - r->index1;
-        if (len < 0)
-            len = 0;
-
-        switch (r->vec.type)
+        /* We have a (map) range lvalue. */
+        switch (self->lpc_lvalue.x.lvalue_type)
         {
-            case T_POINTER:
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = self->lpc_lvalue.u.protected_range_lvalue;
+                Py_ssize_t len = r->index2 - r->index1;
+
+                if (len < 0)
+                    len = 0;
+
+                switch (r->vec.type)
+                {
+                    case T_POINTER:
+                        if (idx < 0 || idx >= len)
+                        {
+                            PyErr_SetString(PyExc_IndexError, "index out of range");
+                            return NULL;
+                        }
+
+                        return ldmud_lvalue_create(r->vec.u.vec->item + r->index1 + idx);
+
+                    case T_STRING:
+                    case T_BYTES:
+                    {
+                        PyObject* ob;
+                        svalue_t result;
+                        string_t *p;
+                        ssize_t pos, num;
+
+                        if (r->vec.u.str->info.unicode == STRING_UTF8)
+                            num = byte_to_char_index(get_txt(r->vec.u.str) + r->index1, len, NULL);
+                        else
+                            num = len;
+
+                        if (idx < 0 || idx >= num)
+                        {
+                            PyErr_SetString(PyExc_IndexError, "index out of range");
+                            return NULL;
+                        }
+
+                        p = make_mutable(r->vec.u.str);
+                        if (!p)
+                            return PyErr_NoMemory();
+
+                        if (r->vec.u.str != p)
+                        {
+                            if (r->var != NULL && r->var->val.type == r->vec.type && r->var->val.u.str == r->vec.u.str)
+                            {
+                                /* Update the corresponding variable. */
+                                free_mstring(r->var->val.u.str);
+                                r->var->val.u.str = ref_mstring(p);
+                            }
+                            r->vec.u.str = p;
+                        }
+
+                        if (r->vec.u.str->info.unicode == STRING_UTF8)
+                            pos = char_to_byte_index(get_txt(p) + r->index1, len, idx, NULL);
+                        else
+                            pos = idx;
+
+                        assign_protected_char_lvalue_no_free(&result, r->var, p, get_txt(p) + r->index1 + pos);
+                        ob = ldmud_lvalue_create(&result);
+                        free_svalue(&result);
+
+                        return ob;
+                    }
+
+                    default:
+                        fatal("Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                }
+            }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                struct protected_map_range_lvalue *r = self->lpc_lvalue.u.protected_map_range_lvalue;
+                Py_ssize_t len = r->index2 - r->index1;
+                svalue_t *value;
+
+                if (len < 0)
+                    len = 0;
+
                 if (idx < 0 || idx >= len)
                 {
                     PyErr_SetString(PyExc_IndexError, "index out of range");
                     return NULL;
                 }
 
-                return ldmud_lvalue_create(r->vec.u.vec->item + r->index1 + idx);
-
-            case T_STRING:
-            case T_BYTES:
-            {
-                PyObject* ob;
-                svalue_t result;
-                string_t *p;
-                ssize_t pos, num;
-
-                if (r->vec.u.str->info.unicode == STRING_UTF8)
-                    num = byte_to_char_index(get_txt(r->vec.u.str) + r->index1, len, NULL);
-                else
-                    num = len;
-
-                if (idx < 0 || idx >= num)
+                value = get_map_value(r->map, &(r->key));
+                if (value == &const0)
                 {
-                    PyErr_SetString(PyExc_IndexError, "index out of range");
-                    return NULL;
+                    PyObject *ob;
+                    svalue_t result;
+
+                    assign_protected_mapentry_lvalue_no_free(&result, r->map, &(r->key), r->index1 + idx);
+                    ob = ldmud_lvalue_create(&result);
+                    free_svalue(&result);
+
+                    return ob;
                 }
-
-                p = make_mutable(r->vec.u.str);
-                if (!p)
-                    return PyErr_NoMemory();
-
-                if (r->vec.u.str != p)
-                {
-                    if (r->var != NULL && r->var->val.type == r->vec.type && r->var->val.u.str == r->vec.u.str)
-                    {
-                        /* Update the corresponding variable. */
-                        free_mstring(r->var->val.u.str);
-                        r->var->val.u.str = ref_mstring(p);
-                    }
-                    r->vec.u.str = p;
-                }
-
-                if (r->vec.u.str->info.unicode == STRING_UTF8)
-                    pos = char_to_byte_index(get_txt(p) + r->index1, len, idx, NULL);
                 else
-                    pos = idx;
-
-                assign_protected_char_lvalue_no_free(&result, r->var, p, get_txt(p) + r->index1 + pos);
-                ob = ldmud_lvalue_create(&result);
-                free_svalue(&result);
-
-                return ob;
+                    return ldmud_lvalue_create(value + r->index1 + idx);
             }
 
             default:
-                fatal("Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                fatal("Illegal lvalue type %d\n",self->lpc_lvalue.x.lvalue_type);
+                break;
         }
     }
     else
@@ -8077,21 +8179,96 @@ ldmud_lvalue_subscript (ldmud_lvalue_t *self, PyObject *key)
 
             if (vec == NULL)
             {
-                /* We have a range lvalue. */
-                struct protected_range_lvalue *r;
+                /* We have a (map) range lvalue. */
+                switch (self->lpc_lvalue.x.lvalue_type)
+                {
+                    case LVALUE_PROTECTED_RANGE:
+                    {
+                        struct protected_range_lvalue *r;
 
-                assert(self->lpc_lvalue.x.lvalue_type == LVALUE_PROTECTED_RANGE);
-                r = self->lpc_lvalue.u.protected_range_lvalue;
+                        r = self->lpc_lvalue.u.protected_range_lvalue;
 
-                vec = &(r->vec);
-                var = r->var;
-                offset = r->index1;
-                size = length = r->index2 - r->index1;
-                if (length <= 0)
-                    length = 0;
+                        vec = &(r->vec);
+                        var = r->var;
+                        offset = r->index1;
+                        size = length = r->index2 - r->index1;
+                        if (length <= 0)
+                            length = 0;
 
-                if (r->vec.type == T_STRING && r->vec.u.str->info.unicode == STRING_UTF8)
-                    length = (Py_ssize_t)byte_to_char_index(get_txt(r->vec.u.str) + offset, length, NULL);
+                        if (r->vec.type == T_STRING && r->vec.u.str->info.unicode == STRING_UTF8)
+                            length = (Py_ssize_t)byte_to_char_index(get_txt(r->vec.u.str) + offset, length, NULL);
+                        break;
+                    }
+
+                    case LVALUE_PROTECTED_MAP_RANGE:
+                    {
+                        struct protected_map_range_lvalue *r = self->lpc_lvalue.u.protected_map_range_lvalue;
+
+                        if (PySlice_GetIndicesEx(key, r->index2 - r->index1, &start, &stop, &step, &slicelength) < 0)
+                            return NULL;
+
+                        if (slicelength <= 0)
+                        {
+                            PyObject *arr_result;
+
+                            put_ref_array(&result, &null_vector);
+                            arr_result = ldmud_lvalue_create(&result);
+                            free_svalue(&result);
+                            return arr_result;
+                        }
+
+                        if (step == 1)
+                        {
+                            /* We generate another map range. */
+                            assign_protected_map_range_lvalue_no_free(&result, r->map, &(r->key), r->index1 + start, r->index1 + stop);
+                            ob = ldmud_lvalue_create(&result);
+                            free_svalue(&result);
+
+                            return ob;
+                        }
+                        else
+                        {
+                            /* We generate an array of lvalues to the selected values. */
+                            void (*save_handler)(const char *, ...);
+                            svalue_t *values;
+                            vector_t *arr;
+                            PyObject *arr_result;
+
+                            save_handler = allocate_array_error_handler;
+                            allocate_array_error_handler = python_error_handler;
+                            arr = allocate_array_unlimited(slicelength);
+                            allocate_array_error_handler = save_handler;
+
+                            if (arr == NULL)
+                                return PyErr_NoMemory();
+
+                            values = get_map_value(r->map, &(r->key));
+                            if (values == &const0)
+                            {
+                                /* Key does not exist, create this as a
+                                 * list of map entry lvalues.
+                                 */
+                                for (Py_ssize_t cur = start, i = 0; i < slicelength; cur += step, i++)
+                                    assign_protected_mapentry_lvalue_no_free(arr->item + i, r->map, &(r->key), r->index1 + cur);
+                            }
+                            else
+                            {
+                                /* Create lvalues to the entries. */
+                                for (Py_ssize_t cur = start, i = 0; i < slicelength; cur += step, i++)
+                                    assign_protected_lvalue_no_free(arr->item + i, values + r->index1 + cur);
+                            }
+
+                            put_array(&result, arr);
+                            arr_result = ldmud_lvalue_create(&result);
+                            free_svalue(&result);
+                            return arr_result;
+                        }
+                    }
+
+                    default:
+                        fatal("Illegal lvalue type %d\n",self->lpc_lvalue.x.lvalue_type);
+                        return NULL;
+                }
             }
             else
             {
@@ -8177,23 +8354,113 @@ ldmud_lvalue_subscript (ldmud_lvalue_t *self, PyObject *key)
             }
 
             second = PyTuple_GetItem(key, 1);
-            if (second==NULL || !PyIndex_Check(second))
+            if (second==NULL)
+                return NULL;
+            else if (PyIndex_Check(second))
+            {
+                idx = PyNumber_AsSsize_t(second, PyExc_IndexError);
+                if (idx == -1 && PyErr_Occurred())
+                    return NULL;
+
+                if (idx < 0 || idx >= vec->u.map->num_values)
+                {
+                    PyErr_SetString(PyExc_IndexError, "index out of range");
+                    return NULL;
+                }
+
+                err = python_to_svalue(&skey, PyTuple_GetItem(key, 0));
+            }
+            else if (PySlice_Check(second))
+            {
+                Py_ssize_t start, stop, step, slicelength;
+
+                if (PySlice_GetIndicesEx(second, vec->u.map->num_values,
+                                 &start, &stop, &step, &slicelength) < 0)
+                    return NULL;
+
+                err = python_to_svalue(&skey, PyTuple_GetItem(key, 0));
+                if (err != NULL)
+                {
+                    PyErr_SetString(PyExc_ValueError, err);
+                    return NULL;
+                }
+
+                if (slicelength <= 0)
+                {
+                    PyObject *arr_result;
+                    svalue_t lv;
+
+                    free_svalue(&skey);
+
+                    put_ref_array(&lv, &null_vector);
+                    arr_result = ldmud_lvalue_create(&lv);
+                    free_svalue(&lv);
+                    return arr_result;
+                }
+
+                if (step == 1)
+                {
+                    /* We generate a map range. */
+                    svalue_t lv;
+                    PyObject *ob;
+
+                    assign_protected_map_range_lvalue_no_free(&lv, vec->u.map, &(skey), start, stop);
+                    free_svalue(&skey);
+
+                    ob = ldmud_lvalue_create(&lv);
+                    free_svalue(&lv);
+
+                    return ob;
+                }
+                else
+                {
+                    /* We generate an array of lvalues. */
+                    void (*save_handler)(const char *, ...);
+                    svalue_t *values;
+                    vector_t *arr;
+                    PyObject *arr_result;
+                    svalue_t lv;
+
+                    save_handler = allocate_array_error_handler;
+                    allocate_array_error_handler = python_error_handler;
+                    arr = allocate_array_unlimited(slicelength);
+                    allocate_array_error_handler = save_handler;
+
+                    if (arr == NULL)
+                    {
+                        free_svalue(&skey);
+                        return PyErr_NoMemory();
+                    }
+
+                    values = get_map_value(vec->u.map, &(skey));
+                    if (values == &const0)
+                    {
+                        /* Key does not exist, create this as a
+                         * list of map entry lvalues.
+                         */
+                        for (Py_ssize_t cur = start, i = 0; i < slicelength; cur += step, i++)
+                            assign_protected_mapentry_lvalue_no_free(arr->item + i, vec->u.map, &(skey), cur);
+                    }
+                    else
+                    {
+                        /* Create lvalues to the entries. */
+                        for (Py_ssize_t cur = start, i = 0; i < slicelength; cur += step, i++)
+                            assign_protected_lvalue_no_free(arr->item + i, values + cur);
+                    }
+
+                    free_svalue(&skey);
+
+                    put_array(&lv, arr);
+                    arr_result = ldmud_lvalue_create(&lv);
+                    free_svalue(&lv);
+                    return arr_result;
+                }
+            }
+            else
             {
                 PyErr_Format(PyExc_IndexError, "second index should be an integer, not %.200s", second->ob_type->tp_name);
                 return NULL;
             }
-
-            idx = PyNumber_AsSsize_t(second, PyExc_IndexError);
-            if (idx == -1 && PyErr_Occurred())
-                return NULL;
-
-            if (idx < 0 || idx >= vec->u.map->num_values)
-            {
-                PyErr_SetString(PyExc_IndexError, "index out of range");
-                return NULL;
-            }
-
-            err = python_to_svalue(&skey, PyTuple_GetItem(key, 0));
         }
         else
             err = python_to_svalue(&skey, key);
@@ -8262,10 +8529,11 @@ ldmud_lvalue_get_value (ldmud_lvalue_t *self, void *closure)
         svalue_t vec;
         PyObject *result;
 
-        assert(self->lpc_lvalue.x.lvalue_type == LVALUE_PROTECTED_RANGE);
+        assert(self->lpc_lvalue.x.lvalue_type == LVALUE_PROTECTED_RANGE
+            || self->lpc_lvalue.x.lvalue_type == LVALUE_PROTECTED_MAP_RANGE);
 
         assign_rvalue_no_free_no_collapse(&vec, &(self->lpc_lvalue));
-        result = svalue_to_python(val);
+        result = svalue_to_python(&vec);
         free_svalue(&vec);
 
         return result;

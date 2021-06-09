@@ -1176,6 +1176,20 @@ symbol_operator (const char *symbol, const char **endp)
  *   #'[<..   -> F_RX_RANGE
  *   #'[>..   -> F_AX_RANGE
  *   #'[,]    -> F_MAP_INDEX
+ *   #'[,<]   -> F_MAP_RINDEX
+ *   #'[,>]   -> F_MAP_AINDEX
+ *   #'[,..]  -> F_MAP_RANGE
+ *   #'[,..<] -> F_MAP_NR_RANGE
+ *   #'[,<..] -> F_MAP_RN_RANGE
+ *   #'[,<..<]-> F_MAP_RR_RANGE
+ *   #'[,..>] -> F_MAP_NA_RANGE
+ *   #'[,>..] -> F_MAP_AN_RANGE
+ *   #'[,<..>]-> F_MAP_RA_RANGE
+ *   #'[,>..<]-> F_MAP_AR_RANGE
+ *   #'[,>..>]-> F_MAP_AA_RANGE
+ *   #'[,..   -> F_MAP_NX_RANGE
+ *   #'[,<..  -> F_MAP_RX_RANGE
+ *   #'[,>..  -> F_MAP_AX_RANGE
  *   #'[      -> F_INDEX
  *   #'[<     -> F_RINDEX
  *   #'[>     -> F_AINDEX
@@ -1498,11 +1512,100 @@ symbol_operator (const char *symbol, const char **endp)
             ret = F_NX_RANGE;
             break;
         }
-        else if (c == ',' && symbol[1] == ']')
+        else if (c == ',')
         {
-            symbol++;
-            ret = F_MAP_INDEX;
-            break;
+            c = *++symbol;
+            if (c == ']')
+            {
+                ret = F_MAP_INDEX;
+                break;
+            }
+            else if (c == '<')
+            {
+                if (symbol[1] == '.' && symbol[2] == '.')
+                {
+                    c = *(symbol+=3);
+                    if (c == ']')
+                    {
+                        ret = F_MAP_RN_RANGE;
+                        break;
+                    }
+                    else if (c == '>' && symbol[1] == ']')
+                    {
+                        symbol++;
+                        ret = F_MAP_RA_RANGE;
+                        break;
+                    }
+                    else if (c == '<' && symbol[1] == ']')
+                    {
+                        symbol++;
+                        ret = F_MAP_RR_RANGE;
+                        break;
+                    }
+                    symbol--;
+                    ret = F_MAP_RX_RANGE;
+                    break;
+                }
+                else if (symbol[1] == ']')
+                {
+                    symbol++;
+                    ret = F_MAP_RINDEX;
+                    break;
+                }
+            }
+            else if (c == '>')
+            {
+                if (symbol[1] == '.' && symbol[2] == '.')
+                {
+                    c = *(symbol+=3);
+                    if (c == ']')
+                    {
+                        ret = F_MAP_AN_RANGE;
+                        break;
+                    }
+                    else if (c == '>' && symbol[1] == ']')
+                    {
+                        symbol++;
+                        ret = F_MAP_AA_RANGE;
+                        break;
+                    }
+                    else if (c == '<' && symbol[1] == ']')
+                    {
+                        symbol++;
+                        ret = F_MAP_AR_RANGE;
+                        break;
+                    }
+                    symbol--;
+                    ret = F_MAP_AX_RANGE;
+                    break;
+                }
+                else if (symbol[1] == ']')
+                {
+                    symbol++;
+                    ret = F_MAP_AINDEX;
+                    break;
+                }
+            }
+            else if (c == '.' && symbol[1] == '.')
+            {
+                c = *(symbol+=2);
+                if (c == ']') {
+                    ret = F_MAP_RANGE;
+                    break;
+                } else if (c == '>' && symbol[1] == ']') {
+                    symbol++;
+                    ret = F_MAP_NA_RANGE;
+                    break;
+                } else if (c == '<' && symbol[1] == ']') {
+                    symbol++;
+                    ret = F_MAP_NR_RANGE;
+                    break;
+                }
+                symbol--;
+                ret = F_MAP_NX_RANGE;
+                break;
+            }
+            symbol--;
         }
         symbol--;
         ret = F_INDEX;
