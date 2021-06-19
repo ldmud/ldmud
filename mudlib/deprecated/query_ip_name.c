@@ -7,7 +7,7 @@
 
 #include <interactive_info.h>
 
-varargs string query_ip_name(object player)
+varargs string query_ip_name(object|int* player)
 {
     object ob = player;
     ob ||= efun::this_player();
@@ -18,7 +18,7 @@ varargs string query_ip_name(object player)
     return efun::interactive_info(ob, II_IP_NAME);
 }
 
-varargs string query_ip_number(object player)
+varargs string query_ip_number(object|int* player)
 {
     object ob = player;
     ob ||= efun::this_player();
