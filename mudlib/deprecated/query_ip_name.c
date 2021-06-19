@@ -12,6 +12,8 @@ varargs string query_ip_name(object player)
     object ob = player;
     ob ||= efun::this_player();
 
+    if(!interactive(ob)) return 0;
+
     player = efun::interactive_info(ob, II_IP_ADDRESS);
     return efun::interactive_info(ob, II_IP_NAME);
 }
@@ -20,6 +22,8 @@ varargs string query_ip_number(object player)
 {
     object ob = player;
     ob ||= efun::this_player();
+
+    if(!interactive(ob)) return 0;
 
     player = efun::interactive_info(ob, II_IP_ADDRESS);
     return efun::interactive_info(ob, II_IP_NUMBER);
