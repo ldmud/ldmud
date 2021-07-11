@@ -6570,14 +6570,6 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
                 if(recall_pointer(r))
                     break;
 
-                /* Only one reference? No need for an lvalue reference here. */
-                if(!lookup_pointer(ptable,r)->ref_count)
-                {
-                    /* Go to the fallback. */
-                    done = false;
-                    break;
-                }
-
                 /* Check whether the variable reference is still valid. */
                 var_valid = (r->var != NULL
                  && ((r->vec.type == T_POINTER && r->var->val.type == T_POINTER && r->vec.u.vec == r->var->val.u.vec)
@@ -6594,6 +6586,14 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
 
                 if (!vec_referenced && var_valid)
                     vec_referenced = lookup_pointer(ptable, r->var)->ref_count;
+
+                /* Only one reference? No need for an lvalue reference here. */
+                if(!vec_referenced && !lookup_pointer(ptable,r)->ref_count)
+                {
+                    /* Go to the fallback. */
+                    done = false;
+                    break;
+                }
 
                 {
                     L_PUTC_PROLOG

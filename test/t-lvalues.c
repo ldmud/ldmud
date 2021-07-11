@@ -1208,6 +1208,15 @@ mixed *tests = ({
                == "({({1,2,3,}),})";
        :)
     }),
+    ({ "save_value with array range lvalue references 6", 0,
+       (:
+           int* arr = ({0,1,2,3,4,5});
+           mixed var = &(arr[1..3]);
+
+           return explode(save_value(({&arr, &var})),"\n")[1]
+               == "({<1>=&(({0,1,2,3,4,5,}),),&(<1>,1..3),})";
+       :)
+    }),
     ({ "save_value with array range lvalue references in old format 1", 0,
        (:
            int* arr = ({0,1,2,3,4,5});
