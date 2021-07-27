@@ -659,7 +659,7 @@ static mem_block_t mem_block[NUMAREAS];
    * function number <n>.
    */
 
-#define DEFAULT_VALUES_POS_COUNT  GET_BLOCK_SIZE(A_DEFAULT_VALUES_POSITION)
+#define DEFAULT_VALUES_POS_COUNT  GET_BLOCK_COUNT(A_DEFAULT_VALUES_POSITION)
   /* The current number of functions who have a code block for
    * default values.
    */
