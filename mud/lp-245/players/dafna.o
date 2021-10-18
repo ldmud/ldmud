@@ -1,0 +1,46 @@
+#3:2
+time_to_heal 6
+money 0
+name "dafna"
+msgin "arrives"
+msgout "leaves"
+is_npc 0
+brief 0
+level 1
+hit_point 50
+max_hp 50
+max_sp 50
+experience 0
+mmsgout "disappears in a puff of smoke"
+mmsgin "arrives in a puff of smoke"
+ghost 0
+spell_points 1
+age 5
+is_invis 0
+frog 0
+whimpy 0
+auto_load ""
+dead 0
+flags 0
+alignment 0
+gender 2
+Str 1
+Int 1
+Con 1
+Dex 1
+title "the utter novice"
+password "lpTeDvCd94irM"
+al_title "neutral"
+intoxicated 0
+stuffed 0
+soaked 0
+headache 0
+max_headache 0
+called_from_ip "127.0.0.1"
+quests 0
+mailaddr "dafna@kollos.com"
+tot_value 0
+access_list 0
+stats_is_updated 1
+scar 0
+other_copy 0
