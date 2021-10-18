@@ -1,0 +1,18 @@
+2021.10.18 11:39:09 LDMud 3.6.4 (3.6.4-1-g7365f66f) (development)
+2021.10.18 11:39:09 Seeding PRG from /dev/urandom.
+2021.10.18 11:39:09 Attempting to start erq '/usr/local/mud/bin/erq'.
+2021.10.18 11:39:09 Hostname 'BoxThing' address '127.0.1.1'
+2021.10.18 11:39:09 UDP recv-socket requested for port: 4246
+2021.10.18 11:39:09 LDMud ready for users.
+2021.10.18 11:39:10 Warning: Indexing past string end is deprecated: index 0, string length: 0.
+2021.10.18 11:39:10 program: players/lars/mapper.c, object: players/lars/mapper line 108
+2021.10.18 11:39:12 Warning: Indexing past string end is deprecated: index 0, string length: 0.
+2021.10.18 11:39:12 program: players/lars/mapper.c, object: players/lars/mapper line 108
+2021.10.18 11:39:14 Warning: Indexing past string end is deprecated: index 0, string length: 0.
+2021.10.18 11:39:14 program: players/lars/mapper.c, object: players/lars/mapper line 108
+2021.10.18 11:39:16 Warning: Indexing past string end is deprecated: index 0, string length: 0.
+2021.10.18 11:39:16 program: players/lars/mapper.c, object: players/lars/mapper line 108
+2021.10.18 11:39:28 Warning: Indexing past string end is deprecated: index 0, string length: 0.
+2021.10.18 11:39:28 program: players/lars/mapper.c, object: players/lars/mapper line 108
+2021.10.18 11:39:40 Warning: Indexing past string end is deprecated: index 0, string length: 0.
+2021.10.18 11:39:40 program: players/lars/mapper.c, object: players/lars/mapper line 108
