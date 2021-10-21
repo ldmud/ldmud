@@ -1,0 +1,339 @@
+`configure' configures LDMud 3.5.0 to adapt to many kinds of systems.
+
+Usage: ./configure [OPTION]... [VAR=VALUE]...
+
+To assign environment variables (e.g., CC, CFLAGS...), specify them as
+VAR=VALUE.  See below for descriptions of some of the useful variables.
+
+Defaults for the options are specified in brackets.
+
+Configuration:
+  -h, --help              display this help and exit
+      --help=short        display options specific to this package
+      --help=recursive    display the short help of all the included packages
+  -V, --version           display version information and exit
+  -q, --quiet, --silent   do not print `checking ...' messages
+      --cache-file=FILE   cache test results in FILE [disabled]
+  -C, --config-cache      alias for `--cache-file=config.cache'
+  -n, --no-create         do not create output files
+      --srcdir=DIR        find the sources in DIR [configure dir or `..']
+
+Installation directories:
+  --prefix=PREFIX         install architecture-independent files in PREFIX
+                          [/usr/local/mud]
+  --exec-prefix=EPREFIX   install architecture-dependent files in EPREFIX
+                          [PREFIX]
+
+By default, `make install' will install all the files in
+`/usr/local/mud/bin', `/usr/local/mud/lib' etc.  You can specify
+an installation prefix other than `/usr/local/mud' using `--prefix',
+for instance `--prefix=$HOME'.
+
+For better control, use the options below.
+
+Fine tuning of the installation directories:
+  --bindir=DIR            user executables [EPREFIX/bin]
+  --sbindir=DIR           system admin executables [EPREFIX/sbin]
+  --libexecdir=DIR        program executables [EPREFIX/libexec]
+  --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
+  --sharedstatedir=DIR    modifiable architecture-independent data [PREFIX/com]
+  --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
+  --runstatedir=DIR       modifiable per-process data [LOCALSTATEDIR/run]
+  --libdir=DIR            object code libraries [EPREFIX/lib]
+  --includedir=DIR        C header files [PREFIX/include]
+  --oldincludedir=DIR     C header files for non-gcc [/usr/include]
+  --datarootdir=DIR       read-only arch.-independent data root [PREFIX/share]
+  --datadir=DIR           read-only architecture-independent data [DATAROOTDIR]
+  --infodir=DIR           info documentation [DATAROOTDIR/info]
+  --localedir=DIR         locale-dependent data [DATAROOTDIR/locale]
+  --mandir=DIR            man documentation [DATAROOTDIR/man]
+  --docdir=DIR            documentation root [DATAROOTDIR/doc/ldmud]
+  --htmldir=DIR           html documentation [DOCDIR]
+  --dvidir=DIR            dvi documentation [DOCDIR]
+  --pdfdir=DIR            pdf documentation [DOCDIR]
+  --psdir=DIR             ps documentation [DOCDIR]
+
+Optional Features:
+  --disable-option-checking  ignore unrecognized --enable/--with options
+  --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
+  --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-erq=(no/erq/xerq)  default=enabled(erq)
+        Enables and or selects ERQ demon
+  --enable-access-control  default=enabled
+        Enable access control
+  --enable-access-log  default=disabled
+        Log all connection attempts
+  --enable-compat-mode  default=disabled
+        Enable compat mode
+  --enable-strict-euids  default=disabled
+        Enforce euids for loading objects
+  --enable-filename-spaces  default=disabled
+        Allow space characters in filenames
+  --enable-share-variables  default=disabled
+        Enable clone initialization from blueprint variable values
+  --enable-use-ipv6  default=disabled
+        Enables support for IPv6
+  --enable-use-mccp  default=disabled
+        Enables MCCP support
+  --enable-use-mysql  default=disabled
+        Enables mySQL support
+  --enable-use-pgsql  default=disabled
+        Enables PostgreSQL support
+  --enable-use-sqlite  default=disabled
+        Enables SQLite support
+  --enable-use-json  default=disabled
+        Enables JSON-C Support
+  --enable-use-pcre  default=enabled
+        Use PCRE per default: no/yes
+  --enable-use-xml  default=disabled
+        Enables XML support: no/xml2/iksemel/yes
+  --enable-use-deprecated  default=enabled
+        Enables obsolete and deprecated efuns
+  --enable-use-tls  default=disabled
+        Enables Transport Layer Security over Telnet: no/gnu/ssl/yes
+  --enable-use-gcrypt  default=enabled
+        Enables support for libgcrypt
+  --enable-use-python  default=disabled
+        Enables Python extension
+  --enable-use-parse-command  default=enabled
+        Enables efun parse_command()
+  --enable-use-process-string  default=enabled
+        Enables efun process_string()
+  --enable-comm-stat  default=enabled
+        Enable statistics for outgoing packets
+  --enable-apply-cache_stat  default=enabled
+        Enable statistics for apply cache
+  --enable-malloc-sbrk  default=enabled
+        Use sbrk() if possible (smalloc,slaballoc)
+  --enable-malloc-check  default=enabled
+        Enable simple malloc checks (smalloc,slaballoc)
+  --enable-malloc-trace  default=disabled
+        Annotate allocations with source file:line
+  --enable-malloc-lpc-trace  default=disabled
+        Annotate allocations with LPC object info
+  --enable-malloc-sbrk-trace  default=disabled
+        Log all esbrk() calls (smalloc,slaballoc)
+  --enable-malloc-replaceable  default=disabled
+        Try to replace system malloc by our own (dangerous!)
+  --enable-dynamic-costs  default=disabled
+        Assign eval costs dynamically
+  --enable-eval-cost-trace  default=disabled
+        Writes the evaluation costs in the stracktrace
+  --enable-trace-code  default=enabled
+        trace the most recently executed bytecode
+  --enable-rxcache_table  default=enabled
+        Cache compiled regular expressions
+  --enable-synchronous-heart-beat  default=enabled
+        Do all heart beats at once.
+  --enable-opcprof  default=disabled
+        create VM instruction usage statistics
+  --enable-verbose-opcprof  default=disabled
+        with opcprof: include instruction names
+  --enable-debug  default=enabled
+        enable sanity checks
+  --enable-yydebug  default=disabled
+        enable LPC compiler debug output
+  --enable-no-inlines  default=disabled
+        disable inlining
+  --enable-debug-telnet  default=disabled
+        enable telnet machine diagnostics
+  --enable-debug-malloc-allocs  default=disabled
+        enable small block diagnostics
+  --enable-swap-efun  default=disabled
+        Enable swap() efun for testing purposes
+  --enable-check-object-stat  default=disabled
+        trace changes to the object statistics
+  --enable-check-mapping-total  default=disabled
+        check the mapping statistic
+  --enable-check-object-ref  default=disabled
+        check object references
+  --enable-check-object-gc-ref  default=enabled
+        check object references in GC
+  --enable-dump-gc-refs  default=disabled
+        trace GC references
+  --enable-valgrind  default=disabled
+        instrument allocators with valgrind client requests?
+
+Optional Packages:
+  --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
+  --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
+  --with-xml-path=VALUE
+        Optional location of the XML include/ and lib/ directory
+  --with-tls-path=VALUE
+        Optional location of the TLS include/ and lib/ directory
+  --with-tls-keyfile=VALUE  default=key.pem
+        Default x509 keyfile
+  --with-tls-keydirectory=VALUE  default=no
+        Default directory holding keys and certificates
+  --with-tls-certfile=VALUE  default=cert.pem
+        Default x509 certificate file
+  --with-tls-trustfile=VALUE  default=no
+        Default filename holding trusted PEM certificates
+  --with-tls-trustdirectory=VALUE  default=no
+        Default directory holding trusted PEM certificates
+  --with-tls-crlfile=VALUE  default=no
+        Default filename holding certificate revocation lists
+  --with-tls-crldirectory=VALUE  default=no
+        Default directory holding certificate revocation lists
+  --with-tls-password=pass:PASSWORD / env:VARIABLE / file:PATHNAME / fd:DESCRIPTOR / stdin / none  default=none
+        Default password for the keyfile
+  --with-python-script=VALUE  default=startup.py
+        Startup python script
+  --with-optimize=VALUE  default=med
+        Optimization level: no/low/med/high
+  --with-access-file=VALUE  default=ACCESS.ALLOW
+        access permissions file
+  --with-access-log=VALUE  default=access.allow.log
+        access log file
+  --with-write-buffer-max-size=VALUE  default=100000
+        max size of write buffer per interactive
+  --with-erq-max-reply=VALUE  default=1024
+        max size of replies from ERQ
+  --with-erq-max-send=VALUE  default=1024
+        max size of commands sent to ERQ, xerq only
+  --with-erq-debug=VALUE  default=0
+        ERQ debug level
+  --with-read-file-max-size=BYTES  default=50000
+        maximum size of a file allowed to be read by 'read_file()'
+  --with-master-name=VALUE  default=secure/master
+        name of the master object
+  --with-input-escape=VALUE  default="!"
+        input escape character
+  --with-time-to-clean_up=SECONDS  default=3600
+        time before cleaning up unused objects
+  --with-time-to-swap=SECONDS  default=900
+        time before swapping out unused objects
+  --with-time-to-swap-variables=SECONDS  default=1800
+        time before swapping out variables
+  --with-time-to-reset=SECONDS  default=1800
+        time between resetting objects
+  --with-alarm-time=SECONDS  default=2
+        timer granularity
+  --with-heart-beat-interval=SECONDS  default=2
+        time between heartbeats
+  --with-evaluator-stack-size=VALUE  default=2000
+        virtual machine stack size
+  --with-max-user-trace=VALUE  default=60
+        maximum user function call depth
+  --with-max-trace=VALUE  default=65
+        maximum function call depth during error handling
+  --with-compiler-stack-size=VALUE  default=400
+        depth of parser stack
+  --with-max-bits=VALUE  default=6144
+        maximum number of bits in a bit string
+  --with-portno=VALUE  default=4242
+        tcp port to listen on
+  --with-udp-port=VALUE  default=4246
+        udp port to listen on
+  --with-maxnumports=VALUE  default=20
+        maximum number of tcp ports to listen on
+  --with-max-cost=VALUE  default=1000000
+        maximum eval cost for a single evaluation
+  --with-catch-reserved-cost=VALUE  default=2000
+        eval cost reserved for catch()
+  --with-master-reserved-cost=VALUE  default=512
+        eval cost reserved for master
+  --with-swap-file=VALUE  default=LP_SWAP
+        name of the swap file
+  --with-max-array-size=VALUE  default=5000
+        max number of array elements
+  --with-max-mapping-keys=VALUE  default=5000
+        max number of mapping entries
+  --with-max-mapping-size=VALUE  default=15000
+        max number of mapping elements
+  --with-max-callouts=VALUE  default=0
+        max number of callouts; 0=unlimited
+  --with-max-players=VALUE  default=50
+        maximum number of simultaneous players
+  --with-max-local=VALUE  default=50
+        maximum number of local variables per function
+  --with-allowed-ed-cmds=VALUE  default=20
+        number of ed commands per backend cycle
+  --with-max-command-length=VALUE  default=1000
+        maximum length of a command
+  --with-reserved-user-size=VALUE  default=700000
+        memory reserved for user usage
+  --with-reserved-master-size=VALUE  default=100000
+        memory reserved for master usage
+  --with-reserved-system-size=VALUE  default=200000
+        memory reserved for internal usage
+  --with-htable-size=VALUE  default=4096
+        shared string hash table size
+  --with-itable-size=VALUE  default=256
+        identifier hash table size
+  --with-otable-size=VALUE  default=1024
+        object hash table size
+  --with-defmax=VALUE  default=65000
+        maximum expanded size of preprocessor macro
+  --with-apply-cache-bits=VALUE  default=12
+        2^N = size of apply cache
+  --with-rxcache-table=VALUE  default=8192
+        cache size for compiled regular expressions
+  --with-max-byte-transfer=VALUE  default=50000
+        maximum write/read size for read/write_bytes
+  --with-set-buffer-size-max=VALUE  default=65536
+        maximum size of socket send buffer
+  --with-malloc=default/smalloc/slaballoc/sysmalloc  default=default
+        memory manager to use
+  --with-min-malloced=VALUE  default=0
+        amount of memory to allocate on startup
+  --with-min-small-malloced=VALUE  default=0
+        amount of memory to allocate for small blocks on startup
+  --with-hard-malloc-limit=VALUE  default=0x4000000
+        maximum amount of memory to allocate; 0=unlimited
+  --with-soft-malloc-limit=VALUE  default=0
+        soft limit for the amount of memory to allocate; 0=unlimited
+  --with-total-trace-length=VALUE  default=4096
+        number of operations stored in bytecode trace
+  --with-pcre-recursion-limit=VALUE  default=3000
+        maximum number of recursions in PCRE package
+  --with-wizlist-file=VALUE  default=WIZLIST
+        name of the wizlist file
+  --with-max_net_connects=VALUE  default=10
+        maximum number of concurrent connection attempts
+  --with-random-period-length=607 / 1279 / 2281 / 4253 / 11213 / 19937 / 44497 / 86243 / 132049 / 216091  default=19937
+        period length of the random number generator
+  --with-valgrind-redzone=VALUE  default=0
+        add an unused buffer at the begin and end of each memory block in words
+  --with-setting=SETTING  include a predefined setting
+
+Some influential environment variables:
+  CC          C compiler command
+  CFLAGS      C compiler flags
+  LDFLAGS     linker flags, e.g. -L<lib dir> if you have libraries in a
+              nonstandard directory <lib dir>
+  LIBS        libraries to pass to the linker, e.g. -l<library>
+  CPPFLAGS    (Objective) C/C++ preprocessor flags, e.g. -I<include dir> if
+              you have headers in a nonstandard directory <include dir>
+  CPP         C preprocessor
+  PKG_CONFIG  path to pkg-config utility
+  PKG_CONFIG_PATH
+              directories to add to pkg-config's search path
+  PKG_CONFIG_LIBDIR
+              path overriding pkg-config's built-in search path
+  SQLITE3_CFLAGS
+              C compiler flags for SQLITE3, overriding pkg-config
+  SQLITE3_LIBS
+              linker flags for SQLITE3, overriding pkg-config
+  JSONC_CFLAGS
+              C compiler flags for JSONC, overriding pkg-config
+  JSONC_LIBS  linker flags for JSONC, overriding pkg-config
+  PYTHON_EMBED_CFLAGS
+              C compiler flags for PYTHON_EMBED, overriding pkg-config
+  PYTHON_EMBED_LIBS
+              linker flags for PYTHON_EMBED, overriding pkg-config
+  PYTHON_CFLAGS
+              C compiler flags for PYTHON, overriding pkg-config
+  PYTHON_LIBS linker flags for PYTHON, overriding pkg-config
+  XML2_CFLAGS C compiler flags for XML2, overriding pkg-config
+  XML2_LIBS   linker flags for XML2, overriding pkg-config
+  IKSEMEL_CFLAGS
+              C compiler flags for IKSEMEL, overriding pkg-config
+  IKSEMEL_LIBS
+              linker flags for IKSEMEL, overriding pkg-config
+
+Use these variables to override the choices made by `configure' or to help
+it to find libraries and programs with nonstandard names/locations.
+
+Report bugs to <https://mantis.ldmud.eu/mantis/>.
+LDMud home page: <http://www.ldmud.eu/>.
