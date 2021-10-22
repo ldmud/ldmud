@@ -1404,7 +1404,8 @@ parse_error (Bool warning, const char *error_file, int line, const char *what
         push_c_string(inter_sp, error_file);
         push_c_string(inter_sp, buff);
         push_number(inter_sp, warning ? 1 : 0);
-        apply_master(STR_LOG_ERROR, 3);
+        push_number(inter_sp, line);
+        apply_master(STR_LOG_ERROR, 4);
     }
 } /* parse_error() */
 
