@@ -101,7 +101,7 @@
 // void dangling_lfun_closure ()
 //   Handle a dangling lfun-closure.
 //
-// void log_error (string file, string err, int warn)
+// void log_error (string file, string err, int warn, int line)
 //   Announce a compiler-time error or warning.
 //
 // mixed heart_beat_error (object culprit, string err,
@@ -717,7 +717,7 @@ void dangling_lfun_closure ()
 }
 
 //---------------------------------------------------------------------------
-void log_error (string file, string err, int warn)
+void log_error (string file, string err, int warn, int line)
 
 // Announce a compiler-time error or warning.
 //
