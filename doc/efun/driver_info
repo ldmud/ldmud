@@ -36,8 +36,8 @@ DESCRIPTION
                                      one read_file()/write_file() call.
             int[LIMIT_CALLOUTS]:     the number of callouts at one time.
             int[LIMIT_COST]:         how to account the current cost.
-            int[LIMIT_MEMROY]:       the max. number of bytes which can be 
-                                     _additionally_ allocated/used 
+            int[LIMIT_MEMORY]:       the max. number of bytes which can be
+                                     _additionally_ allocated/used
                                      _per top-level execution thread_
 
           For all limits except LIMIT_COST a limit of '0' aka LIMIT_UNLIMITED
