@@ -14,7 +14,18 @@ varargs int tail(string file)
 
     if (!stringp(file) || !this_player())
         return 0;
-    bytes txt = read_bytes(file, -(TAIL_MAX_BYTES + 80), (TAIL_MAX_BYTES + 80));
+
+    int size = file_size(file);
+    if (size < 0)
+        return 0;
+
+    int start_offset, end_offset;
+    start_offset = end_offset = TAIL_MAX_BYTES + 80;
+
+    if ((size - start_offset) < 0)
+      start_offset = 0;
+
+    bytes txt = read_bytes(file, -start_offset, end_offset);
     if (!bytesp(txt))
         return 0;
 
