@@ -15172,10 +15172,13 @@ update_virtual_program (program_t *from, inherit_t *oldinheritp, inherit_t *newi
 
         for (inherit_t* inh = oldinheritp + 1; inh < last_inherit; inh++)
         {
-            if(inh->variable_index_offset & NON_VIRTUAL_OFFSET_TAG)
+            if (inh->variable_index_offset & NON_VIRTUAL_OFFSET_TAG)
                 continue;
 
-            if(inh->inherit_type & (INHERIT_TYPE_DUPLICATE))
+            /* Ignore inherits (usually INHERIT_TYPE_DUPLICATE) with variables
+             * before oldinheritp.
+             */
+            if (inh->variable_index_offset <= oldinheritp->variable_index_offset)
                 continue;
 
             inh->variable_index_offset -= diff;

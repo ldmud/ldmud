@@ -1,0 +1,1 @@
+int middle_var;
