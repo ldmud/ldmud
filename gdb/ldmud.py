@@ -47,7 +47,16 @@ class MStringPrinter:
             result += '"'
             return result
         else:
-            return '"' + val["txt"].string(length = val["size"]) + '"'
+            # Some GDB versions have a broken implementation
+            # of gdb.Value.string(), therefore doing manually
+            # val["txt"].string('utf-8', length = val["size"])
+            b = []
+            for idx in range(val["size"]):
+                ch = val["txt"][idx]
+                if ch < 0:
+                    ch += 256
+                b.append(ch)
+            return '"' + bytes(b).decode('utf-8') + '"'
 
 class PtrNamePrinter:
     "Print an pointer to a struct with an name entry"
@@ -67,7 +76,7 @@ class PtrNamePrinter:
             if nameval.address == 0:
                 return print_ptr(val.address)
 
-        return print_ptr(val.address) + ' "' + nameval["txt"].string(length = nameval["size"]) + '"'
+        return print_ptr(val.address) + ' ' + MStringPrinter(nameval).to_string()
 
 class ArrayPrinter:
     "Print an LPC array"
