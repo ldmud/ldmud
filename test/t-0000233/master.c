@@ -32,7 +32,7 @@ void run_test()
 
     rm("a.c");
 
-    for(testnum = 0; testnum < 32; testnum++)
+    for(testnum = 0; testnum < 64; testnum++)
     {
         foreach(string ob: ({"a","b","b2","c","c2","d"}))
             destruct(find_object(ob));
@@ -216,9 +216,10 @@ string *epilog(int eflag)
                 ((testnum & 2) ? "#define NEW_VARIABLES\n" : "") +
                 ((testnum & 4) ? "#define SUB_INHERIT\n" : "") +
                 ((testnum & 8) ? "#define TEST_VIRTUAL virtual\n" : "#define TEST_VIRTUAL\n") +
-                ((testnum &16) ? "#define DOUBLE_INHERIT\n" : "");
+                ((testnum &16) ? "#define DOUBLE_INHERIT\n" : "") +
+                ((testnum &32) ? "#define MIDDLE_INHERITS\n" : "");
         });
 
-    limited(#'run_test, LIMIT_EVAL, 1000000);
+    limited(#'run_test, LIMIT_EVAL, 5000000);
     return 0;
 }

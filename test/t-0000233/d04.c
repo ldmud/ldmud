@@ -1,4 +1,8 @@
 virtual inherit "a";
+#ifdef MIDDLE_INHERITS
+inherit "m1";
+inherit "m2";
+#endif
 TEST_VIRTUAL inherit "b";
 
 private string c_var = "c";

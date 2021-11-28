@@ -1,4 +1,8 @@
 TEST_VIRTUAL inherit "c";
+#ifdef MIDDLE_INHERITS
+inherit "m1";
+inherit "m2";
+#endif
 TEST_VIRTUAL inherit "b";
 
 int count_both()
