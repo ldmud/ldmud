@@ -470,6 +470,8 @@ mixed *tests = ({
     ({ "sprintf 8", 0, (: sprintf("%-=6s", "abc\x00def") == "abc\x00def" :) }),
     ({ "sprintf 9", 0, (: sprintf("%-#6.1s", "abc\x00def") == "abc\x00def" :) }),
     ({ "sprintf 10", 0, (: sprintf("%-'\x00'6s", "abc") == "abc\x00\x00\x00" :) }),
+    ({ "sprintf 11", 0, (: sprintf("%=-4s\n", "A B\rC D E\n") == "A B\nC D\nE\n" :) }),
+    ({ "sprintf 12", 0, (: sprintf("%=-4s\n", "A B\rC D\rE F G\n") == "A B\nC D\nE F\nG\n" :) }),
 
     ({ "sprintf doc01", 0, (: sprintf("foo")                     == "foo"           :) }),
     ({ "sprintf doc02", 0, (: sprintf("%s","foo")                == "foo"           :) }),

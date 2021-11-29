@@ -1326,7 +1326,7 @@ add_column (fmt_state_t *st, cst **column)
     if ((COL->info & INFO_A) == INFO_A_JUSTIFY && length > (mp_int)COL->size)
         length = COL->size;
 
-    for (p = COL_D; length && p < COL_E && *p !='\n';)
+    for (p = COL_D; length && p < COL_E && *p !='\n' && *p != '\r';)
     {
         int width;
         size_t clen = next_grapheme_break(p, COL_E - p, &width);
@@ -1343,7 +1343,7 @@ add_column (fmt_state_t *st, cst **column)
     }
 
     done = p - COL_D;
-    if (p < COL_E && *p !='\n')
+    if (p < COL_E && *p !='\n' && *p != '\r')
     {
         /* Column data longer than the permitted size: find a
          * a space to do wordwrapping.
@@ -1407,7 +1407,7 @@ add_column (fmt_state_t *st, cst **column)
      */
     if ((COL->info & INFO_A) == INFO_A_JUSTIFY
      && *COL_D && *(COL_D+1)
-     && *p != '\n' && *p != '\0'
+     && *p != '\n' && *p != '\r' && *p != '\0'
        )
     {
         add_justified(st, COL_D, p - COL_D, COL->size);
@@ -1427,7 +1427,7 @@ add_column (fmt_state_t *st, cst **column)
         cst *temp;
         int ret;
 
-        if (*(COL_D-1) == '\n')
+        if (*(COL_D-1) == '\n' || *(COL_D-1) == '\r')
             ret = 2;
         else
             ret = 1;
