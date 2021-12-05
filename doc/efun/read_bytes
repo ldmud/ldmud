@@ -5,14 +5,19 @@ DESCRIPTION
         Reads a given amount of bytes from file.
         If <start> is not given or 0, the file is read from the
         beginning, else from the <start>th byte on. If <start> is
-        negative, it is counted from the end of the file.
-        <number> is the number of bytes to read. 0 or negative values
-        are possible, but not useful.
-        If <start> would be outside the actual size of the file, 0 is
+        negative, it is counted from the end of the file. If counting
+        from the end of the file would extend beyond the beginning of
+        the file the file is read fronm the beginning. <number> is the 
+        number of bytes to read. 0 or negative values are possible, but not
+        useful. If <start> would be outside the end of the file, 0 is
         returned instead of a string.
 
         The maximum bytes being read per call is LIMIT_BYTE (see
         query_limits()).
+
+HISTORY
+        LDMud 3.X.X added support for start offsets before the beginning 
+        of the file.
 
 SEE ALSO
         read_file(E), write_bytes(E), write_file(E)
