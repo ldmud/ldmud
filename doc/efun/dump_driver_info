@@ -5,7 +5,7 @@ SYNOPSIS
         int dump_driver_info(int what, string filename)
 
 DESCRIPTION
-        Dumps information specificied by <what> into a file
+        Dumps information specified by <what> into a file
         specified by <filename>. If <filename> is omitted,
         a default file name is used. The function calls
         master->valid_write() to check that it can write
@@ -32,7 +32,7 @@ DESCRIPTION
             - the swap status:
                nothing if not swapped,
                'PROG SWAPPED' if only the program is swapped
-               'VAR SWAPPED' if only the variabes are swapped
+               'VAR SWAPPED' if only the variables are swapped
                'SWAPPED' if both program and variables are swapped
             - the time the object was created
 
