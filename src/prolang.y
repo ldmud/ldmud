@@ -7728,6 +7728,16 @@ delete_prog_string (void)
 
     struct
     {
+        ident_t *name;           /* Identifier for argument. */
+        uint32   default_expr;   /* Startaddress of the expression for the
+                                  * default value (or UINT32_MAX if none).
+                                  */
+    } function_argument;
+      /* A single formal argument of a function.
+       */
+
+    struct
+    {
         p_int start;          /* Starting position in A_DEFAULT_VALUES. */
         short num;            /* Number of arguments. */
         short num_opt;        /* Number of arguments with default values. */
@@ -7795,8 +7805,9 @@ delete_prog_string (void)
 %type <lpctype>      decl_cast cast
 %type <statement>    statement statements statements_block block inline_block inline_comma_expr cond while do for foreach switch return
 %type <switch_block> switch_block switch_statements
-%type <address>      note_start new_arg_name
+%type <address>      note_start
 %type <rvalue>       comma_expr opt_default_value
+%type <function_argument> new_arg_name
 %type <function_arguments> argument argument_list inline_opt_args
 %type <function_block> function_body
 %type <lrvalue>      expr4 expr0
@@ -8989,13 +9000,19 @@ argument_list:
           $$.num_opt = 0;
           $$.start = 0;
 
-          if ($1 != UINT32_MAX)
+          if ($1.name == NULL || $1.name->type != I_TYPE_LOCAL)
+          {
+              $$.num = 0;
+              if ($1.default_expr != UINT32_MAX)
+                  CURRENT_PROGRAM_SIZE = $1.default_expr;
+          }
+          else if ($1.default_expr != UINT32_MAX)
           {
               /* We have a default value for this argument. */
               $$.start = DEFAULT_VALUES_BLOCK_SIZE;
 
               /* Now move the initialization code to the A_DEFAULT_VALUES block. */
-              if (save_default_value($1))
+              if (save_default_value($1.default_expr))
                   $$.num_opt++;
           }
       }
@@ -9004,7 +9021,13 @@ argument_list:
           $$ = $1;
           $$.num++;
 
-          if ($3 != UINT32_MAX)
+          if ($3.name == NULL || $3.name->type != I_TYPE_LOCAL)
+          {
+              $$.num--;
+              if ($3.default_expr != UINT32_MAX)
+                  CURRENT_PROGRAM_SIZE = $3.default_expr;
+          }
+          else if ($3.default_expr != UINT32_MAX)
           {
               /* We have a default value for the argument. */
 
@@ -9015,7 +9038,7 @@ argument_list:
               }
 
               /* Now move the initialization code to the A_DEFAULT_VALUES block. */
-              if (save_default_value($3))
+              if (save_default_value($3.default_expr))
                   $$.num_opt++;
           }
           else if ($$.num_opt != 0 && !(local_variables[current_number_of_locals-1].type.t_flags & TYPE_MOD_VARARGS))
@@ -9100,7 +9123,8 @@ new_arg_name:
 
           free_fulltype($3.type);
 
-          $$ = $3.start;
+          $$.default_expr = $3.start;
+          $$.name = varident;
       }
 ; /* new_arg_name */
 
@@ -15653,6 +15677,8 @@ use_variable (ident_t* name, enum variable_usage usage)
         if (!(idx & VIRTUAL_VAR_TAG))
             GLOBAL_VARIABLE(idx).usage |= usage;
     }
+    else if (name->type != I_TYPE_LOCAL)
+        return;
     else if (name->u.local.context >= 0)
     {
         // Do we have to look at the outer closure?
