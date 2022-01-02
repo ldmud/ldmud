@@ -272,8 +272,35 @@ static bool call_lpc_secure(CClosureFun fun, int num_arg, void* data);
 static void python_save_context();
 static void python_clear_context();
 static void python_restore_context();
+static PyObject* python_find_type_in_seq(PyObject *seq, PyObject *name);
 
 /* -- Python definitions and functions --- */
+
+static PyObject* python_find_type_in_seq(PyObject *seq, PyObject *name) {
+    // Seq must be a PySequence instance.
+    if (!PySequence_Check(seq)) { return 0; };
+    // Name must be a PyUnicode instance.
+    if (!PyUnicode_Check(name)) { return 0; };
+
+    Py_ssize_t seq_size = PySequence_Size(seq);
+    // Size of seq must be evenly divisible by two.
+    if(seq_size % 2) { return 0; }
+
+    PyObject *typ = 0;
+    for (long i = 0; i < seq_size; i += 2) {
+      PyObject *key_item = PySequence_GetItem(seq, i);
+      // Check if the value at i is a unicode string matching name
+      if (key_item && PyUnicode_Check(key_item) && PyUnicode_Compare(key_item, name) == 0) {
+          // If so, then te type is the adjacent index
+          typ = PySequence_GetItem(seq, i + 1);
+          Py_XDECREF(key_item);
+          break;
+      }
+      Py_XDECREF(key_item);
+    }
+
+    return typ;
+}
 
 static PyObject*
 python_register_efun (PyObject *module, PyObject *args, PyObject *kwds)
@@ -444,7 +471,14 @@ python_register_efun (PyObject *module, PyObject *args, PyObject *kwds)
         returnname = PyUnicode_FromString("return");
         if (returnname)
         {
-            PyObject* retanno = PyObject_GetItem(annotations, returnname);
+            PyObject* retanno;
+
+            if (PySequence_Check(annotations)) {
+                retanno = python_find_type_in_seq(annotations, returnname);
+            } else {
+                retanno = PyObject_GetItem(annotations, returnname);
+            }
+
             if (retanno)
                 types[0] = pythontype_to_lpctype(retanno);
             else
@@ -469,7 +503,12 @@ python_register_efun (PyObject *module, PyObject *args, PyObject *kwds)
                 continue;
             }
 
-            arganno = PyObject_GetItem(annotations, argname);
+            if (PySequence_Check(annotations)) {
+                arganno = python_find_type_in_seq(annotations, argname);
+            } else {
+                arganno = PyObject_GetItem(annotations, argname);
+            }
+
             if (!arganno)
             {
                 PyErr_Clear();
