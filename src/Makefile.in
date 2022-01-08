@@ -460,11 +460,11 @@ parse.o : actions.h array.h backend.h bytecode.h bytecode_gen.h config.h \
 
 parser.o : ../mudlib/sys/driver_hook.h applied_decl.h array.h backend.h \
     bytecode.h bytecode_gen.h closure.h config.h driver.h exec.h gcollect.h \
-    hash.h i-eval_cost.h iconv_opt.h instrs.h interpret.h lang.c lex.h \
-    machine.h main.h mapping.h mstrings.h my-alloca.h object.h pkg-python.h \
-    port.h prolang.h ptrtable.h sent.h simul_efun.h simulate.h stdstrings.h \
-    strfuns.h structs.h svalue.h swap.h switch.h typedefs.h types.h \
-    wiz_list.h xalloc.h
+    hash.h i-eval_cost.h iconv_opt.h instrs.h interpret.h lang.c lang.h \
+    lex.h machine.h main.h mapping.h mstrings.h my-alloca.h object.h \
+    pkg-python.h port.h prolang.h ptrtable.h sent.h simul_efun.h simulate.h \
+    stdstrings.h strfuns.h structs.h svalue.h swap.h switch.h typedefs.h \
+    types.h wiz_list.h xalloc.h
 
 pkg-gcrypt.o : ../mudlib/sys/tls.h bytecode.h bytecode_gen.h config.h \
     driver.h iconv_opt.h machine.h main.h pkg-gcrypt.h port.h sent.h \
@@ -672,7 +672,7 @@ object.o : instrs.h stdstrings.h
 
 parse.o : stdstrings.h
 
-parser.o : instrs.h lang.c stdstrings.h
+parser.o : instrs.h lang.c lang.h stdstrings.h
 
 pkg-mysql.o : instrs.h stdstrings.h
 

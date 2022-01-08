@@ -1,7 +1,7 @@
 [COPYRIGHT]
 Copyright 1997-2007 by Lars Düning.
 .br
-Copyright 2008-2021 by Bertram Felgenhauer, Alexander Motzkau and Dominik Schäfer.
+Copyright 2008-2022 by Bertram Felgenhauer, Alexander Motzkau and Dominik Schäfer.
 
 LDMud is based on LPmud, which is
 .br
@@ -12,7 +12,7 @@ Copyright 1991-1997 by Jörn Rennecke.
 Source code herein refers to the source code, and any executables
 created from the same source code.
 
-All rights reserved.  Permission is granted to use, extend and modify the
+All rights reserved. Permission is granted to use, extend and modify the
 source code provided subject to the restriction that the source code may
 not be used in any way whatsoever for monetary gain.
 
