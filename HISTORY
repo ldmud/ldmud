@@ -4,6 +4,16 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+08-Jan-2022 (LDMud Team) -- 3.5.5
+    - Fixed Crashes:
+       + Fixed crash when having more than 255 lambda values.
+       + Fixed crash in memory allocator (#871).
+       + Fixed crash in virtual inherit handling (#899).
+
+    - Language:
+       + Index operation cannot be called like efuns anymore.
+       + Fixed refcounting mismatch when a virtual function disappeared.
+
 06-Apr-2021 (LDMud Team) -- 3.5.4
     - Fixed Crashes:
        + Fixed a crash when a virtual inherited program was updated twice.
