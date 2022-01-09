@@ -134,7 +134,31 @@ topic: doc
     }
 {% endhighlight %}
   </dd>
-  
+
+  <dt><code>yield</code></dt>
+  <dd>
+    <code>yield</code> suspends the execution of a coroutine and optionally passes
+    a value to the caller or another coroutine.
+{% highlight c %}
+    async void range(int start, int stop, int step = 1)
+    {
+        for (int i = start; i < stop; i+= step)
+            yield(i);
+    }
+{% endhighlight %}
+  </dd>
+
+  <dt><code>await</code></dt>
+  <dd>
+    <code>await</code> suspends the execution of a coroutine until another coroutine
+    finishes and optionally passes a value.
+{% highlight c %}
+    async void fun()
+    {
+        await(sleep(2));
+    }
+{% endhighlight %}
+  </dd>
 </dl>
 
 <a class="prev" href="lpc-types.html">Previous</a>

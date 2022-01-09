@@ -147,6 +147,17 @@ topic: doc
 {% endhighlight %}
   </dd>
 
+  <dt><code>lwobject</code><dt>
+  <dd>
+    A lightweight object is a middle ground between structs and full-blown objects.
+    They are very similar to objects but have automatic lifetime.
+
+{% highlight c %}
+    lwobject lwo = new_lwobject("/obj/foo");
+
+    lwo->set_bar(42);
+{% endhighlight %}
+
   <dt><code>closure</code></dt>
   <dd>
     Closures reference executable code, usually other functions in
@@ -160,6 +171,27 @@ topic: doc
     Closures are usually not mutable. They are executed with funcall:
 {% highlight c %}
     funcall(cl, "Hello, World!");
+{% endhighlight %}
+  </dd>
+
+  <dt><code>coroutine</code></dt>
+  <dd>
+    A coroutine variable holds the execution state of an asynchronous function.
+    Such a function can be suspended and continued at a later time.
+
+{% highlight c %}
+    async void fun()
+    {
+        // Do something.
+
+        yield(); // Pause
+
+        // Do something later.
+    }
+
+    coroutine cr = fun();
+
+    call_coroutine(cr);
 {% endhighlight %}
   </dd>
 </dl>

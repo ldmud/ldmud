@@ -117,5 +117,55 @@ type.
   </dd>
 </dl>
 
+<h3>Asynchronous Functions</h3>
+Functions can be declared with <code>async</code> to be asynchronous.
+This means the function can suspend its execution at any time and be resumed later on.
+At each suspension a value can be passed in and/or out.
+
+{% highlight c %}
+    async void fun()
+    {
+        // Do something.
+
+        int a = yield(); // Suspend and get a value from outside.
+
+        // Do something else.
+
+        int b = yield(); // Suspend and get another value.
+
+        return a+b;
+    }
+{% endhighlight %}
+
+To execute such a function a coroutine object must be created.
+This is similar to calling the function but will not start execution immediately,
+but only create the coroutine object. With a call to <code>call_coroutine</code>
+or using <code>await</code>, the execution can be started/continued.
+
+{% highlight c %}
+    coroutine cr = fun();
+
+    call_coroutine(cr);                 // Initial start
+    call_coroutine(cr, 1);              // Pass 1 into the coroutine
+    int result = call_coroutine(cr, 2); // Pass 2 into the coroutine
+{% endhighlight %}
+
+Coroutines can call other coroutines either with <code>call_coroutine</code>
+or <code>await</code>. The former suspends execution only till the first suspension
+of the called coroutine, the later suspends execution until the called coroutine has ended.
+
+{% highlight c %}
+    async void fun()
+    {
+        foreach(int i: 10)
+        {
+            printf("Counting: %d\n", i);
+
+            // Assuming there is a sleep() coroutine.
+            await(sleep(1));
+        }
+    }
+{% endhighlight %}
+
 <a class="prev" href="lpc-flow.html">Previous</a>
 <a class="next" href="lpc-efuns.html">Next</a>

@@ -138,5 +138,20 @@ be passed to the shadowed object. The only calls that will not be redirected
 are the ones from the shadow itself.
 </p>
 
+<h3>Lightweight Objects</h3>
+
+<p>
+Lightweight objects are similar regular objects but have some restrictions and advantages:
+They don't have a name, cannot have an environment or inventory, cannot be living or
+interactive, cannot have shadows or be a shadow. But they have a much smaller memory
+footprint than regular objects and are destructed automatically. They can be copied
+and saved.
+</p>
+
+<p>
+Similar to regular objects, lightweight objects are built from LPC files
+via <code><a href="https://github.com/ldmud/ldmud/blob/master/doc/efun/new_lwobject">new_lwobject</a></code>.
+</p>
+
 <a class="prev" href="lpc-efuns.html">Previous</a>
 <a class="next" href="lpc-inheritance.html">Next</a>
