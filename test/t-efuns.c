@@ -1,3 +1,5 @@
+#define OWN_PRIVILEGE_VIOLATION
+
 #include "/inc/base.inc"
 #include "/inc/testarray.inc"
 #include "/inc/gc.inc"
@@ -5,6 +7,7 @@
 #include "/sys/tls.h"
 #include "/sys/configuration.h"
 #include "/sys/functionlist.h"
+#include "/sys/input_to.h"
 #include "/sys/lpctypes.h"
 #include "/sys/object_info.h"
 #include "/sys/regexp.h"
@@ -42,6 +45,10 @@ mixed global_var;
 
 int f(int arg);
 object clone = clonep() ? 0 : clone_object(this_object());
+
+string last_privi_op;
+mixed last_privi_who;
+mixed* last_privi_args;
 
 mixed *tests = ({
     // TODO: Add cases for indexing at string end ("abc"[3])
@@ -256,6 +263,30 @@ mixed *tests = ({
             return res == 62;
         :)
     }),
+    ({ "configure_interactive (privileged)", 0,
+       (:
+            last_privi_op = 0;
+            configure_interactive(0, IC_ENCODING, "UTF-8");
+
+            if (last_privi_op != 0) // Master should always be privileged.
+                return 0;
+
+            return interactive_info(0, IC_ENCODING) == "UTF-8";
+        :)
+    }),
+    ({ "configure_interactive (unprivileged)", 0,
+       (:
+            last_privi_op = 0;
+            funcall(bind_lambda(#'configure_interactive, clone), 0, IC_ENCODING, "ASCII");
+
+            if (last_privi_op != "configure_interactive"
+             || last_privi_who != clone
+             || !deep_eq(last_privi_args, ({0, IC_ENCODING, "ASCII"})))
+                return 0;
+
+            return interactive_info(0, IC_ENCODING) == "ASCII";
+        :)
+    }),
     ({ "get_type_info(int,0)", 0, (: get_type_info(10,              0) == T_NUMBER       :) }),
     ({ "get_type_info(str,0)", 0, (: get_type_info("10",            0) == T_STRING       :) }),
     ({ "get_type_info(str,1)", 0, (: get_type_info("10",            1) == 0              :) }), /* Shared string */
@@ -276,6 +307,20 @@ mixed *tests = ({
     ({ "get_type_info(str,0)", 0, (: get_type_info((<test_struct>), 0) == T_STRUCT       :) }),
     ({ "get_type_info(str,1)", 0, (: get_type_info((<test_struct>), 1) == "test_struct"  :) }), /* Struct name */
     ({ "get_type_info(byt,0)", 0, (: get_type_info(b"10",           0) == T_BYTES        :) }),
+    ({ "input_to (privileged, no player)", 0,
+        (:
+            // This shouldn't crash.
+            input_to((::), INPUT_IGNORE_BANG);
+            return 1;
+        :)
+    }),
+    ({ "input_to (unprivileged, no player)", 0,
+        (:
+            // This shouldn't crash.
+            funcall(bind_lambda(#'input_to, clone), (::), INPUT_IGNORE_BANG);
+            return 1;
+        :)
+    }),
     ({ "save_object 1", 0, (: stringp(save_object()) :) }), /* Bug #594 */
     ({ "strstr 01", 0, (: strstr("","") == 0 :) }), /* Bug #536 */
     ({ "strstr 02", 0, (: strstr("","", 1) == -1 :) }),
@@ -790,12 +835,13 @@ mixed *tests = ({
         :)
     }),
 
-    ({ "variable_list 1", 0, (: deep_eq(variable_list(this_object()),                        ({ "last_rt_warning",            "json_testdata", "json_teststring", "b",              "dhe_testdata", "global_var", "clone",     "tests",                   "args"      })) :) }),
+
+    ({ "variable_list 1", 0, (: deep_eq(variable_list(this_object()),                        ({ "last_rt_warning",            "json_testdata", "json_teststring", "b",              "dhe_testdata", "global_var", "clone",     "last_privi_op", "last_privi_who", "last_privi_args",          "tests",                   "args"      })) :) }),
     ({ "variable_list 2", 0, (: deep_eq(map(variable_list(this_object(), RETURN_FUNCTION_FLAGS), #'&, NAME_INHERITED|TYPE_MOD_NOSAVE|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|TYPE_MOD_VIRTUAL|TYPE_MOD_NO_MASK|TYPE_MOD_PUBLIC),
-                                                                                             ({ 0,                            0,               0,                 TYPE_MOD_NO_MASK, 0,              0,            0,           0,                         0           })) :) }),
-    ({ "variable_list 3", 0, (: deep_eq(variable_list(this_object(), RETURN_FUNCTION_TYPE),  ({ TYPE_MOD_POINTER|TYPE_STRING, TYPE_MAPPING,    TYPE_STRING,       TYPE_BYTES,       TYPE_STRING,    TYPE_ANY,     TYPE_OBJECT, TYPE_MOD_POINTER|TYPE_ANY, TYPE_NUMBER })) :) }),
+                                                                                             ({ 0,                            0,               0,                 TYPE_MOD_NO_MASK, 0,              0,            0,           0,                0,                0,                         0,                         0           })) :) }),
+    ({ "variable_list 3", 0, (: deep_eq(variable_list(this_object(), RETURN_FUNCTION_TYPE),  ({ TYPE_MOD_POINTER|TYPE_STRING, TYPE_MAPPING,    TYPE_STRING,       TYPE_BYTES,       TYPE_STRING,    TYPE_ANY,     TYPE_OBJECT, TYPE_STRING,      TYPE_ANY,         TYPE_MOD_POINTER|TYPE_ANY, TYPE_MOD_POINTER|TYPE_ANY, TYPE_NUMBER })) :) }),
     ({ "variable_list 4", 0, (: deep_eq(variable_list(this_object(), RETURN_FUNCTION_NAME | RETURN_FUNCTION_TYPE), 
-                                ({ "last_rt_warning", TYPE_MOD_POINTER|TYPE_STRING, "json_testdata", TYPE_MAPPING, "json_teststring", TYPE_STRING, "b", TYPE_BYTES, "dhe_testdata", TYPE_STRING, "global_var", TYPE_ANY, "clone", TYPE_OBJECT, "tests", TYPE_MOD_POINTER|TYPE_ANY, "args", TYPE_NUMBER })) :) }),
+                                ({ "last_rt_warning", TYPE_MOD_POINTER|TYPE_STRING, "json_testdata", TYPE_MAPPING, "json_teststring", TYPE_STRING, "b", TYPE_BYTES, "dhe_testdata", TYPE_STRING, "global_var", TYPE_ANY, "clone", TYPE_OBJECT, "last_privi_op", TYPE_STRING, "last_privi_who", TYPE_ANY, "last_privi_args", TYPE_MOD_POINTER|TYPE_ANY, "tests", TYPE_MOD_POINTER|TYPE_ANY, "args", TYPE_NUMBER })) :) }),
     ({ "variable_list 5", 0, (: variable_list(this_object(), RETURN_VARIABLE_VALUE)[3] == b"\x00" :) }),
 
 #ifdef __JSON__
@@ -904,6 +950,15 @@ string *epilog(int eflag)
 
     run_test();
     return 0;
+}
+
+int privilege_violation(string op, mixed who, varargs mixed* args)
+{
+    last_privi_op = op;
+    last_privi_who = who;
+    last_privi_args = args;
+
+    return 1;
 }
 
 int f(int arg)

@@ -7191,31 +7191,23 @@ v_input_to (svalue_t *sp, int num_arg)
         }
     }
 
-    if ((flags & IGNORE_BANG)
-     && !privilege_violation4(STR_INPUT_TO, svalue_object(command_giver), 0, flags, sp))
+    if (!check_object(command_giver)
+     || ((flags & IGNORE_BANG)
+      && !privilege_violation4(STR_INPUT_TO, svalue_object(command_giver), 0, flags, sp))
+    /* There is a chance that the privilege_violation() method destructed
+     * the current object or the command_giver - return as if the call was
+     * denied.
+     */
+     || is_current_object_destructed()
+     || !check_object(command_giver))
     {
         do
         {
             free_svalue(sp--);
         } while (--num_arg);
-        
+
         put_number(arg, 0); /* arg should equal sp+1 */
         return arg;
-    }
-
-    /* There is a chance that the privilege_violation() method destructed
-     * the current object or the command_giver - return as if the call was
-     * denied.
-     */
-    if (is_current_object_destructed() || !check_object(command_giver))
-    {
-	do
-	{
-	    free_svalue(sp--);
-	} while (--num_arg);
-	
-	put_number(arg, 0); /* arg should equal sp+1 */
-	return arg;
     }
 
     /* Allocate and setup the input_to structure */
@@ -8472,7 +8464,7 @@ f_configure_interactive (svalue_t *sp)
 
     if (is_current_object_destructed()
      || ((!ob || ob != get_current_object())
-      && !privilege_violation_n(STR_CONFIGURE_INTERACTIVE, svalue_object(ob), sp, 2)))
+      && !privilege_violation_n(STR_CONFIGURE_INTERACTIVE, ob ? svalue_object(ob) : const0, sp, 2)))
     {
         sp = pop_n_elems(3, sp);
         return sp;
