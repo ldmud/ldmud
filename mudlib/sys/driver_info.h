@@ -191,6 +191,9 @@
 #define DI_STATUS_TEXT_MALLOC                               -703
 #define DI_STATUS_TEXT_MALLOC_EXTENDED                      -704
 
+/* Misc Status */
+#define DI_NUM_SIMUL_EFUNS_TABLED                           -900
+
 /* Indices into the subarrays of DI_MEMORY_EXTENDED_STATISTICS (if given) */
 
 #define DIM_ES_MAX_ALLOC   0

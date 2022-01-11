@@ -49,6 +49,8 @@
 #include "xalloc.h"
 #include "pkg-python.h"
 
+#include "../mudlib/sys/driver_info.h"
+
 /*-------------------------------------------------------------------------*/
 
 object_t *simul_efun_object  = NULL;
@@ -495,6 +497,28 @@ get_simul_efun_header (ident_t* name)
         return &simul_efun_table[name->u.global.sim_efun].function;
     }
 } /* get_simul_efun_header() */
+
+/*-------------------------------------------------------------------------*/
+void
+sefun_driver_info (svalue_t *svp, int value)
+
+/* Returns the simul_efun information for driver_info(<what>).
+ * <svp> points to the svalue for the result.
+ */
+
+{
+    switch (value)
+    {
+        case DI_NUM_SIMUL_EFUNS_TABLED:
+            put_number(svp, num_simul_efun);
+            break;
+
+        default:
+            fatal("Unknown option for sefun_driver_info(): %d\n", value);
+            break;
+    }
+
+} /* sefun_driver_info() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef GC_SUPPORT
