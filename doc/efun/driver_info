@@ -668,7 +668,7 @@ DESCRIPTION
 
 
 
-        Status texts:
+      Status texts:
 
         <what> == DI_STATUS_TEXT_MEMORY:
           A printable string containing information about
@@ -689,6 +689,13 @@ DESCRIPTION
         <what> == DI_STATUS_TEXT_MALLOC_EXTENDED:
           A printable strings with extended memory statistics
           (if the driver was compiled with them).
+
+
+      Misc Status:
+
+        <what> == DI_NUM_SIMUL_EFUNS_TABLED:
+          The number of known simul_efuns (active or not) in the simul_efun
+          table.
 
 
 HISTORY

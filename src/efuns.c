@@ -126,6 +126,7 @@
 #include "sha1.h"
 #include "stdstrings.h"
 #include "simulate.h"
+#include "simul_efun.h"
 #include "strfuns.h"
 #include "structs.h"
 #ifdef USE_TLS
@@ -10039,6 +10040,10 @@ f_driver_info (svalue_t *sp)
             }
             break;
         }
+
+        case DI_NUM_SIMUL_EFUNS_TABLED:
+            sefun_driver_info(&result, what);
+            break;
     }
 
     /* Clean up the stack and return the result */

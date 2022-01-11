@@ -50,6 +50,7 @@ extern void invalidate_simul_efuns (void);
 extern Bool assert_simul_efun_object(void);
 extern string_t *query_simul_efun_file_name(void);
 extern function_t *get_simul_efun_header(ident_t* name) __attribute__((nonnull));
+extern void sefun_driver_info (svalue_t *svp, int value) __attribute__((nonnull(1)));
 
 #ifdef GC_SUPPORT
 extern void clear_simul_efun_refs(void);
