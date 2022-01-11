@@ -10,6 +10,9 @@ class TestModule(unittest.TestCase):
         self.assertIsNone(ldmud.get_simul_efun())
 
 class TestObject(unittest.TestCase):
+    def testEarlyObjectLoad(self):
+        self.assertTrue(early_ob_worked)
+
     def testInitLoaded(self):
         ob = ldmud.Object("/master")
         self.assertIsNotNone(ob)
@@ -818,3 +821,11 @@ ldmud.register_hook(ldmud.ON_OBJECT_CREATED, ob_created)
 ldmud.register_hook(ldmud.ON_OBJECT_DESTRUCTED, ob_destroyed)
 
 ldmud.register_efun("python_get_hook_info", get_hook_info)
+
+# Test loading objects at startup
+early_ob = ldmud.Object("/testob")
+if early_ob is not None and early_ob.name == "/testob":
+    early_ob_worked = True
+    ldmud.efuns.destruct(early_ob)
+else:
+    early_ob_worked = False

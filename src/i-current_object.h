@@ -82,7 +82,8 @@ set_current_object (object_t *ob)
 {
     if (!ob)
         clear_current_object();
-    put_object(&current_object, ob);
+    else
+        put_object(&current_object, ob);
 } /* set_current_object() */
 
 /*-------------------------------------------------------------------------*/
@@ -95,7 +96,8 @@ set_current_lwobject (lwobject_t *lwob)
 {
     if (!lwob)
         clear_current_object();
-    put_lwobject(&current_object, lwob);
+    else
+        put_lwobject(&current_object, lwob);
 } /* set_current_lwobject() */
 
 /*-------------------------------------------------------------------------*/
