@@ -2936,6 +2936,9 @@ ldmud_object_create (object_t* ob)
 {
     ldmud_object_t *self;
 
+    if (ob == NULL)
+        return NULL;
+
     self = (ldmud_object_t *)ldmud_object_type.tp_alloc(&ldmud_object_type, 0);
     if (self == NULL)
         return NULL;
