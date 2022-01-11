@@ -818,3 +818,7 @@ ldmud.register_hook(ldmud.ON_OBJECT_CREATED, ob_created)
 ldmud.register_hook(ldmud.ON_OBJECT_DESTRUCTED, ob_destroyed)
 
 ldmud.register_efun("python_get_hook_info", get_hook_info)
+
+# Test loading an object before master is available
+lpc_ob = ldmud.Object("a")
+print(f"lpc_ob loaded: {lpc_ob}", file=sys.stderr)
