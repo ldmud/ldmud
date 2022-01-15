@@ -42,7 +42,8 @@ GESCHICHTE
             NonLambda-Closures, Symbole und gequotete Arrays zu laden,
             indem ein neues Format fuer das Savefile verwendet wird.
         LDMud 3.5.0 unterstuetzt das Einlesen von Formatversion 2 mit hoeherer
-            Praezision der Gleitkommazahlen.
+            Praezision der Gleitkommazahlen und Formatversion 3 um
+	    lvalue-Referenzen einzulesen.
 
 SIEHE AUCH
         save_object(E), restore_value(E), valid_read(M)
