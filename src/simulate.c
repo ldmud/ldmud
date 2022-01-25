@@ -3964,14 +3964,21 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args)
 
 /*-------------------------------------------------------------------------*/
 int
-setup_function_callback ( callback_t *cb, svalue_t ob, string_t * fun
-                        , int nargs, svalue_t * args)
+setup_function_callback_base ( callback_t *cb, svalue_t ob, string_t * fun
+                             , int nargs, svalue_t * args, bool no_warn)
 
-/* Setup the empty/uninitialized callback <cb> to hold a function
+/* Aliases:
+ *   setup_function_callback(cb, ob, fun, nargs, args)
+ *         == setup_function_callback_base(cb, ob, fun, nargs, args, false)
+ *
+ * Setup the empty/uninitialized callback <cb> to hold a function
  * call to <ob>:<fun> with the <nargs> arguments starting from <args>.
  *
  * Both <ob> and <fun> are copied from the caller, but the arguments are
  * adopted (taken away from the caller).
+ *
+ * If function <fun> doesn't exist in <ob> and <no_warn> is not set,
+ * issue a runtime warning.
  *
  * Result is -1 on success, or, when encountering an illegal argument,
  * the index of the faulty argument (but even then all caller arguments
@@ -3993,7 +4000,7 @@ setup_function_callback ( callback_t *cb, svalue_t ob, string_t * fun
         cb->function.named.ob = const0;
         cb->function.named.name = NULL;
     }
-    else
+    else if (!no_warn)
     {
         /* Check whether the function does exist, */
         switch (ob.type)
@@ -4009,7 +4016,7 @@ setup_function_callback ( callback_t *cb, svalue_t ob, string_t * fun
     }
 
     return error_index;
-} /* setup_function_callback() */
+} /* setup_function_callback_base() */
 
 /*-------------------------------------------------------------------------*/
 int
@@ -4145,9 +4152,10 @@ setup_efun_callback_base ( callback_t **cb, svalue_t *args, int nargs
         if (ob.type != T_NUMBER)
         {
             memsafe(*cb = xalloc(sizeof(callback_t)), sizeof(callback_t), "callback structure");
-            error_index = setup_function_callback(*cb, ob, args[0].u.str
-                                                 , nargs-first_arg
-                                                 , args+first_arg);
+            error_index = setup_function_callback_base(*cb, ob, args[0].u.str
+                                                      , nargs-first_arg
+                                                      , args+first_arg
+                                                      , bNoObj);
             if (error_index >= 0)
                 error_index += first_arg;
         }

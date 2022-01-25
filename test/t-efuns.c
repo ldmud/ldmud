@@ -835,6 +835,8 @@ mixed *tests = ({
         :)
     }),
 
+    ({ "unique_array 1", 0,  (: last_rt_warning = 0; unique_array(({}), "ThisFunctionDoesNotExist"); return !last_rt_warning; :) }),
+    ({ "unique_array 2", 0,  (: last_rt_warning = 0; unique_array(({this_object()}), "ThisFunctionDoesNotExist"); return !last_rt_warning; :) }),
 
     ({ "variable_list 1", 0, (: deep_eq(variable_list(this_object()),                        ({ "last_rt_warning",            "json_testdata", "json_teststring", "b",              "dhe_testdata", "global_var", "clone",     "last_privi_op", "last_privi_who", "last_privi_args",          "tests",                   "args"      })) :) }),
     ({ "variable_list 2", 0, (: deep_eq(map(variable_list(this_object(), RETURN_FUNCTION_FLAGS), #'&, NAME_INHERITED|TYPE_MOD_NOSAVE|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|TYPE_MOD_VIRTUAL|TYPE_MOD_NO_MASK|TYPE_MOD_PUBLIC),
