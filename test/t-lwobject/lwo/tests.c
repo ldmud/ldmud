@@ -8,7 +8,7 @@
 #include "../inc/msg.inc"
 #include "../inc/testarray.inc"
 
-int var1 = 42;
+nosave int var1 = 42;
 string var2;
 mixed var3;
 
@@ -351,6 +351,23 @@ int run_tests()
             function int()
             {
                 return restore_value(save_value(#'var1)) == #'var1;
+            }
+        }),
+        ({ "save_value honoring nosave", 0,
+            function int()
+            {
+                string text = save_value(this_object());
+                return !("var1" in text) && "var2" in text && "var3" in text;
+            }
+        }),
+        ({ "restore_value honoring nosave", 0,
+            function int()
+            {
+                lwobject copy;
+
+                var3 = 110;
+                copy = restore_value(regreplace(save_value(this_object()), "var3", "var1", 0));
+                return copy.check(0);
             }
         }),
         ({ "to_string(op_cl)", 0,

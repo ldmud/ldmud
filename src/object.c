@@ -5990,6 +5990,7 @@ save_lwobject (lwobject_t *lwob)
 
 {
     int num;
+    bool first = true;
 
     /* Recall the struct from the pointer table.
      * If it is a shared one, there's nothing else to do.
@@ -6016,10 +6017,16 @@ save_lwobject (lwobject_t *lwob)
     num = lwob->prog->num_variables;
     for (int i = 0; i < num; i++)
     {
-        if (i)
-            MY_PUTC(',')
-        else
+        if (lwob->prog->variables[i].type.t_flags & TYPE_MOD_STATIC)
+            continue;
+
+        if (first)
+        {
             MY_PUTC(' ')
+            first = false;
+        }
+        else
+            MY_PUTC(',')
 
         save_string(lwob->prog->variables[i].name, -1, -1, true);
     }
@@ -6034,6 +6041,9 @@ save_lwobject (lwobject_t *lwob)
     /* And now ... the variable values. */
     for (int i = 0; i < num; i++)
     {
+        if (lwob->prog->variables[i].type.t_flags & TYPE_MOD_STATIC)
+            continue;
+
         save_svalue(lwob->variables + i, ',', MY_FALSE);
     }
 
@@ -8321,7 +8331,8 @@ restore_lwobject (svalue_t *svp, char **str)
             int next_var_idx = cur_var_idx;
             while (true)
             {
-                if (prog->variables[next_var_idx].name == var_name)
+                if (!(prog->variables[next_var_idx].type.t_flags & TYPE_MOD_STATIC)
+                 && prog->variables[next_var_idx].name == var_name)
                 {
                     variable = lwob->variables + next_var_idx;
                     vartype = prog->variables[next_var_idx].type.t_type;
