@@ -259,6 +259,41 @@ void run_test()
                 return clone.pop() == "What?" && clone.empty() && !orig.empty();
             }
         }),
+        ({ "saving and restoring in a mapping", 0,
+            function int()
+            {
+                lwobject orig = new_lwobject("/lwo/stack");
+                lwobject clone;
+
+                orig.push("What?");
+                clone = restore_value(save_value(([1:orig])))[1];
+                return clone.pop() == "What?" && clone.empty() && !orig.empty();
+            }
+        }),
+        ({ "saving and restoring in an array", 0,
+            function int()
+            {
+                lwobject orig = new_lwobject("/lwo/stack");
+                lwobject clone;
+
+                orig.push("What?");
+                clone = restore_value(save_value(({orig})))[0];
+                return clone.pop() == "What?" && clone.empty() && !orig.empty();
+            }
+        }),
+        ({ "saving and restoring in an lwobject", 0,
+            function int()
+            {
+                lwobject outer = new_lwobject("/lwo/stack");
+                lwobject inner = new_lwobject("/lwo/stack");
+                lwobject clone;
+
+                outer.push(inner);
+                inner.push("What?");
+                clone = restore_value(save_value(outer));
+                return clone.pop().pop() == "What?" && clone.empty() && !outer.empty() && !inner.empty();
+            }
+        }),
         ({ "blueprint()", 0,
             function int()
             {

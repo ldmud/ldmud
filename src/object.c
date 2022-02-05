@@ -7787,7 +7787,7 @@ skip_element (char **str)
             return true;
         }
 
-        case '(':  /* array, struct or mapping */
+        case '(':  /* array, struct, mapping or lightweight object*/
         {
             /* Lazy way of doing it, a bit inefficient */
             struct rms_parameters tmp_par;
@@ -7796,6 +7796,7 @@ skip_element (char **str)
             tmp_par.str = pt + 2;
             if (pt[1] == '{'
              || pt[1] == '<'
+             || pt[1] == '*'
                )
                 tsiz = restore_size(&tmp_par.str);
             else if (pt[1] == '[')
@@ -8158,6 +8159,7 @@ restore_size (char **str)
         {
         case '}':  /* End of array */
         case '>':  /* End of struct */
+        case '*':  /* End of lightweight object */
           {
             if (pt[1] != ')')
                 return -1;
