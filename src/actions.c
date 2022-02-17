@@ -604,7 +604,10 @@ call_modify_command (char *buff)
     {
         if (svp->type == T_STRING)
         {
-            extract_cstr(buff, svp->u.str, (size_t)MAX_COMMAND_LENGTH);
+            size_t len = get_string_up_to_size(get_txt(svp->u.str), mstrsize(svp->u.str), MAX_COMMAND_LENGTH-1, NULL);
+
+            strncpy(buff, get_txt(svp->u.str), len);
+            buff[len] = 0;
         } else if (svp->type == T_NUMBER && svp->u.number) {
             return MY_TRUE;
         }

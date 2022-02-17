@@ -43,6 +43,7 @@ extern size_t utf8_size (p_int code);
 extern char* utf8_prev (char* text, size_t pos);
 extern size_t unicode_to_utf8(p_int code, char* buf);
 extern size_t utf8_to_unicode(const char* buf, size_t len, p_int *code);
+extern size_t get_string_up_to_size(const char* str, size_t len, size_t size, bool* error);
 
 extern char* get_illegal_sequence(char* buf, size_t len, iconv_t cd);
 

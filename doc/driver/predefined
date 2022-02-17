@@ -52,7 +52,9 @@ DESCRIPTION
         __HEART_BEAT_INTERVAL__    : the configured heartbeat time.
         __SYNCHRONOUS_HEART_BEAT__ : defined if synchronous heartbeats are
                                      enabled.
-        __MAX_COMMAND_LENGTH__     : the maximum length a command can have.
+        __MAX_COMMAND_LENGTH__     : the maximum length a command from
+                                     command(), execute_command() or
+                                     H_MODIFY_COMMAND can have.
         __EFUN_DEFINED__(name)     : if the efun 'name' exists, this
                                      macro evaluates to " 1 ", else to " 0 ".
         __DRIVER_LOG__             : the name of the default debug.log file

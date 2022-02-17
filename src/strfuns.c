@@ -771,6 +771,49 @@ utf8_to_unicode (const char* buf, size_t len, p_int *code)
 
 /*--------------------------------------------------------------------*/
 
+size_t
+get_string_up_to_size (const char* str, size_t len, size_t size, bool* error)
+
+/* Determines the length (in bytes) for <str> that will not exceed
+ * the given size (in bytes). If there are errors in the encoding
+ * returns the length up to the faulty byte and sets the <error> flag
+ * (if not NULL).
+ */
+
+{
+    int result = 0;
+
+    if (len <= size)
+        return len;
+
+    while (len != 0)
+    {
+        p_int ch;
+        size_t clen = utf8_to_unicode(str, len, &ch);
+
+        if (!clen)
+        {
+            if (error)
+                *error = true;
+            return result;
+        }
+
+        if (clen > size)
+            break;
+
+        result += clen;
+        str += clen;
+        len -= clen;
+        size -= clen;
+    }
+
+    if (error)
+        *error = false;
+    return result;
+} /* get_string_up_to_size() */
+
+/*--------------------------------------------------------------------*/
+
 char*
 get_illegal_sequence (char* buf, size_t len, iconv_t cd)
 
