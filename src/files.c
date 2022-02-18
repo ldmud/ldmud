@@ -1367,7 +1367,7 @@ v_read_file (svalue_t *sp, int num_arg)
     inter_sp = sp;
     iec = xalloc(sizeof(*iec));
     if (!iec)
-        errorf("(read_file) Out of memory (%ld bytes) for error handler\n", sizeof(*iec));
+        errorf("(read_file) Out of memory (%zd bytes) for error handler\n", sizeof(*iec));
     iec->cd = cd;
     push_error_handler(iconv_error_handler, &(iec->head));
     sp++;
@@ -1447,7 +1447,7 @@ v_read_file (svalue_t *sp, int num_arg)
         if (!str)
         {
             fclose(conv.f);
-            errorf("(read_file) Out of memory (%ld bytes) for buffer\n", size+1);
+            errorf("(read_file) Out of memory (%zd bytes) for buffer\n", size+1);
             /* NOTREACHED */
             break;
         }
@@ -1841,7 +1841,7 @@ v_write_file (svalue_t *sp, int num_arg)
     inter_sp = sp;
     iec = xalloc(sizeof(*iec));
     if (!iec)
-        errorf("(write_file) Out of memory (%ld bytes) for error handler\n", sizeof(*iec));
+        errorf("(write_file) Out of memory (%zd bytes) for error handler\n", sizeof(*iec));
     iec->cd = cd;
     push_error_handler(iconv_error_handler, &(iec->head));
     sp++;
@@ -1937,7 +1937,7 @@ v_write_file (svalue_t *sp, int num_arg)
             if (!outbuf)
             {
                 fclose(f);
-                errorf("(write_file) Out of memory (%ld bytes) for buffer\n", outbufsize);
+                errorf("(write_file) Out of memory (%zd bytes) for buffer\n", outbufsize);
             }
 
             while (true)

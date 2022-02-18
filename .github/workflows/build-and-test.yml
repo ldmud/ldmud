@@ -8,12 +8,17 @@ jobs:
             matrix:
                 cc: [gcc, clang]
                 coverage: [false, true]
+                machine: [i386, amd64]
+                exclude:
+                    - machine: i386
+                      coverage: true
         continue-on-error: ${{ matrix.coverage }}
         steps:
             - name: Install dependencies
               run: |
+                ${{ matrix.machine == 'i386' && 'sudo dpkg --add-architecture i386' || 'true' }}
                 sudo apt-get update -y
-                sudo apt-get install -y --no-install-recommends ${{ matrix.cc }} bison autoconf autogen libgcrypt20-dev libgnutls28-dev libsqlite3-dev libpq-dev libmysqlclient-dev python3-dev libjson-c-dev libxml2-dev zlib1g-dev ${{ (matrix.cc == 'gcc' && matrix.coverage) && 'lcov python3-pip' || ''}} ${{ (matrix.cc == 'clang' && matrix.coverage) && 'llvm' || ''}}
+                sudo apt-get install -y --no-install-recommends ${{ matrix.cc }} bison autoconf autogen ${{matrix.machine=='i386' && 'gcc-multilib' || ''}} libgcrypt20-dev:${{matrix.machine}} libgnutls28-dev:${{matrix.machine}} libsqlite3-dev:${{matrix.machine}} libpq-dev:${{matrix.machine}} libmysqlclient-dev:${{matrix.machine}} ${{ matrix.machine == 'amd64' && 'python3-dev python3' || '' }} libpcre3-dev:${{matrix.machine}} libjson-c-dev:${{matrix.machine}} libxml2-dev:${{matrix.machine}} zlib1g-dev:${{matrix.machine}} ${{ (matrix.cc == 'gcc' && matrix.coverage) && 'lcov python3-pip' || ''}} ${{ (matrix.cc == 'clang' && matrix.coverage) && 'llvm' || ''}}
             - name: Checkout sources
               uses: actions/checkout@v2
             - name: Generate build files
@@ -24,11 +29,14 @@ jobs:
               shell: sh
               run: ./configure --enable-use-ipv6 --enable-use-mccp --enable-use-json --enable-use-pcre
                                --enable-use-mysql --enable-use-pgsql --enable-use-sqlite
-                               --enable-use-xml --enable-use-tls  --enable-use-gcrypt --enable-use-python
+                               --enable-use-xml --enable-use-tls  --enable-use-gcrypt
                                --enable-malloc-trace --enable-malloc-lpc-trace  --enable-dynamic-costs
                                --enable-eval-cost-trace --enable-trace-code --enable-swap-efun
+                               ${{ matrix.machine == 'amd64' && '--enable-use-python' || '' }}
+                               ${{ matrix.machine == 'i386' && '--target=i686-pc-linux-gnu' || '' }}
                                ${{ matrix.coverage && '--with-optimize=no' || ''}}
-                               EXTRA_CFLAGS="-DINSIDE_TRAVIS -Werror ${{ matrix.cc == 'gcc' && '-Wno-unused-result' || '' }} ${{ matrix.cc == 'gcc' && !matrix.coverage && '-D_FORTIFY_SOURCE=2' || '' }}"
+                               EXTRA_CFLAGS="-DINSIDE_TRAVIS -Werror ${{ matrix.machine == 'i386' && '-m32' || '' }} ${{ matrix.cc == 'gcc' && '-Wno-unused-result' || '' }} ${{ matrix.cc == 'gcc' && !matrix.coverage && '-D_FORTIFY_SOURCE=2' || '' }}"
+                               ${{ matrix.machine == 'i386' && 'LDFLAGS=-m32'}}
                                CC=${{ matrix.cc }}
             - name: Build driver
               working-directory: src

@@ -473,7 +473,8 @@ ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key)
     case T_MAPPING:
         if (val->u.map->num_values != 1)
           errorf("json_serialize(): can only serialize mappings with width 1, "
-                 "but got mapping with width %ld.\n",val->u.map->num_values);
+                 "but got mapping with width %"PRIdPINT".\n",
+                 val->u.map->num_values);
         
         jobj = json_object_new_object();
         // the created object has to be attached to the parent immediately to

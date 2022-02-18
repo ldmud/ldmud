@@ -544,7 +544,7 @@ static INLINE svalue_t svalue_float(const double val)
     return (svalue_t){ T_FLOAT, {}, {.float_number = val } };
 #else
     int exponent;
-    int32_t mantissa = SPLIT_DOUBLE(val, &exponent)
+    int32_t mantissa = SPLIT_DOUBLE(val, &exponent);
 
     return (svalue_t){ T_FLOAT, {.exponent = exponent}, {.mantissa = mantissa } };
 #endif

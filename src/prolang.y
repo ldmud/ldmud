@@ -3332,7 +3332,7 @@ ins_uint32 (uint32_t l)
                 , CURRENT_PROGRAM_SIZE + sizeof(uint32_t));
     }
  } // ins_uint32()
-#endif // FLOAT_FORMAT_2
+#else
 /*-------------------------------------------------------------------------*/
 static void
 ins_double (double d)
@@ -3350,6 +3350,7 @@ ins_double (double d)
                  , CURRENT_PROGRAM_SIZE + sizeof(double));
     }
 } /* ins_double() */
+#endif // FLOAT_FORMAT_2
 /*-------------------------------------------------------------------------*/
 static void upd_uint32 (bc_offset_t offset, uint32_t l) UNUSED;
 static void
