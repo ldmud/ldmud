@@ -516,6 +516,53 @@ get_union_type (lpctype_t *head, lpctype_t* member)
         return result;
     }
 
+    if(member->t_class == TCLASS_STRUCT)
+    {
+        // Look at other structs in head. If we encounter lpctype_any_struct
+        // in either head or member, only this will survive.
+        lpctype_t *current = head;
+        while (true)
+        {
+            lpctype_t *elem = current->t_class == TCLASS_UNION ? current->t_union.member : current;
+            if (elem->t_class == TCLASS_STRUCT)
+            {
+                // Is the generic struct already in there, then there's nothing
+                // else to be done.
+                if (elem->t_struct.name == NULL)
+                    return ref_lpctype(head);
+
+                // If we want to add the generic struct type, then we have to
+                // remove all specific ones.
+                if (member->t_struct.name == NULL)
+                {
+                    result = ref_lpctype(member);
+
+                    while (true)
+                    {
+                        lpctype_t *insert_elem = insert->t_class == TCLASS_UNION ? insert->t_union.member : insert;
+
+                        if (insert_elem->t_class != TCLASS_STRUCT)
+                        {
+                            lpctype_t *prev_result = result;
+                            result = get_union_type(result, insert_elem);
+                            free_lpctype(prev_result);
+                        }
+
+                        if (insert->t_class == TCLASS_UNION)
+                            insert = insert->t_union.head;
+                        else
+                            return result;
+                    }
+                    /* NOTREACHED */
+                }
+            }
+
+            if (current->t_class == TCLASS_UNION)
+                current = current->t_union.head;
+            else
+                break;
+        }
+    }
 
     while (insert->t_class == TCLASS_UNION && insert->t_union.member > member)
     {

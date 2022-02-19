@@ -1653,7 +1653,7 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
             }
             else // no struct
             {
-                snprintf(buf, bufsize, "unknown struct");
+                snprintf(buf, bufsize, "struct mixed");
                 return strlen(buf);
             }
 
@@ -9238,6 +9238,10 @@ single_basic_non_void_type:
           }
 
           free_mstring($2);
+      }
+    | L_STRUCT L_MIXED
+      {
+        $$ = lpctype_any_struct;
       }
     | single_basic_non_void_type '*'
       {

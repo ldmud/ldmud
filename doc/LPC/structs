@@ -78,13 +78,16 @@ USAGE
         LPC it constructs a new struct type whereever it is included).
 
 
-        A variable to hold a struct is defined like this:
+        A variable to hold a specific or arbitrary struct is defined like
+        this:
 
             struct Foo var;
+            struct mixed var;
 
         and similar for function arguments:
 
             void fun (struct Foo arg)
+            void fun (struct mixed arg)
 
 
         Just writing 'struct Foo var' however does not _create_ a struct,
