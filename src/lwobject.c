@@ -73,7 +73,7 @@ lwobject_t *
 create_lwobject (object_t *blueprint)
 
 /* Create a lightweight object of the object <blueprint>.
- * The variables will be zero-initialized.
+ * The variables will be initialized with __INIT.
  */
 
 {
@@ -89,6 +89,7 @@ create_lwobject (object_t *blueprint)
 
     push_lwobject(inter_sp, result); /* In case of an error. */
     give_uid_to_lwobject(result, blueprint);
+    sapply_lwob_ign_prot(STR_VARINIT, result, 0);
     inter_sp--;
 
     return result;
@@ -99,7 +100,8 @@ lwobject_t *
 copy_lwobject (lwobject_t *orig, bool copy_variables)
 
 /* Create a copy of <orig>.
- * If <copy_variables> is false, the variables will be left empty.
+ * If <copy_variables> is false, the variables will be left initialized
+ * with __INIT.
  */
 
 {
@@ -112,10 +114,17 @@ copy_lwobject (lwobject_t *orig, bool copy_variables)
     result->user = orig->user;
     result->eff_user = orig->eff_user;
 
+    push_lwobject(inter_sp, result); /* In case of an error. */
+    sapply_lwob_ign_prot(STR_VARINIT, result, 0);
+    inter_sp--;
+
     if (copy_variables)
     {
         for (int i=0; i < result->prog->num_variables; i++)
+        {
+            free_svalue(result->variables+i);
             assign_rvalue_no_free(result->variables+i, orig->variables+i);
+        }
     }
 
     return result;

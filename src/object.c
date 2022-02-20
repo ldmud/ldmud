@@ -8350,37 +8350,36 @@ restore_lwobject (svalue_t *svp, char **str)
             }
         }
 
+        /* Restore the value and put it on the stack first. */
+        push_number(inter_sp, 0);
+        if (!restore_svalue(inter_sp, str, ','))
+        {
+            inter_sp--;
+            pop_stack();
+            free_svalue(svp);
+            *svp = const0;
+            return false;
+        }
+
         if (!variable)
         {
             /* The variable doesn't exist anymore, read and discard. */
-            svalue_t tmp;
-            if (!restore_svalue(&tmp, str, ','))
-            {
-                pop_stack();
-                free_svalue(svp);
-                *svp = const0;
-                return false;
-            }
-
-            free_svalue(&tmp);
+            pop_stack();
         }
         else
         {
-            if (!restore_svalue(variable, str, ','))
+            if (rtt_checks && !check_rtt_compatibility(vartype, inter_sp))
             {
+                pop_stack();
                 pop_stack();
                 free_svalue(svp);
                 *svp = const0;
                 return false;
             }
 
-            if (rtt_checks && !check_rtt_compatibility(vartype, variable))
-            {
-                pop_stack();
-                free_svalue(svp);
-                *svp = const0;
-                return false;
-            }
+            free_svalue(variable);
+            transfer_svalue_no_free(variable, inter_sp);
+            inter_sp--;
         }
     }
 

@@ -62,6 +62,10 @@ MISCELLANEOUS
         any outside program can inspect its variables. To really hide
         variable contents they must be nosave.
 
+        Prior to restoring or copying a lightweight object all variables
+        of the new lightweight object will be initialized regularly first
+        when pragma init_variables is in effect.
+
 
 HISTORY
         Lightweight objects were introduced in LDMud 3.6.5.

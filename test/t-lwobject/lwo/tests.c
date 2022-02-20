@@ -367,7 +367,7 @@ int run_tests()
 
                 var3 = 110;
                 copy = restore_value(regreplace(save_value(this_object()), "var3", "var1", 0));
-                return copy.check(0);
+                return copy.check(42);
             }
         }),
         ({ "to_string(op_cl)", 0,

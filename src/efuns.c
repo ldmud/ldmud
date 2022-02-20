@@ -7180,7 +7180,10 @@ copy_svalue (svalue_t *dest, svalue_t *src
 
             /* Copy the variables. */
             for (int i = 0; i < num_var; i++)
+            {
+                free_svalue(new->variables + i);
                 copy_svalue(new->variables + i, old->variables + i, ptable, depth+1);
+            }
         }
         else /* shared object we already encountered */
             put_ref_lwobject(dest, (lwobject_t*)rec->data);
@@ -7553,16 +7556,19 @@ f_deep_copy (svalue_t *sp)
     case T_MAPPING:
     case T_LVALUE:
       {
-        svalue_t new;
-
-        ptable = new_pointer_table();
+        ptable = push_new_pointer_table();
         if (!ptable)
             errorf("(deep_copy) Out of memory for pointer table.\n");
-        copy_svalue(&new, sp, ptable, 0);
+
+        inter_sp++;
+        copy_svalue(inter_sp, sp, ptable, 0);
         if (sp->type == T_QUOTED_ARRAY)
-            new.x.quotes = sp->x.quotes;
-        transfer_svalue(sp, &new);
-        free_pointer_table(ptable);
+            inter_sp->x.quotes = sp->x.quotes;
+        transfer_svalue(sp, inter_sp);
+        inter_sp--;
+
+        pop_stack(); /* Free pointer table. */
+
         break;
       }
     }

@@ -5453,12 +5453,16 @@ define_global_variable (ident_t* name, fulltype_t actual_type, Bool with_init)
         /* If this is the first variable initialization and
          * pragma_share_variables is in effect, insert
          * the check for blueprint/clone initialisation:
-         *    if (clonep(this_object())) return 1;
+         *    if (clonep(this_object()) || lwobjectp(this_object()) return 1;
          */
         if (!variables_initialized && pragma_share_variables)
         {
             ins_f_code(F_THIS_OBJECT);
             ins_f_code(F_CLONEP);
+            ins_f_code(F_BRANCH_WHEN_NON_ZERO);
+            ins_byte(4);
+            ins_f_code(F_THIS_OBJECT);
+            ins_f_code(F_LWOBJECTP);
             ins_f_code(F_BRANCH_WHEN_ZERO);
             ins_byte(2);
             ins_f_code(F_CONST1);
