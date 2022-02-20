@@ -28,4 +28,5 @@ HISTORY
         LDMud 3.6.5 introduced lightweight objects.
 
 SEE ALSO
-        hooks(C), create_ob(H), create_super(H), create_clone(H)
+        hooks(C), create_lwobject_copy(H), create_lwobject_restore(H),
+        create_ob(H), create_super(H), create_clone(H)

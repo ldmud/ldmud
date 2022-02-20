@@ -2,14 +2,20 @@ SYNOPSIS
         mixed deep_copy(mixed arg)
 
 DESCRIPTION
-        Create a deep copy of <arg> and return it. For arrays and mappings
-        this means that a new array or mapping is created with copies of the
-        original content. Embedded arrays and mappings are truly copied, too.
+        Create a deep copy of <arg> and return it. For arrays, mappings,
+        structs and lightweight objects this means that a new array, mapping,
+        struct resp. lightweight object is created with copies of the
+        original content. Embedded arrays, mappings, structs or lightweight
+        objects are truly copied, too.
 
         For other values this function is a no-op.
 
-        If DYNAMIC_COST is defined, every nested mapping or array counts
-        towards the evaluation cost in both size and nesting depth.
+        If a lightweight objects was copied, the H_CREATE_LWOBJECT_COPY hook
+        will be called to finish initialization of the lightweight object.
+
+        If DYNAMIC_COST is defined, every nested array, mapping, struct and
+        lightweight objects counts towards the evaluation cost in both size
+        and nesting depth.
 
 EXAMPLES
         mixed *a, *b;

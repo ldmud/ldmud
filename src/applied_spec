@@ -123,6 +123,8 @@ static void|int H_CLEAN_UP(int);
 protected int H_COMMAND(string, object);
 protected void H_CREATE_CLONE(...);
 protected void H_CREATE_LWOBJECT(...);
+protected varargs void H_CREATE_LWOBJECT_COPY();
+protected varargs void H_CREATE_LWOBJECT_RESTORE();
 protected varargs void H_CREATE_OB();
 protected varargs void H_CREATE_SUPER();
 protected int H_DEFAULT_METHOD(mixed, string, ...);

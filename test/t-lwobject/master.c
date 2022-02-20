@@ -269,6 +269,17 @@ void run_test()
                 copy(orig);
             }
         }),
+        ({ "copy() with error during copied()", TF_ERROR,
+            function void()
+            {
+                // Foremost we check that nothing leaks.
+                object master = load_object("/lwo/error");
+                lwobject orig = new_lwobject("/lwo/error");
+
+                master.activate_error_on_copy();
+                copy(orig);
+            }
+        }),
         ({ "deep_copy()", 0,
             function int()
             {
@@ -291,6 +302,17 @@ void run_test()
                 lwobject orig = new_lwobject("/lwo/error");
 
                 master.activate_error_on_init();
+                deep_copy(({orig}));
+            }
+        }),
+        ({ "deep_copy() with error during copied()", TF_ERROR,
+            function void()
+            {
+                // Foremost we check that nothing leaks.
+                object master = load_object("/lwo/error");
+                lwobject orig = new_lwobject("/lwo/error");
+
+                master.activate_error_on_copy();
                 deep_copy(({orig}));
             }
         }),
@@ -363,6 +385,19 @@ void run_test()
                 outer.push(inner);
 
                 master.activate_error_on_init();
+                restore_value(save_value(outer));
+            }
+        }),
+        ({ "saving and restoring with error during restored()", TF_ERROR,
+            function void()
+            {
+                // Foremost we check that nothing leaks.
+                object master = load_object("/lwo/error");
+                lwobject outer = new_lwobject("/lwo/stack");
+                lwobject inner = new_lwobject("/lwo/error");
+                outer.push(inner);
+
+                master.activate_error_on_restore();
                 restore_value(save_value(outer));
             }
         }),
@@ -520,6 +555,8 @@ string *epilog(int eflag)
 {
     set_driver_hook(H_CREATE_OB, "create");
     set_driver_hook(H_CREATE_LWOBJECT, "new");
+    set_driver_hook(H_CREATE_LWOBJECT_COPY, "copied");
+    set_driver_hook(H_CREATE_LWOBJECT_RESTORE, "restored");
     set_driver_hook(H_LWOBJECT_UIDS, unbound_lambda(({}), "lwuid"));
 
     run_test();

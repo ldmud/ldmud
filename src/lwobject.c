@@ -131,6 +131,52 @@ copy_lwobject (lwobject_t *orig, bool copy_variables)
 } /* copy_lwobject() */
 
 /*-------------------------------------------------------------------------*/
+void
+reset_lwobject (lwobject_t *lwob, int hook, int num_arg)
+
+/* Call the driver hook (one of H_CREATE_LWOBJECT*) on the given lwobject.
+ */
+
+{
+    if (driver_hook[hook].type == T_CLOSURE)
+    {
+        lambda_t *l = driver_hook[hook].u.lambda;
+
+        if (l->function.code.num_arg)
+        {
+            /* Closure accepts at least one argument,
+             * so it gets the target object there and we execute
+             * it in the context of the creator (current object).
+             */
+            assign_current_object(&(l->ob), "reset_lwobject");
+
+            /* We need to add the lightweight object as an
+             * argument before all the others.
+             */
+            inter_sp++;
+            for (int i = 0; i < num_arg; i++)
+                inter_sp[-i] = inter_sp[-i-1];
+            put_ref_lwobject(inter_sp - num_arg, lwob);
+
+            call_lambda(&driver_hook[hook], num_arg+1);
+            pop_stack(); /* Ignore result. */
+        }
+        else
+        {
+            /* No arguments, just bind to target */
+            free_svalue(&(l->ob));
+            put_ref_lwobject(&(l->ob), lwob);
+            call_lambda(&driver_hook[hook], 0);
+            inter_sp = pop_n_elems(num_arg+1, inter_sp); /* arguments & result */
+        }
+    }
+    else if (driver_hook[hook].type == T_STRING)
+    {
+        sapply_lwob_ign_prot(driver_hook[hook].u.str, lwob, num_arg);
+    }
+} /* reset_lwobject() */
+
+/*-------------------------------------------------------------------------*/
 svalue_t *
 v_new_lwobject (svalue_t *sp, int num_arg)
 
@@ -205,43 +251,7 @@ v_new_lwobject (svalue_t *sp, int num_arg)
     sapply_lwob_ign_prot(STR_VARINIT, result, 0);
 
     /* Call the H_CREATE_LWOBJECT hook. */
-    if (driver_hook[H_CREATE_LWOBJECT].type == T_CLOSURE)
-    {
-        lambda_t *l = driver_hook[H_CREATE_LWOBJECT].u.lambda;
-
-        if (l->function.code.num_arg)
-        {
-            /* Closure accepts at least one argument,
-             * so it gets the target object there and we execute
-             * it in the context of the creator (current object).
-             */
-            assign_current_object(&(l->ob), "new_lwobject");
-
-            /* We need to add the lightweight object as an
-             * argument before all the others.
-             */
-            sp++;
-            for (int i = 1; i < num_arg; i++)
-                sp[1-i] = sp[-i];
-            put_ref_lwobject(sp - num_arg + 1, result);
-
-            inter_sp = sp;
-            call_lambda(&driver_hook[H_CREATE_LWOBJECT], num_arg);
-            pop_stack(); /* Ignore result. */
-        }
-        else
-        {
-            /* No arguments, just bind to target */
-            free_svalue(&(l->ob));
-            put_ref_lwobject(&(l->ob), result);
-            call_lambda(&driver_hook[H_CREATE_LWOBJECT], 0);
-            inter_sp = pop_n_elems(num_arg, inter_sp); /* arguments & result */
-        }
-    }
-    else if (driver_hook[H_CREATE_LWOBJECT].type == T_STRING)
-    {
-        sapply_lwob_ign_prot(driver_hook[H_CREATE_LWOBJECT].u.str, result, num_arg-1);
-    }
+    reset_lwobject(result, H_CREATE_LWOBJECT, num_arg - 1);
 
     assert(inter_sp == argp); /* All arguments should be freed by now. */
     return argp;

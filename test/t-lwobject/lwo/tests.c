@@ -17,6 +17,16 @@ void new()
     var2 = "new";
 }
 
+void copied()
+{
+    var2 = "copied";
+}
+
+void restored()
+{
+    var2 = "restored";
+}
+
 int check(int val)
 {
     return var1 == val;
@@ -25,6 +35,11 @@ int check(int val)
 int get()
 {
     return var1;
+}
+
+string last_create()
+{
+    return var2;
 }
 
 string string_function(string arg)
@@ -65,6 +80,18 @@ int run_tests()
                 return lwobjectp(this_object())
                     && !lwobjectp(blueprint());
             }
+        }),
+        ({ "H_CREATE_LWOBJECT_COPY called", 0,
+            function int()
+            {
+                return copy(this_object()).last_create() == "copied";
+            },
+        }),
+        ({ "H_CREATE_LWOBJECT_RESTORE called", 0,
+            function int()
+            {
+                return restore_value(save_value(this_object())).last_create() == "restored";
+            },
         }),
         ({ "comparisons", 0,
             function int()

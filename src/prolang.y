@@ -186,6 +186,8 @@ short hook_type_map[NUM_DRIVER_HOOKS] =
     H_CREATE_OB:                    SH(T_STRING), \
     H_CREATE_CLONE:                 SH(T_STRING), \
     H_CREATE_LWOBJECT:              SH(T_STRING), \
+    H_CREATE_LWOBJECT_COPY:         SH(T_STRING), \
+    H_CREATE_LWOBJECT_RESTORE:      SH(T_STRING), \
     H_RESET:                        SH(T_STRING), \
     H_CLEAN_UP:       SH(T_CLOSURE) SH(T_STRING), \
     H_MODIFY_COMMAND: SH(T_CLOSURE) SH(T_STRING) SH(T_MAPPING), \

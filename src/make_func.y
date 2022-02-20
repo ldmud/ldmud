@@ -1866,6 +1866,10 @@ name_to_hook(char *name)
         return H_CREATE_CLONE;
     if ( !strcmp(name, "CREATE_LWOBJECT") )
         return H_CREATE_LWOBJECT;
+    if ( !strcmp(name, "CREATE_LWOBJECT_COPY") )
+        return H_CREATE_LWOBJECT_COPY;
+    if ( !strcmp(name, "CREATE_LWOBJECT_RESTORE") )
+        return H_CREATE_LWOBJECT_RESTORE;
     if ( !strcmp(name, "RESET") )
         return H_RESET;
     if ( !strcmp(name, "CLEAN_UP") )

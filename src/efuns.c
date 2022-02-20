@@ -6983,6 +6983,10 @@ f_copy (svalue_t *sp)
             free_lwobject(old);
             sp->u.lwob = new;
         }
+        /* We call the hook regardless of whether we actually did the copy,
+         * so the optimization stays invisible to LPC.
+         */
+        reset_lwobject(sp->u.lwob, H_CREATE_LWOBJECT_COPY, 0);
         break;
       }
 
@@ -7522,6 +7526,163 @@ copy_svalue (svalue_t *dest, svalue_t *src
 } /* copy_svalue() */
 
 /*-------------------------------------------------------------------------*/
+static void process_copy_svalue (svalue_t *src, struct pointer_table *ptable);
+static void
+process_copy_mapping (svalue_t *key, svalue_t *val, void *extra)
+
+/* Called from process_copy_svalue() as part of the mapping walk to
+ * process any entries in the mapping. <extra> is a (struct csv_info *).
+ */
+
+{
+    struct csv_info *info = (struct csv_info *)extra;
+
+    process_copy_svalue(key, info->ptable);
+
+    for (int i = 0; i < info->width; i++)
+        process_copy_svalue(val++, info->ptable);
+} /* process_copy_mapping() */
+
+/*-------------------------------------------------------------------------*/
+static void
+process_copy_svalue (svalue_t *src, struct pointer_table *ptable)
+
+/* Go through the copy of <src> using the <ptable> and do some postprocessing.
+ * Currently this means calling the H_CREATE_LWOBJECT_COPY hook for any
+ * lwobjects that were copied.
+ *
+ * This function will reset the .data entry in <ptable> to NULL to mark
+ * any processed data structure.
+ */
+
+{
+    switch (src->type)
+    {
+        case T_QUOTED_ARRAY:
+        case T_POINTER:
+        {
+            vector_t *old = src->u.vec;
+            struct pointer_record *rec;
+
+            if (old == &null_vector)
+                break;
+
+            rec = find_add_pointer(ptable, old, false);
+            if (!rec || !rec->data)
+                break;
+
+            rec->data = NULL;
+            for (mp_int i = 0; i < VEC_SIZE(old); i++)
+                process_copy_svalue(old->item + i, ptable);
+            break;
+        }
+
+        case T_LWOBJECT:
+        {
+            lwobject_t *old = src->u.lwob;
+            struct pointer_record *rec = find_add_pointer(ptable, old, false);
+
+            if (!rec || !rec->data)
+                break;
+
+            reset_lwobject((lwobject_t*)rec->data, H_CREATE_LWOBJECT_COPY, 0);
+
+            rec->data = NULL;
+            for (int i = 0; i < old->prog->num_variables; i++)
+                process_copy_svalue(old->variables + i, ptable);
+            break;
+        }
+
+        case T_STRUCT:
+        {
+            struct_t *old = src->u.strct;
+            struct pointer_record *rec = find_add_pointer(ptable, old, false);
+
+            if (!rec || !rec->data)
+                break;
+
+            rec->data = NULL;
+            for (int i = 0; i < struct_size(old); i++)
+                process_copy_svalue(old->member + i, ptable);
+            break;
+        }
+
+        case T_MAPPING:
+        {
+            mapping_t *old = src->u.map;
+            struct pointer_record *rec = find_add_pointer(ptable, old, false);
+            struct csv_info info;
+
+            if (!rec || !rec->data)
+                break;
+
+            rec->data = NULL;
+            info.width = old->num_values;
+            info.ptable = ptable;
+            walk_mapping(old, process_copy_mapping, &info);
+            break;
+        }
+
+        case T_LVALUE:
+            switch (src->x.lvalue_type)
+            {
+                default:
+                    fatal("(deep_copy) Illegal lvalue %p type %d\n", src, src->x.lvalue_type);
+                    break;
+
+                case LVALUE_PROTECTED:
+                {
+                    struct protected_lvalue *l = src->u.protected_lvalue;
+                    struct pointer_record *rec = find_add_pointer(ptable, l, false);
+
+                    if (!rec || !rec->data)
+                        break;
+
+                    rec->data = NULL;
+                    process_copy_svalue(&(l->val), ptable);
+                    break;
+                }
+
+                case LVALUE_PROTECTED_CHAR:
+                    break;
+
+                case LVALUE_PROTECTED_RANGE:
+                {
+                    struct protected_range_lvalue *r = src->u.protected_range_lvalue;
+                    struct pointer_record *rec = find_add_pointer(ptable, r, false);
+
+                    if (!rec || !rec->data)
+                        break;
+
+                    rec->data = NULL;
+                    process_copy_svalue(&(r->vec), ptable);
+                    break;
+                }
+
+                case LVALUE_PROTECTED_MAPENTRY:
+                {
+                    struct protected_mapentry_lvalue *e = src->u.protected_mapentry_lvalue;
+                    struct pointer_record *rec = find_add_pointer(ptable, e, false);
+                    svalue_t oldmap = { T_MAPPING };
+
+                    if (!rec || !rec->data)
+                        break;
+
+                    rec->data = NULL;
+                    oldmap.u.map = e->map;
+                    process_copy_svalue(&(e->key), ptable);
+                    process_copy_svalue(&oldmap, ptable);
+                    break;
+                }
+            }
+            break;
+
+        default:
+            break;
+    } /* switch(src->type) */
+} /* process_copy_svalue() */
+
+/*-------------------------------------------------------------------------*/
 svalue_t *
 f_deep_copy (svalue_t *sp)
 
@@ -7564,6 +7725,11 @@ f_deep_copy (svalue_t *sp)
         copy_svalue(inter_sp, sp, ptable, 0);
         if (sp->type == T_QUOTED_ARRAY)
             inter_sp->x.quotes = sp->x.quotes;
+        /* Only after the entire structure has been copied, we can call the
+         * driver hooks upon lightweight objects in there. (Otherwise the
+         * hooks might see partial structures.)
+         */
+        process_copy_svalue(sp, ptable);
         transfer_svalue(sp, inter_sp);
         inter_sp--;
 

@@ -8293,7 +8293,8 @@ restore_lwobject (svalue_t *svp, char **str)
     blueprint = get_object(prog_name);
     pop_stack(); /* Freeing prog_name. */
     if ((!blueprint)
-     || (O_PROG_SWAPPED(blueprint) && load_ob_from_swap(blueprint) < 0))
+     || (O_PROG_SWAPPED(blueprint) && load_ob_from_swap(blueprint) < 0)
+     || (blueprint->prog->flags & P_NO_LIGHTWEIGHT))
     {
         pop_stack(); /* Freeing name. */
         return false;
@@ -8384,6 +8385,8 @@ restore_lwobject (svalue_t *svp, char **str)
     }
 
     pop_stack(); /* Freeing name. */
+
+    reset_lwobject(lwob, H_CREATE_LWOBJECT_RESTORE, 0);
 
     (*str)++;
     if (**str != ')')

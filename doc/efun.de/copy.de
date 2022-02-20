@@ -3,11 +3,16 @@ SYNOPSIS
 
 BESCHREIBUNG
         Erzeugt eine flache Kopie von <arg> und liefert diese zurueck. Fuer
-        Arrays und Mappings heisst das, dass neue Arrays bzw. Mappings erzeugt
-        werden, die Kopien der Elemente des Originals enthalten. Eingebettete
-        Arrays und Mappings werden jedoch als Referenz uebergeben!
+        Arrays, Mappings, Structs und leichtgewichtige Objekte heisst das,
+        dass neue Arrays, Mappings, Structs bzw. leichtgewichtige Objekte
+        erzeugt werden, die Kopien der Elemente des Originals enthalten.
+        Eingebettete Arrays, Mappings, Structs oder leichtgewichtige Objekte
+        werden jedoch als Referenz uebergeben!
 
         Fuer andere Werte von <arg> bewirkt diese Funktion nichts.
+
+        Falls ein leichtgewichtiges Objekt kopiert wurde, wird der Hook
+        H_CREATE_LWOBJECT_COPY zur Vollendung der Initialisierung aufgerufen.
 
 BEISPIELE
         mixed *a, *b;
