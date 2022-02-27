@@ -127,7 +127,7 @@ void run_test()
                 return getuid(lwob) == "lwuid" && geteuid(lwob) == "lwuid";
             }
         }),
-        ({ "calling a lightweight object", 0,
+        ({ "calling a lightweight object with .", 0,
             function int()
             {
                 lwobject lwob = new_lwobject("/lwo/stack");
@@ -139,7 +139,7 @@ void run_test()
                 return lwob.pop() == "!";
             }
         }),
-        ({ "calling a lightweight object several times", 0,
+        ({ "calling a lightweight object several times with .", 0,
             function int()
             {
                 /* This is for testing the call cache. */
@@ -149,12 +149,44 @@ void run_test()
                 return lwob.pop() == 2 && lwob.pop() == 1 && lwob.pop() == 0;
             }
         }),
-        ({ "calling a missing function in a lightweight object several times", 0,
+        ({ "calling a missing function in a lightweight object several times with .", 0,
             function int()
             {
                 lwobject "/lwo/stack" lwob = new_lwobject("/lwo/stack");
                 foreach(int i: 3)
                     if (!catch(lwob.append(i)))
+                        return 0;
+                return 1;
+            }
+        }),
+        ({ "calling a lightweight object with ->", 0,
+            function int()
+            {
+                lwobject lwob = new_lwobject("/lwo/stack");
+                lwob->push("Here");
+                lwob->push("I");
+                lwob->push("Am");
+                lwob->push("!");
+
+                return lwob->pop() == "!";
+            }
+        }),
+        ({ "calling a lightweight object several times with ->", 0,
+            function int()
+            {
+                /* This is for testing the call cache. */
+                lwobject "/lwo/stack" lwob = new_lwobject("/lwo/stack");
+                foreach(int i: 3)
+                    lwob->push(i);
+                return lwob->pop() == 2 && lwob->pop() == 1 && lwob->pop() == 0;
+            }
+        }),
+        ({ "calling a missing function in a lightweight object several times with ->", 0,
+            function int()
+            {
+                lwobject "/lwo/stack" lwob = new_lwobject("/lwo/stack");
+                foreach(int i: 3)
+                    if (lwob->append(i))
                         return 0;
                 return 1;
             }

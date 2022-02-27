@@ -15722,6 +15722,7 @@ again:
                          , get_txt(ap[1].u.str)
                          , get_txt(ap[0].u.lwob->prog->name));
                 sp = _pop_n_elems(2, inter_sp);
+                push_number(sp, 0);
             }
         }
         else
