@@ -228,7 +228,8 @@ class SValuePrinter:
     T_CALLBACK                       = 0xf
     T_ERROR_HANDLER                  = 0x10
     T_BREAK_ADDR                     = 0x11
-    T_NULL                           = 0x12
+    T_ARG_FRAME                      = 0x12
+    T_NULL                           = 0x13
 
     LVALUE_UNPROTECTED               = 0x00
     LVALUE_UNPROTECTED_CHAR          = 0x01
@@ -256,6 +257,7 @@ class SValuePrinter:
         T_CALLBACK:                       "T_CALLBACK",
         T_ERROR_HANDLER:                  "T_ERROR_HANDLER",
         T_BREAK_ADDR:                     "T_BREAK_ADDR",
+        T_ARG_FRAME:                      "T_ARG_FRAME",
         T_NULL:                           "T_NULL",
     }
 
@@ -341,6 +343,8 @@ class SValuePrinter:
             return [(".u.error_handler", val["u"]["error_handler"])]
         elif stype == self.T_BREAK_ADDR:
             return [(".u.break_addr", val["u"]["break_addr"])]
+        elif stype == self.T_ARG_FRAME:
+            return [(".u.lvalue", val["u"]["lvalue"])]
         else:
             return []
 
