@@ -8243,7 +8243,12 @@ reset_machine (Bool first)
         {
             if (csp->lambda.type == T_CLOSURE)
                 free_closure(&csp->lambda);
-            free_coroutine(csp->coroutine);
+            if (csp->coroutine != NULL)
+            {
+                if (csp->coroutine->state == CS_RUNNING)
+                    abort_coroutine(csp->coroutine);
+                free_coroutine(csp->coroutine);
+            }
             free_svalue(&(csp->pretend_to_be));
             csp--;
         }
