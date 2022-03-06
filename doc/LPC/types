@@ -129,6 +129,8 @@ DESCRIPTION
                 functions, efuns and to functions compiled at
                 run-time ("lambda closures").
 
+    o coroutine Holds the execution state of an asynchronous function.
+
     o symbol    Identifier names, which in essence are quoted strings.
                 They are used to compute lambda closures, e.g. instead
                 of ({..., 'ident, ... }) you can write declare a
@@ -160,7 +162,11 @@ DESCRIPTION
     A pointer to a destructed object will always have the value 0.
 
 
+HISTORY
+    The types lwobject and coroutine were introduced in LDMud 3.6.5.
+
+
 SEE ALSO
-    alists(LPC), arrays(LPC), mappings(LPC), closures(LPC), structs(LPC),
-    unions(LPC), typeof(E), get_type_info(E), inheritance(LPC),
-    pragma(LPC), modifiers(LPC), escape(LPC)
+    alists(LPC), arrays(LPC), mappings(LPC), closures(LPC), coroutines(LPC),
+    objects(LPC), structs(LPC), unions(LPC), typeof(E), get_type_info(E),
+    inheritance(LPC), pragma(LPC), modifiers(LPC), escape(LPC)
