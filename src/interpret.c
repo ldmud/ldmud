@@ -1947,16 +1947,6 @@ normalize_svalue (svalue_t *svp, bool collapse_lvalues)
             {
                 struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
 
-                if (collapse_lvalues
-                 && r->ref == 1
-                 && (r->var == NULL || r->var->ref == 1))
-                {
-                    svalue_t temp = *svp;
-                    internal_assign_rvalue_no_free(svp, &temp);
-                    free_svalue(&temp);
-                    continue;
-                }
-
                 if (r->var != NULL
                  && (r->vec.type != r->var->val.type
                   || (r->vec.type == T_POINTER && r->vec.u.vec != r->var->val.u.vec)
@@ -1966,6 +1956,20 @@ normalize_svalue (svalue_t *svp, bool collapse_lvalues)
                     deref_protected_lvalue(r->var);
                     r->var = NULL;
                 }
+
+                if (collapse_lvalues
+                 && r->ref == 1
+                 && (r->var == NULL || r->var->ref == 1)
+                 && (r->vec.type == T_POINTER
+                    ? r->vec.u.vec->ref == (r->var == NULL ? 1 : 2)
+                    : r->vec.u.str->info.ref == (r->var == NULL ? 1 : 2)))
+                {
+                    svalue_t temp = *svp;
+                    internal_assign_rvalue_no_free(svp, &temp);
+                    free_svalue(&temp);
+                    continue;
+                }
+
                 break;
             }
 
