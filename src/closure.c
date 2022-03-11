@@ -1731,7 +1731,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
         assert(r->vec.type == T_STRING);
 
         assign_rvalue_no_free(&tmp, value);
-        insert_value_push(value);
+        insert_value_push(&tmp);
         free_svalue(&tmp);
         break;
       }
@@ -2505,24 +2505,19 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                     PUT_UINT8(pstart+1, GET_UINT8(pstart+1)+1);
                                 }
 
+                                /* Count the extra byte we're going to insert */
+                                end++;
+                                void_dest++;
+                                non_void_dest++;
+
                                 /* Compute the distance for the <cond> branch */
                                 start = *--branchp;
                                 offset = (current.code[start+1] & VOID_GIVEN)
                                           ? void_dest - start - 1
                                           : non_void_dest - start - 1;
 
-                                /* Count the extra byte we're going to insert */
-                                end++;
-                                void_dest++;
-                                non_void_dest++;
-
                                 if (offset > 0x7fff)
                                     UNIMPLEMENTED
-
-                                /* Compute the distance to store while q and p
-                                 * give the proper offset.
-                                 */
-                                dist = (unsigned short)(offset + (q-p));
 
                                 /* Move the code after this branch.
                                  */
@@ -2532,7 +2527,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                 } while (--j);
 
                                 /* Store the new branch in place of the old one. */
-                                RSTORE_SHORT(q, dist);
+                                RSTORE_SHORT(q, offset);
 
                                 p -= 2;
                                 code = GET_CODE(p);
@@ -3315,6 +3310,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     /* This is compiled as:
                      *
                      *      SAVE_ARG_FRAME
+                     *      <reserve value>
                      *      CATCH l / CATCH_NO_LOG l
                      *      <body>
                      *   l: END_CATCH
@@ -3326,6 +3322,11 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
 
                     if (block_size < 2 || block_size > 6)
                         lambda_error("Wrong number of arguments to #'catch\n");
+
+                    if (current.code_left < 1)
+                        realloc_code();
+                    current.code_left--;
+                    STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
 
                     flags = 0;
                     for (i = 3; i <= block_size; i++)
@@ -3358,11 +3359,10 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                          "'reserve as catch-modifier.\n");
                     }
 
-                    if (current.code_left < 4)
+                    if (current.code_left < 3)
                         realloc_code();
-                    current.code_left -= 4;
+                    current.code_left -= 3;
 
-                    STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
                     STORE_CODE(current.codep, F_CATCH);
 
                     STORE_UINT8(current.codep, flags);
@@ -3596,6 +3596,8 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     int i, size;
 
                     size = block_size - 2;
+                    if (size < 0)
+                        lambda_error("Missing tempate for #'(<.\n");
                     if (size > STRUCT_MAX_MEMBERS)
                     {
                         lambda_error("Too many elements for struct.\n");
