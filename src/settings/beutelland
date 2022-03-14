@@ -4,7 +4,7 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/RoleMUD/ --libexecdir=/RoleMUD/home/bin --libdir=/RoleMUD/MUD-Lib --enable-erq=xerq --with-setting=beutelland $*
+exec ./configure --prefix=/RoleMUD/ --libexecdir=/RoleMUD/bin --libdir=/RoleMUD/MUD-Lib --enable-erq=xerq --with-setting=beutelland $*
 exit 1
 
 
@@ -34,9 +34,10 @@ enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
 enable_access_control=no
 enable_use_parse_command=no
-enable_use_mysql=yes
+enable_use_mysql=no
 enable_use_pcre=no
-with_erq_dir=/RoleMUD/erq/bin
+enable_use_mccp=yes
+with_erq_dir=/RoleMUD/bin
 with_swap_file=Swap_File
 
 # --- Runtime limits ---
