@@ -333,6 +333,8 @@ locate_out (program_t *prog)
     prog->update_index_map   = MAKEOFFSET(unsigned short *, update_index_map);
     prog->struct_defs        = MAKEOFFSET(struct_def_t *, struct_defs);
     prog->includes           = MAKEOFFSET(include_t *, includes);
+    if (prog->lwo_call_cache)
+        prog->lwo_call_cache = MAKEOFFSET(call_cache_t *, lwo_call_cache);
     if (prog->type_start)
     {
         prog->argument_types = MAKEOFFSET(lpctype_t **, argument_types);
@@ -379,6 +381,8 @@ locate_in (program_t *prog)
     prog->update_index_map   = MAKEPTR(unsigned short *, update_index_map);
     prog->struct_defs        = MAKEPTR(struct_def_t*, struct_defs);
     prog->includes           = MAKEPTR(include_t*, includes);
+    if (prog->lwo_call_cache)
+        prog->lwo_call_cache = MAKEPTR(call_cache_t *, lwo_call_cache);
     if (prog->type_start)
     {
         prog->argument_types = MAKEPTR(lpctype_t **, argument_types);
