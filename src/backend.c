@@ -1421,15 +1421,12 @@ static Bool did_swap;
              * is inherited by other objects. Cloned objects might as well
              * believe they are not inherited. Swapped objects will not
              * have a ref count > 1 (and will have an invalid ob->prog
-             * pointer). If the object is a blueprint, the extra reference
-             * from the program will not be counted.
+             * pointer).
              */
             if (obj->flags & (O_CLONE|O_REPLACED))
                 push_number(inter_sp, 0);
             else if (O_PROG_SWAPPED(obj))
                 push_number(inter_sp, 1);
-            else if (obj->prog->blueprint == obj)
-                push_number(inter_sp, obj->prog->ref - 1);
             else
                 push_number(inter_sp, obj->prog->ref);
 
