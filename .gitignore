@@ -33,3 +33,4 @@ src/util/xerq/erq
 test/log/*
 test/*.log
 *.pyc
+.dccache
