@@ -2,7 +2,7 @@ NAME
         #include <functionlist.h>
         #include <lpctypes.h>
 
-        mixed * variable_list(object ob, int flags)
+        mixed * variable_list(object ob|lwobject, int flags)
 
 DESCRIPTION
         Return an array with information about <ob>s variables. For

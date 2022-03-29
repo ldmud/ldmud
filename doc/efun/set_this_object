@@ -1,5 +1,5 @@
 SYNOPSIS
-        void set_this_object(object object_to_pretend_to_be)
+        void set_this_object(object|lwobject object_to_pretend_to_be)
 
 DESCRIPTION
         This is a privileged function, only to be used in the master

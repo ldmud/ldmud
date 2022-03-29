@@ -1,7 +1,7 @@
 SYNOPSIS
         closure symbol_function(symbol arg)
         closure symbol_function(string arg)
-        closure symbol_function(string arg, object|string obj)
+        closure symbol_function(string arg, object|lwobject|string obj)
 
 BESCHREIBUNG
         Erzeugt eine Lfun-, Efun- oder Operator-Closure aus <arg>, wobei

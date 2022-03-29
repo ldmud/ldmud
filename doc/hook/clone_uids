@@ -33,4 +33,4 @@ DESCRIPTION
 HISTORY
 
 SEE ALSO
-        hooks(C), uids(C), load_uids(H)
+        hooks(C), uids(C), load_uids(H), lwobject_uids(H)

@@ -2,6 +2,8 @@
 #include "/inc/msg.inc"
 #include "/inc/testarray.inc"
 
+#include "/sys/driver_info.h"
+
 mixed* fun(string arg, int num)
 {
     return ({arg, num});
@@ -12,15 +14,40 @@ void run_test()
     msg("\nRunning test for simul-efuns:\n"
           "-----------------------------\n");
 
-    run_array(({
+    return run_array(({
+        ({ "Check number of tabled sefuns", 0,
+            (:
+                return driver_info(DI_NUM_SIMUL_EFUNS_TABLED) == 65534;
+            :)
+        }),
         ({ "Calling sefun0000", 0,
             (:
                 return sefun0000() == 0;
             :)
         }),
-        ({ "Calling sefunFFF0", 0,
+        ({ "Calling sefunF000", 0,
             (:
-                return sefunFFF0() == 0xfff0;
+                return sefunF000() == 0xf000;
+            :)
+        }),
+        ({ "Calling sefunFFFF", 0,
+            (:
+                return sefunFFFF() == 0xffff;
+            :)
+        }),
+        ({ "Calling #'sefun0000", 0,
+            (:
+                return funcall(#'sefun0000) == 0;
+            :)
+        }),
+        ({ "Calling #'sefunF000", 0,
+            (:
+                return funcall(#'sefunF000) == 0xf000;
+            :)
+        }),
+        ({ "Calling #'sefunFFFF", 0,
+            (:
+                return funcall(#'sefunFFFF) == 0xffff;
             :)
         }),
         ({ "Calling increment()", 0,

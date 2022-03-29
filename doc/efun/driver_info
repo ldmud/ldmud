@@ -135,7 +135,9 @@ DESCRIPTION
                                       the code.
 
                string[TRACE_OBJECT]:  The name of the object for which the code
-                                      was executed.
+                                      was executed. For lightweight objects
+                                      this is 0.
+
                int[TRACE_LOC]:
                    _TYPE_LAMBDA: current program offset from the start of the
                                  closure code.
@@ -374,8 +376,14 @@ DESCRIPTION
         <what> == DI_NUM_REGEX_TABLE_SLOTS:
           Number of slots in the regexp cache table.
 
-        <what> == DI_NUM_LVALUES
+        <what> == DI_NUM_LVALUES:
           Number of lvalues (values referenced by &var).
+
+        <what> == DI_NUM_NAMED_OBJECT_TYPES:
+          Number of named object types.
+
+        <what> == DI_NUM_NAMED_OBJECT_TYPES_TABLE_SLOTS:
+          Number of table entries for named object types.
 
         <what> == DI_SIZE_ACTIONS:
           Total size of allocated actions.
@@ -446,6 +454,9 @@ DESCRIPTION
 
         <what> == DI_SIZE_BUFFER_SWAP:
           The size of the memory buffer for the swap file.
+
+        <what> == DI_SIZE_NAMED_OBJECT_TYPES_TABLE:
+          The size of the table for named object types.
 
 
 
@@ -657,7 +668,7 @@ DESCRIPTION
 
 
 
-        Status texts:
+      Status texts:
 
         <what> == DI_STATUS_TEXT_MEMORY:
           A printable string containing information about
@@ -678,6 +689,13 @@ DESCRIPTION
         <what> == DI_STATUS_TEXT_MALLOC_EXTENDED:
           A printable strings with extended memory statistics
           (if the driver was compiled with them).
+
+
+      Misc Status:
+
+        <what> == DI_NUM_SIMUL_EFUNS_TABLED:
+          The number of known simul_efuns (active or not) in the simul_efun
+          table.
 
 
 HISTORY

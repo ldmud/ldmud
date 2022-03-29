@@ -1,0 +1,38 @@
+string function_with_too_many_arguments(
+    string var0="0", string var1="1", string var2="2", string var3="3", string var4="4", string var5="5", string var6="6", string var7="7",
+    string var8="8", string var9="9", string var10="10", string var11="11", string var12="12", string var13="13", string var14="14", string var15="15",
+    string var16="16", string var17="17", string var18="18", string var19="19", string var20="20", string var21="21", string var22="22", string var23="23",
+    string var24="24", string var25="25", string var26="26", string var27="27", string var28="28", string var29="29", string var30="30", string var31="31",
+    string var32="32", string var33="33", string var34="34", string var35="35", string var36="36", string var37="37", string var38="38", string var39="39",
+    string var40="40", string var41="41", string var42="42", string var43="43", string var44="44", string var45="45", string var46="46", string var47="47",
+    string var48="48", string var49="49", string var50="50", string var51="51", string var52="52", string var53="53", string var54="54", string var55="55",
+    string var56="56", string var57="57", string var58="58", string var59="59", string var60="60", string var61="61", string var62="62", string var63="63",
+    string var64="64", string var65="65", string var66="66", string var67="67", string var68="68", string var69="69", string var70="70", string var71="71",
+    string var72="72", string var73="73", string var74="74", string var75="75", string var76="76", string var77="77", string var78="78", string var79="79",
+    string var80="80", string var81="81", string var82="82", string var83="83", string var84="84", string var85="85", string var86="86", string var87="87",
+    string var88="88", string var89="89", string var90="90", string var91="91", string var92="92", string var93="93", string var94="94", string var95="95",
+    string var96="96", string var97="97", string var98="98", string var99="99", string var100="100", string var101="101", string var102="102", string var103="103",
+    string var104="104", string var105="105", string var106="106", string var107="107", string var108="108", string var109="109", string var110="110", string var111="111",
+    string var112="112", string var113="113", string var114="114", string var115="115", string var116="116", string var117="117", string var118="118", string var119="119",
+    string var120="120", string var121="121", string var122="122", string var123="123", string var124="124", string var125="125", string var126="126", string var127="127",
+    string var128="128", string var129="129", string var130="130", string var131="131", string var132="132", string var133="133", string var134="134", string var135="135",
+    string var136="136", string var137="137", string var138="138", string var139="139", string var140="140", string var141="141", string var142="142", string var143="143",
+    string var144="144", string var145="145", string var146="146", string var147="147", string var148="148", string var149="149", string var150="150", string var151="151",
+    string var152="152", string var153="153", string var154="154", string var155="155", string var156="156", string var157="157", string var158="158", string var159="159",
+    string var160="160", string var161="161", string var162="162", string var163="163", string var164="164", string var165="165", string var166="166", string var167="167",
+    string var168="168", string var169="169", string var170="170", string var171="171", string var172="172", string var173="173", string var174="174", string var175="175",
+    string var176="176", string var177="177", string var178="178", string var179="179", string var180="180", string var181="181", string var182="182", string var183="183",
+    string var184="184", string var185="185", string var186="186", string var187="187", string var188="188", string var189="189", string var190="190", string var191="191",
+    string var192="192", string var193="193", string var194="194", string var195="195", string var196="196", string var197="197", string var198="198", string var199="199",
+    string var200="200", string var201="201", string var202="202", string var203="203", string var204="204", string var205="205", string var206="206", string var207="207",
+    string var208="208", string var209="209", string var210="210", string var211="211", string var212="212", string var213="213", string var214="214", string var215="215",
+    string var216="216", string var217="217", string var218="218", string var219="219", string var220="220", string var221="221", string var222="222", string var223="223",
+    string var224="224", string var225="225", string var226="226", string var227="227", string var228="228", string var229="229", string var230="230", string var231="231",
+    string var232="232", string var233="233", string var234="234", string var235="235", string var236="236", string var237="237", string var238="238", string var239="239",
+    string var240="240", string var241="241", string var242="242", string var243="243", string var244="244", string var245="245", string var246="246", string var247="247",
+    string var248="248", string var249="249", string var250="250", string var251="251", string var252="252", string var253="253", string var254="254", string var255="255",
+    string var256="256")
+{
+    // Main thing is, that the driver doesn't crash.
+   return var256;
+}

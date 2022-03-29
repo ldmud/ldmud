@@ -74,6 +74,9 @@ void run_test()
 string *epilog(int eflag)
 {
     set_driver_hook(H_INCLUDE_DIRS, ({"/sys/"}) );
+    set_driver_hook(H_COMMAND, "command"); /* For the applied lfun check. */
+    set_driver_hook(H_CREATE_LWOBJECT, "create_lwobject");       /* Dito. */
+    set_driver_hook(H_CLEAN_UP, "clean_up");                     /* Dito. */
 
     run_test();
     return 0;

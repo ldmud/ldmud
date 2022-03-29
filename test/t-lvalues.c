@@ -1270,7 +1270,7 @@ mixed *tests = ({
 
            // Break the circular reference.
            &(arr[2][0]) = 10;
-           return deep_eq(arr[2], ({10,101,12}));;
+           return deep_eq(arr[2], ({10,101,12}));
        :)
     }),
     ({ "restore_value of array range with wrong indices 1", TF_ERROR,

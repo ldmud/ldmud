@@ -204,6 +204,7 @@ static unsigned char  *reginputend; /* Pointer to the end of the string input. *
 static unsigned char  *regbol;      /* Beginning of input, for ^ check. */
 static char **regstartp;      /* Pointer to startp array. */
 static char **regendp;        /* Ditto for endp. */
+static int regremainingdepth; /* Remaining recursion depth. */
 #ifdef DEBUG
 Bool regnarrate = MY_FALSE;   /* TRUE: dump matching operations */
 #endif
@@ -218,7 +219,7 @@ static void  reginsert (char op, unsigned char *opnd);
 static unsigned char *reg (Bool paren, int *flagp);
 
 static int regtry(regexp*, char *);
-static Bool regmatch(unsigned char *);
+static int regmatch(unsigned char *);
 static int regrepeat(unsigned char *);
 
 #ifdef DEBUG
@@ -1038,6 +1039,7 @@ regtry (regexp *prog, char *string)
     reginputend = (unsigned char *)string + strlen(string);
     regstartp = prog->startp;
     regendp = prog->endp;
+    regremainingdepth = LD_REGEXP_RECURSION_LIMIT;
 
     sp = prog->startp;
     ep = prog->endp;
@@ -1111,8 +1113,8 @@ reg_strchr (unsigned char* chars, unsigned char* chptr, size_t remaining)
 } /* reg_strchr() */
 
 /*-------------------------------------------------------------------------*/
-static Bool
-regmatch (unsigned char *prog)
+static inline int
+regmatch_int (unsigned char *prog)
 
 /* regmatch - main matching routine
  *
@@ -1363,6 +1365,29 @@ regmatch (unsigned char *prog)
      * terminating point.
      */
     return RE_ERROR_CORRUPT;
+} /* regmatch_int() */
+
+/*-------------------------------------------------------------------------*/
+static int
+regmatch (unsigned char *prog)
+
+/* Wrapper around regmatch_int that checks the recursion depth. */
+
+{
+    int result;
+
+    if (regremainingdepth && !--regremainingdepth)
+    {
+        regremainingdepth++;
+        return RE_ERROR_BACKTRACK;
+    }
+
+    result = regmatch_int(prog);
+
+    if (regremainingdepth)
+        regremainingdepth++;
+
+    return result;
 } /* regmatch() */
 
 /*-------------------------------------------------------------------------*/

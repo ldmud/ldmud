@@ -4,6 +4,56 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+09-Jan-2022 (LDMud Team) -- 3.6.5
+    - Fixed Crashes:
+       + Fixed a crash in implode() with bytes.
+       + Fixed a freeze when handling default function argument values.
+       + Fixed crash when having more than 255 lambda values.
+       + Fixed crash in virtual inherit handling (#899).
+       + Fixed crash on too many local variables (#900).
+
+    - Lanuage:
+       + Added new type: lightweight objects
+       + Added new type: coroutines
+       + Implement named object types (#842).
+       + Implemented 'in' operator for membership tests (#726).
+       + Improved missing return detection (#332).
+       + Implemented dead code detection.
+       + Implemented type checks for comparison operations.
+       + Warn about floats used in a boolean context (#780).
+       + Warn about incorrect definitions of applied lfuns (#882).
+       + Warn about unused literal values.
+       + Index operation cannot be called like efuns anymore.
+       + Fixed refcounting mismatch when a virtual function disappeared.
+
+    - Runtime:
+       + Removed argument for create() and reset().
+       + Warn when a callback function does not exist.
+       + Implemented closures to simul-efuns that exceeded the sefun table.
+         (#782)
+       + Prevent reentrant SQLite calls.
+       + Implement recursion limit in traditional regexp engine.
+
+    - Changed Efuns:
+       + clone_object(): Pass additional arguments to create().
+       + read_bytes() accepts now negative start offsets beyond file start.
+       + restore_value()/restore_object(): Fixed parsing of context closures.
+       + sprintf(): Fixed newline handling in column mode (#529).
+       + sprintf(): Fixed handling of '%%' (#665).
+       + sprintf(): Fixed handling of '\0' (#800).
+       + sprintf(): Treat '\r' in table mode as line breaks.
+
+    - Networking:
+       + Fixed discarding of newlines when switching to charmode (#892).
+       + Fixed handling of Telnet NUL bytes.
+
+    - Master Object:
+       + log_error(): New argument "line" containing the line number (#899).
+
+    - Other:
+       + Python functions can amend LPC objects with additional member
+         variables.
+
 06-Apr-2021 (LDMud Team) -- 3.6.4
     - Fixed Crashes:
        + Assertion failure when adding string contants to byte constants.

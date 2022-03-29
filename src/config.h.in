@@ -452,14 +452,20 @@
 #define ALLOWED_ED_CMDS           @val_allowed_ed_cmds@
 /* TODO: ALLOWED_ED_CMDS: make this a runtime option */
 
-/* Limit the amount of recursion in the PCRE code. Setting it to low will
- * prevent certain regexps to be executed properly, setting it too high can
- * cause that regexps to crash the driver. Set it according to the
- * available maximum stack size for the driver process. (Rule of thumb:
- * The memory used for a recursion on the stack seems to be within 466 and
- * 1008 bytes. If you have 8M of stack size, reserve half of it for LPC 
- * recursions and choose about 3000 - 4000.) In doubt, increase the stack
- * size limit for the driver process with ulimit & Co.)
+/* Limit the amount of recursion in the traditional regexp engine.
+ * Setting it to low will prevent certain regexps to be executed properly,
+ * setting it too high can cause that regexps to crash the driver.
+ * Set it according to the available maximum stack size for the driver
+ * process. The traditional engine needs approx. 250 bytes per recursion.
+ * If you have 8M of stack size, reserve half of it for LPC recursions.
+ * This would allow up to 16000 recursions.
+ * Defaults to 10000.
+ */
+#define LD_REGEXP_RECURSION_LIMIT    @val_re_recursion_limit@
+
+/* Same as above for the PCRE engine. The engine seems to need between
+ * 466 and 1008 bytes per recursion step. So for 8M of stack size you
+ * could allow about 3000 - 4000.
  * Defaults to 3000
  */
 #define LD_PCRE_RECURSION_LIMIT    @val_pcre_recursion_limit@
@@ -503,6 +509,13 @@
  * objects is somewhat more uniform than that of strings.
  */
 #define OTABLE_SIZE               @val_otable_size@
+
+/* Maximum named object type hash table size.
+ * This is the maximum size, the table size will only grow when needed.
+ * As this table should seldom outgrow the object table, you could use
+ * the same value here.
+ */
+#define TTABLE_SIZE               @val_ttable_size@
 
 /* Define the size of the ident_table. It contains all global identifiers
  * (efuns and permanent defines) as well as the identifiers of a compiled

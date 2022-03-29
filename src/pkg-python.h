@@ -61,6 +61,7 @@ extern void python_interrupt();
 extern void python_handle_sigchld();
 extern void python_process_pending_jobs();
 
+extern void python_free_object(object_t *ob);
 extern void python_free_replace_program_protector(replace_ob_t *r_ob);
 extern void python_replace_program_adjust(replace_ob_t *r_ob);
 

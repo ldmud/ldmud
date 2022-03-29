@@ -16,7 +16,9 @@
 
 typedef enum type_classes    type_classes_t;
 typedef enum primary_types   primary_types_t;
+typedef enum object_types    object_types_t;
 typedef struct struct_info_s struct_info_t;
+typedef struct object_type_s object_type_t;
 typedef struct array_type_s  array_type_t;
 typedef struct union_type_s  union_type_t;
 typedef uint32               typeflags_t;
@@ -43,6 +45,7 @@ enum type_classes
 {
     TCLASS_PRIMARY,
     TCLASS_STRUCT,
+    TCLASS_OBJECT,
     TCLASS_ARRAY,
     TCLASS_UNION
 };
@@ -54,14 +57,21 @@ enum primary_types
     TYPE_NUMBER       =  1,
     TYPE_STRING       =  2,
     TYPE_VOID         =  3,
-    TYPE_OBJECT       =  4,
-    TYPE_MAPPING      =  5,
-    TYPE_FLOAT        =  6,
-    TYPE_ANY          =  7,   /* Will match any type */
-    TYPE_CLOSURE      =  8,
-    TYPE_SYMBOL       =  9,
-    TYPE_QUOTED_ARRAY = 10,
-    TYPE_BYTES        = 11,
+    TYPE_MAPPING      =  4,
+    TYPE_FLOAT        =  5,
+    TYPE_ANY          =  6,   /* Will match any type */
+    TYPE_CLOSURE      =  7,
+    TYPE_SYMBOL       =  8,
+    TYPE_QUOTED_ARRAY =  9,
+    TYPE_BYTES        = 10,
+    TYPE_COROUTINE    = 11,
+};
+
+/* -- Object types -- */
+enum object_types
+{
+    OBJECT_REGULAR,
+    OBJECT_LIGHTWEIGHT
 };
 
 struct struct_info_s
@@ -77,6 +87,23 @@ struct struct_info_s
      * NULL otherwise.
      */
     struct_type_t *def;
+};
+
+struct object_type_s
+{
+    /* The program name of the object (refcounted).
+     * It has a leading '/' and trailing '.c'.
+     * If it is NULL it means 'any object'.
+     */
+    string_t *program_name;
+
+    /* Next entry in the object type table.
+     */
+    lpctype_t *next;
+
+    /* The type of object.
+     */
+    object_types_t type;
 };
 
 struct array_type_s
@@ -146,6 +173,7 @@ struct lpctype_s
     {
         primary_types_t  t_primary;     /* TCLASS_PRIMARY */
         struct_info_t    t_struct;      /* TCLASS_STRUCT */
+        object_type_t    t_object;      /* TCLASS_OBJECT */
         array_type_t     t_array;       /* TCLASS_ARRAY */
         union_type_t     t_union;       /* TCLASS_UNION */
     };
@@ -209,21 +237,25 @@ struct fulltype_s
 };
 
 /* Basic types */
-extern lpctype_t *lpctype_int, *lpctype_string, *lpctype_object,
+extern lpctype_t *lpctype_int, *lpctype_string, *lpctype_bytes,
                  *lpctype_mapping, *lpctype_float, *lpctype_mixed,
-                 *lpctype_closure, *lpctype_symbol, *lpctype_quoted_array,
-                 *lpctype_any_struct, *lpctype_void, *lpctype_bytes,
-                 *lpctype_unknown;
+                 *lpctype_closure, *lpctype_symbol, *lpctype_coroutine,
+                 *lpctype_quoted_array,
+                 *lpctype_any_struct, *lpctype_any_object,
+                 *lpctype_any_lwobject, *lpctype_void, *lpctype_unknown;
 
 /* For use in initializers */
-extern lpctype_t _lpctype_int, _lpctype_string, _lpctype_object,
+extern lpctype_t _lpctype_int, _lpctype_string, _lpctype_bytes,
                  _lpctype_mapping, _lpctype_float, _lpctype_mixed,
-                 _lpctype_closure, _lpctype_symbol, _lpctype_quoted_array,
-                 _lpctype_any_struct, _lpctype_void, _lpctype_bytes,
-                 _lpctype_unknown;
+                 _lpctype_closure, _lpctype_symbol, _lpctype_coroutine,
+                 _lpctype_quoted_array,
+                 _lpctype_any_struct, _lpctype_any_object,
+                 _lpctype_any_lwobject, _lpctype_void, _lpctype_unknown;
 
 
 extern lpctype_t *get_struct_type(struct_type_t* def);
+extern lpctype_t *get_object_type(string_t* prog);
+extern lpctype_t *get_lwobject_type(string_t* prog);
 extern lpctype_t *get_array_type(lpctype_t *element);
 extern lpctype_t *get_array_type_with_depth(lpctype_t *element, int depth);
 extern lpctype_t *get_union_type(lpctype_t *head, lpctype_t* member);
@@ -235,7 +267,10 @@ extern void update_struct_type(lpctype_t *t, struct_type_t *def);
 extern void clean_struct_type(lpctype_t *t);
 extern void _free_lpctype(lpctype_t *t);
 extern bool lpctype_contains(lpctype_t* src, lpctype_t* dest);
+extern bool is_compatible_object(object_t *ob, lpctype_t *t);
+extern bool is_compatible_lwobject(lwobject_t *ob, lpctype_t *t);
 extern int get_type_compat_int(lpctype_t *t);
+extern void types_driver_info(svalue_t *svp, int value) __attribute__((nonnull(1)));
 
 /* bool is_type_struct(lpctype_t *t)
  *   Returns true, iff <t> represents a specific or any struct type.
@@ -306,6 +341,8 @@ static INLINE fulltype_t get_fulltype_flags(lpctype_t *t, typeflags_t f)
 
 extern void clear_lpctype_ref (lpctype_t *t);
 extern void count_lpctype_ref (lpctype_t *t);
+extern void clear_object_type_table_refs();
+extern void remove_unreferenced_object_types();
 
 /* void clear_fulltype_ref(fulltype_t &t)
  *   Clear all references associated with <t>.

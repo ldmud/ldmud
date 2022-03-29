@@ -4,48 +4,56 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/RoleMUD/ --libexecdir=/RoleMUD/home/bin --libdir=/RoleMUD/MUD-Lib --enable-erq=xerq --with-setting=beutelland $*
+exec ./configure --prefix=/RoleMUD/ --libexecdir=/RoleMUD/bin --libdir=/RoleMUD/MUD-Lib --with-setting=beutelland $*
 exit 1
 
 
 # --- Timing ---
 with_time_to_clean_up=5400
-with_time_to_swap=900
-with_time_to_swap_variables=1800
 with_time_to_reset=3600
 
+# --- Swap ---
+with_time_to_swap=-1
+with_time_to_swap_variables=-1
+
 # --- Memory ---
-with_reserved_user_size=0x800000
-with_reserved_master_size=0x50000
-with_reserved_system_size=0x100000
-with_hard_malloc_limit=0x16000000
+with_hard_malloc_limit=0
+with_soft_malloc_limit=0
 
 # --- Interpreter ---
 with_max_cost=1000000
 with_max_trace=65
 with_max_user_trace=60
- 
+
 # --- Communication ---
 with_portno=5678
 with_udp_port=4246
+enable_use_mccp=yes
+
+# --- ERQ ---
+enable_erq=xerq
+with_erq_dir=/RoleMUD/bin
 
 #----------- Compilation Options ----------
-enable_malloc_trace=yes
-enable_malloc_lpc_trace=yes
-enable_access_control=no
+enable_malloc_trace=no
+enable_malloc_lpc_trace=no
+enable_eval_cost_trace=yes
 enable_use_parse_command=no
-enable_use_mysql=yes
+enable_use_process_string=no
 enable_use_pcre=no
-with_erq_dir=/RoleMUD/erq/bin
-with_swap_file=Swap_File
+
+# --- Wizlist ---
+with_wizlist_file=no
+
+# --- Access Control ---
+enable_access_control=no
 
 # --- Runtime limits ---
-with_catch_reserved_cost=10000
-with_master_reserved_cost=0x800
+with_catch_reserved_cost=40000
+with_master_reserved_cost=10000
 with_max_players=100
-
-# --- Internal Tables ---
-with_htable_size=0x4096
-with_otable_size=0x1024
-with_apply_cache_bits=10
-
+with_max_array_size=10000
+with_max_mapping_keys=10000
+with_max_mapping_size=100000
+with_max_byte_transfer=100000
+with_read_file_max_size=100000

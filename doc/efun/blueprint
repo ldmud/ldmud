@@ -1,7 +1,7 @@
 PRELIMINARY
 SYNOPSIS
         object blueprint()
-        object blueprint(string|object ob)
+        object blueprint(string|object|lwobject ob)
 
 DESCRIPTION
         The efuns returns the blueprint for the given object <ob>, or for

@@ -22,17 +22,45 @@ struct lvalue_block_s
     p_int size;
 };
 
+/* --- struct statement_s: Information about a statement block ---
+ *
+ * Here we keep track of some control flow information, that we'll
+ * use for proper diagnostics.
+ */
+
+struct statement_s
+{
+    bool may_return         : 1;  /* The statement may issue a return.   */
+    bool may_break          : 1;  /* The statement may issue a break.    */
+    bool may_continue       : 1;  /* The statement may issue a continue. */
+    bool may_finish         : 1;  /* The statement may finish without
+                                   * a break or return.
+                                   */
+    bool is_empty           : 1;  /* There is no real statement.         */
+    bool warned_dead_code   : 1;  /* We already warned about dead code.  */
+};
+
 
 /* --- Variables --- */
 
 extern lpctype_t _lpctype_unknown_array, _lpctype_any_array,    _lpctype_int_float,
                  _lpctype_int_array,     _lpctype_string_array, _lpctype_object_array,
                  _lpctype_bytes_array,   _lpctype_string_bytes, _lpctype_string_or_bytes_array,
-                 _lpctype_string_object, _lpctype_string_object_array;
+                 _lpctype_string_object, _lpctype_string_object_array,
+                 _lpctype_lwobject_array,_lpctype_any_object_or_lwobject,
+                 _lpctype_any_object_or_lwobject_array,
+                 _lpctype_any_object_or_lwobject_array_array,
+                 _lpctype_int_or_string, _lpctype_string_or_string_array,
+                 _lpctype_catch_msg_arg;
 extern lpctype_t *lpctype_unknown_array, *lpctype_any_array,    *lpctype_int_float,
                  *lpctype_int_array,     *lpctype_string_array, *lpctype_object_array,
                  *lpctype_bytes_array,   *lpctype_string_bytes, *lpctype_string_or_bytes_array,
-                 *lpctype_string_object, *lpctype_string_object_array;
+                 *lpctype_string_object, *lpctype_string_object_array,
+                 *lpctype_lwobject_array,*lpctype_any_object_or_lwobject,
+                 *lpctype_any_object_or_lwobject_array,
+                 *lpctype_any_object_or_lwobject_array_array,
+                 *lpctype_int_or_string, *lpctype_string_or_string_array,
+                 *lpctype_catch_msg_arg;
 
 extern int yychar;
 extern int32 current_id_number;

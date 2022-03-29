@@ -1,0 +1,10 @@
+SYNOPSIS
+        int lwobjectp(mixed arg)
+
+DESCRIPTION
+        Return 1 if arg is a lightweight object.
+
+SEE ALSO
+        bytesp(E), clonep(E), closurep(E), floatp(E), intp(E), mappingp(E),
+        objectp(E), pointerp(E), referencep(E), stringp(E), structp(E),
+        symbolp(E)

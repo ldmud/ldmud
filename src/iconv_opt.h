@@ -177,10 +177,27 @@ static INLINE iconv_opt_t iconv_opt_init()
     return (iconv_opt_t) {.cd = (iconv_t)-1, .type = ICONV_OPT_NATIVE };
 }
 
+// Some or all of these might be defined my system headers (e.g. on MacOS).
+#ifdef iconv_t
+#undef iconv_t
+#endif
 #define iconv_t     iconv_opt_t
+
+#ifdef iconv_open
+#undef iconv_open
+#endif
 #define iconv_open  iconv_opt_open
+
+#ifdef iconv_close
+#undef iconv_close
+#endif
 #define iconv_close iconv_opt_close
+
+#ifdef iconv
+#undef iconv
+#endif
 #define iconv       iconv_opt
+
 #define iconv_valid iconv_opt_valid
 #define iconv_init  iconv_opt_init
 

@@ -4108,6 +4108,11 @@ int sefunFFF7() { return 65527; }
 int sefunFFF8() { return 65528; }
 int sefunFFF9() { return 65529; }
 int sefunFFFA() { return 65530; }
+int sefunFFFB() { return 65531; }
+int sefunFFFC() { return 65532; }
+int sefunFFFD() { return 65533; }
+int sefunFFFE() { return 65534; }
+int sefunFFFF() { return 65535; }
 
 nomask mixed call_other(object ob, string fun, int arg)
 {

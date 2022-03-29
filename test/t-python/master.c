@@ -8,10 +8,12 @@ struct test_struct
     float   t_float;
     string  t_string;
     object  t_object;
+    lwobject t_lwobject;
     mixed*  t_array;
     mapping t_mapping;
     symbol  t_symbol;
     mixed   t_quoted_array;
+    coroutine t_coroutine;
 };
 
 void run_test()
@@ -60,6 +62,13 @@ void run_test()
                 return python_return(this_object()) == this_object();
             :)
         }),
+        ({ "passing lightweight objects", 0,
+            (:
+                lwobject lwob = new_lwobject("/testob");
+                destruct(find_object("/testob"));
+                return lwobjectp(lwob) && python_return(lwob) == lwob;
+            :)
+        }),
         ({ "passing arrays", 0,
             (:
                 mixed * arr = ({1,2,3});
@@ -86,6 +95,15 @@ void run_test()
                        python_return(#'this_object) == #'this_object &&
                        python_return(cl) == cl &&
                        python_return(#',) == #',;
+            :)
+        }),
+        ({ "passing coroutines", 0,
+            (:
+                coroutine cr = "/testob"->testcoroutine();
+                int result = python_return(cr) == cr;
+                destruct(find_object("/testob"));
+
+                return result;
             :)
         }),
         ({ "passing symbols", 0,
@@ -160,6 +178,13 @@ void run_test()
                 return sizeof(oblist) == 1 && oblist[0] == this_object();
             :)
         }),
+        ({ "Python GC", 0,
+            (:
+                /* We just start it and see, that it doesn't crash. */
+                python_gc();
+                return 1;
+            :)
+        }),
         ({ "Python test suite", 0,
             (:
                 msg("\n");
@@ -203,10 +228,12 @@ void run_test()
                 -1000000.0,
                 "Garbage",
                 this_object(),
+                new_lwobject("/testob"),
                 ({ 5, 3, 1}),
                 ([2,3,5]),
                 quote("abc"+"gc"),
-                quote(({11, 13, 17}))
+                quote(({11, 13, 17})),
+                "/testob"->testcoroutine(),
             ));
 
             python_remember_testob(load_object("/testrp"));
@@ -231,11 +258,13 @@ void run_test()
                     val->t_float != -1000000.0 ||
                     val->t_string != "Garbage" ||
                     val->t_object != this_object() ||
+                    !lwobjectp(val->t_lwobject) || program_name(val->t_lwobject) != "/testob.c" ||
                     val->t_array[0] != 5 || val->t_array[1] != 3 || val->t_array[2] != 1 ||
                     sizeof(val->t_mapping) != 3 || widthof(val->t_mapping) != 0 ||
                     !member(val->t_mapping, 2) || !member(val->t_mapping, 3) || !member(val->t_mapping, 5) ||
                     unquote(val->t_symbol) != "ab" + "cgc" ||
-                    sizeof(unquote(val->t_quoted_array)) != 3
+                    sizeof(unquote(val->t_quoted_array)) != 3 ||
+                    !coroutinep(val->t_coroutine)
                   )
                 {
                     msg("Wrong value returned from python_get() after GC.!\n");

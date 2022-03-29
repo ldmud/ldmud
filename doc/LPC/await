@@ -1,0 +1,35 @@
+NAME
+        await
+
+SYNTAX
+        await(<coroutine>)
+        await(<coroutine>, <value>)
+
+DESCRIPTION
+        The instruction is only allowed in a coroutine and suspends its
+        execution.
+
+        The target coroutine must also be in a suspended state. Its
+        execution will then continue.
+
+        The current coroutine will wait for the execution of the target
+        coroutine to finish with a return statement or end of statement
+        block. It cannot continue its execution until then. Only one
+        coroutine may wait for another. If there is already a coroutine
+        waiting for the target coroutine the instruction will fail.
+
+        Any calls during the waiting period to continue the current
+        coroutine will result in execution of the target coroutine.
+        So the await() call can be seen as a sub-coroutine call.
+
+        The value will be passed into the target coroutine as the result
+        of its yield() instruction that suspended its execution before.
+        If the coroutine had just started, the value will be discarded.
+        If no value was given, 0 will be passed instead.
+
+HISTORY
+        Coroutines were introduced in LDMud 3.6.5.
+
+SEE ALSO
+        coroutines(LPC), async(LPC), yield(LPC), foreach(LPC),
+        call_coroutine(E), this_coroutine(E)

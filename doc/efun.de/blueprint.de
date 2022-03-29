@@ -1,7 +1,7 @@
 VORLAEUFIG
 SYNOPSIS
         object blueprint()
-        object blueprint(string|object ob)
+        object blueprint(string|object|lwobject ob)
 
 BESCHREIBUNG
         Die Efun liefert den Blueprint fuer das angegeben Objekt <ob> oder

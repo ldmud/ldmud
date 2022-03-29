@@ -1,5 +1,6 @@
 SYNOPSIS
-        void catch_msg(mixed *|struct|mapping|object msg, object obj)
+        void catch_msg(mixed *|struct|mapping|object msg,
+                       object|lwobject obj)
 
 DESCRIPTION
         When say(), tell_room() or tell_object() are used with a

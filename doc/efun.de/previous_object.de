@@ -1,6 +1,6 @@
 SYNOPSIS
-        object previous_object()
-        object previous_object(int i)
+        object|lwobject previous_object()
+        object|lwobject previous_object(int i)
 
 BESCHREIBUNG
         Liefert einen Pointer auf das letzte Objekt, das einen Aufruf (mittels
@@ -22,7 +22,7 @@ BESCHREIBUNG
 
 BEISPIELE
         int sicherheitscheck() {
-            object prev;
+            object|lwobject prev;
             if (!(prev=previous_object()));
             else if (getuid(prev)  != getuid(this_object()));
             else if (geteuid(prev) != geteuid(this_object()));

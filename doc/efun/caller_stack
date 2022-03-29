@@ -1,6 +1,6 @@
 SYNOPSIS
-        object * caller_stack()
-        object * caller_stack(int add_interactive)
+        <object|lwobject>* caller_stack()
+        <object|lwobject>* caller_stack(int add_interactive)
 
 DESCRIPTION
         Returns an array of the previous_object()s who caused the

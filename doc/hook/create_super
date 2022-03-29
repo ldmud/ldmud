@@ -5,7 +5,7 @@ SYNOPSIS
 
         <value> being:
 
-          void <name> (0)
+          void <name>   ( void )
           int <closure> ( void )
           int <closure> (object obj_to_init)
 
@@ -26,11 +26,12 @@ DESCRIPTION
         interval computed from TIME_TO_RESET is used.
 
         If the hook is defined as the name of an lfun in the object,
-        it is called in the object with 0 as argument and any result
+        it is called in the object with no argument and any result
         is ignored.
 
 HISTORY
         LDMud 3.2.10 allowed static functions to be given by name.
+        LDMud 3.6.5 removed the argument given for the lfun call.
 
 SEE ALSO
-        hooks(C), create_ob(H), create_clone(H)
+        hooks(C), create_ob(H), create_clone(H), create_lwobject(H)

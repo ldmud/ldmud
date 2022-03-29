@@ -60,6 +60,7 @@
 #include "svalue.h"
 #include "xalloc.h"
 
+#include "i-current_object.h"
 #include "../mudlib/sys/regexp.h"
 
 /*-------------------------------------------------------------------------*/
@@ -1145,7 +1146,7 @@ getfn (Bool writeflg)
         return NULL;
     }
 
-    file2 = check_valid_path(file, command_giver, STR_ED_START, writeflg);
+    file2 = check_valid_path(file, svalue_object(command_giver), STR_ED_START, writeflg);
     free_mstring(file);
 
     if (!file2)
@@ -3175,7 +3176,7 @@ ed_start (string_t *file_arg, string_t *exit_fn, object_t *exit_ob)
     /* Check for read on startup, since the buffer is read in. But don't
      * check for write, since we may want to change the file name.
      */
-    new_path = check_valid_path(file_arg, command_giver, STR_ED_START, MY_FALSE);
+    new_path = check_valid_path(file_arg, svalue_object(command_giver), STR_ED_START, MY_FALSE);
     if (!file_arg && !new_path)
         return;
 
@@ -3392,9 +3393,9 @@ free_ed_buffer (input_t *ih)
         }
         else
         {
-            object_t *save = current_object;
+            svalue_t save = current_object;
 
-            current_object = ob;
+            set_current_object(ob);
             secure_apply(name, ob, 0);
             current_object = save;
         }
@@ -3580,7 +3581,8 @@ v_ed (svalue_t *sp, int num_arg)
  */
 
 {
-    if (current_object->flags & O_DESTRUCTED)
+    object_t *ob = get_current_object();
+    if (!ob || (ob->flags & O_DESTRUCTED))
     {
         /* could confuse the master... */
         errorf("Calling ed from destructed object.\n");
@@ -3600,7 +3602,7 @@ v_ed (svalue_t *sp, int num_arg)
     else /* num_arg == 2 */
     {
         if (sp->type == T_STRING)
-            ed_start((sp-1)->u.str, sp->u.str, current_object);
+            ed_start((sp-1)->u.str, sp->u.str, ob);
         else /* sp is number 0 */
             ed_start((sp-1)->u.str, NULL, NULL);
         free_svalue(sp--);

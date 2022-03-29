@@ -14,16 +14,12 @@
  * a simul-efun call is that of a call-other, and specific calls may even
  * be implemented as such.
  *
- * The driver keeps a table (simul_efunp) of all simul-efuns compiled so far,
+ * The driver keeps a table of all simul-efuns compiled so far,
  * distinguished by name and number of arguments. If a simul-efun is removed
  * from the simul-efun object, its corresponding entry is only marked as
  * "discarded", again because older programs may still reference it by index.
  * If such a discarded simul-efun is re-implemented by a new simul-efun object,
  * the old table entry is reactivated.
- *
- * The first SEFUN_TABLE_SIZE simul-efuns of this table are mirrored in a
- * second table (simul_efun_table) from where they are called by index with
- * the special SIMUL_EFUN instruction.
  *---------------------------------------------------------------------------
  */
 
@@ -32,10 +28,12 @@
 
 #include "my-alloca.h"
 #include <stdio.h>
+#include <assert.h>
 
 #include "simul_efun.h"
 
 #include "array.h"
+#include "closure.h"
 #include "exec.h"
 #include "gcollect.h"
 #include "interpret.h"
@@ -51,14 +49,9 @@
 #include "xalloc.h"
 #include "pkg-python.h"
 
-/*-------------------------------------------------------------------------*/
+#include "../mudlib/sys/driver_info.h"
 
-function_t *simul_efunp = NULL;
-  /* The function_t's of all simul_efuns encountered. sefuns are distinguished
-   * by name and number of arguments - discarded sefuns are not removed
-   * because older programs might still reference them. On the other hand,
-   * a discarded sefun may be re-actived if a suitable function is compiled.
-   */
+/*-------------------------------------------------------------------------*/
 
 object_t *simul_efun_object  = NULL;
   /* The primary simul_efun object.
@@ -78,7 +71,17 @@ vector_t *simul_efun_vector  = NULL;
 simul_efun_table_t simul_efun_table[SEFUN_TABLE_SIZE];
   /* The table holding the information for all simul-efuns which
    * can be called directly with the SIMUL_EFUN instruction.
-   * A .funstart of NULL marks unused/discarded entries.
+   *
+   * Sefuns are distinguished by name and number of arguments - discarded
+   * sefuns are not removed because older programs might still reference
+   * them. On the other hand, a discarded sefun may be re-actived if a
+   * suitable function is compiled.
+   *
+   * The table contains the function_t of all (current and former)
+   * sefuns. For discarded sefuns .funstart will be NULL,
+   * otherwise .funstart, .program, .function_index_offset and
+   * .variable_index_offset can be used to directly jump into the
+   * function.
    */
 
 ident_t *all_simul_efuns = NULL;
@@ -87,11 +90,7 @@ ident_t *all_simul_efuns = NULL;
    */
 
 int num_simul_efun = 0;
-  /* Number of functions (active or not) listed in simul_efunp.
-   */
-
-static int total_simul_efun  = 0;
-  /* Allocated size of simul_efunp.
+  /* Number of functions (active or not) listed in simul_efun_table.
    */
 
 static string_t *simul_efun_file_name = NULL;
@@ -103,7 +102,7 @@ static program_t *simul_efun_program= NULL;
    */
 
 static unsigned short all_discarded_simul_efun = I_GLOBAL_SEFUN_OTHER;
-  /* First index of the list of discarded sefuns in simul_efunp.
+  /* First index of the list of discarded sefuns in simul_efun_table.
    * With this list, it is faster to find a sefun entry to reactivate.
    */
 
@@ -121,9 +120,9 @@ remove_efun_shadows (ident_t* list)
         int j = id->u.global.sim_efun;
 
         /* If they are listed in the table, move them into the inactive list. */
-        if (j != I_GLOBAL_SEFUN_OTHER && j < SIZE_SEFUN_TABLE)
+        if (j != I_GLOBAL_SEFUN_OTHER && j != I_GLOBAL_SEFUN_BY_NAME && j < SIZE_SEFUN_TABLE)
         {
-            simul_efunp[j].offset.next_sefun = all_discarded_simul_efun;
+            simul_efun_table[j].function.offset.next_sefun = all_discarded_simul_efun;
             all_discarded_simul_efun = j;
         }
 
@@ -166,8 +165,11 @@ invalidate_simul_efuns (void)
 
         all_simul_efuns = all_simul_efuns->next_all;
 
-        simul_efunp[j].offset.next_sefun = all_discarded_simul_efun;
-        all_discarded_simul_efun = j;
+        if (j != I_GLOBAL_SEFUN_BY_NAME)
+        {
+            simul_efun_table[j].function.offset.next_sefun = all_discarded_simul_efun;
+            all_discarded_simul_efun = j;
+        }
 
         free_shared_identifier(id);
     }
@@ -208,7 +210,7 @@ assert_simul_efun_object (void)
     program_t          *progp;
     CBool              *visible; /* Flag for every function: visible or not */
     string_t           *name;
-    int                 i, j, num_fun;
+    int                 i, j;
 
     invalidate_simul_efuns(); /* Invalidate the simul_efun information */
 
@@ -272,15 +274,8 @@ assert_simul_efun_object (void)
     }
     reference_prog( (simul_efun_program = ob->prog), "get_simul_efun");
 
-    num_fun = ob->prog->num_function_names;
-    if (num_fun == 0)
+    if (ob->prog->num_function_names == 0)
         return MY_TRUE;
-    if (!simul_efunp)
-    {
-        simul_efunp = xalloc(sizeof (function_t) * num_fun);
-    }
-    else
-        num_fun = total_simul_efun;
 
     free_defines(); /* to prevent #defines hideing places for globals */
 
@@ -377,7 +372,7 @@ assert_simul_efun_object (void)
                 all_simul_efuns = p;
             }
 
-            /* Find the proper index in simul_efunp[] */
+            /* Find the proper index in simul_efun_table[] */
             switch(0) { default: /* TRY... */
 
                 /* Try to find a discarded sefun entry with matching
@@ -386,75 +381,77 @@ assert_simul_efun_object (void)
                 if (all_discarded_simul_efun != I_GLOBAL_SEFUN_OTHER)
                 {
                     int last = I_GLOBAL_SEFUN_OTHER;
+                    bool needs_ap = (flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS)) || funheader->num_opt_arg;
 
                     j = all_discarded_simul_efun;
                     do
                     {
-                        if ((!(flags & TYPE_MOD_VARARGS) && num_arg != simul_efunp[j].num_arg)
-                         || 0 != ((simul_efunp[j].flags ^ flags) & TYPE_MOD_VARARGS)
-                         || 0 != ((simul_efunp[j].flags ^ flags) & TYPE_MOD_XVARARGS)
-                           )
+                        /* We reuse a discarded entry if already compiled
+                         * programs are compatible with that. This means:
+                         *  - The name didn't change.
+                         *  - The requirement of an argument frame didn't change.
+                         *  - For calls without an argument frame the number of
+                         *    arguments didn't change.
+                         */
+                        if (!mstreq(function_name, simul_efun_table[j].function.name))
                             continue;
-                        if (!mstreq(function_name, simul_efunp[j].name))
+
+                        if (needs_ap != ((simul_efun_table[j].function.flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS)) || simul_efun_table[j].function.num_opt_arg))
+                            continue;
+
+                        if (!needs_ap && num_arg != simul_efun_table[j].function.num_arg)
                             continue;
 
                         /* Found one: remove it from the 'discarded' list */
                         if (last == I_GLOBAL_SEFUN_OTHER)
-                            all_discarded_simul_efun = simul_efunp[j].offset.next_sefun;
+                            all_discarded_simul_efun = simul_efun_table[j].function.offset.next_sefun;
                         else
-                            simul_efunp[last].offset.next_sefun = simul_efunp[j].offset.next_sefun;
+                            simul_efun_table[last].function.offset.next_sefun = simul_efun_table[j].function.offset.next_sefun;
                         break;
                     }
-                    while ( (j = simul_efunp[last = j].offset.next_sefun) != I_GLOBAL_SEFUN_OTHER);
+                    while ( (j = simul_efun_table[last = j].function.offset.next_sefun) != I_GLOBAL_SEFUN_OTHER);
 
                     if (j != I_GLOBAL_SEFUN_OTHER)
                         break; /* switch */
                 }
 
                 /* New simul_efun: make a new entry */
-                (void)ref_mstring(function_name);
-                j = num_simul_efun++;
-                if (num_simul_efun > num_fun)
+                if (num_simul_efun == SEFUN_TABLE_SIZE)
                 {
-                    num_fun = num_simul_efun + 12;
-                    simul_efunp = rexalloc(simul_efunp
-                                          , sizeof (function_t) * num_fun
-                      );
+                    p->u.global.sim_efun = I_GLOBAL_SEFUN_BY_NAME;
+                    continue;
                 }
-                simul_efunp[j].name    = function_name;
+
+                j = num_simul_efun++;
+                simul_efun_table[j].function.name    = ref_mstring(function_name);
             } /* switch() */
 
-            /* j now indexes the simul_efunp[] entry to use */
+            /* j now indexes the simul_efun_table[] entry to use */
 
             p->u.global.sim_efun = j;
-            simul_efunp[j].flags      = funheader->flags;
-            simul_efunp[j].type       = funheader->type;
-            simul_efunp[j].num_locals = funheader->num_locals;
-            simul_efunp[j].num_arg    = num_arg;
-            simul_efunp[j].num_opt_arg= funheader->num_opt_arg;
+            simul_efun_table[j].function.flags       = funheader->flags;
+            simul_efun_table[j].function.type        = funheader->type;
+            simul_efun_table[j].function.num_locals  = funheader->num_locals;
+            simul_efun_table[j].function.num_arg     = num_arg;
+            simul_efun_table[j].function.num_opt_arg = funheader->num_opt_arg;
 
             if (inherit_progp->type_start
              && (type_idx = inherit_progp->type_start[funheader->offset.fx]) != INDEX_START_NONE)
-                simul_efunp[j].offset.argtypes = inherit_progp->argument_types + type_idx;
+                simul_efun_table[j].function.offset.argtypes = inherit_progp->argument_types + type_idx;
             else
-                simul_efunp[j].offset.argtypes = NULL;
+                simul_efun_table[j].function.offset.argtypes = NULL;
 
-            /* If possible, make an entry in the simul_efun table */
-            if ((size_t)j < SEFUN_TABLE_SIZE)
-            {
-                simul_efun_table[j].funstart = funstart;
-                simul_efun_table[j].program = inherit_progp;
-                simul_efun_table[j].function_index_offset = fun_ix_offs;
-                simul_efun_table[j].variable_index_offset = var_ix_offs;
-            }
+            simul_efun_table[j].funstart = funstart;
+            simul_efun_table[j].program = inherit_progp;
+            simul_efun_table[j].function_index_offset = fun_ix_offs;
+            simul_efun_table[j].variable_index_offset = var_ix_offs;
         } /* if (function visible) */
     } /* for ( all functions) */
 
-    total_simul_efun = num_fun;
     simul_efun_object = ob;
 
     return MY_TRUE;
-} /* get_simul_efun_object() */
+} /* assert_simul_efun_object() */
 
 /*-------------------------------------------------------------------------*/
 string_t *
@@ -466,11 +463,62 @@ query_simul_efun_file_name(void)
 
 {
 #ifdef DEBUG
-    if (simul_efunp == NULL)
+    if (simul_efun_file_name == NULL)
         fatal("query_simul_efun_file_name called when non exists!\n");
 #endif
     return simul_efun_file_name;
 }
+
+/*-------------------------------------------------------------------------*/
+function_t *
+get_simul_efun_header (ident_t* name)
+
+/* Return the function header for the simul-efun <name>.
+ * <name> must be a valid simul-efun identifier (i.e. there
+ * must be a simul-efun object with such a function).
+ */
+
+{
+    assert(name->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER);
+
+    if (name->u.global.sim_efun == I_GLOBAL_SEFUN_BY_NAME)
+    {
+        /* We have to lookup the function in the simul-efun object itself. */
+        assert(simul_efun_object != NULL);
+
+        int fx = find_function(name->name, simul_efun_object->prog);
+        if (fx == -1)
+            fatal("Can't find simul_efun %s", get_txt(name->name));
+
+        return get_function_header(simul_efun_object->prog, fx);
+    }
+    else
+    {
+        return &simul_efun_table[name->u.global.sim_efun].function;
+    }
+} /* get_simul_efun_header() */
+
+/*-------------------------------------------------------------------------*/
+void
+sefun_driver_info (svalue_t *svp, int value)
+
+/* Returns the simul_efun information for driver_info(<what>).
+ * <svp> points to the svalue for the result.
+ */
+
+{
+    switch (value)
+    {
+        case DI_NUM_SIMUL_EFUNS_TABLED:
+            put_number(svp, num_simul_efun);
+            break;
+
+        default:
+            fatal("Unknown option for sefun_driver_info(): %d\n", value);
+            break;
+    }
+
+} /* sefun_driver_info() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef GC_SUPPORT
@@ -505,14 +553,8 @@ count_simul_efun_refs (void)
     if (simul_efun_file_name)
         count_ref_from_string(simul_efun_file_name);
 
-    if (simul_efunp)
-    {
-        int i;
-
-        note_malloced_block_ref((char *)simul_efunp);
-        for (i = num_simul_efun; --i >= 0; )
-            count_ref_from_string(simul_efunp[i].name);
-    }
+    for (int i = num_simul_efun; --i >= 0; )
+        count_ref_from_string(simul_efun_table[i].function.name);
 
     if (simul_efun_vector && !simul_efun_vector->ref++)
     {
@@ -560,23 +602,4 @@ count_simul_efun_extra_refs (struct pointer_table *ptable)
 
 #endif
 
-/*-------------------------------------------------------------------------*/
-#if 0
-/*
- * Test if 'name' is a simul_efun. The string pointer MUST be a pointer to
- * a shared string.
- */
-function_t *find_simul_efun(name)
-    char *name;
-{
-    int i;
-    for (i=0; i < num_simul_efun; i++) {
-        if (name == simul_efunp[i].name)
-            return &simul_efunp[i];
-    }
-    return 0;
-} /* find_simul_efun() */
-#endif
-
 /***************************************************************************/
-

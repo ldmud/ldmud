@@ -235,6 +235,7 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-current_object.h"
 #include "i-svalue_cmp.h"
 
 #define TIME_TO_COMPACT (600) /* 10 Minutes */
@@ -557,7 +558,7 @@ allocate_mapping (mp_int size, mp_int num_values)
  */
 
 {
-    return get_new_mapping(current_object->user, num_values, size, 0);
+    return get_new_mapping(get_current_user(), num_values, size, 0);
 } /* allocate_mapping() */
 
 /*-------------------------------------------------------------------------*/
@@ -710,7 +711,9 @@ mhash (svalue_t * svp)
         }
         else if (CLOSURE_MALLOCED(svp->x.closure_type))
         {
-            i = (p_int)(svp->u.lambda->ob) ^ *SVALUE_FULLTYPE(svp);
+            i = (svp->u.lambda->ob.type == T_OBJECT
+               ? (p_int)svp->u.lambda->ob.u.ob
+               : (p_int)svp->u.lambda->ob.u.lwob) ^ *SVALUE_FULLTYPE(svp);
         }
         else /* Efun, Simul-Efun, Operator closure */
         {
@@ -1558,7 +1561,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
             if (m->hash)
                 cm_size -= m->hash->cond_deleted;
         }
-        m2 = get_new_mapping(current_object->user, new_width, 0, cm_size);
+        m2 = get_new_mapping(get_current_user(), new_width, 0, cm_size);
         if (!m2)
         {
             outofmem(sizeof *m2 + (mp_int)sizeof(svalue_t) * m->num_entries * new_width
@@ -1781,7 +1784,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
         if (m1->cond) cm3size += m1->cond->size;
         if (m2->cond) cm3size += m2->cond->size;
 
-        m3 = get_new_mapping(current_object->user, num_values, hsize, cm3size);
+        m3 = get_new_mapping(get_current_user(), num_values, hsize, cm3size);
 
         if (!m3)
         {
@@ -2629,146 +2632,6 @@ mapping_overhead (mapping_t *m)
     return rc;
 } /* mapping_overhead() */
 
-/*-------------------------------------------------------------------------*/
-
-/* Structure used by set_mapping_user() to communicate with ..._filter()
- */
-struct set_mapping_user_locals
-{
-    p_int        num_values;  /* Number of values per key */
-    object_t  *owner;       /* Owner to set */
-    svalue_t **hairy;
-      /* Next free entry in the array of keys which need manual tweaking */
-};
-
-
-static void
-set_mapping_user_filter (svalue_t *key, svalue_t *data, void *extra)
-
-/* walk_mapping-callback function used by set_mapping_user().
- * <extra> points in fact to a struct set_mapping_user_locals.
- *
- * Set the owner of <key> and all <data> to extra.owner (this might call
- * set_mapping_user() recursively).
- *
- * If the key needs special treatment (ie. changing the owner would change
- * its sort index), it is left unchanged and a memory copy of it is stored in
- * extra.hairy++.
- */
-
-{
-    p_int i;
-    struct set_mapping_user_locals *locals;
-    object_t *owner;
-
-    locals = (struct set_mapping_user_locals *)extra;
-    owner = locals->owner;
-
-    if (key->type == T_CLOSURE)
-    {
-        *(locals->hairy++) = key;
-    }
-    else
-    {
-        set_svalue_user(key, owner);
-    }
-    for (i = locals->num_values; --i > 0;)
-    {
-        set_svalue_user(data++, owner);
-    }
-}
-
-void
-set_mapping_user (mapping_t *m, object_t *owner)
-
-/* Set the <owner> as the user of mapping <m> and all its contained
- * keys and values, and update the wizlist entry for <owner>.
- *
- * As this function is called only for variables in newly compiled
- * objects, there is no need to guard against recursive
- * calls for this particular mapping.
- */
-
-{
-    p_int num_values;
-    mp_int total;
-    wiz_list_t *user;
-    struct set_mapping_user_locals locals;
-    svalue_t **first_hairy;
-    mp_int i;
-
-    num_values = m->num_values;
-
-    /* Move the total size in the wizlist from the old owner
-     * to the new one
-     */
-    total = (mp_int)( sizeof(*m)
-                     + ((m->cond) ? SIZEOF_MC(m->cond, m->num_values) : 0)
-                    );
-    LOG_SUB("set_mapping_user", total);
-    m->user->mapping_total -= total;
-    check_total_mapping_size();
-    user = owner->user;
-    m->user = user;
-    LOG_ADD("set_mapping_user", total);
-    m->user->mapping_total += total;
-    check_total_mapping_size();
-
-
-    /* Walk the mapping to set all owners */
-
-    locals.owner = owner;
-    locals.num_values = num_values;
-    first_hairy = alloca(((m->cond) ? m->cond->size : 1) * sizeof(svalue_t *));
-    if (!first_hairy)
-    {
-        errorf("Stack overflow.\n");
-        /* NOTREACHED */
-        return;
-    }
-    locals.hairy = first_hairy;
-    walk_mapping(m, set_mapping_user_filter, &locals);
-
-    /* All 'hairy' keys are changed by reassignment to the mapping.
-     * Be aware that changing the user might not change the search order.
-     */
-    for (i = locals.hairy - first_hairy; --i >= 0; first_hairy++)
-    {
-        svalue_t new_key, *dest, *source;
-        mp_int j;
-
-        /* Create the new key by changing its owner */
-        assign_svalue_no_free(&new_key, *first_hairy);
-        set_svalue_user(&new_key, owner);
-
-        /* Create a new entry in the mapping for the new key */
-        dest = get_map_lvalue_unchecked(m, &new_key);
-        if (!dest)
-        {
-            outofmemory("key with new owner");
-            /* NOTREACHED */
-            return;
-        }
-        free_svalue(&new_key);
-
-        /* Move the values from the old entry to the new one, invalidating
-         * the old ones by this.
-         */
-        source = get_map_value(m, *first_hairy);
-        if (source != dest)
-        {
-            if (num_values)
-                memcpy((char *)dest, (char *)source, num_values * sizeof *dest);
-            for (j = num_values; --j > 0; source++)
-                source->type = T_INVALID;
-
-            /* Remove the old entry */
-            remove_mapping(m, *first_hairy);
-        }
-    }
-} /* set_mapping_user() */
-
-
 #ifdef GC_SUPPORT
 
 /*-------------------------------------------------------------------------*/
@@ -2863,7 +2726,7 @@ handle_destructed_key (svalue_t *key)
              */
             l->function.lambda->ob = l->ob;
             l->ref = -1;
-            l->ob = (object_t *)stale_misc_closures;
+            l->ob.u.lambda = stale_misc_closures;
             stale_misc_closures = l;
         }
         else
@@ -2880,7 +2743,7 @@ handle_destructed_key (svalue_t *key)
             if (gc_obj_list_destructed)
                 fatal("gc_obj_list_destructed is NULL\n");
 #endif
-            l->function.lambda->ob = gc_obj_list_destructed;
+            l->function.lambda->ob.u.ob = gc_obj_list_destructed;
         }
     }
     count_ref_in_vector(key, 1);
@@ -3960,7 +3823,7 @@ v_walk_mapping (svalue_t *sp, int num_arg)
         p_int j;
         svalue_t *sp2, *data;
 
-        if (!callback_object(cb))
+        if (!valid_callback_object(cb))
             errorf("Object used by walk_mapping destructed\n");
 
         /* Push the key */
@@ -4147,7 +4010,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
             }
         }
 
-        if (!callback_object(cb))
+        if (!valid_callback_object(cb))
             errorf("Object used by %s destructed"
                  , bFull ? "filter" : "filter_mapping");
 
@@ -4386,7 +4249,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
             return NULL;
         }
 
-        if (!callback_object(cb))
+        if (!valid_callback_object(cb))
             errorf("Object used by %s destructed"
                  , bFull ? "map" : "map_mapping");
 

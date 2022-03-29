@@ -26,6 +26,10 @@
 #define OC_HEART_BEAT          1
 #define OC_EUID                2
 
+/* Possible options for configure_lwobject().
+ */
+#define LC_EUID                          0
+
 /* Possible options for configure_driver().
  */
 #define DC_MEMORY_LIMIT                  0

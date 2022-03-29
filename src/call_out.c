@@ -44,6 +44,7 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-current_object.h"
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/driver_info.h"
@@ -150,7 +151,7 @@ v_call_out (svalue_t *sp, int num_arg)
      * and return.
      */
 
-    if (current_object->flags & O_DESTRUCTED)
+    if (is_current_object_destructed())
     {
         do {
             free_svalue(sp--);
@@ -262,7 +263,7 @@ call_out (void)
     static struct call *current_call_out;
       /* Current callout, static so that longjmp() won't clobber it. */
 
-    static object_t *called_object;
+    static svalue_t called_object;
       /* Object last called, static so that longjmp() won't clobber it */
 
     struct error_recovery_info error_recovery_info;
@@ -285,20 +286,29 @@ call_out (void)
         /* An error occurred: recover and delete the guilty callout */
 
         struct call *cop;
-        object_t *ob;
-        wiz_list_t *user;
+        svalue_t ob;
+        wiz_list_t *user = NULL;
 
         mark_end_evaluation();
         clear_state();
         debug_message("%s Error in call out.\n", time_stamp());
         cop = current_call_out;
         ob = called_object;
-        if (ob)
+
+        switch (ob.type)
+        {
+            case T_OBJECT:
+                user = ob.u.ob->user;
+                break;
+            case T_LWOBJECT:
+                user = ob.u.lwob->user;
+                break;
+        }
+        if (user)
         {
             /* Disable the user for this call_out cycle. This is mainly
              * meant to stop runaway call_outs causing too-long-evaluations.
              */
-            user = ob->user;
             user->call_out_cost = -1;
         }
         free_call(cop);
@@ -313,7 +323,7 @@ call_out (void)
      */
     while (call_list && call_list->delta <= 0)
     {
-        object_t    *ob;
+        svalue_t     ob;
         struct call *cop;
         wiz_list_t  *user;
 
@@ -336,27 +346,34 @@ call_out (void)
         /* Get the object for the function call and make sure it's valid */
 
         ob = callback_object(&(cop->fun));
-        if (!ob)
+        switch (ob.type)
         {
-            /* Nothing to call */
-            free_call(cop);
-            continue;
-        }
+            case T_OBJECT:
+                if (O_PROG_SWAPPED(ob.u.ob) && load_ob_from_swap(ob.u.ob) < 0)
+                {
+                    debug_message("%s Error in call_out: out of memory: "
+                                  "unswap object '%s'.\n", time_stamp()
+                                 , get_txt(ob.u.ob->name));
+                    free_call(cop);
+                    continue;
+                }
+                user = ob.u.ob->user;
+                break;
 
-        if (O_PROG_SWAPPED(ob)
-         && load_ob_from_swap(ob) < 0)
-        {
-            debug_message("%s Error in call_out: out of memory: "
-                          "unswap object '%s'.\n", time_stamp()
-                         , get_txt(ob->name));
-            free_call(cop);
-            continue;
+            case T_LWOBJECT:
+                user = ob.u.lwob->user;
+                break;
+
+            case T_NUMBER:
+            default:
+                /* Nothing to call */
+                free_call(cop);
+                continue;
         }
 
         /* Check if the user has exceeded its eval limit for this cycle.
          * If yes, reschedule the call_out for one second later.
          */
-        user = ob->user;
         if (user->last_call_out == current_time
          && user->call_out_cost < 0
            )
@@ -387,14 +404,14 @@ call_out (void)
             else
                 command_giver = NULL;
         }
-        else if (ob->flags & O_SHADOW)
+        else if (ob.type == T_OBJECT && (ob.u.ob->flags & O_SHADOW))
         {
             /* Look at the object which is at the end of the shadow chain.
              */
             shadow_t *shadow_sent;
             object_t *sob;
 
-            sob = ob;
+            sob = ob.u.ob;
             while ((shadow_sent = O_GET_SHADOW(sob)), shadow_sent->shadowing)
                 sob = shadow_sent->shadowing;
 
@@ -412,12 +429,12 @@ call_out (void)
                 trace_level = 0;
             }
         }
-        else
+        else if (ob.type == T_OBJECT)
         {
             /* If at all, this object must be the command_giver */
 
-            if (ob->flags & O_ENABLE_COMMANDS)
-                command_giver = ob;
+            if (ob.u.ob->flags & O_ENABLE_COMMANDS)
+                command_giver = ob.u.ob;
             else
                 command_giver = NULL;
             trace_level = 0;
@@ -452,7 +469,7 @@ call_out (void)
 
 /*-------------------------------------------------------------------------*/
 static void
-find_call_out (object_t *ob, svalue_t *fun, Bool do_free_call)
+find_call_out (svalue_t ob, svalue_t *fun, Bool do_free_call)
 
 /* Find the (first) callout for <ob>/<fun> (or <fun> if it is a closure).
  * If <do_free_call> is true, the found callout is removed.
@@ -519,9 +536,9 @@ found:
     for (copp = &call_list; NULL != (cop = *copp); copp = &cop->next)
     {
         delay += cop->delta;
-        if (cop->fun.function.named.ob == ob
-         && cop->fun.function.named.name == fun_name
-         && !cop->fun.is_lambda)
+        if (!cop->fun.is_lambda
+         && object_svalue_eq(cop->fun.function.named.ob, ob)
+         && cop->fun.function.named.name == fun_name)
         {
             if (do_free_call)
             {
@@ -631,10 +648,7 @@ remove_stale_call_outs (void)
 
     for (copp = &call_list; NULL != (cop = *copp); )
     {
-        object_t *ob;
-
-        ob = callback_object(&(cop->fun));
-        if (!ob)
+        if (!valid_callback_object(&(cop->fun)))
         {
             num_callouts--;
             if (cop->next)
@@ -722,7 +736,7 @@ get_all_call_outs (void)
      */
     for (i = 0, cop = call_list; cop; cop = cop->next)
     {
-        if (!callback_object(&(cop->fun)))
+        if (!valid_callback_object(&(cop->fun)))
             continue;
         i++;
     }
@@ -735,12 +749,12 @@ get_all_call_outs (void)
     for (i=0, cop = call_list; cop; cop = cop->next)
     {
         vector_t *vv;
-        object_t *ob;
+        svalue_t  ob;
 
         next_time += cop->delta;
 
         ob = callback_object(&(cop->fun));
-        if (!ob)
+        if (ob.type == T_NUMBER)
             continue;
 
         /* Get the subarray */
@@ -750,16 +764,14 @@ get_all_call_outs (void)
         if (cop->fun.is_lambda)
         {
             if (cop->fun.function.lambda.x.closure_type == CLOSURE_LFUN)
-                put_ref_object( vv->item
-                              , cop->fun.function.lambda.u.lambda->function.lfun.ob
-                              , "get_all_call_outs");
+                assign_object_svalue_no_free(vv->item, cop->fun.function.lambda.u.lambda->function.lfun.ob, "get_all_call_outs");
             else
-                put_ref_object(vv->item, ob, "get_all_call_outs");
+                assign_object_svalue_no_free(vv->item, ob, "get_all_call_outs");
             assign_svalue_no_free(&vv->item[1], &cop->fun.function.lambda);
         }
         else
         {
-            put_ref_object(vv->item, ob, "get_all_call_outs");
+            assign_object_svalue_no_free(vv->item, ob, "get_all_call_outs");
             put_ref_string(vv->item + 1, cop->fun.function.named.name);
         }
 

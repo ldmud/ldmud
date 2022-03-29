@@ -50,6 +50,7 @@
 #include "heartbeat.h"
 #include "iconv_opt.h"
 #include "lex.h"
+#include "lwobject.h"
 #include "main.h"
 #include "mapping.h"
 #include "mempools.h"
@@ -75,6 +76,7 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-current_object.h"
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/driver_hook.h"
@@ -218,16 +220,18 @@ object_t *master_ob = NULL;
   /* The master object.
    */
 
-object_t *current_object = NULL;
+svalue_t current_object = { T_NUMBER, {}, { .number = 0 } };
   /* The object interpreting a function.
+   * Any references in it are not counted.
    */
 
 object_t *current_interactive;
   /* The user who caused this execution.
    */
 
-object_t *previous_ob;
+svalue_t previous_ob = { T_NUMBER, {}, { .number = 0 } };
   /* The previous object which called the current_object.
+   * Any references in it are not counted.
    */
 
 svalue_t driver_hook[NUM_DRIVER_HOOKS];
@@ -419,6 +423,7 @@ catch_instruction ( int flags, uint offset
 
         /* beware of errors after set_this_object() */
         current_object = csp->ob;
+        csp->ob = const0;
 
         /* catch() faked a subroutine call internally, which has to be
          * undone again. This will also set the pc to the proper
@@ -653,17 +658,25 @@ fatal (const char *fmt, ...)
     va_end(va);
 
     fflush(stderr);
-    if (current_object)
+    if (current_object.type == T_OBJECT)
         fprintf(stderr, "%s Current object was %s\n"
-                      , ts, current_object->name
-                            ? get_txt(current_object->name) : "<null>");
+                      , ts, current_object.u.ob->name
+                            ? get_txt(current_object.u.ob->name) : "<null>");
+    else if (current_object.type == T_LWOBJECT)
+        fprintf(stderr, "%s Current lightweight object was from %s\n"
+                      , ts, current_object.u.lwob->prog->name
+                            ? get_txt(current_object.u.lwob->prog->name) : "<null>");
     debug_message("%s ", ts);
     vdebug_message(fmt, va2);
     va_end(va2);
-    if (current_object)
+    if (current_object.type == T_OBJECT)
         debug_message("%s Current object was %s\n"
-                     , ts, current_object->name
-                           ? get_txt(current_object->name) : "<null>");
+                     , ts, current_object.u.ob->name
+                           ? get_txt(current_object.u.ob->name) : "<null>");
+    else if (current_object.type == T_LWOBJECT)
+        debug_message("%s Current lightweight object was from %s\n"
+                     , ts, current_object.u.lwob->prog->name
+                           ? get_txt(current_object.u.lwob->prog->name) : "<null>");
     debug_message("%s Dump of the call chain:\n", ts);
     (void)dump_trace(MY_TRUE, NULL, NULL);
     printf("%s LDMud aborting on fatal error.\n", time_stamp());
@@ -760,7 +773,7 @@ errorf (const char *fmt, ...)
     string_t *malloced_error;        /* copy of emsg_buf+1 */
     string_t *malloced_file = NULL;  /* copy of program name */
     string_t *malloced_name = NULL;  /* copy of the object name */
-    object_t *curobj = NULL;         /* Verified current object */
+    svalue_t  curobj = const0;       /* Verified current object */
     char      fixed_fmt[ERROR_FMT_LEN];
       /* Note: When changing this buffer, also change the HEAP_STACK_GAP
        * limit in xalloc.c!
@@ -790,12 +803,10 @@ errorf (const char *fmt, ...)
     fmt = limit_error_format(fixed_fmt, sizeof(fixed_fmt), fmt);
 
     /* Check the current object */
-    curobj = NULL;
-    if (current_object != NULL
-     && current_object != &dummy_current_object_for_loads)
+    if (get_current_object() != &dummy_current_object_for_loads)
         curobj = current_object;
 
-    if (curobj)
+    if (curobj.type != T_NUMBER)
         assign_eval_cost();
 
     /* We allow recursive errors only from "sensitive" environments.
@@ -951,19 +962,29 @@ errorf (const char *fmt, ...)
     /* If we have a current_object, determine the program location
      * of the fault.
      */
-    if (curobj)
+    if (curobj.type != T_NUMBER)
     {
         line_number = get_line_number_if_any(&file);
-        debug_message("%s program: %s, object: %s line %"PRIdMPINT"\n"
-                     , ts, get_txt(file), get_txt(curobj->name)
-                     , line_number);
+        if (curobj.type == T_OBJECT)
+        {
+            debug_message("%s program: %s, object: %s line %"PRIdMPINT"\n"
+                         , ts, get_txt(file), get_txt(curobj.u.ob->name)
+                         , line_number);
+            malloced_name = ref_mstring(curobj.u.ob->name);
+        }
+        else /* curobj.type == T_LWOBJECT */
+        {
+            debug_message("%s program: %s, lightweight object: %s line %"PRIdMPINT"\n"
+                         , ts, get_txt(file), get_txt(curobj.u.lwob->prog->name)
+                         , line_number);
+            malloced_name = ref_mstring(curobj.u.lwob->prog->name);
+        }
         if (current_prog && num_error < 3)
         {
             do_save_error = MY_TRUE;
         }
 
         malloced_file = file; /* Adopt reference */
-        malloced_name = ref_mstring(curobj->name);
     }
 
     /* On a triple error, duplicate the error messages so far on stdout */
@@ -973,13 +994,16 @@ errorf (const char *fmt, ...)
         /* Error context is secure_apply() */
 
         printf("%s error in function call: %s", ts, emsg_buf+1);
-        if (curobj)
-        {
+        if (curobj.type == T_OBJECT)
             printf("%s program: %s, object: %s line %"PRIdMPINT"\n"
-                  , ts, get_txt(file), get_txt(curobj->name)
+                  , ts, get_txt(file), get_txt(curobj.u.ob->name)
                   , line_number
                   );
-        }
+        else if (curobj.type == T_LWOBJECT)
+            printf("%s program: %s, lightweight object: %s line %"PRIdMPINT"\n"
+                  , ts, get_txt(file), get_txt(curobj.u.lwob->prog->name)
+                  , line_number
+                  );
     }
 
     /* Dump the backtrace (unless already done) */
@@ -1124,7 +1148,7 @@ errorf (const char *fmt, ...)
 
         push_ref_string(inter_sp, malloced_error);
         a = 1;
-        if (curobj)
+        if (curobj.type != T_NUMBER)
         {
             push_ref_string(inter_sp, malloced_file);
             push_ref_string(inter_sp, malloced_name);
@@ -1148,7 +1172,7 @@ errorf (const char *fmt, ...)
         }
         else
         {
-            if (!curobj)
+            if (curobj.type == T_NUMBER)
             {
                 /* Push dummy values to keep the argument order correct */
                 push_number(inter_sp, 0);
@@ -1181,7 +1205,7 @@ errorf (const char *fmt, ...)
             push_ref_valid_object(inter_sp, culprit, "runtime_error");
             push_ref_string(inter_sp, malloced_error);
             a = 2;
-            if (curobj)
+            if (curobj.type != T_NUMBER)
             {
                 push_ref_string(inter_sp, malloced_file);
                 push_ref_string(inter_sp, malloced_name);
@@ -1269,7 +1293,7 @@ warnf (char *fmt, ...)
 {
     char     *ts;
     string_t *file = NULL;           /* program name */
-    object_t *curobj = NULL;         /* Verified current object */
+    svalue_t  curobj = const0;       /* Verified current object */
     char      msg_buf[10000];
       /* The buffer for the error message to be created.
        */
@@ -1306,12 +1330,10 @@ warnf (char *fmt, ...)
     fmt = limit_error_format(fixed_fmt, sizeof(fixed_fmt), fmt);
 
     /* Check the current object */
-    curobj = NULL;
-    if (current_object != NULL
-     && current_object != &dummy_current_object_for_loads)
+    if (get_current_object() != &dummy_current_object_for_loads)
         curobj = current_object;
 
-    if (curobj)
+    if (curobj.type != T_NUMBER)
         assign_eval_cost();
 
     /* Generate the error message */
@@ -1324,12 +1346,17 @@ warnf (char *fmt, ...)
     /* If we have a current_object, determine the program location
      * of the fault.
      */
-    if (curobj)
+    if (curobj.type != T_NUMBER)
     {
         line_number = get_line_number_if_any(&file);
-        debug_message("%s program: %s, object: %s line %"PRIdMPINT"\n"
-                     , ts, get_txt(file), get_txt(curobj->name)
-                     , line_number);
+        if (curobj.type == T_OBJECT)
+            debug_message("%s program: %s, object: %s line %"PRIdMPINT"\n"
+                         , ts, get_txt(file), get_txt(curobj.u.ob->name)
+                         , line_number);
+        else /* curobj.type == T_LWOBJECT */
+            debug_message("%s program: %s, lightweight object: %s line %"PRIdMPINT"\n"
+                         , ts, get_txt(file), get_txt(curobj.u.lwob->prog->name)
+                         , line_number);
     }
 
     fflush(stdout);
@@ -1342,14 +1369,21 @@ warnf (char *fmt, ...)
         object_t * save_cmd = command_giver;
 
         put_c_string(++inter_sp, msg_buf);
-        if (curobj)
+        if (curobj.type == T_OBJECT)
         {
             if (compat_mode)
-                push_ref_string(inter_sp, curobj->name);
+                push_ref_string(inter_sp, curobj.u.ob->name);
             else
-                push_string(inter_sp, add_slash(curobj->name));
+                push_string(inter_sp, add_slash(curobj.u.ob->name));
         }
-        else
+        else if (curobj.type == T_LWOBJECT)
+        {
+            if (compat_mode)
+                push_ref_string(inter_sp, curobj.u.lwob->prog->name);
+            else
+                push_string(inter_sp, add_slash(curobj.u.lwob->prog->name));
+        }
+        else /* curobj-type == T_NUMBER */
             push_number(inter_sp, 0);
         if (file)
             push_ref_string(inter_sp, file);
@@ -1404,7 +1438,8 @@ parse_error (Bool warning, const char *error_file, int line, const char *what
         push_c_string(inter_sp, error_file);
         push_c_string(inter_sp, buff);
         push_number(inter_sp, warning ? 1 : 0);
-        apply_master(STR_LOG_ERROR, 3);
+        push_number(inter_sp, line);
+        apply_master(STR_LOG_ERROR, 4);
     }
 } /* parse_error() */
 
@@ -1427,33 +1462,6 @@ throw_error (svalue_t *v)
     free_svalue(v);
     errorf("Throw with no catch.\n");
 } /* throw_error() */
-
-/*-------------------------------------------------------------------------*/
-void
-set_svalue_user (svalue_t *svp, object_t *owner)
-
-/* Set the owner of <svp> to object <owner>, if the svalue knows of
- * this concept. This may cause a recursive call to this function again.
- */
-
-{
-    switch(svp->type)
-    {
-    case T_POINTER:
-    case T_QUOTED_ARRAY:
-        set_vector_user(svp->u.vec, owner);
-        break;
-    case T_MAPPING:
-      {
-        set_mapping_user(svp->u.map, owner);
-        break;
-      }
-    case T_CLOSURE:
-      {
-        set_closure_user(svp, owner);
-      }
-    }
-} /* set_svalue_user() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1502,7 +1510,86 @@ push_give_uid_error_context (object_t *ob)
 } /* push_give_uid_error_context() */
 
 /*-------------------------------------------------------------------------*/
-static Bool
+static bool
+determine_uid (svalue_t ob, string_t* name, wiz_list_t **user, wiz_list_t **eff_user, int hook, int numarg, char** err)
+
+/* <user> and <eff_user> are uninitialized uids for <ob>, call the driver hook <hook>
+ * with <numarg> arguments to determine them.
+ * Returns true on success, on failure return false and set <*err> to the error message.
+ * <err> must initially point to a buffer of at least 1000 bytes for the error message.
+ */
+
+{
+    lambda_t *l;
+    svalue_t *ret;
+
+    *user = &default_wizlist_entry;  /* Default uid */
+
+    if ( NULL != (l = driver_hook[hook].u.lambda) )
+    {
+        if (driver_hook[hook].x.closure_type == CLOSURE_LAMBDA)
+            assign_object_svalue(&(l->ob), ob, "determine_uid");
+
+        call_lambda(&driver_hook[hook], numarg);
+        ret = inter_sp;
+
+        if (ret->type == T_STRING)
+        {
+            *eff_user = *user = add_name(ret->u.str);
+            pop_stack();        /* deallocate result */
+            return true;
+        }
+        else if (ret->type == T_POINTER && VEC_SIZE(ret->u.vec) == 2
+              && (   ret->u.vec->item[0].type == T_STRING
+                  || (!strict_euids && ret->u.vec->item[0].u.number)
+                 )
+                )
+        {
+            ret = ret->u.vec->item;
+            *user =   ret[0].type != T_STRING
+                    ? &default_wizlist_entry
+                    : add_name(ret[0].u.str);
+            *eff_user = ret[1].type != T_STRING
+                      ? 0
+                      : add_name(ret[1].u.str);
+            pop_stack();
+            return true;
+        }
+        else if (!strict_euids && ret->type == T_NUMBER && ret->u.number)
+        {
+            *user = &default_wizlist_entry;
+            *eff_user = NULL;
+            pop_stack();
+            return MY_TRUE;
+        }
+        else
+        {
+            pop_stack(); /* deallocate result */
+            sprintf(*err, "%s '%.900s' illegal to load (no uid).\n"
+                        , (ob.type == T_LWOBJECT ? "Lightweight object of" : "Object")
+                        , get_txt(name));
+        }
+    }
+    else
+    {
+        do pop_stack(); while (--numarg); /* deallocate arguments */
+        *err = "closure to set uid not initialized!\n";
+    }
+
+    if (master_ob == NULL)
+    {
+        /* Only for the master object. */
+        *user = add_name(STR_NONAME);
+        *eff_user = NULL;
+        return true;
+    }
+
+    *eff_user = *user = add_name(STR_NONAME);
+    return false;
+} /* determine_uid() */
+
+/*-------------------------------------------------------------------------*/
+static bool
 give_uid_to_object (object_t *ob, int hook, int numarg)
 
 /* Object <ob> was just created - call the driver_hook <hook> with <numarg>
@@ -1512,100 +1599,59 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
  */
 
 {
-    lambda_t *l;
-    char *err, errtxt[1024];
-    svalue_t arg, *ret;
+    svalue_t arg = { T_OBJECT, {}, {.ob = ob } };
+    char errtxt[1024];
+    char *err = errtxt;
 
-    ob->user = &default_wizlist_entry;  /* Default uid */
-
-    if ( NULL != (l = driver_hook[hook].u.lambda) )
+    if (!determine_uid(arg, ob->name, &(ob->user), &(ob->eff_user), hook, numarg, &err))
     {
-        if (driver_hook[hook].x.closure_type == CLOSURE_LAMBDA)
-        {
-            free_object(l->ob, "give_uid_to_object");
-            l->ob = ref_object(ob, "give_uid_to_object");
-        }
-        call_lambda(&driver_hook[hook], numarg);
-        ret = inter_sp;
-        xfree(ret[-1].u.lvalue); /* free error context */
+        errorf("%s", err);
 
-        if (ret->type == T_STRING)
-        {
-            ob->user = add_name(ret->u.str);
-            ob->eff_user = ob->user;
-            pop_stack();        /* deallocate result */
-            inter_sp--;         /* skip error context */
-            return MY_TRUE;
-        }
-        else if (ret->type == T_POINTER && VEC_SIZE(ret->u.vec) == 2
-              && (   ret->u.vec->item[0].type == T_STRING
-                  || (!strict_euids && ret->u.vec->item[0].u.number)
-                 )
-                )
-        {
-            ret = ret->u.vec->item;
-            ob->user =   ret[0].type != T_STRING
-                       ? &default_wizlist_entry
-                       : add_name(ret[0].u.str);
-            ob->eff_user = ret[1].type != T_STRING
-                           ? 0
-                           : add_name(ret[1].u.str);
-            pop_stack();
-            inter_sp--;
-            return MY_TRUE;
-        }
-        else if (!strict_euids && ret->type == T_NUMBER && ret->u.number)
-        {
-            ob->user = &default_wizlist_entry;
-            ob->eff_user = NULL;
-            pop_stack();
-            inter_sp--;
-            return MY_TRUE;
-        }
-        else
-        {
-            pop_stack(); /* deallocate result */
-            sprintf(errtxt, "Object '%.900s' illegal to load (no uid).\n"
-                          , get_txt(ob->name));
-            err = errtxt;
-        }
+        /* NOTREACHED */
+        return false;
     }
     else
+        return true;
+} /* give_uid_to_object() */
+
+/*-------------------------------------------------------------------------*/
+bool
+give_uid_to_lwobject (lwobject_t *lwob, object_t* blueprint)
+
+/* Lightweight object <lwob> was just created. Call the driver_hook
+ * H_LWOBJECT_UIDS to give it its uid and euid.
+ * Return true on success, raise an error on failure.
+ * Free the reference to <lwob> on failure.
+ */
+
+{
+    svalue_t arg = { T_LWOBJECT, {}, {.lwob = lwob } };
+    char errtxt[1024];
+    char *err = errtxt;
+
+    push_ref_object(inter_sp, blueprint, "give_uid_to_lwobject");
+
+    if (!determine_uid(arg, blueprint->name, &(lwob->user), &(lwob->eff_user), H_LWOBJECT_UIDS, 1, &err))
     {
-        do pop_stack(); while (--numarg); /* deallocate arguments */
-        xfree(inter_sp->u.lvalue);
-        err = "closure to set uid not initialized!\n";
+        errorf("%s", err);
+
+        /* NOTREACHED */
+        return false;
     }
-
-    inter_sp--;  /* skip error context */
-
-    if (master_ob == NULL)
-    {
-        /* Only for the master object. */
-        ob->user = add_name(STR_NONAME);
-        ob->eff_user = NULL;
-        return MY_TRUE;
-    }
-
-    ob->user = add_name(STR_NONAME);
-    ob->eff_user = ob->user;
-    put_object(&arg, ob);
-    destruct_object(&arg);
-    errorf("%s", err);
-    /* NOTREACHED */
-    return MY_FALSE;
+    else
+        return true;
 } /* give_uid_to_object() */
 
 /*-------------------------------------------------------------------------*/
 const char *
-make_name_sane (const char *pName, Bool addSlash)
+make_name_sane (const char *pName, bool addSlash, bool addDotC)
 
 /* Make a given object name sane.
  *
  * The function removes leading '/' (if addSlash is true, all but one leading
- * '/' are removed), a trailing '.c', and folds consecutive
- * '/' into just one '/'. The '.c' removal does not work when given
- * clone object names (i.e. names ending in '#<number>').
+ * '/' are removed), a trailing '.c' (unless addDotC is true), and folds
+ * consecutive '/' into just one '/'. The '.c' removal does not work when
+ * given clone object names (i.e. names ending in '#<number>').
  *
  * The function returns a pointer to a static(!) buffer with the cleant
  * up name, or NULL if the given name already was sane.
@@ -1615,7 +1661,7 @@ make_name_sane (const char *pName, Bool addSlash)
     static char buf[MAXPATHLEN+1];
     const char *from = pName;
     char *to;
-    short bDiffers = MY_FALSE;
+    bool bDiffers = false;
 
     to = buf;
 
@@ -1626,12 +1672,12 @@ make_name_sane (const char *pName, Bool addSlash)
         if (*from == '/')
             from++;
         else
-            bDiffers = MY_TRUE;
+            bDiffers = true;
     }
 
     while (*from == '/' || (from[0] == '.' && from[1] == '/'))
     {
-        bDiffers = MY_TRUE;
+        bDiffers = true;
         from++;
     }
     /* addSlash or not: from now points to the first non-'/' */
@@ -1645,19 +1691,26 @@ make_name_sane (const char *pName, Bool addSlash)
             *to = '/';
             while (*from == '/' || (from[0] == '.' && from[1] == '/'))
             {
-                bDiffers = MY_TRUE;
+                bDiffers = true;
                 from++;
             }
 
             from--;
         }
-        else if ('.' == *from && 'c' == *(from+1) && '\0' == *(from+2))
+        else if (!addDotC && '.' == *from && 'c' == *(from+1) && '\0' == *(from+2))
         {
-            bDiffers = MY_TRUE;
+            bDiffers = true;
             break;
         }
         else
             *to = *from;
+    }
+
+    if (addDotC && (to < buf+2 || to[-2] != '.' || to[-1] != 'c'))
+    {
+        *to++ = '.';
+        *to++ = 'c';
+        bDiffers = true;
     }
     *to = '\0';
 
@@ -1847,11 +1900,11 @@ load_object (const char *lname, Bool create_super, int depth
     nlink.name = name;
     nlink.prev = chain;
 
-    if (strict_euids && current_object && current_object->eff_user == 0
-     && current_object->name)
+    if (strict_euids && current_object.type != T_NUMBER && !get_current_eff_user()
+     && (current_object.type != T_OBJECT || current_object.u.ob->name))
         errorf("Can't load objects when no effective user.\n");
 
-    if (master_ob && master_ob->flags & O_DESTRUCTED)
+    if (master_ob && (master_ob->flags & O_DESTRUCTED))
     {
         /* The master has been destructed, and it has not been noticed yet.
          * Reload it, because it can't be done inside of yyparse.
@@ -2046,7 +2099,7 @@ load_object (const char *lname, Bool create_super, int depth
             char * pInherited;
             const char * tmp;
 
-            tmp = make_name_sane(get_txt(inherit_file), MY_FALSE);
+            tmp = make_name_sane(get_txt(inherit_file), false, false);
             if (!tmp)
             {
                 pInherited = get_txt(inherit_file);
@@ -2160,31 +2213,17 @@ load_object (const char *lname, Bool create_super, int depth
     push_ref_string(inter_sp, ob->name);
     if (give_uid_to_object(ob, H_LOAD_UIDS, 1))
     {
-        /* The object has an uid - now we can update the .user
-         * of its initializers.
-         */
-        svalue_t *svp;
-        int j;
-        object_t *save_current;
+        svalue_t save_current = current_object;
 
-        save_current = current_object;
-        current_object = ob; /* just in case */
-        svp = ob->variables;
-        for (j = ob->prog->num_variables;  --j >= 0; svp++)
-        {
-            if (svp->type == T_NUMBER)
-                continue;
-            set_svalue_user(svp, ob);
-        }
+        /* Remove error context. */
+        assert(inter_sp->type == T_ERROR_HANDLER);
+        xfree(inter_sp->u.error_handler);
+        inter_sp--;
 
-        if (save_current == &dummy_current_object_for_loads)
+        if (get_current_object() == &dummy_current_object_for_loads)
         {
             /* The master object is loaded with no current object */
-            current_object = NULL;
-        }
-        else
-        {
-            current_object = save_current;
+            clear_current_object();
         }
 
         if (ob->flags & O_DESTRUCTED)
@@ -2203,7 +2242,7 @@ load_object (const char *lname, Bool create_super, int depth
             pop_stack();
             return NULL;
         }
-        reset_object(ob, create_super ? H_CREATE_SUPER : H_CREATE_OB);
+        reset_object(ob, create_super ? H_CREATE_SUPER : H_CREATE_OB, 0);
 
         /* If the master inherits anything -Ugh- we have to have
          * some object to attribute initialized variables to.
@@ -2281,10 +2320,12 @@ make_new_name (string_t *str)
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-clone_object (string_t *str1)
+clone_object (string_t *str1, int num_arg)
 
 /* Create a clone of the object named <str1>, which may be a clone itself.
- * On success, return the new object, otherwise NULL.
+ * On success, return the new object, otherwise NULL. <num_arg> values
+ * on the stack will be passed to the H_CREATE_CLONE hook and removed
+ * from the stack afterwards.
  */
 
 {
@@ -2292,7 +2333,7 @@ clone_object (string_t *str1)
     object_t *save_command_giver = command_giver;
     string_t *name;
 
-    if (strict_euids && current_object && current_object->eff_user == NULL)
+    if (strict_euids && current_object.type != T_NUMBER && !get_current_eff_user())
         errorf("Illegal to call clone_object() with effective user 0\n");
 
     ob = get_object(str1);
@@ -2300,7 +2341,10 @@ clone_object (string_t *str1)
     /* If the object self-destructed...
      */
     if (ob == NULL)
+    {
+        inter_sp = pop_n_elems(num_arg, inter_sp);
         return NULL;
+    }
 
     /* If ob is a clone, try finding the blueprint first via the object's
      * program, then via the load_name.
@@ -2397,7 +2441,7 @@ clone_object (string_t *str1)
     reference_prog (ob->prog, "clone_object");
     new_ob->ticks = new_ob->gigaticks = 0;
 #ifdef DEBUG
-    if (!current_object)
+    if (current_object.type == T_NUMBER)
         fatal("clone_object() from no current_object !\n");
 #endif
     new_ob->next_all = obj_list;
@@ -2414,10 +2458,16 @@ clone_object (string_t *str1)
     push_ref_string(inter_sp, new_ob->name);
     give_uid_to_object(new_ob, H_CLONE_UIDS, 2);
 
+    /* Remove error context. */
+    assert(inter_sp->type == T_ERROR_HANDLER);
+    xfree(inter_sp->u.error_handler);
+    inter_sp--;
+
     if (new_ob->flags & O_DESTRUCTED)
     {
         warnf("Object '%s' was destroyed before initialization.\n"
              , get_txt(new_ob->name));
+        inter_sp = pop_n_elems(num_arg, inter_sp);
         return NULL;
     }
     init_object_variables(new_ob, ob);
@@ -2426,9 +2476,10 @@ clone_object (string_t *str1)
     {
         warnf("Object '%s' was destroyed during initialization.\n"
              , get_txt(new_ob->name));
+        inter_sp = pop_n_elems(num_arg, inter_sp);
         return NULL;
     }
-    reset_object(new_ob, H_CREATE_CLONE);
+    reset_object(new_ob, H_CREATE_CLONE, num_arg);
     command_giver = check_object(save_command_giver);
 
     /* Never know what can happen ! :-( */
@@ -2471,7 +2522,7 @@ lookfor_object (string_t * str, Bool bLoad)
      * TODO:: and move the make_name_sane() into those where it can
      * TODO:: be dirty.
      */
-    pName = make_name_sane(get_txt(str), MY_FALSE);
+    pName = make_name_sane(get_txt(str), false, false);
     if (!pName)
         pName = get_txt(str);
 
@@ -2507,7 +2558,7 @@ find_object_str (const char * str)
      * TODO:: and move the make_name_sane() into those where it can
      * TODO:: be dirty.
      */
-    pName = make_name_sane(str, MY_FALSE);
+    pName = make_name_sane(str, false, false);
     if (!pName)
         pName = str;
 
@@ -3685,7 +3736,7 @@ convert_path_from_native_or_throw (const char* path, size_t len)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-check_valid_path (string_t *path, object_t *caller, string_t* call_fun, Bool writeflg)
+check_valid_path (string_t *path, svalue_t caller, string_t* call_fun, Bool writeflg)
 
 /* Object <caller> will read resp. write (<writeflg>) the file <path>
  * for the efun <call_fun>.
@@ -3704,19 +3755,34 @@ check_valid_path (string_t *path, object_t *caller, string_t* call_fun, Bool wri
 {
     svalue_t *v;
     wiz_list_t *eff_user;
+    string_t *name;
 
     if (path)
         push_ref_string(inter_sp, path);
     else
         push_number(inter_sp, 0);
 
-    if ( NULL != (eff_user = caller->eff_user)  && NULL != eff_user->name)
+    switch (caller.type)
+    {
+        case T_OBJECT:
+            eff_user = caller.u.ob->eff_user;
+            name = caller.u.ob->name;
+            break;
+        case T_LWOBJECT:
+            eff_user = caller.u.lwob->eff_user;
+            name = caller.u.lwob->prog->name;
+            break;
+        default:
+            fatal("Illegal caller for check_valid_path.\n");
+    }
+
+    if ( eff_user != NULL && eff_user->name != NULL)
         push_ref_string(inter_sp, eff_user->name);
     else
         push_number(inter_sp, 0);
 
     push_ref_string(inter_sp, call_fun);
-    push_ref_valid_object(inter_sp, caller, "check_valid_path");
+    assign_object_svalue_no_free(++inter_sp, caller, "check_valid_path");
     if (writeflg)
         v = apply_master(STR_VALID_WRITE, 4);
     else
@@ -3767,7 +3833,7 @@ check_valid_path (string_t *path, object_t *caller, string_t* call_fun, Bool wri
     /* Push the path onto the VM stack so that errorf() can free it */
     push_string(inter_sp, path);
     errorf("Illegal path '%s' for %s() by %s\n", get_txt(path), get_txt(call_fun)
-         , get_txt(caller->name));
+         , get_txt(name));
     return NULL;
 } /* check_valid_path() */
 
@@ -3783,7 +3849,7 @@ init_empty_callback (callback_t *cb)
 {
     cb->num_arg = 0;
     cb->is_lambda = MY_FALSE;
-    cb->function.named.ob = NULL;
+    cb->function.named.ob = const0;
     cb->function.named.name = NULL;
 } /* init_empty_callback() */
 
@@ -3839,11 +3905,10 @@ free_callback (callback_t *cb)
     }
     else if (!(cb->is_lambda))
     {
-        if (cb->function.named.ob)
-            free_object(cb->function.named.ob, "free_callback");
+        free_svalue(&(cb->function.named.ob));
         if (cb->function.named.name)
             free_mstring(cb->function.named.name);
-        cb->function.named.ob = NULL;
+        cb->function.named.ob = const0;
         cb->function.named.name = NULL;
     }
 
@@ -3899,7 +3964,7 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args)
 
 /*-------------------------------------------------------------------------*/
 int
-setup_function_callback ( callback_t *cb, object_t * ob, string_t * fun
+setup_function_callback ( callback_t *cb, svalue_t ob, string_t * fun
                         , int nargs, svalue_t * args)
 
 /* Setup the empty/uninitialized callback <cb> to hold a function
@@ -3918,15 +3983,29 @@ setup_function_callback ( callback_t *cb, object_t * ob, string_t * fun
 
     cb->is_lambda = MY_FALSE;
     cb->function.named.name = make_tabled_from(fun); /* for faster apply()s */
-    cb->function.named.ob = ref_object(ob, "callback");
+    assign_object_svalue_no_free(&(cb->function.named.ob), ob, "callback");
 
     error_index = setup_callback_args(cb, nargs, args);
     if (error_index >= 0)
     {
-        free_object(cb->function.named.ob, "callback");
+        free_svalue(&(cb->function.named.ob));
         free_mstring(cb->function.named.name);
-        cb->function.named.ob = NULL;
+        cb->function.named.ob = const0;
         cb->function.named.name = NULL;
+    }
+    else
+    {
+        /* Check whether the function does exist, */
+        switch (ob.type)
+        {
+            case T_OBJECT:
+                warn_missing_function_ob(ob.u.ob, cb->function.named.name);
+                break;
+
+            case T_LWOBJECT:
+                warn_missing_function_lwob(ob.u.lwob, cb->function.named.name);
+                break;
+        }
     }
 
     return error_index;
@@ -3953,9 +4032,7 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
     cb->is_lambda = MY_TRUE;
     transfer_svalue_no_free(&(cb->function.lambda), cl);
 
-    if (cb->function.lambda.x.closure_type == CLOSURE_UNBOUND_LAMBDA
-     || cb->function.lambda.x.closure_type == CLOSURE_PRELIMINARY
-       )
+    if (cb->function.lambda.x.closure_type == CLOSURE_UNBOUND_LAMBDA)
     {
         /* Uncalleable closure  */
         error_index = 0;
@@ -3994,7 +4071,7 @@ setup_efun_callback_base ( callback_t **cb, svalue_t *args, int nargs
  *
  * If bNoObj is FALSE (the usual case), this form is also allowed:
  *
- *   (string fun, string|object obj, mixed extra, ...)
+ *   (string fun, string|object|lwobject obj, mixed extra, ...)
  *
  * If the first argument is a string and the second neither an object
  * nor a string, this_object() is used as object specification. Ditto
@@ -4026,7 +4103,7 @@ setup_efun_callback_base ( callback_t **cb, svalue_t *args, int nargs
     }
     else if (args[0].type == T_STRING)
     {
-        object_t *ob;
+        svalue_t  ob;
         int       first_arg;
 
         first_arg = 1;
@@ -4040,14 +4117,18 @@ setup_efun_callback_base ( callback_t **cb, svalue_t *args, int nargs
             }
             else
             {
-                if (args[1].type == T_OBJECT)
+                if (args[1].type == T_OBJECT || args[1].type == T_LWOBJECT)
                 {
-                    ob = args[1].u.ob;
+                    ob = args[1];
                     first_arg = 2;
                 }
                 else if (args[1].type == T_STRING)
                 {
-                    ob = get_object(args[1].u.str);
+                    object_t *target = get_object(args[1].u.str);
+                    if (target)
+                        ob = svalue_object(target);
+                    else
+                        ob.type = T_NUMBER;
                     first_arg = 2;
                 }
                 else
@@ -4061,7 +4142,7 @@ setup_efun_callback_base ( callback_t **cb, svalue_t *args, int nargs
         else
             ob = current_object;
 
-        if (ob != NULL)
+        if (ob.type != T_NUMBER)
         {
             memsafe(*cb = xalloc(sizeof(callback_t)), sizeof(callback_t), "callback structure");
             error_index = setup_function_callback(*cb, ob, args[0].u.str
@@ -4121,23 +4202,45 @@ callback_change_object (callback_t *cb, object_t *obj)
  */
 
 {
-    object_t *old;
+    svalue_t old;
     if (cb->is_lambda)
     {
         fatal("callback_change_object(): Must not be called with a closure callback.");
         /* NOTREACHED */
         return;
     }
-    
-    old = cb->function.named.ob;
-    cb->function.named.ob = ref_object(obj, "change callback");
 
-    if (old)
-        free_object(old, "change_callback");
+    old = cb->function.named.ob;
+    put_ref_object(&(cb->function.named.ob), obj, "change callback");
+    free_svalue(&old);
 } /* callback_change_object() */
 
 /*-------------------------------------------------------------------------*/
-object_t *
+void
+callback_change_lwobject (callback_t *cb, lwobject_t *lwobj)
+
+/* Change the object the callback is bound to, if it is a function callback.
+ * A new reference is added to <lwobj>.
+ */
+
+{
+    if (cb->is_lambda)
+    {
+        fatal("callback_change_lwobject(): Must not be called with a closure callback.");
+        /* NOTREACHED */
+        return;
+    }
+
+    if (cb->function.named.ob.type != T_LWOBJECT
+     || cb->function.named.ob.u.lwob != lwobj)
+    {
+        free_svalue(&(cb->function.named.ob));
+        put_ref_lwobject(&(cb->function.named.ob), lwobj);
+    }
+} /* callback_change_lwobject() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t
 callback_object (callback_t *cb)
 
 /* Return the object to call from the callback structure <cb>.
@@ -4145,17 +4248,29 @@ callback_object (callback_t *cb)
  */
 
 {
-    object_t *ob;
+    svalue_t ob;
 
     if (cb->is_lambda)
-        ob = !CLOSURE_MALLOCED(cb->function.lambda.x.closure_type)
-             ? cb->function.lambda.u.ob
-             : cb->function.lambda.u.lambda->ob;
+        ob = get_bound_object(cb->function.lambda);
     else
         ob = cb->function.named.ob;
 
-    return check_object(ob);
+    if (ob.type == T_OBJECT && (ob.u.ob->flags & O_DESTRUCTED))
+        return const0;
+    return ob;
 } /* callback_object() */
+
+/*-------------------------------------------------------------------------*/
+bool
+valid_callback_object (callback_t *cb)
+
+/* Return true, if the callback <cb> has still a valid object.
+ * Return false, if it's been destructed.
+ */
+
+{
+    return callback_object(cb).type != T_NUMBER;
+} /* valid_callback_object() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -4203,12 +4318,12 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
  */
 
 {
-    object_t *ob;
+    svalue_t ob;
     int num_arg;
 
     ob = callback_object(cb);
-    if (!ob
-     || (O_PROG_SWAPPED(ob) && load_ob_from_swap(ob) < 0)
+    if (ob.type == T_NUMBER
+     || (ob.type == T_OBJECT && O_PROG_SWAPPED(ob.u.ob) && load_ob_from_swap(ob.u.ob) < 0)
        )
     {
         while (nargs-- > 0)
@@ -4272,7 +4387,7 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
              * we need the program for a proper traceback. We made sure
              * before that the program has been swapped in.
              */
-            current_prog = ob->prog;
+            current_prog = (ob.type == T_OBJECT) ? ob.u.ob->prog : ob.u.lwob->prog;
         }
 
         call_lambda(&(cb->function.lambda), num_arg + nargs);
@@ -4287,7 +4402,9 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
         if (toplevel)
             tracedepth = 0;
 
-        if (!sapply(cb->function.named.name, ob, num_arg + nargs))
+        if (ob.type == T_OBJECT
+         ? !sapply(cb->function.named.name, ob.u.ob, num_arg + nargs)
+         : !sapply_lwob(cb->function.named.name, ob.u.lwob, num_arg + nargs))
             transfer_svalue(&apply_return_value, &const0);
     }
 
@@ -4311,7 +4428,7 @@ count_callback_extra_refs (callback_t *cb)
 
 {
     if (!cb->is_lambda)
-        count_extra_ref_in_object(cb->function.named.ob);
+        count_extra_ref_in_vector(&cb->function.named.ob, 1);
     else
         count_extra_ref_in_vector(&cb->function.lambda, 1);
     if (cb->num_arg == 1)
@@ -4346,10 +4463,10 @@ clear_ref_in_callback (callback_t *cb)
     else
     {
 #ifdef DEBUG
-        if (!callback_object(cb))
+        if (!valid_callback_object(cb))
             fatal("GC run on callback with stale object.\n");
 #endif
-        clear_object_ref(cb->function.named.ob);
+        clear_ref_in_vector(&(cb->function.named.ob), 1);
     }
 } /* clear_ref_in_callback() */
 
@@ -4371,14 +4488,14 @@ count_ref_in_callback (callback_t *cb)
     }
 
 #ifdef DEBUG
-    if (!callback_object(cb))
+    if (!valid_callback_object(cb))
         fatal("GC run on callback with stale object.\n");
 #endif
     if (cb->is_lambda)
         count_ref_in_vector(&(cb->function.lambda), 1);
     else
     {
-        cb->function.named.ob->ref++;
+        count_ref_in_vector(&(cb->function.named.ob), 1);
         count_ref_from_string(cb->function.named.name);
     }
 } /* count_ref_in_callback() */
@@ -4539,6 +4656,8 @@ print_svalue (svalue_t *arg)
         add_message("<BYTES>");
     else if (arg->type == T_OBJECT)
         add_message("OBJ(%s)", get_txt(arg->u.ob->name));
+    else if (arg->type == T_LWOBJECT)
+        add_message("LWOBJ(%s)", get_txt(arg->u.lwob->prog->name));
     else if (arg->type == T_NUMBER)
         add_message("%"PRIdPINT, arg->u.number);
     else if (arg->type == T_FLOAT)
@@ -4554,6 +4673,8 @@ print_svalue (svalue_t *arg)
         add_message("<MAPPING>");
     else if (arg->type == T_CLOSURE)
         add_message("<CLOSURE>");
+    else if (arg->type == T_COROUTINE)
+        add_message("<COROUTINE>");
     else
         add_message("<OTHER:%"PRIdPHINT">", arg->type);
 } /* print_svalue() */
@@ -4564,12 +4685,12 @@ print_svalue (svalue_t *arg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_clone_object (svalue_t * sp)
+v_clone_object (svalue_t *sp, int num_arg)
 
 /* EFUN clone_object()
  *
- *   object clone_object(string name)
- *   object clone_object(object template)
+ *   object clone_object(string name, ...)
+ *   object clone_object(object template, ...)
  *
  * Clone a new object from definition <name>, or alternatively from
  * the object <template>. In both cases, the new object is given an
@@ -4578,28 +4699,29 @@ f_clone_object (svalue_t * sp)
 
 {
     object_t *ob;
+    svalue_t *argp = sp - num_arg + 1;
 
     /* Get the argument and clone the object */
-    if (sp->type == T_STRING)
+    if (argp->type == T_STRING)
     {
-        ob = clone_object(sp->u.str);
+        ob = clone_object(argp->u.str, num_arg - 1);
     }
     else
     {
-        ob = clone_object(sp->u.ob->load_name);
+        ob = clone_object(argp->u.ob->load_name, num_arg - 1);
     }
 
-    assert(inter_sp == sp);
-    free_svalue(sp);
+    assert(inter_sp == argp);
+    free_svalue(argp);
 
     if (ob)
     {
-        put_ref_object(sp, ob, "F_CLONE_OBJECT");
+        put_ref_object(argp, ob, "F_CLONE_OBJECT");
     }
     else
-        put_number(sp, 0);
+        put_number(argp, 0);
 
-    return sp;
+    return argp;
 } /* f_clone_object() */
 
 /*-------------------------------------------------------------------------*/
@@ -4706,7 +4828,8 @@ validate_shadowing (object_t *ob)
     program_t *shadow, *victim;
     svalue_t *ret;
 
-    cob = current_object;
+    assert(current_object.type == T_OBJECT); /* f_shadow() will make sure. */
+    cob = current_object.u.ob;
     shadow = cob->prog;
 
     if (cob->flags & O_DESTRUCTED)
@@ -4809,6 +4932,9 @@ f_shadow (svalue_t *sp)
 {
     object_t *ob;
 
+    if (current_object.type != T_OBJECT)
+        errorf("shadow() without current object.\n");
+
     /* Get the arguments */
     ob = sp->u.ob;
     deref_object(ob, "shadow");
@@ -4835,11 +4961,11 @@ f_shadow (svalue_t *sp)
             shadow_sent = O_GET_SHADOW(ob);
         }
 
-        assert_shadow_sent(current_object);
-        co_shadow_sent = O_GET_SHADOW(current_object);
+        assert_shadow_sent(current_object.u.ob);
+        co_shadow_sent = O_GET_SHADOW(current_object.u.ob);
 
         co_shadow_sent->shadowing = ob;
-        shadow_sent->shadowed_by = current_object;
+        shadow_sent->shadowed_by = current_object.u.ob;
         put_number(sp, 1);
         return sp;
     }
@@ -4865,8 +4991,11 @@ f_unshadow (svalue_t *sp)
     shadow_t *shadow_sent, *shadowing_sent;
     object_t *shadowing, *shadowed_by;
 
-    if (current_object->flags & O_SHADOW
-     && NULL != (shadowing = (shadow_sent = O_GET_SHADOW(current_object))->shadowing) )
+    if (current_object.type != T_OBJECT)
+        errorf("unshadow() without current object.\n");
+
+    if (current_object.u.ob->flags & O_SHADOW
+     && NULL != (shadowing = (shadow_sent = O_GET_SHADOW(current_object.u.ob))->shadowing) )
     {
         shadowing_sent = O_GET_SHADOW(shadowing);
 
@@ -4887,12 +5016,12 @@ f_unshadow (svalue_t *sp)
             check_shadow_sent(shadowing);
         }
 
-        remove_shadow_actions(current_object, shadowing);
+        remove_shadow_actions(current_object.u.ob, shadowing);
 
         shadow_sent->shadowed_by = NULL;
         shadow_sent->shadowing = NULL;
 
-        check_shadow_sent(current_object);
+        check_shadow_sent(current_object.u.ob);
     }
 
     return sp;
@@ -5038,7 +5167,7 @@ f_set_driver_hook (svalue_t *sp)
         {
             driver_hook[n] = *sp;
             driver_hook[n].x.closure_type = CLOSURE_LAMBDA;
-            driver_hook[n].u.lambda->ob = ref_object(master_ob, "hook closure");
+            put_ref_object(&(driver_hook[n].u.lambda->ob), master_ob, "hook closure");
             if (n == H_NOECHO)
             {
                 mudlib_telopts();
@@ -5106,11 +5235,13 @@ f_write (svalue_t *sp)
 {
     object_t *save_command_giver = command_giver;
 
+    /* write() can also be used from a shadow to a living object. */
     if (!command_giver
-     && current_object->flags & O_SHADOW
-     && O_GET_SHADOW(current_object)->shadowing)
+     && current_object.type == T_OBJECT
+     && current_object.u.ob->flags & O_SHADOW
+     && O_GET_SHADOW(current_object.u.ob)->shadowing)
     {
-        command_giver = current_object;
+        command_giver = current_object.u.ob;
     }
 
     if (command_giver)
@@ -5416,7 +5547,7 @@ v_limited (svalue_t * sp, int num_arg)
     put_array(argp+1, vec);
 
     /* If this object is destructed, no extern calls may be done */
-    if (current_object->flags & O_DESTRUCTED
+    if (is_current_object_destructed()
      || !privilege_violation2(STR_LIMITED, argp, argp+1, sp)
         )
     {

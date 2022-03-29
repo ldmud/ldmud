@@ -199,4 +199,5 @@ HISTORY
         LDMud 3.5.0 redesigned the whole efun.
 
 SEE ALSO
-        configure_object(E), interactive_info(E), driver_info(E)
+        configure_object(E), lwobject_info(E), interactive_info(E),
+        driver_info(E)

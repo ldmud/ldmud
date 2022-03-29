@@ -1,11 +1,13 @@
 SYNOPSIS
-        mixed * map_objects(object *arr, string fun, mixed extra, ...)
-        mixed * map_objects(string *arr, string fun, mixed extra, ...)
+        mixed * map_objects(object   *arr, string fun, mixed extra, ...)
+        mixed * map_objects(lwobject *arr, string fun, mixed extra, ...)
+        mixed * map_objects(string   *arr, string fun, mixed extra, ...)
 
 DESCRIPTION
         Similar to map(), but calls arr[n]->fun(extra,...). The returned value
         replaces the object/string in returned array.
-        <arr> may contain a mixture of objects and object names as well.
+        <arr> may contain a mixture of regular and lightweight objects and
+        object names as well.
 
         Any number of extra arguments is allowed, which are all
         passed. 0-entries in arr are ignored.

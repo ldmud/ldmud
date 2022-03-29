@@ -1,6 +1,7 @@
 SYNOPSIS
         void tell_object(object|string ob, string str)
-        void tell_object(object|string ob, mixed *|mapping|struct|object msg)
+        void tell_object(object|string ob,
+                         mixed *|mapping|struct|object|lwobject msg)
 
 DESCRIPTION
         Send a message str to object ob (which is looked up and if necessary

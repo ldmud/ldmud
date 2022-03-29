@@ -2,9 +2,11 @@ SYNOPSIS
         void tell_room(string|object obj, string str)
         void tell_room(string|object obj, string str, object *exclude)
 
-        void tell_room(string|object obj, mixed *|mapping|struct|object msg)
-        void tell_room(string|object obj, mixed *|mapping|struct|object msg,
-                                                     object *exclude)
+        void tell_room(string|object obj,
+                       mixed *|mapping|struct|object|lwobject msg)
+        void tell_room(string|object obj,
+                       mixed *|mapping|struct|object|lwobject msg,
+                       object *exclude)
 
 BESCHREIBUNG
         Gibt einen Text <str> an den Raum <obj> aus. <obj> kann auch der

@@ -18,6 +18,7 @@
 #define OI_NO_CLONE                     -11
 #define OI_NO_SHADOW                    -12
 #define OI_SHARE_VARIABLES              -13
+#define OI_NO_LIGHTWEIGHT               -14
 
 /* Swapping */
 #define OI_SWAPPED                      -20

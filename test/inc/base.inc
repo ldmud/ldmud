@@ -6,6 +6,7 @@ void inaugurate_master (int arg)
 {
     set_driver_hook(H_LOAD_UIDS, unbound_lambda(({}), "uid"));
     set_driver_hook(H_CLONE_UIDS, unbound_lambda(({}), "uid"));
+    set_driver_hook(H_LWOBJECT_UIDS, unbound_lambda(({}), "uid"));
     set_driver_hook(H_NOTIFY_FAIL, "");
 }
 #endif

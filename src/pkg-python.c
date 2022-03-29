@@ -73,11 +73,13 @@ enum python_structmember_type
 #include "actions.h"
 #include "array.h"
 #include "closure.h"
+#include "coroutine.h"
 #include "exec.h"
 #include "gcollect.h"
 #include "instrs.h"
 #include "interpret.h"
 #include "lex.h"
+#include "lwobject.h"
 #include "mapping.h"
 #include "mstrings.h"
 #include "object.h"
@@ -92,6 +94,7 @@ enum python_structmember_type
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-current_object.h"
 
 #if PY_VERSION_HEX >= 0x03070000
 #define USE_PYTHON_CONTEXT
@@ -244,11 +247,14 @@ static const char* visibility_names[] = {
 };
 
 static ldmud_gc_var_t *gc_object_list = NULL,
+                      *gc_lwobject_list = NULL,
+                      *gc_program_list = NULL,
                       *gc_array_list = NULL,
                       *gc_mapping_list = NULL,
                       *gc_mapping_list_list = NULL,
                       *gc_struct_list = NULL,
                       *gc_closure_list = NULL,
+                      *gc_coroutine_list = NULL,
                       *gc_symbol_list = NULL,
                       *gc_quoted_array_list = NULL,
                       *gc_lvalue_list = NULL;
@@ -798,15 +804,29 @@ struct ldmud_object_s
     object_t *lpc_object;       /* Can be NULL. */
 };
 
-struct ldmud_object_and_index_s
+struct ldmud_lwobject_s
 {
-    struct ldmud_object_s ob_base;
+    PyGCObject_HEAD
+
+    lwobject_t *lpc_lwobject;   /* Can be NULL. */
+};
+
+struct ldmud_program_s
+{
+    PyGCObject_HEAD
+    program_t *lpc_program;     /* Cannot be NULL, not refcounted. */
+    svalue_t   lpc_object;      /* T_OBJECT or T_LWOBJECT. */
+};
+
+struct ldmud_program_and_index_s
+{
+    struct ldmud_program_s ob_base;
                                 /* Object can never by NULL. */
 
     unsigned short index;       /* Function or variable index. */
 };
 
-struct ldmud_object_lfun_argument_s
+struct ldmud_program_lfun_argument_s
 {
 
     PyObject_HEAD
@@ -821,6 +841,13 @@ struct ldmud_closure_s
     PyGCObject_HEAD
 
     svalue_t lpc_closure;       /* Can be T_INVALID. */
+};
+
+struct ldmud_coroutine_s
+{
+    PyGCObject_HEAD
+
+    coroutine_t *lpc_coroutine; /* Can be NULL. */
 };
 
 struct ldmud_symbol_s
@@ -848,10 +875,13 @@ typedef struct ldmud_array_s ldmud_array_t;
 typedef struct ldmud_mapping_s ldmud_mapping_t;
 typedef struct ldmud_struct_s ldmud_struct_t;
 typedef struct ldmud_struct_and_index_s ldmud_struct_and_index_t;
+typedef struct ldmud_program_s ldmud_program_t;
 typedef struct ldmud_object_s ldmud_object_t;
+typedef struct ldmud_lwobject_s ldmud_lwobject_t;
 typedef struct ldmud_closure_s ldmud_closure_t;
-typedef struct ldmud_object_and_index_s ldmud_object_and_index_t;
-typedef struct ldmud_object_lfun_argument_s ldmud_object_lfun_argument_t;
+typedef struct ldmud_coroutine_s ldmud_coroutine_t;
+typedef struct ldmud_program_and_index_s ldmud_program_and_index_t;
+typedef struct ldmud_program_lfun_argument_s ldmud_program_lfun_argument_t;
 typedef struct ldmud_symbol_s ldmud_symbol_t;
 typedef struct ldmud_quoted_array_s ldmud_quoted_array_t;
 typedef struct ldmud_lvalue_s ldmud_lvalue_t;
@@ -903,41 +933,165 @@ remove_gc_object (ldmud_gc_var_t** list, ldmud_gc_var_t* var)
 } /* remove_gc_object() */
 
 /*-------------------------------------------------------------------------*/
-/* Objects */
+/* Helper functions for all types */
 
-/*-------------------------------------------------------------------------*/
-static bool
-ldmud_object_check_available (ldmud_object_t* self)
+static PyObject *
+get_class_dir (PyObject* self)
 
-/* Helper function to check whether the object is not NULL
- * and not swapped out. Returns true if so, false otherwise.
- * Sets a Python error if false.
+/* Return a set as a starting point for __dir__ implementations.
  */
 
 {
-    if (!self->lpc_object)
+    PyObject *dict, *cls;
+    PyObject *attrs = NULL;
+
+    /* Get the __dir__ for the class. */
+    cls = PyObject_GetAttrString((PyObject*)self, "__class__");
+    if (cls != NULL)
     {
-        PyErr_Format(PyExc_ValueError, "empty object given");
-        return false;
+        dict = PyObject_Dir(cls);
+        Py_DECREF(cls);
+    }
+    else
+        dict = NULL;
+    if (dict == NULL)
+        PyErr_Clear();
+    else
+    {
+        attrs = PySet_New(dict);
+        if (attrs == NULL)
+            PyErr_Clear();
+        Py_DECREF(dict);
     }
 
-    /* Make the program resident */
-    if (O_PROG_SWAPPED(self->lpc_object))
+    if (attrs == NULL)
     {
-        self->lpc_object->time_of_ref = current_time;
-        if (load_ob_from_swap(self->lpc_object) < 0)
-        {
-            PyErr_Format(PyExc_MemoryError, "out of memory when unswapping object '%s'", get_txt(self->lpc_object->name));
-            return false;
-        }
+        attrs = PySet_New(NULL);
+        if (attrs == NULL)
+            return NULL;
     }
 
-    return true;
-} /* ldmud_object_check_available() */
+    return attrs;
+}
+
+/*-------------------------------------------------------------------------*/
+static string_t *
+find_tabled_python_string (PyObject* name, const char *msg, bool *error)
+
+/* Search a tabled string that matches the given Python string.
+ * Returns NULL on error (error = true) or when not found (error = false).
+ * <msg> denotes the kind of name for error messages.
+ */
+
+{
+    PyObject *utf8;
+    char* namebuf;
+    ssize_t namelength;
+    string_t* result;
+
+    if (!PyUnicode_Check(name))
+    {
+        PyErr_Format(PyExc_TypeError,
+                     "%s must be string, not '%.200s'",
+                     msg, name->ob_type->tp_name);
+        *error = true;
+        return NULL;
+    }
+
+    utf8 = PyUnicode_AsEncodedString(name, "utf-8", "replace");
+    if (utf8 == NULL)
+    {
+        PyErr_Format(PyExc_ValueError, "undecodable %s", msg);
+        *error = true;
+        return NULL;
+    }
+
+    PyBytes_AsStringAndSize(utf8, &namebuf, &namelength);
+    result = find_tabled_str_n(namebuf, namelength, STRING_UTF8);
+    Py_DECREF(utf8);
+
+    *error = false;
+    return result;
+} /* find_tabled_python_string() */
+
+/*-------------------------------------------------------------------------*/
+/* Programs (Regular and Lightweight Objects) */
 
 /*-------------------------------------------------------------------------*/
 static bool
-ldmud_object_register_replace_program_protector (ldmud_object_and_index_t* ref)
+ldmud_program_check_available (ldmud_program_t* self)
+
+/* Helper function to check whether the object is set and not swapped out.
+ * Returns true if so, false otherwise. Sets a Python error if false.
+ */
+
+{
+    switch (self->lpc_object.type)
+    {
+        case T_NUMBER:
+            PyErr_Format(PyExc_ValueError, "empty object given");
+            return false;
+
+        case T_OBJECT:
+            /* Make the program resident */
+            if (O_PROG_SWAPPED(self->lpc_object.u.ob))
+            {
+                self->lpc_object.u.ob->time_of_ref = current_time;
+                if (load_ob_from_swap(self->lpc_object.u.ob) < 0)
+                {
+                    PyErr_Format(PyExc_MemoryError, "out of memory when unswapping object '%s'", get_txt(self->lpc_object.u.ob->name));
+                    return false;
+                }
+            }
+            return true;
+
+        case T_LWOBJECT:
+            return true;
+    }
+
+    PyErr_Format(PyExc_ValueError, "unknown object type");
+    return false;
+} /* ldmud_program_check_available() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_program_bool(ldmud_program_t *self)
+
+/* Return 0 (false) for destructed objects, 1 (true) for normal objects.
+ */
+
+{
+    switch (self->lpc_object.type)
+    {
+        case T_OBJECT:
+            return check_object(self->lpc_object.u.ob) != NULL;
+
+        case T_LWOBJECT:
+            return true;
+
+        case T_NUMBER:
+        default:
+            return false;
+    }
+} /* ldmud_object_bool() */
+
+/*-------------------------------------------------------------------------*/
+static void
+ldmud_program_dealloc (ldmud_program_t* self)
+
+/* Destroy the ldmud_program_t object
+ */
+
+{
+    free_svalue(&(self->lpc_object));
+    remove_gc_object(&gc_program_list, (ldmud_gc_var_t*)self);
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+} /* ldmud_program_dealloc() */
+
+/*-------------------------------------------------------------------------*/
+static bool
+ldmud_program_register_replace_program_protector (ldmud_program_and_index_t* ref)
 
 /* Helper function to check whether the object has replace_program()
  * in progress. If so, adds the object to the protector.
@@ -945,7 +1099,12 @@ ldmud_object_register_replace_program_protector (ldmud_object_and_index_t* ref)
  */
 
 {
-    object_t* ob = ref->ob_base.lpc_object;
+    object_t* ob;
+
+    if (ref->ob_base.lpc_object.type != T_OBJECT)
+        return true;
+
+    ob = ref->ob_base.lpc_object.u.ob;
     if (!ob)
         return true;
 
@@ -980,35 +1139,35 @@ ldmud_object_register_replace_program_protector (ldmud_object_and_index_t* ref)
     ob->flags |= O_LAMBDA_REFERENCED;
 
     return true;
-} /* ldmud_object_register_replace_program_protector() */
+} /* ldmud_program_register_replace_program_protector() */
 
 /*-------------------------------------------------------------------------*/
 static void
-ldmud_object_lfun_argument_dealloc (ldmud_object_lfun_argument_t* self)
+ldmud_program_lfun_argument_dealloc (ldmud_program_lfun_argument_t* self)
 
-/* Destroy the ldmud_object_lfun_argument_t object
+/* Destroy the ldmud_program_lfun_argument_t object
  */
 
 {
     Py_XDECREF(self->type);
     Py_TYPE(self)->tp_free((PyObject*)self);
-} /* ldmud_object_lfun_argument_dealloc() */
+} /* ldmud_program_lfun_argument_dealloc() */
 
 /*-------------------------------------------------------------------------*/
-static PyMemberDef ldmud_object_lfun_argument_members[] = {
-    { "position", PYTHON_SMT_INT,       offsetof(ldmud_object_lfun_argument_t, position), READONLY, "Position of the argument" },
-    { "type",     PYTHON_SMT_OBJECT_EX, offsetof(ldmud_object_lfun_argument_t, type),     READONLY, "Type of the argument"     },
-    { "flags",    PYTHON_SMT_INT,       offsetof(ldmud_object_lfun_argument_t, flags),    READONLY, "Flags of the argument"    },
+static PyMemberDef ldmud_program_lfun_argument_members[] = {
+    { "position", PYTHON_SMT_INT,       offsetof(ldmud_program_lfun_argument_t, position), READONLY, "Position of the argument" },
+    { "type",     PYTHON_SMT_OBJECT_EX, offsetof(ldmud_program_lfun_argument_t, type),     READONLY, "Type of the argument"     },
+    { "flags",    PYTHON_SMT_INT,       offsetof(ldmud_program_lfun_argument_t, flags),    READONLY, "Flags of the argument"    },
     { NULL }
 };
 
-static PyTypeObject ldmud_object_lfun_argument_type =
+static PyTypeObject ldmud_program_lfun_argument_type =
 {
     PyVarObject_HEAD_INIT(NULL, 0)
     "ldmud.LfunArgument",               /* tp_name */
-    sizeof(ldmud_object_lfun_argument_t),  /* tp_basicsize */
+    sizeof(ldmud_program_lfun_argument_t), /* tp_basicsize */
     0,                                  /* tp_itemsize */
-    (destructor)ldmud_object_lfun_argument_dealloc, /* tp_dealloc */
+    (destructor)ldmud_program_lfun_argument_dealloc, /* tp_dealloc */
     0,                                  /* tp_print */
     0,                                  /* tp_getattr */
     0,                                  /* tp_setattr */
@@ -1032,7 +1191,7 @@ static PyTypeObject ldmud_object_lfun_argument_type =
     0,                                  /* tp_iter */
     0,                                  /* tp_iternext */
     0,                                  /* tp_methods */
-    ldmud_object_lfun_argument_members, /* tp_members */
+    ldmud_program_lfun_argument_members,/* tp_members */
     0,                                  /* tp_getset */
     0,                                  /* tp_base */
     0,                                  /* tp_dict */
@@ -1046,7 +1205,7 @@ static PyTypeObject ldmud_object_lfun_argument_type =
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
-ldmud_object_lfun_repr (ldmud_object_and_index_t *val)
+ldmud_program_lfun_repr (ldmud_program_and_index_t *val)
 
 /* Return a string representation of this lfun.
  */
@@ -1054,40 +1213,69 @@ ldmud_object_lfun_repr (ldmud_object_and_index_t *val)
 {
     function_t* fun;
 
-    if (!val->ob_base.lpc_object)
+    if (val->ob_base.lpc_object.type == T_NUMBER)
         return PyUnicode_FromString("<LPC vanished lfun>");
 
-    if (!ldmud_object_check_available(&val->ob_base))
+    if (!ldmud_program_check_available(&val->ob_base))
         return NULL;
 
-    fun = get_function_header(val->ob_base.lpc_object->prog, val->index);
-    return PyUnicode_FromFormat("<LPC lfun /%s->%s()>", get_txt(val->ob_base.lpc_object->name), get_txt(fun->name));
-} /* ldmud_object_lfun_repr() */
+    fun = get_function_header(val->ob_base.lpc_program, val->index);
+
+    if (val->ob_base.lpc_object.type == T_OBJECT)
+        return PyUnicode_FromFormat("<LPC lfun /%s->%s()>", get_txt(val->ob_base.lpc_object.u.ob->name), get_txt(fun->name));
+    else
+        return PyUnicode_FromFormat("<LPC lfun /%s->%s()>", get_txt(val->ob_base.lpc_program->name), get_txt(fun->name));
+} /* ldmud_program_lfun_repr() */
 
 /*-------------------------------------------------------------------------*/
 static Py_hash_t
-ldmud_object_and_index_hash (ldmud_object_and_index_t *val)
+ldmud_program_and_index_hash (ldmud_program_and_index_t *val)
 
 /* Return a hash of the object and index.
  */
 
 {
-    return _Py_HashPointer(val->ob_base.lpc_object) ^ val->index;
-} /* ldmud_object_and_index_hash() */
+    void *ptr;
+    switch (val->ob_base.lpc_object.type)
+    {
+        case T_OBJECT:
+            ptr = (void*)val->ob_base.lpc_object.u.ob;
+            break;
+
+        case T_LWOBJECT:
+            ptr = (void*)val->ob_base.lpc_object.u.lwob;
+            break;
+
+        case T_NUMBER:
+        default:
+            ptr = NULL;
+            break;
+    }
+    return _Py_HashPointer(ptr) ^ val->index;
+} /* ldmud_program_and_index_hash() */
 
 /*-------------------------------------------------------------------------*/
 static void
-ldmud_object_lfun_call_lfun (int num_arg, ldmud_object_and_index_t* lfun)
+ldmud_program_lfun_call_lfun (int num_arg, ldmud_program_and_index_t* lfun)
 
-/* Helper function for ldmud_object_lfun_call().
+/* Helper function for ldmud_program_lfun_call().
  */
 
 {
-    call_function_args(lfun->ob_base.lpc_object, lfun->index, num_arg);
+    switch (lfun->ob_base.lpc_object.type)
+    {
+        case T_OBJECT:
+            call_ob_function_args(lfun->ob_base.lpc_object.u.ob, lfun->index, num_arg);
+            break;
+
+        case T_LWOBJECT:
+            call_lwob_function_args(lfun->ob_base.lpc_object.u.lwob, lfun->index, num_arg);
+            break;
+    }
 }
 
 static PyObject*
-ldmud_object_lfun_call (ldmud_object_and_index_t *lfun, PyObject *arg, PyObject *kw)
+ldmud_program_lfun_call (ldmud_program_and_index_t *lfun, PyObject *arg, PyObject *kw)
 
 /* Call the given lfun.
  */
@@ -1095,16 +1283,16 @@ ldmud_object_lfun_call (ldmud_object_and_index_t *lfun, PyObject *arg, PyObject 
 {
     function_t *fun;
 
-    if(!(python_is_external ? master_ob : current_object))
+    if(python_is_external ? (!master_ob) : (current_object.type == T_NUMBER))
     {
         PyErr_SetString(PyExc_RuntimeError, "can't call an efun without a current object");
         return NULL;
     }
 
-    if (!ldmud_object_check_available(&lfun->ob_base))
+    if (!ldmud_program_check_available(&lfun->ob_base))
         return NULL;
 
-    fun = get_function_header(lfun->ob_base.lpc_object->prog, lfun->index);
+    fun = get_function_header(lfun->ob_base.lpc_program, lfun->index);
     if (kw != NULL && PyDict_Size(kw) != 0)
     {
         PyErr_Format(PyExc_TypeError, "%.200s() takes no keyword arguments",
@@ -1147,7 +1335,7 @@ ldmud_object_lfun_call (ldmud_object_and_index_t *lfun, PyObject *arg, PyObject 
 
         inter_sp = sp;
 
-        if(call_lpc_secure((CClosureFun)ldmud_object_lfun_call_lfun, num_arg, lfun))
+        if(call_lpc_secure((CClosureFun)ldmud_program_lfun_call_lfun, num_arg, lfun))
         {
             result = svalue_to_python(inter_sp);
             pop_stack();
@@ -1160,17 +1348,17 @@ ldmud_object_lfun_call (ldmud_object_and_index_t *lfun, PyObject *arg, PyObject 
 
     return NULL;
 
-} /* ldmud_object_lfun_call() */
+} /* ldmud_program_lfun_call() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
-ldmud_object_and_index_richcompare (ldmud_object_and_index_t *self, PyObject *other, int op)
+ldmud_program_and_index_richcompare (ldmud_program_and_index_t *self, PyObject *other, int op)
 
 /* Compare <self> to <other> with the compare operation <op>.
  */
 
 {
-    object_t *self_ob, *other_ob;
+    svalue_t self_ob, other_ob;
     bool result;
     PyObject* resultval;
 
@@ -1181,75 +1369,118 @@ ldmud_object_and_index_richcompare (ldmud_object_and_index_t *self, PyObject *ot
     }
 
     self_ob = self->ob_base.lpc_object;
-    other_ob = ((ldmud_object_and_index_t*)other)->ob_base.lpc_object;
+    other_ob = ((ldmud_program_and_index_t*)other)->ob_base.lpc_object;
 
-    if(self_ob == NULL && other_ob == NULL)
-        result = op == Py_LE || op == Py_EQ || op == Py_GE;
-    else if(self_ob == NULL)
+    if(self_ob.type < other_ob.type)
         result = op == Py_LT || op == Py_LE || op == Py_NE;
-    else if(other_ob == NULL)
+    else if (self_ob.type > other_ob.type)
         result = op == Py_GT || op == Py_GE || op == Py_NE;
+    else if (self_ob.type == T_NUMBER)
+        result = op == Py_LE || op == Py_EQ || op == Py_GE;
     else
     {
+        string_t *self_name, *other_name;
+        lwobject_t *self_lwob = NULL, *other_lwob = NULL;
+        object_t *self_rob = NULL, *other_rob = NULL;
+
+        if (self_ob.type == T_OBJECT)
+        {
+            self_rob = self_ob.u.ob;
+            other_rob = other_ob.u.ob;
+            self_name = self_rob->name;
+            other_name = other_rob->name;
+        }
+        else
+        {
+            self_lwob = self_ob.u.lwob;
+            other_lwob = other_ob.u.lwob;
+            self_name = self_lwob->prog->name;
+            other_name = other_lwob->prog->name;
+        }
+
         switch (op)
         {
             case Py_LT:
             {
-                int cmp = mstring_compare(self_ob->name, other_ob->name);
+                int cmp = mstring_compare(self_name, other_name);
                 if (cmp != 0)
                 {
                     result = cmp < 0;
                     break;
                 }
 
-                result = (self->index < ((ldmud_object_and_index_t*)other)->index);
+                if (self_lwob != other_lwob)
+                {
+                    result = self_lwob < other_lwob;
+                    break;
+                }
+
+                result = (self->index < ((ldmud_program_and_index_t*)other)->index);
                 break;
             }
 
             case Py_LE:
             {
-                int cmp = mstring_compare(self_ob->name, other_ob->name);
+                int cmp = mstring_compare(self_name, other_name);
                 if (cmp != 0)
                 {
                     result = cmp <= 0;
                     break;
                 }
 
-                result = (self->index <= ((ldmud_object_and_index_t*)other)->index);
+                if (self_lwob != other_lwob)
+                {
+                    result = self_lwob <= other_lwob;
+                    break;
+                }
+
+                result = (self->index <= ((ldmud_program_and_index_t*)other)->index);
                 break;
             }
 
             case Py_EQ:
-                 result = (self_ob == other_ob && self->index == ((ldmud_object_and_index_t*)other)->index);
+                 result = (self_rob == other_rob && self_lwob == other_lwob && self->index == ((ldmud_program_and_index_t*)other)->index);
                  break;
 
             case Py_NE:
-                 result = (self_ob != other_ob || self->index != ((ldmud_object_and_index_t*)other)->index);
+                 result = (self_rob != other_rob || self_lwob != other_lwob || self->index != ((ldmud_program_and_index_t*)other)->index);
                  break;
 
             case Py_GT:
             {
-                int cmp = mstring_compare(self_ob->name, other_ob->name);
+                int cmp = mstring_compare(self_name, other_name);
                 if (cmp != 0)
                 {
                     result = cmp > 0;
                     break;
                 }
 
-                result = (self->index > ((ldmud_object_and_index_t*)other)->index);
+                if (self_lwob != other_lwob)
+                {
+                    result = self_lwob > other_lwob;
+                    break;
+                }
+
+                result = (self->index > ((ldmud_program_and_index_t*)other)->index);
                 break;
             }
 
             case Py_GE:
             {
-                int cmp = mstring_compare(self_ob->name, other_ob->name);
+                int cmp = mstring_compare(self_name, other_name);
                 if (cmp != 0)
                 {
                     result = cmp >= 0;
                     break;
                 }
 
-                result = (self->index >= ((ldmud_object_and_index_t*)other)->index);
+                if (self_lwob != other_lwob)
+                {
+                    result = self_lwob >= other_lwob;
+                    break;
+                }
+
+                result = (self->index >= ((ldmud_program_and_index_t*)other)->index);
                 break;
             }
 
@@ -1264,11 +1495,11 @@ ldmud_object_and_index_richcompare (ldmud_object_and_index_t *self, PyObject *ot
     resultval = result ? Py_True : Py_False;
     Py_INCREF(resultval);
     return resultval;
-} /* ldmud_object_and_index_richcompare() */
+} /* ldmud_program_and_index_richcompare() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_lfun_get_name (ldmud_object_and_index_t *lfun, void *closure)
+ldmud_program_lfun_get_name (ldmud_program_and_index_t *lfun, void *closure)
 
 /* Return the name for the lfun.
  */
@@ -1276,16 +1507,16 @@ ldmud_object_lfun_get_name (ldmud_object_and_index_t *lfun, void *closure)
 {
     function_t* fun;
 
-    if (!ldmud_object_check_available(&lfun->ob_base))
+    if (!ldmud_program_check_available(&lfun->ob_base))
         return NULL;
 
-    fun = get_function_header(lfun->ob_base.lpc_object->prog, lfun->index);
+    fun = get_function_header(lfun->ob_base.lpc_program, lfun->index);
     return PyUnicode_FromStringAndSize(get_txt(fun->name), mstrsize(fun->name));
-} /* ldmud_object_lfun_get_name() */
+} /* ldmud_program_lfun_get_name() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_lfun_get_file_name (ldmud_object_and_index_t *lfun, void *closure)
+ldmud_program_lfun_get_file_name (ldmud_program_and_index_t *lfun, void *closure)
 
 /* Return the file name for the lfun.
  */
@@ -1297,10 +1528,10 @@ ldmud_object_lfun_get_file_name (ldmud_object_and_index_t *lfun, void *closure)
     string_t *name;
     PyObject* result;
 
-    if (!ldmud_object_check_available(&lfun->ob_base))
+    if (!ldmud_program_check_available(&lfun->ob_base))
         return NULL;
 
-    get_function_header_extended(lfun->ob_base.lpc_object->prog, lfun->index, (const program_t**) &progp, &fx);
+    get_function_header_extended(lfun->ob_base.lpc_program, lfun->index, (const program_t**) &progp, &fx);
     funstart = progp->program + (progp->functions[fx] & FUNSTART_MASK);
     if (is_undef_function(funstart))
     {
@@ -1319,11 +1550,11 @@ ldmud_object_lfun_get_file_name (ldmud_object_and_index_t *lfun, void *closure)
     result = PyUnicode_FromFormat("/%s", get_txt(name));
     free_mstring(name);
     return result;
-} /* ldmud_object_lfun_get_file_name() */
+} /* ldmud_program_lfun_get_file_name() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_lfun_get_line_number (ldmud_object_and_index_t *lfun, void *closure)
+ldmud_program_lfun_get_line_number (ldmud_program_and_index_t *lfun, void *closure)
 
 /* Return the starting line number for the lfun.
  */
@@ -1334,10 +1565,10 @@ ldmud_object_lfun_get_line_number (ldmud_object_and_index_t *lfun, void *closure
     bytecode_p funstart;
     string_t *name;
 
-    if (!ldmud_object_check_available(&lfun->ob_base))
+    if (!ldmud_program_check_available(&lfun->ob_base))
         return NULL;
 
-    get_function_header_extended(lfun->ob_base.lpc_object->prog, lfun->index, (const program_t**) &progp, &fx);
+    get_function_header_extended(lfun->ob_base.lpc_program, lfun->index, (const program_t**) &progp, &fx);
     funstart = progp->program + (progp->functions[fx] & FUNSTART_MASK);
     if (is_undef_function(funstart))
     {
@@ -1355,11 +1586,11 @@ ldmud_object_lfun_get_line_number (ldmud_object_and_index_t *lfun, void *closure
     }
 
     return PyLong_FromLong(pos);
-} /* ldmud_object_lfun_get_line_number() */
+} /* ldmud_program_lfun_get_line_number() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_lfun_get_arguments (ldmud_object_and_index_t *lfun, void *closure)
+ldmud_program_lfun_get_arguments (ldmud_program_and_index_t *lfun, void *closure)
 
 /* Return the argument list for the lfun.
  */
@@ -1370,17 +1601,17 @@ ldmud_object_lfun_get_arguments (ldmud_object_and_index_t *lfun, void *closure)
     int fx;
     PyObject* result;
 
-    if (!ldmud_object_check_available(&lfun->ob_base))
+    if (!ldmud_program_check_available(&lfun->ob_base))
         return NULL;
 
-    fun = get_function_header_extended(lfun->ob_base.lpc_object->prog, lfun->index, &progp, &fx);
+    fun = get_function_header_extended(lfun->ob_base.lpc_program, lfun->index, &progp, &fx);
     result = PyList_New(fun->num_arg);
     if (result == NULL)
         return result;
 
     for (int i = 0; i < fun->num_arg; i++)
     {
-        ldmud_object_lfun_argument_t* arg = (ldmud_object_lfun_argument_t*)ldmud_object_lfun_argument_type.tp_alloc(&ldmud_object_lfun_argument_type, 0);
+        ldmud_program_lfun_argument_t* arg = (ldmud_program_lfun_argument_t*)ldmud_program_lfun_argument_type.tp_alloc(&ldmud_program_lfun_argument_type, 0);
         if (arg == NULL)
         {
             Py_DECREF(result);
@@ -1399,11 +1630,11 @@ ldmud_object_lfun_get_arguments (ldmud_object_and_index_t *lfun, void *closure)
 
     return result;
 
-} /* ldmud_object_lfun_get_arguments() */
+} /* ldmud_program_lfun_get_arguments() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_lfun_get_return_type (ldmud_object_and_index_t *lfun, void *closure)
+ldmud_program_lfun_get_return_type (ldmud_program_and_index_t *lfun, void *closure)
 
 /* Return the return type for the lfun.
  */
@@ -1412,10 +1643,10 @@ ldmud_object_lfun_get_return_type (ldmud_object_and_index_t *lfun, void *closure
     function_t *fun;
     PyObject* result;
 
-    if (!ldmud_object_check_available(&lfun->ob_base))
+    if (!ldmud_program_check_available(&lfun->ob_base))
         return NULL;
 
-    fun = get_function_header(lfun->ob_base.lpc_object->prog, lfun->index);
+    fun = get_function_header(lfun->ob_base.lpc_program, lfun->index);
     result = lpctype_to_pythontype(fun->type);
     if (!result)
         PyErr_Format(PyExc_AttributeError, "Function '%s' has no type information or mixed return type", fun->name);
@@ -1426,7 +1657,7 @@ ldmud_object_lfun_get_return_type (ldmud_object_and_index_t *lfun, void *closure
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_lfun_get_flags (ldmud_object_and_index_t *lfun, void *closure)
+ldmud_program_lfun_get_flags (ldmud_program_and_index_t *lfun, void *closure)
 
 /* Return the flags for the lfun.
  */
@@ -1434,10 +1665,10 @@ ldmud_object_lfun_get_flags (ldmud_object_and_index_t *lfun, void *closure)
 {
     funflag_t flags;
 
-    if (!ldmud_object_check_available(&lfun->ob_base))
+    if (!ldmud_program_check_available(&lfun->ob_base))
         return NULL;
 
-    flags = lfun->ob_base.lpc_object->prog->functions[lfun->index];
+    flags = lfun->ob_base.lpc_program->functions[lfun->index];
 
     return PyLong_FromLong(
           ((flags & TYPE_MOD_STATIC)     ? LFUN_FLAG_STATIC     : 0)
@@ -1446,11 +1677,11 @@ ldmud_object_lfun_get_flags (ldmud_object_and_index_t *lfun, void *closure)
         | ((flags & TYPE_MOD_VIRTUAL)    ? LFUN_FLAG_VIRTUAL    : 0)
         | ((flags & TYPE_MOD_DEPRECATED) ? LFUN_FLAG_DEPRECATED : 0));
 
-} /* ldmud_object_lfun_get_flags() */
+} /* ldmud_program_lfun_get_flags() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_lfun_get_visibility (ldmud_object_and_index_t *lfun, void *closure)
+ldmud_program_lfun_get_visibility (ldmud_program_and_index_t *lfun, void *closure)
 
 /* Return the visibility for the lfun.
  */
@@ -1458,23 +1689,20 @@ ldmud_object_lfun_get_visibility (ldmud_object_and_index_t *lfun, void *closure)
 {
     funflag_t flags;
 
-    if (!ldmud_object_check_available(&lfun->ob_base))
+    if (!ldmud_program_check_available(&lfun->ob_base))
         return NULL;
 
-    flags = lfun->ob_base.lpc_object->prog->functions[lfun->index];
+    flags = lfun->ob_base.lpc_program->functions[lfun->index];
 
     return PyLong_FromLong(
         (flags & TYPE_MOD_PRIVATE)   ? VISIBILITY_PRIVATE :
         (flags & TYPE_MOD_PROTECTED) ? VISIBILITY_PROTECTED :
         (flags & TYPE_MOD_PUBLIC)    ? VISIBILITY_PUBLIC :
                                        VISIBILITY_VISIBLE);
-} /* ldmud_object_lfun_get_visibility() */
+} /* ldmud_program_lfun_get_visibility() */
 
 /*-------------------------------------------------------------------------*/
-static void ldmud_object_dealloc(ldmud_object_t* self);
-static int ldmud_object_bool(ldmud_object_t *val);
-
-static PyNumberMethods ldmud_object_lfun_as_number =
+static PyNumberMethods ldmud_program_lfun_as_number =
 {
     0,                                  /* nb_add */
     0,                                  /* nb_subtract */
@@ -1485,37 +1713,37 @@ static PyNumberMethods ldmud_object_lfun_as_number =
     0,                                  /* nb_negative */
     0,                                  /* nb_positive */
     0,                                  /* nb_absolute */
-    (inquiry)ldmud_object_bool,         /* nb_bool */
+    (inquiry)ldmud_program_bool,        /* nb_bool */
 };
 
-static PyGetSetDef ldmud_object_lfun_getset [] = {
-    {"name",        (getter)ldmud_object_lfun_get_name,        NULL, NULL},
-    {"file_name",   (getter)ldmud_object_lfun_get_file_name,   NULL, NULL},
-    {"line_number", (getter)ldmud_object_lfun_get_line_number, NULL, NULL},
-    {"arguments",   (getter)ldmud_object_lfun_get_arguments,   NULL, NULL},
-    {"return_type", (getter)ldmud_object_lfun_get_return_type, NULL, NULL},
-    {"flags",       (getter)ldmud_object_lfun_get_flags,       NULL, NULL},
-    {"visibility",  (getter)ldmud_object_lfun_get_visibility,  NULL, NULL},
+static PyGetSetDef ldmud_program_lfun_getset [] = {
+    {"name",        (getter)ldmud_program_lfun_get_name,        NULL, NULL},
+    {"file_name",   (getter)ldmud_program_lfun_get_file_name,   NULL, NULL},
+    {"line_number", (getter)ldmud_program_lfun_get_line_number, NULL, NULL},
+    {"arguments",   (getter)ldmud_program_lfun_get_arguments,   NULL, NULL},
+    {"return_type", (getter)ldmud_program_lfun_get_return_type, NULL, NULL},
+    {"flags",       (getter)ldmud_program_lfun_get_flags,       NULL, NULL},
+    {"visibility",  (getter)ldmud_program_lfun_get_visibility,  NULL, NULL},
     {NULL}
 };
 
-static PyTypeObject ldmud_object_lfun_type =
+static PyTypeObject ldmud_program_lfun_type =
 {
     PyVarObject_HEAD_INIT(NULL, 0)
     "ldmud.Lfun",                       /* tp_name */
-    sizeof(ldmud_object_and_index_t),   /* tp_basicsize */
+    sizeof(ldmud_program_and_index_t),  /* tp_basicsize */
     0,                                  /* tp_itemsize */
-    (destructor)ldmud_object_dealloc,   /* tp_dealloc */
+    (destructor)ldmud_program_dealloc,  /* tp_dealloc */
     0,                                  /* tp_print */
     0,                                  /* tp_getattr */
     0,                                  /* tp_setattr */
     0,                                  /* tp_reserved */
-    (reprfunc)ldmud_object_lfun_repr,   /* tp_repr */
-    &ldmud_object_lfun_as_number,       /* tp_as_number */
+    (reprfunc)ldmud_program_lfun_repr,  /* tp_repr */
+    &ldmud_program_lfun_as_number,      /* tp_as_number */
     0,                                  /* tp_as_sequence */
     0,                                  /* tp_as_mapping */
-    (hashfunc)ldmud_object_and_index_hash, /* tp_hash  */
-    (ternaryfunc)ldmud_object_lfun_call,/* tp_call */
+    (hashfunc)ldmud_program_and_index_hash, /* tp_hash  */
+    (ternaryfunc)ldmud_program_lfun_call,   /* tp_call */
     0,                                  /* tp_str */
     0,                                  /* tp_getattro */
     0,                                  /* tp_setattro */
@@ -1524,13 +1752,13 @@ static PyTypeObject ldmud_object_lfun_type =
     "LPC lfun",                         /* tp_doc */
     0,                                  /* tp_traverse */
     0,                                  /* tp_clear */
-    (richcmpfunc)ldmud_object_and_index_richcompare, /* tp_richcompare */
+    (richcmpfunc)ldmud_program_and_index_richcompare, /* tp_richcompare */
     0,                                  /* tp_weaklistoffset */
     0,                                  /* tp_iter */
     0,                                  /* tp_iternext */
     0,                                  /* tp_methods */
     0,                                  /* tp_members */
-    ldmud_object_lfun_getset,           /* tp_getset */
+    ldmud_program_lfun_getset,          /* tp_getset */
     0,                                  /* tp_base */
     0,                                  /* tp_dict */
     0,                                  /* tp_descr_get */
@@ -1543,28 +1771,36 @@ static PyTypeObject ldmud_object_lfun_type =
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
-ldmud_object_functions_repr (ldmud_object_t *val)
+ldmud_program_functions_repr (ldmud_program_t *val)
 
 /* Return a string representation of this object.
  */
 
 {
-    if(!val->lpc_object)
-        return PyUnicode_FromString("<LPC empty function list>");
-    return PyUnicode_FromFormat("<LPC functions of /%s>", get_txt(val->lpc_object->name));
-} /* ldmud_object_functions_repr() */
+    switch (val->lpc_object.type)
+    {
+        case T_OBJECT:
+            return PyUnicode_FromFormat("<LPC functions of /%s>", get_txt(val->lpc_object.u.ob->name));
+
+        case T_LWOBJECT:
+            return PyUnicode_FromFormat("<LPC functions of /%s>", get_txt(val->lpc_object.u.lwob->prog->name));
+
+        case T_NUMBER:
+        default:
+            return PyUnicode_FromString("<LPC empty function list>");
+    }
+} /* ldmud_program_functions_repr() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
-ldmud_object_functions_getattro (ldmud_object_t *val, PyObject *name)
+ldmud_program_functions_getattro (ldmud_program_t *val, PyObject *name)
 
 /* Return a function of the function list.
  */
 
 {
-    PyObject *result, *utf8;
-    char* namebuf;
-    ssize_t namelength;
+    PyObject *result;
+    bool error;
     string_t* funname;
 
     /* First check real attributes... */
@@ -1572,51 +1808,37 @@ ldmud_object_functions_getattro (ldmud_object_t *val, PyObject *name)
     if (result || !PyErr_ExceptionMatches(PyExc_AttributeError))
         return result;
 
-    if (!val->lpc_object)
+    if (!val->lpc_program)
         return NULL;
 
     PyErr_Clear();
 
     /* And now search for a function. */
-    if (!PyUnicode_Check(name))
-    {
-        PyErr_Format(PyExc_TypeError,
-                     "attribute name must be string, not '%.200s'",
-                     name->ob_type->tp_name);
+    funname = find_tabled_python_string(name, "function name", &error);
+    if (error)
         return NULL;
-    }
 
-    utf8 = PyUnicode_AsEncodedString(name, "utf-8", "replace");
-    if (utf8 == NULL)
-    {
-        PyErr_SetString(PyExc_ValueError, "undecodable function name");
+    if (!ldmud_program_check_available(val))
         return NULL;
-    }
-
-    PyBytes_AsStringAndSize(utf8, &namebuf, &namelength);
-
-    if (!ldmud_object_check_available(val))
-    {
-        Py_DECREF(utf8);
-        return NULL;
-    }
-
-    funname = find_tabled_str_n(namebuf, namelength, STRING_UTF8);
-    Py_DECREF(utf8);
 
     if (funname)
     {
-        long ix = find_function(funname, val->lpc_object->prog);
+        long ix = find_function(funname, val->lpc_program);
         if (ix >= 0)
         {
-            ldmud_object_and_index_t* lfun = (ldmud_object_and_index_t*)ldmud_object_lfun_type.tp_alloc(&ldmud_object_lfun_type, 0);
+            ldmud_program_and_index_t* lfun = (ldmud_program_and_index_t*)ldmud_program_lfun_type.tp_alloc(&ldmud_program_lfun_type, 0);
             if (lfun == NULL)
                 return NULL;
 
-            lfun->ob_base.lpc_object = ref_object(val->lpc_object, "ldmud_object_functions_getattro");
+            lfun->ob_base.lpc_program = val->lpc_program;
+            lfun->ob_base.lpc_object = val->lpc_object;
+            if (val->lpc_object.type == T_OBJECT)
+                ref_object(val->lpc_object.u.ob, "ldmud_object_functions_getattro");
+            else
+                ref_lwobject(val->lpc_object.u.lwob);
             lfun->index = ix;
-            add_gc_object(&gc_object_list, (ldmud_gc_var_t*)lfun);
-            if (!ldmud_object_register_replace_program_protector(lfun))
+            add_gc_object(&gc_program_list, (ldmud_gc_var_t*)lfun);
+            if (!ldmud_program_register_replace_program_protector(lfun))
             {
                 Py_DECREF(lfun);
                 return NULL;
@@ -1627,57 +1849,33 @@ ldmud_object_functions_getattro (ldmud_object_t *val, PyObject *name)
 
     PyErr_Format(PyExc_AttributeError, "Function '%U' does not exist", name);
     return NULL;
-} /* ldmud_object_functions_getattro() */
+} /* ldmud_program_functions_getattro() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_functions_dir (ldmud_object_t *self)
+ldmud_program_functions_dir (ldmud_program_t *self)
 
 /* Returns a list of all attributes, this includes all function names.
  */
 
 {
-    PyObject *dict, *cls, *result;
-    PyObject *attrs = NULL;
-
-    /* First add the regular dictionaries. */
-    cls = PyObject_GetAttrString((PyObject*)self, "__class__");
-    if (cls != NULL)
-    {
-        dict = PyObject_Dir(cls);
-        Py_DECREF(cls);
-    }
-    else
-        dict = NULL;
-    if (dict == NULL)
-        PyErr_Clear();
-    else
-    {
-        attrs = PySet_New(dict);
-        if (attrs == NULL)
-            PyErr_Clear();
-        Py_DECREF(dict);
-    }
+    PyObject *result;
+    PyObject *attrs = get_class_dir((PyObject*)self);
 
     if (attrs == NULL)
-    {
-        attrs = PySet_New(NULL);
-        if (attrs == NULL)
-            return NULL;
-    }
+        return NULL;
 
     /* Now add all the functions. */
-    if (self->lpc_object)
+    if (self->lpc_program)
     {
-        program_t *progp;
+        program_t *progp = self->lpc_program;
 
-        if (!ldmud_object_check_available(self))
+        if (!ldmud_program_check_available(self))
         {
             Py_DECREF(attrs);
             return NULL;
         }
 
-        progp = self->lpc_object->prog;
         for (int idx = 0; idx < progp->num_function_names; idx++)
         {
             string_t *fun = get_function_header(progp, progp->function_names[idx])->name;
@@ -1699,11 +1897,11 @@ ldmud_object_functions_dir (ldmud_object_t *self)
     result = PySequence_List(attrs);
     Py_DECREF(attrs);
     return result;
-} /* ldmud_object_functions_dir() */
+} /* ldmud_program_functions_dir() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_functions_dict (ldmud_object_t *self, void *closure)
+ldmud_program_functions_dict (ldmud_program_t *self, void *closure)
 
 /* Returns a list of all lfuns.
  */
@@ -1713,23 +1911,22 @@ ldmud_object_functions_dict (ldmud_object_t *self, void *closure)
     if (!dict)
         return NULL;
 
-    if (self->lpc_object)
+    if (self->lpc_program)
     {
-        program_t *progp;
+        program_t *progp = self->lpc_program;
 
-        if (!ldmud_object_check_available(self))
+        if (!ldmud_program_check_available(self))
         {
             Py_DECREF(dict);
             return NULL;
         }
 
-        progp = self->lpc_object->prog;
         for (int idx = 0; idx < progp->num_function_names; idx++)
         {
             int fx = progp->function_names[idx];
             string_t *fun = get_function_header(progp, fx)->name;
             PyObject *funname = PyUnicode_FromStringAndSize(get_txt(fun), mstrsize(fun));
-            ldmud_object_and_index_t* lfun;
+            ldmud_program_and_index_t* lfun;
 
             if (funname == NULL)
             {
@@ -1737,7 +1934,7 @@ ldmud_object_functions_dict (ldmud_object_t *self, void *closure)
                 continue;
             }
 
-            lfun = (ldmud_object_and_index_t*)ldmud_object_lfun_type.tp_alloc(&ldmud_object_lfun_type, 0);
+            lfun = (ldmud_program_and_index_t*)ldmud_program_lfun_type.tp_alloc(&ldmud_program_lfun_type, 0);
             if (lfun == NULL)
             {
                 PyErr_Clear();
@@ -1745,10 +1942,15 @@ ldmud_object_functions_dict (ldmud_object_t *self, void *closure)
                 continue;
             }
 
-            lfun->ob_base.lpc_object = ref_object(self->lpc_object, "ldmud_object_functions_dict");
+            lfun->ob_base.lpc_program = self->lpc_program;
+            lfun->ob_base.lpc_object = self->lpc_object;
+            if (self->lpc_object.type == T_OBJECT)
+                ref_object(self->lpc_object.u.ob, "ldmud_object_functions_dict");
+            else
+                ref_lwobject(self->lpc_object.u.lwob);
             lfun->index = fx;
-            add_gc_object(&gc_object_list, (ldmud_gc_var_t*)lfun);
-            if (!ldmud_object_register_replace_program_protector(lfun))
+            add_gc_object(&gc_program_list, (ldmud_gc_var_t*)lfun);
+            if (!ldmud_program_register_replace_program_protector(lfun))
             {
                 PyErr_Clear();
                 Py_DECREF(funname);
@@ -1766,14 +1968,14 @@ ldmud_object_functions_dict (ldmud_object_t *self, void *closure)
     result = PyDictProxy_New(dict);
     Py_DECREF(dict);
     return result;
-} /* ldmud_object_functions_dict() */
+} /* ldmud_program_functions_dict() */
 
 /*-------------------------------------------------------------------------*/
-static PyMethodDef ldmud_object_functions_methods[] =
+static PyMethodDef ldmud_program_functions_methods[] =
 {
     {
         "__dir__",
-        (PyCFunction)ldmud_object_functions_dir, METH_NOARGS,
+        (PyCFunction)ldmud_program_functions_dir, METH_NOARGS,
         "__dir__() -> List\n\n"
         "Returns a list of all attributes."
     },
@@ -1781,30 +1983,30 @@ static PyMethodDef ldmud_object_functions_methods[] =
     {NULL}
 };
 
-static PyGetSetDef ldmud_object_functions_getset [] = {
-    {"__dict__", (getter)ldmud_object_functions_dict, NULL, NULL},
+static PyGetSetDef ldmud_program_functions_getset [] = {
+    {"__dict__", (getter)ldmud_program_functions_dict, NULL, NULL},
     {NULL}
 };
 
-static PyTypeObject ldmud_object_functions_type =
+static PyTypeObject ldmud_program_functions_type =
 {
     PyVarObject_HEAD_INIT(NULL, 0)
     "ldmud.Functions",                  /* tp_name */
-    sizeof(ldmud_object_t),             /* tp_basicsize */
+    sizeof(ldmud_program_t),            /* tp_basicsize */
     0,                                  /* tp_itemsize */
-    (destructor)ldmud_object_dealloc,   /* tp_dealloc */
+    (destructor)ldmud_program_dealloc,  /* tp_dealloc */
     0,                                  /* tp_print */
     0,                                  /* tp_getattr */
     0,                                  /* tp_setattr */
     0,                                  /* tp_reserved */
-    (reprfunc)ldmud_object_functions_repr, /* tp_repr */
+    (reprfunc)ldmud_program_functions_repr, /* tp_repr */
     0,                                  /* tp_as_number */
     0,                                  /* tp_as_sequence */
     0,                                  /* tp_as_mapping */
     0,                                  /* tp_hash  */
     0,                                  /* tp_call */
     0,                                  /* tp_str */
-    (getattrofunc)ldmud_object_functions_getattro, /* tp_getattro */
+    (getattrofunc)ldmud_program_functions_getattro, /* tp_getattro */
     0,                                  /* tp_setattro */
     0,                                  /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,                 /* tp_flags */
@@ -1815,34 +2017,38 @@ static PyTypeObject ldmud_object_functions_type =
     0,                                  /* tp_weaklistoffset */
     0,                                  /* tp_iter */
     0,                                  /* tp_iternext */
-    ldmud_object_functions_methods,     /* tp_methods */
+    ldmud_program_functions_methods,    /* tp_methods */
     0,                                  /* tp_members */
-    ldmud_object_functions_getset,      /* tp_getset */
+    ldmud_program_functions_getset,     /* tp_getset */
 };
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
-ldmud_object_variable_repr (ldmud_object_and_index_t *val)
+ldmud_program_variable_repr (ldmud_program_and_index_t *val)
 
 /* Return a string representation of this variable.
  */
 
 {
-    variable_t* var;
+    variable_t *var;
 
-    if(!val->ob_base.lpc_object)
+    if (val->ob_base.lpc_object.type == T_NUMBER)
         return PyUnicode_FromString("<LPC vanished variable>");
 
-    if (!ldmud_object_check_available(&val->ob_base))
+    if (!ldmud_program_check_available(&val->ob_base))
         return NULL;
 
-    var = val->ob_base.lpc_object->prog->variables + val->index;
-    return PyUnicode_FromFormat("<LPC variable /%s->%s>", get_txt(val->ob_base.lpc_object->name), get_txt(var->name));
-} /* ldmud_object_variable_repr() */
+    var = val->ob_base.lpc_program->variables + val->index;
+    if (val->ob_base.lpc_object.type == T_OBJECT)
+        return PyUnicode_FromFormat("<LPC variable /%s->%s>", get_txt(val->ob_base.lpc_object.u.ob->name), get_txt(var->name));
+    else
+        return PyUnicode_FromFormat("<LPC variable /%s->%s>", get_txt(val->ob_base.lpc_object.u.lwob->prog->name), get_txt(var->name));
+
+} /* ldmud_program_variable_repr() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_variable_get_name (ldmud_object_and_index_t *varob, void *closure)
+ldmud_program_variable_get_name (ldmud_program_and_index_t *varob, void *closure)
 
 /* Return the name for the variable.
  */
@@ -1850,30 +2056,42 @@ ldmud_object_variable_get_name (ldmud_object_and_index_t *varob, void *closure)
 {
     variable_t* var;
 
-    if (!ldmud_object_check_available(&varob->ob_base))
+    if (!ldmud_program_check_available(&varob->ob_base))
         return NULL;
 
-    var = varob->ob_base.lpc_object->prog->variables + varob->index;
+    var = varob->ob_base.lpc_program->variables + varob->index;
     return PyUnicode_FromStringAndSize(get_txt(var->name), mstrsize(var->name));
-} /* ldmud_object_variable_get_name() */
+} /* ldmud_program_variable_get_name() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_variable_get_value (ldmud_object_and_index_t *varob, void *closure)
+ldmud_program_variable_get_value (ldmud_program_and_index_t *varob, void *closure)
 
 /* Return the value of the variable.
  */
 
 {
-    if (!ldmud_object_check_available(&varob->ob_base))
+    if (!ldmud_program_check_available(&varob->ob_base))
         return NULL;
 
-    return rvalue_to_python(varob->ob_base.lpc_object->variables + varob->index);
-} /* ldmud_object_variable_get_value() */
+    if (varob->ob_base.lpc_object.type == T_OBJECT)
+    {
+        if (O_VAR_SWAPPED(varob->ob_base.lpc_object.u.ob)
+         && load_ob_from_swap(varob->ob_base.lpc_object.u.ob) < 0)
+        {
+            PyErr_Format(PyExc_MemoryError, "out of memory when unswapping object '%s'", get_txt(varob->ob_base.lpc_object.u.ob->name));
+            return false;
+        }
+
+        return rvalue_to_python(varob->ob_base.lpc_object.u.ob->variables + varob->index);
+    }
+    else
+        return rvalue_to_python(varob->ob_base.lpc_object.u.lwob->variables + varob->index);
+} /* ldmud_program_variable_get_value() */
 
 /*-------------------------------------------------------------------------*/
 static int
-ldmud_object_variable_set_value (ldmud_object_and_index_t *varob, PyObject *newval, void *closure)
+ldmud_program_variable_set_value (ldmud_program_and_index_t *varob, PyObject *newval, void *closure)
 
 /* Sets the value for the variable.
  * Returns 0 on success, -1 on failure.
@@ -1884,7 +2102,7 @@ ldmud_object_variable_set_value (ldmud_object_and_index_t *varob, PyObject *newv
     program_t* prog;
     svalue_t lpcval;
 
-    if (!ldmud_object_check_available(&varob->ob_base))
+    if (!ldmud_program_check_available(&varob->ob_base))
         return -1;
 
     if (newval == NULL)
@@ -1897,10 +2115,10 @@ ldmud_object_variable_set_value (ldmud_object_and_index_t *varob, PyObject *newv
         return -1;
     }
 
-    prog = varob->ob_base.lpc_object->prog;
+    prog = varob->ob_base.lpc_program;
     if (prog->flags & P_RTT_CHECKS)
     {
-        variable_t* var = varob->ob_base.lpc_object->prog->variables + varob->index;
+        variable_t* var = varob->ob_base.lpc_program->variables + varob->index;
         lpctype_t *type = var->type.t_type;
 
         if (!check_rtt_compatibility(type, &lpcval))
@@ -1919,14 +2137,26 @@ ldmud_object_variable_set_value (ldmud_object_and_index_t *varob, PyObject *newv
         }
     }
 
-    transfer_svalue(varob->ob_base.lpc_object->variables + varob->index, &lpcval);
+    if (varob->ob_base.lpc_object.type == T_OBJECT)
+    {
+        if (O_VAR_SWAPPED(varob->ob_base.lpc_object.u.ob)
+         && load_ob_from_swap(varob->ob_base.lpc_object.u.ob) < 0)
+        {
+            PyErr_Format(PyExc_MemoryError, "out of memory when unswapping object '%s'", get_txt(varob->ob_base.lpc_object.u.ob->name));
+            return false;
+        }
+
+        transfer_svalue(varob->ob_base.lpc_object.u.ob->variables + varob->index, &lpcval);
+    }
+    else
+        transfer_svalue(varob->ob_base.lpc_object.u.lwob->variables + varob->index, &lpcval);
 
     return 0;
-} /* ldmud_object_variable_set_value() */
+} /* ldmud_program_variable_set_value() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_variable_get_type (ldmud_object_and_index_t *varob, void *closure)
+ldmud_program_variable_get_type (ldmud_program_and_index_t *varob, void *closure)
 
 /* Return the type for the variable.
  */
@@ -1935,21 +2165,21 @@ ldmud_object_variable_get_type (ldmud_object_and_index_t *varob, void *closure)
     variable_t* var;
     PyObject* result;
 
-    if (!ldmud_object_check_available(&varob->ob_base))
+    if (!ldmud_program_check_available(&varob->ob_base))
         return NULL;
 
-    var = varob->ob_base.lpc_object->prog->variables + varob->index;
+    var = varob->ob_base.lpc_program->variables + varob->index;
     result = lpctype_to_pythontype(var->type.t_type);
     if (!result)
         PyErr_Format(PyExc_AttributeError, "Variable '%s' has no type information or mixed type", var->name);
 
     return result;
 
-} /* ldmud_object_variable_get_type() */
+} /* ldmud_program_variable_get_type() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_variable_get_flags (ldmud_object_and_index_t *varob, void *closure)
+ldmud_program_variable_get_flags (ldmud_program_and_index_t *varob, void *closure)
 
 /* Return the flags for the variable.
  */
@@ -1957,10 +2187,10 @@ ldmud_object_variable_get_flags (ldmud_object_and_index_t *varob, void *closure)
 {
     typeflags_t flags;
 
-    if (!ldmud_object_check_available(&varob->ob_base))
+    if (!ldmud_program_check_available(&varob->ob_base))
         return NULL;
 
-    flags = varob->ob_base.lpc_object->prog->variables[varob->index].type.t_flags;
+    flags = varob->ob_base.lpc_program->variables[varob->index].type.t_flags;
 
     return PyLong_FromLong(
           ((flags & TYPE_MOD_STATIC)     ? VARIABLE_FLAG_NOSAVE     : 0)
@@ -1968,11 +2198,11 @@ ldmud_object_variable_get_flags (ldmud_object_and_index_t *varob, void *closure)
         | ((flags & TYPE_MOD_VIRTUAL)    ? VARIABLE_FLAG_VIRTUAL    : 0)
         | ((flags & TYPE_MOD_DEPRECATED) ? VARIABLE_FLAG_DEPRECATED : 0));
 
-} /* ldmud_object_variable_get_flags() */
+} /* ldmud_program_variable_get_flags() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_variable_get_visibility (ldmud_object_and_index_t *varob, void *closure)
+ldmud_program_variable_get_visibility (ldmud_program_and_index_t *varob, void *closure)
 
 /* Return the visibility for the variable.
  */
@@ -1980,20 +2210,20 @@ ldmud_object_variable_get_visibility (ldmud_object_and_index_t *varob, void *clo
 {
     typeflags_t flags;
 
-    if (!ldmud_object_check_available(&varob->ob_base))
+    if (!ldmud_program_check_available(&varob->ob_base))
         return NULL;
 
-    flags = varob->ob_base.lpc_object->prog->variables[varob->index].type.t_flags;
+    flags = varob->ob_base.lpc_program->variables[varob->index].type.t_flags;
 
     return PyLong_FromLong(
         (flags & TYPE_MOD_PRIVATE)   ? VISIBILITY_PRIVATE :
         (flags & TYPE_MOD_PROTECTED) ? VISIBILITY_PROTECTED :
         (flags & TYPE_MOD_PUBLIC)    ? VISIBILITY_PUBLIC :
                                        VISIBILITY_VISIBLE);
-} /* ldmud_object_variable_get_visibility() */
+} /* ldmud_program_variable_get_visibility() */
 
 /*-------------------------------------------------------------------------*/
-static PyNumberMethods ldmud_object_variable_as_number =
+static PyNumberMethods ldmud_program_variable_as_number =
 {
     0,                                  /* nb_add */
     0,                                  /* nb_subtract */
@@ -2004,34 +2234,34 @@ static PyNumberMethods ldmud_object_variable_as_number =
     0,                                  /* nb_negative */
     0,                                  /* nb_positive */
     0,                                  /* nb_absolute */
-    (inquiry)ldmud_object_bool,         /* nb_bool */
+    (inquiry)ldmud_program_bool,        /* nb_bool */
 };
 
-static PyGetSetDef ldmud_object_variable_getset [] = {
-    {"name",       (getter)ldmud_object_variable_get_name,       NULL,                                    NULL},
-    {"value",      (getter)ldmud_object_variable_get_value,      (setter)ldmud_object_variable_set_value, NULL},
-    {"type",       (getter)ldmud_object_variable_get_type,       NULL,                                    NULL},
-    {"flags",      (getter)ldmud_object_variable_get_flags,      NULL,                                    NULL},
-    {"visibility", (getter)ldmud_object_variable_get_visibility, NULL,                                    NULL},
+static PyGetSetDef ldmud_program_variable_getset [] = {
+    {"name",       (getter)ldmud_program_variable_get_name,       NULL,                                     NULL},
+    {"value",      (getter)ldmud_program_variable_get_value,      (setter)ldmud_program_variable_set_value, NULL},
+    {"type",       (getter)ldmud_program_variable_get_type,       NULL,                                     NULL},
+    {"flags",      (getter)ldmud_program_variable_get_flags,      NULL,                                     NULL},
+    {"visibility", (getter)ldmud_program_variable_get_visibility, NULL,                                     NULL},
     {NULL}
 };
 
-static PyTypeObject ldmud_object_variable_type =
+static PyTypeObject ldmud_program_variable_type =
 {
     PyVarObject_HEAD_INIT(NULL, 0)
     "ldmud.Variable",                   /* tp_name */
-    sizeof(ldmud_object_and_index_t),   /* tp_basicsize */
+    sizeof(ldmud_program_and_index_t),  /* tp_basicsize */
     0,                                  /* tp_itemsize */
-    (destructor)ldmud_object_dealloc,   /* tp_dealloc */
+    (destructor)ldmud_program_dealloc,  /* tp_dealloc */
     0,                                  /* tp_print */
     0,                                  /* tp_getattr */
     0,                                  /* tp_setattr */
     0,                                  /* tp_reserved */
-    (reprfunc)ldmud_object_variable_repr, /* tp_repr */
-    &ldmud_object_variable_as_number,   /* tp_as_number */
+    (reprfunc)ldmud_program_variable_repr, /* tp_repr */
+    &ldmud_program_variable_as_number,  /* tp_as_number */
     0,                                  /* tp_as_sequence */
     0,                                  /* tp_as_mapping */
-    (hashfunc)ldmud_object_and_index_hash, /* tp_hash  */
+    (hashfunc)ldmud_program_and_index_hash, /* tp_hash  */
     0,                                  /* tp_call */
     0,                                  /* tp_str */
     0,                                  /* tp_getattro */
@@ -2041,13 +2271,13 @@ static PyTypeObject ldmud_object_variable_type =
     "LPC object variable",              /* tp_doc */
     0,                                  /* tp_traverse */
     0,                                  /* tp_clear */
-    (richcmpfunc)ldmud_object_and_index_richcompare, /* tp_richcompare */
+    (richcmpfunc)ldmud_program_and_index_richcompare, /* tp_richcompare */
     0,                                  /* tp_weaklistoffset */
     0,                                  /* tp_iter */
     0,                                  /* tp_iternext */
     0,                                  /* tp_methods */
     0,                                  /* tp_members */
-    ldmud_object_variable_getset,       /* tp_getset */
+    ldmud_program_variable_getset,      /* tp_getset */
     0,                                  /* tp_base */
     0,                                  /* tp_dict */
     0,                                  /* tp_descr_get */
@@ -2060,28 +2290,37 @@ static PyTypeObject ldmud_object_variable_type =
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
-ldmud_object_variables_repr (ldmud_object_t *val)
+ldmud_program_variables_repr (ldmud_program_t *val)
 
 /* Return a string representation of this object.
  */
 
 {
-    if(!val->lpc_object)
-        return PyUnicode_FromString("<LPC empty variable list>");
-    return PyUnicode_FromFormat("<LPC variables of /%s>", get_txt(val->lpc_object->name));
-} /* ldmud_object_variables_repr() */
+    switch (val->lpc_object.type)
+    {
+        case T_OBJECT:
+            return PyUnicode_FromFormat("<LPC variables of /%s>", get_txt(val->lpc_object.u.ob->name));
+
+        case T_LWOBJECT:
+            return PyUnicode_FromFormat("<LPC variables of /%s>", get_txt(val->lpc_object.u.lwob->prog->name));
+
+        case T_NUMBER:
+        default:
+            return PyUnicode_FromString("<LPC empty variable list>");
+    }
+
+} /* ldmud_program_variables_repr() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
-ldmud_object_variables_getattro (ldmud_object_t *val, PyObject *name)
+ldmud_program_variables_getattro (ldmud_program_t *val, PyObject *name)
 
 /* Return a variable of the variable list.
  */
 
 {
-    PyObject *result, *utf8;
-    char* namebuf;
-    ssize_t namelength;
+    PyObject *result;
+    bool error;
     string_t* varname;
 
     /* First check real attributes... */
@@ -2089,53 +2328,39 @@ ldmud_object_variables_getattro (ldmud_object_t *val, PyObject *name)
     if (result || !PyErr_ExceptionMatches(PyExc_AttributeError))
         return result;
 
-    if (!val->lpc_object)
+    if (!val->lpc_program)
         return NULL;
 
     PyErr_Clear();
 
     /* And now search for a function. */
-    if (!PyUnicode_Check(name))
-    {
-        PyErr_Format(PyExc_TypeError,
-                     "attribute name must be string, not '%.200s'",
-                     name->ob_type->tp_name);
+    varname = find_tabled_python_string(name, "variable name", &error);
+    if (error)
         return NULL;
-    }
 
-    utf8 = PyUnicode_AsEncodedString(name, "utf-8", "replace");
-    if (utf8 == NULL)
-    {
-        PyErr_SetString(PyExc_ValueError, "undecodable variable name");
+    if (!ldmud_program_check_available(val))
         return NULL;
-    }
-
-    PyBytes_AsStringAndSize(utf8, &namebuf, &namelength);
-
-    if (!ldmud_object_check_available(val))
-    {
-        Py_DECREF(utf8);
-        return NULL;
-    }
-
-    varname = find_tabled_str_n(namebuf, namelength, STRING_UTF8);
-    Py_DECREF(utf8);
 
     if (varname)
     {
-        program_t *progp = val->lpc_object->prog;
+        program_t *progp = val->lpc_program;
         for (int ix = 0; ix < progp->num_variables; ix++)
             if (progp->variables[ix].name == varname)
             {
-                ldmud_object_and_index_t* var = (ldmud_object_and_index_t*)ldmud_object_variable_type.tp_alloc(&ldmud_object_variable_type, 0);
+                ldmud_program_and_index_t* var = (ldmud_program_and_index_t*)ldmud_program_variable_type.tp_alloc(&ldmud_program_variable_type, 0);
                 if (var == NULL)
                     return NULL;
 
-                var->ob_base.lpc_object = ref_object(val->lpc_object, "ldmud_object_variables_getattro");
+                var->ob_base.lpc_program = val->lpc_program;
+                var->ob_base.lpc_object = val->lpc_object;
+                if (val->lpc_object.type == T_OBJECT)
+                    ref_object(val->lpc_object.u.ob, "ldmud_object_variables_getattro");
+                else
+                    ref_lwobject(val->lpc_object.u.lwob);
                 var->index = ix;
 
-                add_gc_object(&gc_object_list, (ldmud_gc_var_t*)var);
-                if (!ldmud_object_register_replace_program_protector(var))
+                add_gc_object(&gc_program_list, (ldmud_gc_var_t*)var);
+                if (!ldmud_program_register_replace_program_protector(var))
                 {
                     Py_DECREF(var);
                     return NULL;
@@ -2146,57 +2371,33 @@ ldmud_object_variables_getattro (ldmud_object_t *val, PyObject *name)
 
     PyErr_Format(PyExc_AttributeError, "Variable '%U' does not exist", name);
     return NULL;
-} /* ldmud_object_variables_getattro() */
+} /* ldmud_program_variables_getattro() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_variables_dir (ldmud_object_t *self)
+ldmud_program_variables_dir (ldmud_program_t *self)
 
 /* Returns a list of all attributes, this includes all variable names.
  */
 
 {
-    PyObject *dict, *cls, *result;
-    PyObject *attrs = NULL;
-
-    /* First add the regular dictionaries. */
-    cls = PyObject_GetAttrString((PyObject*)self, "__class__");
-    if (cls != NULL)
-    {
-        dict = PyObject_Dir(cls);
-        Py_DECREF(cls);
-    }
-    else
-        dict = NULL;
-    if (dict == NULL)
-        PyErr_Clear();
-    else
-    {
-        attrs = PySet_New(dict);
-        if (attrs == NULL)
-            PyErr_Clear();
-        Py_DECREF(dict);
-    }
+    PyObject *result;
+    PyObject *attrs = get_class_dir((PyObject*)self);
 
     if (attrs == NULL)
-    {
-        attrs = PySet_New(NULL);
-        if (attrs == NULL)
-            return NULL;
-    }
+        return NULL;
 
     /* Now add all the variables. */
-    if (self->lpc_object)
+    if (self->lpc_program)
     {
-        program_t *progp;
+        program_t *progp = self->lpc_program;
 
-        if (!ldmud_object_check_available(self))
+        if (!ldmud_program_check_available(self))
         {
             Py_DECREF(attrs);
             return NULL;
         }
 
-        progp = self->lpc_object->prog;
         for (int ix = 0; ix < progp->num_variables; ix++)
         {
             string_t *var = progp->variables[ix].name;
@@ -2218,11 +2419,11 @@ ldmud_object_variables_dir (ldmud_object_t *self)
     result = PySequence_List(attrs);
     Py_DECREF(attrs);
     return result;
-} /* ldmud_object_variables_dir() */
+} /* ldmud_program_variables_dir() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
-ldmud_object_variables_dict (ldmud_object_t *self, void *closure)
+ldmud_program_variables_dict (ldmud_program_t *self, void *closure)
 
 /* Returns a list of all variables.
  */
@@ -2232,22 +2433,22 @@ ldmud_object_variables_dict (ldmud_object_t *self, void *closure)
     if (!dict)
         return NULL;
 
-    if (self->lpc_object)
+    if (self->lpc_program)
     {
         program_t *progp;
 
-        if (!ldmud_object_check_available(self))
+        if (!ldmud_program_check_available(self))
         {
             Py_DECREF(dict);
             return NULL;
         }
 
-        progp = self->lpc_object->prog;
+        progp = self->lpc_program;
         for (int ix = 0; ix < progp->num_variables; ix++)
         {
             string_t *var = progp->variables[ix].name;
             PyObject *varname = PyUnicode_FromStringAndSize(get_txt(var), mstrsize(var));
-            ldmud_object_and_index_t* varob;
+            ldmud_program_and_index_t* varob;
 
             if (varname == NULL)
             {
@@ -2255,7 +2456,7 @@ ldmud_object_variables_dict (ldmud_object_t *self, void *closure)
                 continue;
             }
 
-            varob = (ldmud_object_and_index_t*)ldmud_object_variable_type.tp_alloc(&ldmud_object_variable_type, 0);
+            varob = (ldmud_program_and_index_t*)ldmud_program_variable_type.tp_alloc(&ldmud_program_variable_type, 0);
             if (varob == NULL)
             {
                 PyErr_Clear();
@@ -2263,10 +2464,15 @@ ldmud_object_variables_dict (ldmud_object_t *self, void *closure)
                 continue;
             }
 
-            varob->ob_base.lpc_object = ref_object(self->lpc_object, "ldmud_object_variables_dict");
+            varob->ob_base.lpc_program = self->lpc_program;
+            varob->ob_base.lpc_object = self->lpc_object;
+            if (self->lpc_object.type == T_OBJECT)
+                ref_object(self->lpc_object.u.ob, "ldmud_object_variables_dict");
+            else
+                ref_lwobject(self->lpc_object.u.lwob);
             varob->index = ix;
-            add_gc_object(&gc_object_list, (ldmud_gc_var_t*)varob);
-            if (!ldmud_object_register_replace_program_protector(varob))
+            add_gc_object(&gc_program_list, (ldmud_gc_var_t*)varob);
+            if (!ldmud_program_register_replace_program_protector(varob))
             {
                 PyErr_Clear();
                 Py_DECREF(varname);
@@ -2284,14 +2490,14 @@ ldmud_object_variables_dict (ldmud_object_t *self, void *closure)
     result = PyDictProxy_New(dict);
     Py_DECREF(dict);
     return result;
-} /* ldmud_object_variables_dict() */
+} /* ldmud_program_variables_dict() */
 
 /*-------------------------------------------------------------------------*/
-static PyMethodDef ldmud_object_variables_methods[] =
+static PyMethodDef ldmud_program_variables_methods[] =
 {
     {
         "__dir__",
-        (PyCFunction)ldmud_object_variables_dir, METH_NOARGS,
+        (PyCFunction)ldmud_program_variables_dir, METH_NOARGS,
         "__dir__() -> List\n\n"
         "Returns a list of all attributes."
     },
@@ -2299,44 +2505,47 @@ static PyMethodDef ldmud_object_variables_methods[] =
     {NULL}
 };
 
-static PyGetSetDef ldmud_object_variables_getset [] = {
-    {"__dict__", (getter)ldmud_object_variables_dict, NULL, NULL},
+static PyGetSetDef ldmud_program_variables_getset [] = {
+    {"__dict__", (getter)ldmud_program_variables_dict, NULL, NULL},
     {NULL}
 };
 
-static PyTypeObject ldmud_object_variables_type =
+static PyTypeObject ldmud_program_variables_type =
 {
     PyVarObject_HEAD_INIT(NULL, 0)
     "ldmud.Variables",                  /* tp_name */
-    sizeof(ldmud_object_t),             /* tp_basicsize */
+    sizeof(ldmud_program_t),            /* tp_basicsize */
     0,                                  /* tp_itemsize */
-    (destructor)ldmud_object_dealloc,   /* tp_dealloc */
+    (destructor)ldmud_program_dealloc,  /* tp_dealloc */
     0,                                  /* tp_print */
     0,                                  /* tp_getattr */
     0,                                  /* tp_setattr */
     0,                                  /* tp_reserved */
-    (reprfunc)ldmud_object_variables_repr, /* tp_repr */
+    (reprfunc)ldmud_program_variables_repr, /* tp_repr */
     0,                                  /* tp_as_number */
     0,                                  /* tp_as_sequence */
     0,                                  /* tp_as_mapping */
     0,                                  /* tp_hash  */
     0,                                  /* tp_call */
     0,                                  /* tp_str */
-    (getattrofunc)ldmud_object_variables_getattro, /* tp_getattro */
+    (getattrofunc)ldmud_program_variables_getattro, /* tp_getattro */
     0,                                  /* tp_setattro */
     0,                                  /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,                 /* tp_flags */
-    "LPC function list",                /* tp_doc */
+    "LPC variable list",                /* tp_doc */
     0,                                  /* tp_traverse */
     0,                                  /* tp_clear */
     0,                                  /* tp_richcompare */
     0,                                  /* tp_weaklistoffset */
     0,                                  /* tp_iter */
     0,                                  /* tp_iternext */
-    ldmud_object_variables_methods,     /* tp_methods */
+    ldmud_program_variables_methods,    /* tp_methods */
     0,                                  /* tp_members */
-    ldmud_object_variables_getset,      /* tp_getset */
+    ldmud_program_variables_getset,     /* tp_getset */
 };
+
+/*-------------------------------------------------------------------------*/
+/* Objects */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -2460,6 +2669,75 @@ ldmud_object_hash (ldmud_object_t *val)
 } /* ldmud_object_hash() */
 
 /*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_object_getattro (ldmud_object_t *val, PyObject *name)
+
+/* Return an attribute of our object.
+ */
+
+{
+    /* First look at our dictionary. */
+    if (val->lpc_object && val->lpc_object->python_dict)
+    {
+        PyObject *res = PyDict_GetItem((PyObject*) val->lpc_object->python_dict, name);
+        if (res != NULL)
+        {
+            Py_INCREF(res);
+            return res;
+        }
+    }
+
+    /* Forward to the generic function. */
+    return PyObject_GenericGetAttr((PyObject*)val, name);
+
+} /* ldmud_object_getattro() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_object_setattro (ldmud_object_t *val, PyObject *name, PyObject *value)
+
+/* Set an attribute of our object.
+ */
+
+{
+    /* First forward to the generic function. */
+    int res = PyObject_GenericSetAttr((PyObject*)val, name, value);
+
+    /* If unsuccessful, work an our dictionary. */
+    if (res && PyErr_ExceptionMatches(PyExc_AttributeError) && val->lpc_object)
+    {
+        PyObject *extype, *exvalue, *extraceback;
+        PyErr_Fetch(&extype, &exvalue, &extraceback);
+
+        if (value == NULL)
+        {
+            if (val->lpc_object->python_dict)
+                res = PyDict_DelItem((PyObject*)val->lpc_object->python_dict, name);
+        }
+        else
+        {
+            if (!val->lpc_object->python_dict)
+                val->lpc_object->python_dict = PyDict_New();
+            res = PyDict_SetItem((PyObject*)val->lpc_object->python_dict, name, value);
+        }
+
+        if (res)
+        {
+            PyErr_Restore(extype, exvalue, extraceback);
+        }
+        else
+        {
+            Py_XDECREF(extype);
+            Py_XDECREF(exvalue);
+            Py_XDECREF(extraceback);
+        }
+    }
+
+    return res;
+
+} /* ldmud_object_setattro() */
+
+/*-------------------------------------------------------------------------*/
 static bool ldmud_object_check(PyObject *ob);
 
 static PyObject*
@@ -2547,7 +2825,7 @@ ldmud_object_get_list (ldmud_object_t *val, PyTypeObject *type)
  */
 
 {
-    ldmud_object_t *result;
+    ldmud_program_t *result;
 
     if(!val->lpc_object)
     {
@@ -2555,12 +2833,13 @@ ldmud_object_get_list (ldmud_object_t *val, PyTypeObject *type)
         return Py_None;
     }
 
-    result = (ldmud_object_t*)type->tp_alloc(type, 0);
+    result = (ldmud_program_t*)type->tp_alloc(type, 0);
     if (result == NULL)
         return NULL;
 
-    result->lpc_object = ref_object(val->lpc_object, "ldmud_object_get_list");
-    add_gc_object(&gc_object_list, (ldmud_gc_var_t*)result);
+    result->lpc_program = val->lpc_object->prog;
+    put_ref_object(&(result->lpc_object), val->lpc_object, "ldmud_object_get_list");
+    add_gc_object(&gc_program_list, (ldmud_gc_var_t*)result);
 
     return (PyObject *)result;
 } /* ldmud_object_get_list() */
@@ -2588,8 +2867,8 @@ static PyMethodDef ldmud_object_methods[] =
 static PyGetSetDef ldmud_object_getset[] =
 {
     {"name",      (getter)ldmud_object_get_name, NULL, NULL, NULL},
-    {"functions", (getter)ldmud_object_get_list, NULL, NULL, &ldmud_object_functions_type},
-    {"variables", (getter)ldmud_object_get_list, NULL, NULL, &ldmud_object_variables_type},
+    {"functions", (getter)ldmud_object_get_list, NULL, NULL, &ldmud_program_functions_type},
+    {"variables", (getter)ldmud_object_get_list, NULL, NULL, &ldmud_program_variables_type},
     {NULL}
 };
 
@@ -2611,8 +2890,8 @@ static PyTypeObject ldmud_object_type =
     (hashfunc)ldmud_object_hash,        /* tp_hash  */
     0,                                  /* tp_call */
     0,                                  /* tp_str */
-    0,                                  /* tp_getattro */
-    0,                                  /* tp_setattro */
+    (getattrofunc)ldmud_object_getattro,/* tp_getattro */
+    (setattrofunc)ldmud_object_setattro,/* tp_setattro */
     0,                                  /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,                 /* tp_flags */
     "LPC object",                       /* tp_doc */
@@ -2666,6 +2945,346 @@ ldmud_object_create (object_t* ob)
 
     return (PyObject *)self;
 } /* ldmud_object_create() */
+
+/*-------------------------------------------------------------------------*/
+/* Lightweight Objects */
+
+/*-------------------------------------------------------------------------*/
+static void
+ldmud_lwobject_dealloc (ldmud_lwobject_t* self)
+
+/* Destroy the ldmud_lwobject_t object
+ */
+
+{
+    if(self->lpc_lwobject)
+        free_lwobject(self->lpc_lwobject);
+
+    remove_gc_object(&gc_lwobject_list, (ldmud_gc_var_t*)self);
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+} /* ldmud_lwobject_dealloc() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_lwobject_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
+
+/* Implmenent __new__ for ldmud_lwobject_t, i.e. allocate and initialize
+ * the object with null values.
+ */
+
+{
+    ldmud_lwobject_t *self;
+
+    self = (ldmud_lwobject_t *)type->tp_alloc(type, 0);
+    if (self == NULL)
+        return NULL;
+
+    self->lpc_lwobject = NULL;
+    add_gc_object(&gc_lwobject_list, (ldmud_gc_var_t*)self);
+    return (PyObject *)self;
+} /* ldmud_lwobject_new() */
+
+/*-------------------------------------------------------------------------*/
+struct ldmud_lwobject_init_closure_s
+{
+    string_t* filename;
+    lwobject_t* lwob;
+};
+
+static void
+ldmud_lwobject_init_getlwobject (int num_arg UNUSED, struct ldmud_lwobject_init_closure_s* data)
+
+/* Helper function for ldmud_lwobject_init().
+ */
+
+{
+    push_ref_string(inter_sp, data->filename);
+    inter_sp = v_new_lwobject(inter_sp, 1);
+    if (inter_sp->type == T_LWOBJECT)
+    {
+        data->lwob = inter_sp->u.lwob;
+        inter_sp--;
+    }
+    else
+        pop_stack();
+} /* ldmud_lwobject_init_getlwobject() */
+
+static int
+ldmud_lwobject_init (ldmud_lwobject_t *self, PyObject *args, PyObject *kwds)
+
+/* Implement __init__ for ldmud_lwobject_t, i.e. create a new lwobject object
+ * from the given arguments.
+ */
+
+{
+    /* We expect the filename (blueprint to use)
+     */
+
+    static char *kwlist[] = { "filename", NULL};
+
+    Py_ssize_t length;
+    const char *filename;
+    struct ldmud_lwobject_init_closure_s data = { NULL, NULL };
+
+    if (! PyArg_ParseTupleAndKeywords(args, kwds, "s#", kwlist, &filename, &length))
+        return -1;
+
+    data.filename = new_n_unicode_mstring(filename, length);
+    if(!data.filename)
+    {
+        PyErr_SetString(PyExc_MemoryError, "out of memory");
+        return -1;
+    }
+    else
+    {
+        /* new_lwobject() can throw errors, we don't want to jump out of this context. */
+        call_lpc_secure((CClosureFun)ldmud_lwobject_init_getlwobject, 0, &data);
+        free_mstring(data.filename);
+
+        if(data.lwob)
+        {
+            if(self->lpc_lwobject)
+                free_lwobject(self->lpc_lwobject);
+            self->lpc_lwobject = ref_lwobject(data.lwob);
+            return 0;
+        }
+        else
+            return -1;
+    }
+} /* ldmud_lwobject_init() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_lwobject_repr (ldmud_lwobject_t *val)
+
+/* Return a string representation of this lwobject.
+ */
+
+{
+    if(!val->lpc_lwobject)
+        return PyUnicode_FromString("<LPC empty lightweight object>");
+    return PyUnicode_FromFormat("<LPC lightweight object of /%s>", get_txt(val->lpc_lwobject->prog->name));
+} /* ldmud_lwobject_repr() */
+
+/*-------------------------------------------------------------------------*/
+static Py_hash_t
+ldmud_lwobject_hash (ldmud_lwobject_t *val)
+
+/* Return a hash of this lwobject.
+ */
+
+{
+    return _Py_HashPointer(val->lpc_lwobject);
+} /* ldmud_lwobject_hash() */
+
+/*-------------------------------------------------------------------------*/
+static bool ldmud_lwobject_check(PyObject *ob);
+
+static PyObject*
+ldmud_lwobject_richcompare (ldmud_lwobject_t *self, PyObject *other, int op)
+
+/* Compare <self> to <other> with the compare operation <op>.
+ */
+
+{
+    lwobject_t *self_ob, *other_ob;
+    bool result;
+    PyObject* resultval;
+
+    if (!ldmud_lwobject_check(other))
+    {
+        Py_INCREF(Py_NotImplemented);
+        return Py_NotImplemented;
+    }
+
+    self_ob = self->lpc_lwobject;
+    other_ob = ((ldmud_lwobject_t*)other)->lpc_lwobject;
+
+    if(self_ob == NULL && other_ob == NULL)
+        result = op == Py_LE || op == Py_EQ || op == Py_GE;
+    else if(self_ob == NULL)
+        result = op == Py_LT || op == Py_LE || op == Py_NE;
+    else if(other_ob == NULL)
+        result = op == Py_GT || op == Py_GE || op == Py_NE;
+    else
+    {
+        switch (op)
+        {
+            case Py_LT: result = self_ob <  other_ob; break;
+            case Py_LE: result = self_ob <= other_ob; break;
+            case Py_EQ: result = self_ob == other_ob; break;
+            case Py_NE: result = self_ob != other_ob; break;
+            case Py_GT: result = self_ob >  other_ob; break;
+            case Py_GE: result = self_ob >= other_ob; break;
+            default:
+            {
+                Py_INCREF(Py_NotImplemented);
+                return Py_NotImplemented;
+            }
+        }
+    }
+
+    resultval = result ? Py_True : Py_False;
+    Py_INCREF(resultval);
+    return resultval;
+} /* ldmud_lwobject_richcompare() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_lwobject_bool(ldmud_lwobject_t *val)
+
+/* Always return 1 (true), because lightweight objects are always alive.
+ */
+
+{
+    return 1;
+} /* ldmud_lwobject_bool() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_lwobject_get_program_name (ldmud_lwobject_t *val, void *closure)
+
+/* Return the value for the program_name member.
+ */
+
+{
+    if(!val->lpc_lwobject)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    return PyUnicode_FromFormat("/%s", get_txt(val->lpc_lwobject->prog->name));
+} /* ldmud_lwobject_get_name() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_lwobject_get_list (ldmud_lwobject_t *val, PyTypeObject *type)
+
+/* Return the value for the functions or variables member.
+ */
+
+{
+    ldmud_program_t *result;
+
+    if(!val->lpc_lwobject)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    result = (ldmud_program_t*)type->tp_alloc(type, 0);
+    if (result == NULL)
+        return NULL;
+
+    result->lpc_program = val->lpc_lwobject->prog;
+    put_ref_lwobject(&(result->lpc_object), val->lpc_lwobject);
+    add_gc_object(&gc_program_list, (ldmud_gc_var_t*)result);
+
+    return (PyObject *)result;
+} /* ldmud_lwobject_get_list() */
+
+/*-------------------------------------------------------------------------*/
+static PyNumberMethods ldmud_lwobject_as_number =
+{
+    0,                                  /* nb_add */
+    0,                                  /* nb_subtract */
+    0,                                  /* nb_multiply */
+    0,                                  /* nb_remainder */
+    0,                                  /* nb_divmod */
+    0,                                  /* nb_power */
+    0,                                  /* nb_negative */
+    0,                                  /* nb_positive */
+    0,                                  /* nb_absolute */
+    (inquiry)ldmud_lwobject_bool,       /* nb_bool */
+};
+
+static PyMethodDef ldmud_lwobject_methods[] =
+{
+    {NULL}
+};
+
+static PyGetSetDef ldmud_lwobject_getset[] =
+{
+    {"program_name", (getter)ldmud_lwobject_get_program_name, NULL, NULL, NULL},
+    {"functions",    (getter)ldmud_lwobject_get_list, NULL, NULL, &ldmud_program_functions_type},
+    {"variables",    (getter)ldmud_lwobject_get_list, NULL, NULL, &ldmud_program_variables_type},
+    {NULL}
+};
+
+static PyTypeObject ldmud_lwobject_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.LWObject",                   /* tp_name */
+    sizeof(ldmud_lwobject_t),           /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_lwobject_dealloc, /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    (reprfunc)ldmud_lwobject_repr,      /* tp_repr */
+    &ldmud_lwobject_as_number,          /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    (hashfunc)ldmud_lwobject_hash,      /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC lightweight object",           /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    (richcmpfunc)ldmud_lwobject_richcompare, /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_lwobject_methods,             /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_lwobject_getset,              /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    (initproc)ldmud_lwobject_init,      /* tp_init */
+    0,                                  /* tp_alloc */
+    ldmud_lwobject_new,                 /* tp_new */
+};
+
+/*-------------------------------------------------------------------------*/
+static bool
+ldmud_lwobject_check (PyObject *ob)
+
+/* Returns true, when <ob> is of the LPC lwobject type.
+ */
+
+{
+    return Py_TYPE(ob) == &ldmud_lwobject_type;
+} /* ldmud_lwobject_check() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_lwobject_create (lwobject_t* lwob)
+
+/* Creates a new Python lwobject from an LPC lwobject.
+ */
+
+{
+    ldmud_lwobject_t *self;
+
+    self = (ldmud_lwobject_t *)ldmud_lwobject_type.tp_alloc(&ldmud_lwobject_type, 0);
+    if (self == NULL)
+        return NULL;
+
+    self->lpc_lwobject = ref_lwobject(lwob);
+    add_gc_object(&gc_lwobject_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_lwobject_create() */
 
 /*-------------------------------------------------------------------------*/
 /* Arrays */
@@ -4613,9 +5232,8 @@ ldmud_struct_members_getattro (ldmud_struct_t *self, PyObject *name)
  */
 
 {
-    PyObject *result, *utf8;
-    char* namebuf;
-    ssize_t namelength;
+    PyObject *result;
+    bool error;
     string_t* member_name;
     int idx;
 
@@ -4630,24 +5248,9 @@ ldmud_struct_members_getattro (ldmud_struct_t *self, PyObject *name)
     PyErr_Clear();
 
     /* And now search for a member. */
-    if (!PyUnicode_Check(name))
-    {
-        PyErr_Format(PyExc_TypeError,
-                     "attribute name must be string, not '%.200s'",
-                     name->ob_type->tp_name);
+    member_name = find_tabled_python_string(name, "member name", &error);
+    if (error)
         return NULL;
-    }
-
-    utf8 = PyUnicode_AsEncodedString(name, "utf-8", "replace");
-    if (utf8 == NULL)
-    {
-        PyErr_SetString(PyExc_ValueError, "undecodable member name");
-        return NULL;
-    }
-
-    PyBytes_AsStringAndSize(utf8, &namebuf, &namelength);
-    member_name = find_tabled_str_n(namebuf, namelength, STRING_UTF8);
-    Py_DECREF(utf8);
 
     idx = member_name ? struct_find_member(self->lpc_struct->type, member_name) : -1;
     if (idx < 0)
@@ -4678,34 +5281,11 @@ ldmud_struct_members_dir (ldmud_struct_t *self)
  */
 
 {
-    PyObject *dict, *cls, *result;
-    PyObject *attrs = NULL;
-
-    /* First add the regular dictionaries. */
-    cls = PyObject_GetAttrString((PyObject*)self, "__class__");
-    if (cls != NULL)
-    {
-        dict = PyObject_Dir(cls);
-        Py_DECREF(cls);
-    }
-    else
-        dict = NULL;
-    if (dict == NULL)
-        PyErr_Clear();
-    else
-    {
-        attrs = PySet_New(dict);
-        if (attrs == NULL)
-            PyErr_Clear();
-        Py_DECREF(dict);
-    }
+    PyObject *result;
+    PyObject *attrs = get_class_dir((PyObject*)self);
 
     if (attrs == NULL)
-    {
-        attrs = PySet_New(NULL);
-        if (attrs == NULL)
-            return NULL;
-    }
+        return NULL;
 
     /* Now add all the members. */
     if (self->lpc_struct)
@@ -5012,32 +5592,24 @@ ldmud_struct_init (ldmud_struct_t *self, PyObject *args, PyObject *kwds)
                 }
                 else if (PyUnicode_Check(key))
                 {
-                    PyObject *utf8;
-                    Py_ssize_t member_length;
-                    char * buf;
                     string_t *member_name;
+                    bool error;
 
-                    utf8 = PyUnicode_AsEncodedString(key, "utf-8", "replace");
-                    if (utf8 == NULL)
+                    member_name = find_tabled_python_string(key, "member name", &error);
+                    if (error)
                     {
-                        PyErr_SetString(PyExc_ValueError, "undecodable member name");
                         Py_DECREF(item);
                         break;
                     }
 
-                    PyBytes_AsStringAndSize(utf8, &buf, &member_length);
-                    member_name = find_tabled_str_n(buf, member_length, STRING_UTF8);
                     idx = member_name ? struct_find_member(lpc_struct_type, member_name) : -1;
 
                     if (idx < 0)
                     {
-                        PyErr_Format(PyExc_ValueError, "member '%s' not found", buf);
-                        Py_DECREF(utf8);
+                        PyErr_Format(PyExc_ValueError, "member '%U' not found", key);
                         Py_DECREF(item);
                         break;
                     }
-
-                    Py_DECREF(utf8);
                 }
                 else
                 {
@@ -5307,27 +5879,78 @@ ldmud_closure_init (ldmud_closure_t *self, PyObject *args, PyObject *kwds)
 
     Py_ssize_t length;
     const char *name;
-    ldmud_object_t *bound_ob, *lfun_ob;
+    PyObject *bound_ob, *lfun_ob;
+    program_t *prog = NULL;
+    svalue_t sv_bound_ob = const0, sv_lfun_ob = const0;
 
     lfun_ob = NULL;
-    if (! PyArg_ParseTupleAndKeywords(args, kwds, "O!s#|O!", kwlist,
-                                      &ldmud_object_type, &bound_ob,
+    if (! PyArg_ParseTupleAndKeywords(args, kwds, "Os#|O", kwlist,
+                                      &bound_ob,
                                       &name, &length,
-                                      &ldmud_object_type, &lfun_ob))
+                                      &lfun_ob))
         return -1;
 
-    if(bound_ob->lpc_object == NULL || (lfun_ob != NULL && lfun_ob->lpc_object == NULL))
+    if (PyObject_TypeCheck(bound_ob, &ldmud_object_type))
     {
-        PyErr_SetString(PyExc_TypeError, "uninitialized lpc object");
+        object_t *ob = ((ldmud_object_t*)bound_ob)->lpc_object;
+        if (!ob)
+        {
+            PyErr_SetString(PyExc_TypeError, "uninitialized lpc object");
+            return -1;
+        }
+        sv_bound_ob = svalue_object(ob);
+    }
+    else if (PyObject_TypeCheck(bound_ob, &ldmud_lwobject_type))
+    {
+        lwobject_t *lwob = ((ldmud_lwobject_t*)bound_ob)->lpc_lwobject;
+        if (!lwob)
+        {
+            PyErr_SetString(PyExc_TypeError, "uninitialized lpc lwobject");
+            return -1;
+        }
+        sv_bound_ob = svalue_lwobject(lwob);
+    }
+    else
+    {
+        PyErr_SetString(PyExc_TypeError, "object argument must be an ldmud.Object or ldmud.LWObject");
+        return -1;
+    }
+
+    if (lfun_ob == NULL) {}
+    else if (PyObject_TypeCheck(lfun_ob, &ldmud_object_type))
+    {
+        object_t *ob = ((ldmud_object_t*)lfun_ob)->lpc_object;
+        if (!ob)
+        {
+            PyErr_SetString(PyExc_TypeError, "uninitialized lpc object");
+            return -1;
+        }
+        sv_lfun_ob = svalue_object(ob);
+        prog = ob->prog;
+    }
+    else if (PyObject_TypeCheck(lfun_ob, &ldmud_lwobject_type))
+    {
+        lwobject_t *lwob = ((ldmud_lwobject_t*)lfun_ob)->lpc_lwobject;
+        if (!lwob)
+        {
+            PyErr_SetString(PyExc_TypeError, "uninitialized lpc lwobject");
+            return -1;
+        }
+        sv_lfun_ob = svalue_lwobject(lwob);
+        prog = lwob->prog;
+    }
+    else
+    {
+        PyErr_SetString(PyExc_TypeError, "lfun_object argument must be an ldmud.Object or ldmud.LWObject");
         return -1;
     }
 
     if(lfun_ob == NULL)
     {
         /* It shall be a (simul-)efun closure. */
-        object_t *prev_ob = current_object;
+        svalue_t prev_ob = current_object;
 
-        current_object = bound_ob->lpc_object;
+        current_object = sv_bound_ob;
         symbol_efun_str(name, length, &self->lpc_closure, OVERRIDE_NONE, true);
         current_object = prev_ob;
 
@@ -5341,29 +5964,31 @@ ldmud_closure_init (ldmud_closure_t *self, PyObject *args, PyObject *kwds)
     }
     else
     {
-        object_t *prog_ob = lfun_ob->lpc_object;
         string_t *funname;
         int idx;
 
-        if (O_PROG_SWAPPED(prog_ob) && load_ob_from_swap(prog_ob) < 0)
+        if (sv_lfun_ob.type == T_OBJECT)
         {
-            PyErr_SetString(PyExc_MemoryError, "out of memory while unswapping");
-            return -1;
+            if (O_PROG_SWAPPED(sv_lfun_ob.u.ob) && load_ob_from_swap(sv_lfun_ob.u.ob) < 0)
+            {
+                PyErr_SetString(PyExc_MemoryError, "out of memory while unswapping");
+                return -1;
+            }
         }
 
         funname = find_tabled_str_n(name, length, STRING_UTF8);
         if(funname)
-            idx = find_function(funname, prog_ob->prog);
+            idx = find_function(funname, prog);
         else
             idx = -1;
 
         if (idx < 0)
         {
-            PyErr_Format(PyExc_NameError, "unknown function '%s' in '%s'", name, get_txt(prog_ob->prog->name));
+            PyErr_Format(PyExc_NameError, "unknown function '%s' in '%s'", name, get_txt(prog->name));
             return -1;
         }
 
-        closure_lfun(&self->lpc_closure, lfun_ob->lpc_object, NULL,(unsigned short)idx, 0, MY_FALSE);
+        closure_lfun(&self->lpc_closure, sv_lfun_ob, NULL,(unsigned short)idx, 0, MY_FALSE);
         if (self->lpc_closure.type != T_CLOSURE)
         {
             PyErr_SetString(PyExc_MemoryError, "out of memory");
@@ -5371,8 +5996,7 @@ ldmud_closure_init (ldmud_closure_t *self, PyObject *args, PyObject *kwds)
         }
 
         /* The lambda was bound to the wrong object */
-        free_object(self->lpc_closure.u.lambda->ob, "ldmud_closure_init");
-        self->lpc_closure.u.lambda->ob = ref_object(bound_ob->lpc_object, "ldmud_closure_init");
+        assign_object_svalue(&(self->lpc_closure.u.lambda->ob), sv_bound_ob, "ldmud_closure_init");
 
         return 0;
     }
@@ -5398,7 +6022,9 @@ ldmud_closure_hash (ldmud_closure_t *val)
         return _Py_HashPointer(val->lpc_closure.u.lambda) ^ closure_type;
     /* Lfun or identifier closures. */
     if (CLOSURE_MALLOCED(closure_type))
-        return _Py_HashPointer(val->lpc_closure.u.lambda->ob) ^ closure_type;
+        return (val->lpc_closure.u.lambda->ob.type == T_OBJECT
+                ? _Py_HashPointer(val->lpc_closure.u.lambda->ob.u.ob)
+                : _Py_HashPointer(val->lpc_closure.u.lambda->ob.u.lwob)) ^ closure_type;
     /* Efun, simul-efun or operator closure. */
     return closure_type;
 } /* ldmud_closure_hash() */
@@ -5488,7 +6114,7 @@ ldmud_closure_call (ldmud_closure_t *cl, PyObject *arg, PyObject *kw)
  */
 
 {
-    if(!(python_is_external ? master_ob : current_object))
+    if(python_is_external ? (!master_ob) : (current_object.type == T_NUMBER))
     {
         PyErr_SetString(PyExc_RuntimeError, "can't call a closure without a current object");
         return NULL;
@@ -5642,6 +6268,769 @@ ldmud_closure_create (svalue_t* cl)
 
     return (PyObject *)self;
 } /* ldmud_closure_create() */
+
+/*-------------------------------------------------------------------------*/
+/* Coroutines */
+
+static void
+ldmud_coroutine_dealloc (ldmud_coroutine_t* self)
+
+/* Destroy the ldmud_coroutine_t object
+ */
+
+{
+    free_coroutine(self->lpc_coroutine);
+
+    remove_gc_object(&gc_coroutine_list, (ldmud_gc_var_t*)self);
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+} /* ldmud_coroutine_dealloc() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_coroutine_variables_repr (ldmud_coroutine_t *val)
+
+/* Return a string representation of this coroutine variables.
+ */
+
+{
+    function_t *fun;
+    if (val->lpc_coroutine == NULL)
+        return PyUnicode_FromString("<LPC uninitialized coroutine variables>");
+    if (val->lpc_coroutine->prog == NULL)
+        return PyUnicode_FromString("<LPC destructed coroutine variables>");
+
+    fun = val->lpc_coroutine->prog->function_headers + FUNCTION_HEADER_INDEX(val->lpc_coroutine->funstart);
+
+    switch (val->lpc_coroutine->ob.type)
+    {
+        case T_OBJECT:
+            return PyUnicode_FromFormat("<LPC coroutine variables /%s->%s()>", get_txt(val->lpc_coroutine->ob.u.ob->name), get_txt(fun->name));
+        case T_LWOBJECT:
+            return PyUnicode_FromFormat("<LPC coroutine variables /%s->%s()>", get_txt(val->lpc_coroutine->ob.u.lwob->prog->name), get_txt(fun->name));
+        default:
+            return PyUnicode_FromString("<LPC destructed coroutine variables>");
+    }
+} /* ldmud_coroutine_variables_repr() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_coroutine_variables_getattro (ldmud_coroutine_t *val, PyObject *name)
+
+/* Return the value of a local variable.
+ */
+
+{
+    PyObject *result = PyObject_GenericGetAttr((PyObject *)val, name);
+    if (result || !PyErr_ExceptionMatches(PyExc_AttributeError))
+        return result;
+
+    if (!val->lpc_coroutine || !val->lpc_coroutine->prog
+      || (val->lpc_coroutine->state != CS_SLEEPING && val->lpc_coroutine->state != CS_AWAITING))
+        return NULL;
+    else
+    {
+        string_t* varname;
+        bool error;
+
+        PyErr_Clear();
+
+        /* And now search for the variable. */
+        varname = find_tabled_python_string(name, "variable name", &error);
+        if (error)
+            return NULL;
+
+        if (varname)
+        {
+            int num_names = val->lpc_coroutine->num_variable_names;
+            string_t **strings = val->lpc_coroutine->prog->strings;
+            bytecode_t *p = val->lpc_coroutine->pc - 2*num_names;
+
+            for (int i = 0; i < num_names; i++)
+            {
+                if (varname != strings[get_short(p + 2*i)])
+                    continue;
+
+                return svalue_to_python(val->lpc_coroutine->variables + i);
+            }
+        }
+
+        PyErr_Format(PyExc_AttributeError, "Variable '%U' not found", name);
+        return NULL;
+    }
+} /* ldmud_coroutine_variables_getattro() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_coroutine_variables_setattro (ldmud_coroutine_t *val, PyObject *name, PyObject *value)
+
+/* Set the value of a local variable.
+ */
+
+{
+    int res = PyObject_GenericSetAttr((PyObject*)val, name, value);
+    if (!res || !PyErr_ExceptionMatches(PyExc_AttributeError))
+        return res;
+
+    if (!val->lpc_coroutine || !val->lpc_coroutine->prog
+      || (val->lpc_coroutine->state != CS_SLEEPING && val->lpc_coroutine->state != CS_AWAITING))
+        return -1;
+    else
+    {
+        string_t* varname;
+        bool error;
+
+        PyErr_Clear();
+
+        /* And now search for the variable. */
+        varname = find_tabled_python_string(name, "variable name", &error);
+        if (error)
+            return -1;
+
+        if (varname)
+        {
+            int num_names = val->lpc_coroutine->num_variable_names;
+            string_t **strings = val->lpc_coroutine->prog->strings;
+            bytecode_t *p = val->lpc_coroutine->pc - 2*num_names;
+
+            for (int i = 0; i < num_names; i++)
+            {
+                if (varname != strings[get_short(p + 2*i)])
+                    continue;
+
+                if (value == NULL)
+                    assign_svalue(val->lpc_coroutine->variables + i, &const0);
+                else
+                {
+                    svalue_t sv;
+                    const char* err = python_to_svalue(&sv, value);
+
+                    if (err != NULL)
+                    {
+                        PyErr_SetString(PyExc_ValueError, err);
+                        return -1;
+                    }
+
+                    transfer_svalue(val->lpc_coroutine->variables + i, &sv);
+                }
+                return 0;
+            }
+        }
+
+        PyErr_Format(PyExc_AttributeError, "Variable '%U' not found", name);
+        return -1;
+    }
+
+} /* ldmud_coroutine_variables_setattro() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_variables_dir (ldmud_coroutine_t *val)
+
+/* Return a list of all local variables.
+ */
+
+{
+    PyObject *result;
+    PyObject *attrs = get_class_dir((PyObject*)val);
+
+    if (attrs == NULL)
+        return NULL;
+
+    result = PySequence_List(attrs);
+    Py_DECREF(attrs);
+
+    if (val->lpc_coroutine && val->lpc_coroutine->prog
+      && (val->lpc_coroutine->state == CS_SLEEPING || val->lpc_coroutine->state == CS_AWAITING))
+    {
+        int num_names = val->lpc_coroutine->num_variable_names;
+        string_t **strings = val->lpc_coroutine->prog->strings;
+        bytecode_t *p = val->lpc_coroutine->pc - 2*num_names;
+
+        for (int i = 0; i < num_names; i++)
+        {
+            string_t *var = strings[get_short(p + 2*i)];
+            PyObject *varname = PyUnicode_FromStringAndSize(get_txt(var), mstrsize(var));
+
+            if (varname == NULL)
+            {
+                PyErr_Clear();
+                continue;
+            }
+
+            if (PyList_Append(result, varname) < 0)
+                PyErr_Clear();
+            Py_DECREF(varname);
+        }
+    }
+
+    return result;
+} /* ldmud_coroutine_variables_dir() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_variables_dict (ldmud_coroutine_t *val, void *closure)
+
+/* Returns a list of all variables.
+ */
+
+{
+    PyObject *result, *dict = PyDict_New();
+    if (!dict)
+        return NULL;
+
+    if (val->lpc_coroutine && val->lpc_coroutine->prog
+      && (val->lpc_coroutine->state == CS_SLEEPING || val->lpc_coroutine->state == CS_AWAITING))
+    {
+        int num_names = val->lpc_coroutine->num_variable_names;
+        string_t **strings = val->lpc_coroutine->prog->strings;
+        bytecode_t *p = val->lpc_coroutine->pc - 2*num_names;
+        svalue_t *values = val->lpc_coroutine->variables;
+
+        for (int i = 0; i < num_names; i++)
+        {
+            string_t *var = strings[get_short(p + 2*i)];
+            PyObject *varname = PyUnicode_FromStringAndSize(get_txt(var), mstrsize(var));
+            PyObject *value;
+
+            if (varname == NULL)
+            {
+                PyErr_Clear();
+                continue;
+            }
+
+            value = svalue_to_python(values + i);
+            if (value == NULL)
+            {
+                PyErr_Clear();
+                Py_DECREF(varname);
+                continue;
+            }
+
+            if (PyDict_SetItem(dict, varname, value) < 0)
+                PyErr_Clear();
+            Py_DECREF(varname);
+            Py_DECREF(value);
+        }
+    }
+
+    result = PyDictProxy_New(dict);
+    Py_DECREF(dict);
+    return result;
+} /* ldmud_coroutine_variables_dict() */
+
+/*-------------------------------------------------------------------------*/
+static PyMethodDef ldmud_coroutine_variables_methods[] =
+{
+    {
+        "__dir__",
+        (PyCFunction)ldmud_coroutine_variables_dir, METH_NOARGS,
+        "__dir__() -> List\n\n"
+        "Returns a list of all attributes."
+    },
+
+    {NULL}
+};
+
+static PyGetSetDef ldmud_coroutine_variables_getset[] =
+{
+    {"__dict__", (getter)ldmud_coroutine_variables_dict, NULL, NULL},
+    {NULL}
+};
+
+static PyTypeObject ldmud_coroutine_variables_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.CoroutineVariables",         /* tp_name */
+    sizeof(ldmud_coroutine_t),          /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_coroutine_dealloc,/* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    (reprfunc)ldmud_coroutine_variables_repr, /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    (getattrofunc)ldmud_coroutine_variables_getattro, /* tp_getattro */
+    (setattrofunc)ldmud_coroutine_variables_setattro, /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC coroutine variables",          /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_coroutine_variables_methods,  /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_coroutine_variables_getset,   /* tp_getset */
+};
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_coroutine_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
+
+/* Implmenent __new__ for ldmud_coroutine_t, i.e. allocate and initialize
+ * the coroutine with null values.
+ */
+
+{
+    ldmud_coroutine_t *self;
+
+    self = (ldmud_coroutine_t *)type->tp_alloc(type, 0);
+    if (self == NULL)
+        return NULL;
+
+    self->lpc_coroutine = NULL;
+    add_gc_object(&gc_coroutine_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_coroutine_new() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_coroutine_repr (ldmud_coroutine_t *val)
+
+/* Return a string representation of this coroutine.
+ */
+
+{
+    function_t *fun;
+    if (val->lpc_coroutine == NULL)
+        return PyUnicode_FromString("<LPC uninitialized coroutine>");
+    if (val->lpc_coroutine->prog == NULL)
+        return PyUnicode_FromString("<LPC destructed coroutine>");
+
+    fun = val->lpc_coroutine->prog->function_headers + FUNCTION_HEADER_INDEX(val->lpc_coroutine->funstart);
+
+    switch (val->lpc_coroutine->ob.type)
+    {
+        case T_OBJECT:
+            return PyUnicode_FromFormat("<LPC coroutine /%s->%s()>", get_txt(val->lpc_coroutine->ob.u.ob->name), get_txt(fun->name));
+        case T_LWOBJECT:
+            return PyUnicode_FromFormat("<LPC coroutine /%s->%s()>", get_txt(val->lpc_coroutine->ob.u.lwob->prog->name), get_txt(fun->name));
+        default:
+            return PyUnicode_FromString("<LPC destructed coroutine>");
+    }
+} /* ldmud_coroutine_repr() */
+
+/*-------------------------------------------------------------------------*/
+static Py_hash_t
+ldmud_coroutine_hash (ldmud_coroutine_t *val)
+
+/* Return a hash of this coroutine.
+ */
+
+{
+    return _Py_HashPointer(val->lpc_coroutine);
+} /* ldmud_coroutine_hash() */
+
+/*-------------------------------------------------------------------------*/
+static bool ldmud_coroutine_check(PyObject *ob);
+
+static PyObject*
+ldmud_coroutine_richcompare (ldmud_coroutine_t *self, PyObject *other, int op)
+
+/* Compare <self> to <other> with the compare operation <op>.
+ */
+
+{
+    coroutine_t *self_cr, *other_cr;
+    bool result;
+    PyObject* resultval;
+
+    if (!ldmud_coroutine_check(other))
+    {
+        Py_INCREF(Py_NotImplemented);
+        return Py_NotImplemented;
+    }
+
+    self_cr = self->lpc_coroutine;
+    other_cr = ((ldmud_coroutine_t*)other)->lpc_coroutine;
+
+    if(self_cr == NULL && other_cr == NULL)
+        result = op == Py_LE || op == Py_EQ || op == Py_GE;
+    else if(self_cr == NULL)
+        result = op == Py_LT || op == Py_LE || op == Py_NE;
+    else if(other_cr == NULL)
+        result = op == Py_GT || op == Py_GE || op == Py_NE;
+    else
+    {
+        switch (op)
+        {
+            case Py_LT: result = self_cr <  other_cr; break;
+            case Py_LE: result = self_cr <= other_cr; break;
+            case Py_EQ: result = self_cr == other_cr; break;
+            case Py_NE: result = self_cr != other_cr; break;
+            case Py_GT: result = self_cr >  other_cr; break;
+            case Py_GE: result = self_cr >= other_cr; break;
+            default:
+            {
+                Py_INCREF(Py_NotImplemented);
+                return Py_NotImplemented;
+            }
+        }
+    }
+
+    resultval = result ? Py_True : Py_False;
+    Py_INCREF(resultval);
+    return resultval;
+} /* ldmud_coroutine_richcompare() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_coroutine_bool(ldmud_coroutine_t *val)
+
+/* Return 0 (false) for coroutines of destructed objects, 1 (true) for normal objects.
+ */
+
+{
+    if (!val->lpc_coroutine)
+        return 0;
+    return valid_coroutine(val->lpc_coroutine);
+} /* ldmud_coroutine_bool() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_get_object (ldmud_coroutine_t *val, void *closure)
+
+/* Return the value for the object member.
+ */
+
+{
+    if(!val->lpc_coroutine)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    return svalue_to_python(&(val->lpc_coroutine->ob));
+} /* ldmud_coroutine_get_object() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_get_program_name (ldmud_coroutine_t *val, void *closure)
+
+/* Return the value for the program_name member.
+ */
+
+{
+    if(!val->lpc_coroutine || !val->lpc_coroutine->prog)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    return PyUnicode_FromFormat("/%s", get_txt(val->lpc_coroutine->prog->name));
+} /* ldmud_coroutine_get_program_name() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_get_function_name (ldmud_coroutine_t *val, void *closure)
+
+/* Return the value for the function_name member.
+ */
+
+{
+    string_t * name;
+    if(!val->lpc_coroutine || !val->lpc_coroutine->prog)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    name = val->lpc_coroutine->prog->function_headers[FUNCTION_HEADER_INDEX(val->lpc_coroutine->funstart)].name;
+    return PyUnicode_FromStringAndSize(get_txt(name), mstrsize(name));
+} /* ldmud_coroutine_get_function_name() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_get_file_name (ldmud_coroutine_t *val, void *closure)
+
+/* Return the value for the file_name member.
+ */
+
+{
+    string_t * name;
+    PyObject * result;
+
+    if(!val->lpc_coroutine || !val->lpc_coroutine->prog)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    get_line_number(val->lpc_coroutine->pc, val->lpc_coroutine->prog, &name);
+    if (name == STR_UNDEFINED)
+    {
+        free_mstring(name);
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    result = PyUnicode_FromFormat("/%s", get_txt(name));
+    free_mstring(name);
+    return result;
+} /* ldmud_coroutine_get_file_name() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_get_line_number (ldmud_coroutine_t *val, void *closure)
+
+/* Return the value for the line_number member.
+ */
+
+{
+    string_t * name;
+    int pos;
+
+    if(!val->lpc_coroutine || !val->lpc_coroutine->prog)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    pos = get_line_number(val->lpc_coroutine->pc, val->lpc_coroutine->prog, &name);
+    free_mstring(name);
+
+    if (pos == 0)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    return PyLong_FromLong(pos);
+} /* ldmud_coroutine_get_line_number() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_coroutine_get_variables (ldmud_coroutine_t *val, void *closure)
+
+/* Return the value for the variables member.
+ */
+
+{
+    ldmud_coroutine_t *result;
+
+    if (!val->lpc_coroutine || !val->lpc_coroutine->prog
+      || (val->lpc_coroutine->state != CS_SLEEPING && val->lpc_coroutine->state != CS_AWAITING))
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    result = (ldmud_coroutine_t*)ldmud_coroutine_variables_type.tp_alloc(&ldmud_coroutine_variables_type, 0);
+    if (result == NULL)
+        return NULL;
+
+    result->lpc_coroutine = ref_coroutine(val->lpc_coroutine);
+    add_gc_object(&gc_coroutine_list, (ldmud_gc_var_t*)result);
+
+    return (PyObject *)result;
+} /* ldmud_coroutine_get_variables() */
+
+/*-------------------------------------------------------------------------*/
+static void
+ldmud_coroutine_call_coroutine (int num_arg, void* data)
+
+/* Helper function for ldmud_coroutine_call().
+ */
+
+{
+    inter_sp = f_call_coroutine(inter_sp);
+} /* ldmud_coroutine_call_coroutine() */
+
+
+static PyObject*
+ldmud_coroutine_call (ldmud_coroutine_t *cr, PyObject *arg, PyObject *kw)
+
+/* Implement the call operator for coroutines.
+ */
+
+{
+    int num_arg = (int)PyTuple_GET_SIZE(arg);
+    coroutine_t * target = cr->lpc_coroutine;
+
+    if(python_is_external ? (!master_ob) : (current_object.type == T_NUMBER))
+    {
+        PyErr_SetString(PyExc_RuntimeError, "can't call a coroutine without a current object");
+        return NULL;
+    }
+
+    if (kw != NULL && PyDict_Size(kw) != 0)
+    {
+        PyErr_SetString(PyExc_TypeError, "coroutine call takes no keyword arguments");
+        return NULL;
+    }
+    else if (num_arg > 1)
+    {
+        PyErr_SetString(PyExc_TypeError, "coroutine call takes only a single argument");
+        return NULL;
+    }
+    else if (target == NULL)
+    {
+        PyErr_SetString(PyExc_TypeError, "uninitialized lpc coroutine");
+        return NULL;
+    }
+    else if (!valid_coroutine(target))
+    {
+        PyErr_SetString(PyExc_TypeError, "expired lpc coroutine");
+        return NULL;
+    }
+    else if (!(target = get_resumable_coroutine(target)))
+    {
+        PyErr_SetString(PyExc_TypeError, "coroutine is not resumable");
+        return NULL;
+    }
+    else
+    {
+        svalue_t *sp = inter_sp;
+        PyObject *result;
+        const char* err;
+
+        /* Put all arguments on the stack. */
+        push_ref_coroutine(sp, target);
+
+        if (num_arg == 1)
+        {
+            err = python_to_svalue(++sp, PyTuple_GetItem(arg, 0));
+            if (err != NULL)
+            {
+                free_coroutine(target);
+
+                PyErr_SetString(PyExc_ValueError, err);
+                return NULL;
+            }
+        }
+        else
+            push_number(sp, 0);
+
+        inter_sp = sp;
+
+        if(call_lpc_secure((CClosureFun)ldmud_coroutine_call_coroutine, 2, NULL))
+        {
+            result = svalue_to_python(inter_sp);
+            pop_stack();
+        }
+        else
+            result = NULL;
+
+        return result;
+    }
+
+    return NULL;
+} /* ldmud_coroutine_call() */
+
+/*-------------------------------------------------------------------------*/
+static PyNumberMethods ldmud_coroutine_as_number =
+{
+    0,                                  /* nb_add */
+    0,                                  /* nb_subtract */
+    0,                                  /* nb_multiply */
+    0,                                  /* nb_remainder */
+    0,                                  /* nb_divmod */
+    0,                                  /* nb_power */
+    0,                                  /* nb_negative */
+    0,                                  /* nb_positive */
+    0,                                  /* nb_absolute */
+    (inquiry)ldmud_coroutine_bool,      /* nb_bool */
+};
+
+static PyMethodDef ldmud_coroutine_methods[] =
+{
+    {NULL}
+};
+
+static PyGetSetDef ldmud_coroutine_getset[] =
+{
+    {"object",        (getter)ldmud_coroutine_get_object,        NULL, NULL, NULL},
+    {"program_name",  (getter)ldmud_coroutine_get_program_name,  NULL, NULL, NULL},
+    {"function_name", (getter)ldmud_coroutine_get_function_name, NULL, NULL, NULL},
+    {"file_name",     (getter)ldmud_coroutine_get_file_name,     NULL, NULL, NULL},
+    {"line_number",   (getter)ldmud_coroutine_get_line_number,   NULL, NULL, NULL},
+    {"variables",     (getter)ldmud_coroutine_get_variables,     NULL, NULL, NULL},
+    {NULL}
+};
+
+static PyTypeObject ldmud_coroutine_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.Coroutine",                  /* tp_name */
+    sizeof(ldmud_coroutine_t),          /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_coroutine_dealloc,/* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    (reprfunc)ldmud_coroutine_repr,     /* tp_repr */
+    &ldmud_coroutine_as_number,         /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    (hashfunc)ldmud_coroutine_hash,     /* tp_hash  */
+    (ternaryfunc)ldmud_coroutine_call,  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC coroutine",                    /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    (richcmpfunc)ldmud_coroutine_richcompare, /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_coroutine_methods,            /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_coroutine_getset,             /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    0,                                  /* tp_init */
+    0,                                  /* tp_alloc */
+    ldmud_coroutine_new,                /* tp_new */
+};
+
+
+/*-------------------------------------------------------------------------*/
+static bool
+ldmud_coroutine_check (PyObject *ob)
+
+/* Returns true, when <ob> is of the LPC coroutine type.
+ */
+
+{
+    return Py_TYPE(ob) == &ldmud_coroutine_type;
+} /* ldmud_coroutine_check() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_coroutine_create (coroutine_t* cr)
+
+/* Creates a new Python coroutine from an LPC coroutine.
+ */
+
+{
+    ldmud_coroutine_t *self;
+
+    self = (ldmud_coroutine_t *)ldmud_coroutine_type.tp_alloc(&ldmud_coroutine_type, 0);
+    if (self == NULL)
+        return NULL;
+
+    self->lpc_coroutine = ref_coroutine(cr);
+    add_gc_object(&gc_coroutine_list, (ldmud_gc_var_t*)self);
+
+    return (PyObject *)self;
+} /* ldmud_coroutine_create() */
 
 /*-------------------------------------------------------------------------*/
 /* Symbols */
@@ -6141,10 +7530,9 @@ ldmud_lvalue_struct_members_getattro (ldmud_struct_t *self, PyObject *name)
  */
 
 {
-    PyObject *result, *utf8;
-    char* namebuf;
-    ssize_t namelength;
+    PyObject *result;
     string_t* member_name;
+    bool error;
     int idx;
 
     /* First check real attributes... */
@@ -6158,24 +7546,9 @@ ldmud_lvalue_struct_members_getattro (ldmud_struct_t *self, PyObject *name)
     PyErr_Clear();
 
     /* And now search for a member. */
-    if (!PyUnicode_Check(name))
-    {
-        PyErr_Format(PyExc_TypeError,
-                     "attribute name must be string, not '%.200s'",
-                     name->ob_type->tp_name);
+    member_name = find_tabled_python_string(name, "member name", &error);
+    if (error)
         return NULL;
-    }
-
-    utf8 = PyUnicode_AsEncodedString(name, "utf-8", "replace");
-    if (utf8 == NULL)
-    {
-        PyErr_SetString(PyExc_ValueError, "undecodable member name");
-        return NULL;
-    }
-
-    PyBytes_AsStringAndSize(utf8, &namebuf, &namelength);
-    member_name = find_tabled_str_n(namebuf, namelength, STRING_UTF8);
-    Py_DECREF(utf8);
 
     idx = member_name ? struct_find_member(self->lpc_struct->type, member_name) : -1;
     if (idx < 0)
@@ -6307,7 +7680,7 @@ static PyObject*
 ldmud_lvalue_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 /* Implmenent __new__ for ldmud_lvalue_t, i.e. allocate and initialize
- * the closure with null values.
+ * the lvalue with null values.
  */
 
 {
@@ -6361,7 +7734,7 @@ ldmud_lvalue_init (ldmud_lvalue_t *self, PyObject *args, PyObject *kwds)
 static Py_hash_t
 ldmud_lvalue_hash (ldmud_lvalue_t *val)
 
-/* Return a hash of this closure.
+/* Return a hash of this lvalue.
  */
 
 {
@@ -7051,7 +8424,7 @@ static PyTypeObject ldmud_lvalue_type =
 static bool
 ldmud_lvalue_check (PyObject *ob)
 
-/* Returns true, when <ob> is of the LPC closure type.
+/* Returns true, when <ob> is of the LPC lvalue type.
  */
 
 {
@@ -7178,7 +8551,22 @@ ldmud_efun_call_efun (int num_arg, ldmud_efun_t *func)
      */
     svalue_t efun_closure = { T_CLOSURE };
     efun_closure.x.closure_type = (short)(func->efun_idx + CLOSURE_EFUN);
-    efun_closure.u.ob = current_object == NULL ? master_ob : current_object;
+    switch (current_object.type)
+    {
+        case T_OBJECT:
+            efun_closure.u.ob = current_object.u.ob;
+            break;
+
+        case T_LWOBJECT:
+            efun_closure.u.lwob = current_object.u.lwob;
+            efun_closure.x.closure_type += CLOSURE_LWO;
+            break;
+
+        case T_NUMBER:
+        default:
+            efun_closure.u.ob = master_ob;
+            break;
+    }
 
     call_lambda(&efun_closure, num_arg);
 } /* ldmud_efun_call_efun() */
@@ -7191,7 +8579,7 @@ ldmud_efun_call (ldmud_efun_t *func, PyObject *arg, PyObject *kw)
  */
 
 {
-    if(!(python_is_external ? master_ob : current_object))
+    if(python_is_external ? (!master_ob) : (current_object.type == T_NUMBER))
     {
         PyErr_SetString(PyExc_RuntimeError, "can't call an efun without a current object");
         return NULL;
@@ -7389,6 +8777,56 @@ create_efun_namespace ()
 /*-------------------------------------------------------------------------*/
 /* Module definition for the ldmud builtin module */
 
+static int
+ldmud_traverse (PyObject *self, visitproc visit, void *arg)
+
+/* Garbage collection support for Python.
+ * We visit our global variables here.
+ */
+{
+    for (int i = 0; i < PYTHON_EFUN_TABLE_SIZE; i++)
+        Py_VISIT(python_efun_table[i].callable);
+    for (python_poll_fds_t *cur = poll_fds; cur != NULL; cur = cur->next)
+    {
+        Py_VISIT(cur->eventsfun);
+        Py_VISIT(cur->fun);
+    }
+    for (int i = 0; i < PYTHON_HOOK_COUNT; i++)
+        for (python_hook_t* cur = python_hooks[i]; cur != NULL; cur = cur->next)
+            Py_VISIT(cur->fun);
+#ifdef USE_PYTHON_CONTEXT
+    Py_VISIT(python_contextvar_current_object);
+    Py_VISIT(python_contextvar_command_giver);
+#endif
+
+    return 0;
+} /* ldmud_traverse() */
+
+static int
+ldmud_clear (PyObject *self)
+
+/* Garbage collection support for Python.
+ * We clear our global variables here.
+ */
+{
+    for (int i = 0; i < PYTHON_EFUN_TABLE_SIZE; i++)
+        Py_CLEAR(python_efun_table[i].callable);
+    for (python_poll_fds_t *cur = poll_fds; cur != NULL; cur = cur->next)
+    {
+        Py_CLEAR(cur->eventsfun);
+        Py_CLEAR(cur->fun);
+    }
+    for (int i = 0; i < PYTHON_HOOK_COUNT; i++)
+        for (python_hook_t* cur = python_hooks[i]; cur != NULL; cur = cur->next)
+            Py_CLEAR(cur->fun);
+#ifdef USE_PYTHON_CONTEXT
+    Py_CLEAR(python_contextvar_current_object);
+    Py_CLEAR(python_contextvar_command_giver);
+#endif
+
+    return 0;
+} /* ldmud_clear() */
+
 static PyObject*
 ldmud_get_master (PyObject* self, PyObject* args UNUSED)
 
@@ -7493,10 +8931,16 @@ static PyMethodDef ldmud_methods[] =
 
 static PyModuleDef ldmud_module =
 {
-    PyModuleDef_HEAD_INIT, "ldmud",
+    PyModuleDef_HEAD_INIT,
+    "ldmud",                            /* m_name */
     "This module provides access to the LDMud interpreter.",
-    -1, ldmud_methods,
-    NULL, NULL, NULL, NULL
+                                        /* m_doc */
+    -1,                                 /* m_size */
+    ldmud_methods,                      /* m_methods */
+    NULL,                               /* m_slots */
+    ldmud_traverse,                     /* m_traverse */
+    ldmud_clear,                        /* m_clear */
+    NULL                                /* m_free */
 };
 
 static PyObject*
@@ -7511,15 +8955,17 @@ init_ldmud_module ()
     /* Initialize types. */
     if (PyType_Ready(&ldmud_object_type) < 0)
         return NULL;
-    if (PyType_Ready(&ldmud_object_functions_type) < 0)
+    if (PyType_Ready(&ldmud_lwobject_type) < 0)
         return NULL;
-    if (PyType_Ready(&ldmud_object_lfun_type) < 0)
+    if (PyType_Ready(&ldmud_program_functions_type) < 0)
         return NULL;
-    if (PyType_Ready(&ldmud_object_lfun_argument_type) < 0)
+    if (PyType_Ready(&ldmud_program_lfun_type) < 0)
         return NULL;
-    if (PyType_Ready(&ldmud_object_variables_type) < 0)
+    if (PyType_Ready(&ldmud_program_lfun_argument_type) < 0)
         return NULL;
-    if (PyType_Ready(&ldmud_object_variable_type) < 0)
+    if (PyType_Ready(&ldmud_program_variables_type) < 0)
+        return NULL;
+    if (PyType_Ready(&ldmud_program_variable_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_array_type) < 0)
         return NULL;
@@ -7536,6 +8982,10 @@ init_ldmud_module ()
     if (PyType_Ready(&ldmud_struct_member_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_closure_type) < 0)
+        return NULL;
+    if (PyType_Ready(&ldmud_coroutine_type) < 0)
+        return NULL;
+    if (PyType_Ready(&ldmud_coroutine_variables_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_symbol_type) < 0)
         return NULL;
@@ -7557,18 +9007,22 @@ init_ldmud_module ()
 
     /* Add types to module. */
     Py_INCREF(&ldmud_object_type);
+    Py_INCREF(&ldmud_lwobject_type);
     Py_INCREF(&ldmud_array_type);
     Py_INCREF(&ldmud_mapping_type);
     Py_INCREF(&ldmud_struct_type);
     Py_INCREF(&ldmud_closure_type);
+    Py_INCREF(&ldmud_coroutine_type);
     Py_INCREF(&ldmud_symbol_type);
     Py_INCREF(&ldmud_quoted_array_type);
     Py_INCREF(&ldmud_interrupt_exception_type);
     PyModule_AddObject(module, "Object", (PyObject*) &ldmud_object_type);
+    PyModule_AddObject(module, "LWObject", (PyObject*) &ldmud_lwobject_type);
     PyModule_AddObject(module, "Array", (PyObject*) &ldmud_array_type);
     PyModule_AddObject(module, "Mapping", (PyObject*) &ldmud_mapping_type);
     PyModule_AddObject(module, "Struct", (PyObject*) &ldmud_struct_type);
     PyModule_AddObject(module, "Closure", (PyObject*) &ldmud_closure_type);
+    PyModule_AddObject(module, "Coroutine", (PyObject*) &ldmud_coroutine_type);
     PyModule_AddObject(module, "Symbol", (PyObject*) &ldmud_symbol_type);
     PyModule_AddObject(module, "QuotedArray", (PyObject*) &ldmud_quoted_array_type);
     PyModule_AddObject(module, "Lvalue", (PyObject*) &ldmud_lvalue_type);
@@ -7637,10 +9091,6 @@ lpctype_to_pythontype (lpctype_t *type)
                     Py_INCREF(Py_None);
                     return Py_None;
 
-                case TYPE_OBJECT:
-                    Py_INCREF(&ldmud_object_type);
-                    return (PyObject *)&ldmud_object_type;
-
                 case TYPE_MAPPING:
                     Py_INCREF(&ldmud_mapping_type);
                     return (PyObject *)&ldmud_mapping_type;
@@ -7652,6 +9102,10 @@ lpctype_to_pythontype (lpctype_t *type)
                 case TYPE_CLOSURE:
                     Py_INCREF(&ldmud_closure_type);
                     return (PyObject *)&ldmud_closure_type;
+
+                case TYPE_COROUTINE:
+                    Py_INCREF(&ldmud_coroutine_type);
+                    return (PyObject *)&ldmud_coroutine_type;
 
                 case TYPE_SYMBOL:
                     Py_INCREF(&ldmud_symbol_type);
@@ -7674,6 +9128,19 @@ lpctype_to_pythontype (lpctype_t *type)
         case TCLASS_STRUCT:
             Py_INCREF(&ldmud_struct_type);
             return (PyObject *)&ldmud_struct_type;
+
+        case TCLASS_OBJECT:
+            switch (type->t_object.type)
+            {
+                case OBJECT_REGULAR:
+                    Py_INCREF(&ldmud_object_type);
+                    return (PyObject *)&ldmud_object_type;
+
+                case OBJECT_LIGHTWEIGHT:
+                    Py_INCREF(&ldmud_lwobject_type);
+                    return (PyObject *)&ldmud_lwobject_type;
+            }
+            break;
 
         case TCLASS_ARRAY:
             Py_INCREF(&ldmud_array_type);
@@ -7751,7 +9218,10 @@ pythontype_to_lpctype (PyObject* ptype)
          * need to ref-count them.
          */
         if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_object_type))
-            return lpctype_object;
+            return lpctype_any_object;
+
+        if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_lwobject_type))
+            return lpctype_any_lwobject;
 
         if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_array_type))
             return get_array_type(lpctype_mixed);
@@ -7764,6 +9234,9 @@ pythontype_to_lpctype (PyObject* ptype)
 
         if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_closure_type))
             return lpctype_closure;
+
+        if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_coroutine_type))
+            return lpctype_coroutine;
 
         if (PyObject_IsSubclass(ptype, (PyObject*) &ldmud_symbol_type))
             return lpctype_symbol;
@@ -7848,11 +9321,17 @@ svalue_to_python (svalue_t *svp)
         case T_OBJECT:
             return ldmud_object_create(svp->u.ob);
 
+        case T_LWOBJECT:
+            return ldmud_lwobject_create(svp->u.lwob);
+
         case T_MAPPING:
             return ldmud_mapping_create(svp->u.map);
 
         case T_CLOSURE:
             return ldmud_closure_create(svp);
+
+        case T_COROUTINE:
+            return ldmud_coroutine_create(svp->u.coroutine);
 
         case T_SYMBOL:
             return ldmud_symbol_create(svp);
@@ -7926,6 +9405,12 @@ python_to_svalue (svalue_t *dest, PyObject* val)
         return NULL;
     }
 
+    if (PyObject_TypeCheck(val, &ldmud_lwobject_type))
+    {
+        put_ref_lwobject(dest, ((ldmud_lwobject_t*)val)->lpc_lwobject);
+        return NULL;
+    }
+
     if (PyObject_TypeCheck(val, &ldmud_array_type))
     {
         put_ref_array(dest, ((ldmud_array_t*)val)->lpc_array);
@@ -7947,6 +9432,12 @@ python_to_svalue (svalue_t *dest, PyObject* val)
     if (PyObject_TypeCheck(val, &ldmud_closure_type))
     {
         assign_svalue_no_free(dest, &((ldmud_closure_t*)val)->lpc_closure);
+        return NULL;
+    }
+
+    if (PyObject_TypeCheck(val, &ldmud_coroutine_type))
+    {
+        put_ref_coroutine(dest, ((ldmud_coroutine_t*)val)->lpc_coroutine);
         return NULL;
     }
 
@@ -8055,6 +9546,14 @@ python_eq_svalue (PyObject* pval, svalue_t *sval)
             return false;
     }
 
+    if (PyObject_TypeCheck(pval, &ldmud_lwobject_type))
+    {
+        if (sval->type == T_LWOBJECT)
+            return sval->u.lwob == ((ldmud_lwobject_t*)pval)->lpc_lwobject;
+        else
+            return false;
+    }
+
     if (PyObject_TypeCheck(pval, &ldmud_array_type))
     {
         if (sval->type == T_POINTER)
@@ -8083,6 +9582,14 @@ python_eq_svalue (PyObject* pval, svalue_t *sval)
     {
         if (sval->type == T_CLOSURE)
             return closure_cmp(sval, &((ldmud_closure_t*)pval)->lpc_closure) == 0;
+        else
+            return false;
+    }
+
+    if (PyObject_TypeCheck(pval, &ldmud_coroutine_type))
+    {
+        if (sval->type == T_COROUTINE)
+            return sval->u.coroutine == ((ldmud_coroutine_t*)pval)->lpc_coroutine;
         else
             return false;
     }
@@ -8236,7 +9743,7 @@ call_lpc_secure (CClosureFun fun, int num_arg, void* data)
     }
     else
     {
-        object_t *save_ob = current_object;
+        svalue_t save_ob = current_object;
 
         if(python_is_external)
         {
@@ -8244,8 +9751,8 @@ call_lpc_secure (CClosureFun fun, int num_arg, void* data)
              * in the context of the master ob.
              */
             python_restore_context();
-            if (!current_object)
-                current_object = master_ob;
+            if (current_object.type == T_NUMBER)
+                set_current_object(master_ob);
             mark_start_evaluation();
         }
 
@@ -8303,6 +9810,38 @@ python_save_contextvar_object (PyObject** contextvar, const char* name, object_t
         Py_DECREF(ob);
     }
 } /* python_save_contextvar_object() */
+
+/*-------------------------------------------------------------------------*/
+static void
+python_save_contextvar_value (PyObject** contextvar, const char* name, svalue_t object)
+
+/* Save the given LPC value into a the corresponding Python context variable.
+ */
+
+{
+    PyObject *tok, *ob;
+
+    if (!*contextvar)
+    {
+        if (object.type == T_NUMBER)
+            return;
+
+        *contextvar = PyContextVar_New(name, NULL);
+    }
+
+    ob = svalue_to_python(&object);
+    if (!ob)
+        PyErr_Clear();
+    else
+    {
+        tok = PyContextVar_Set(*contextvar, ob);
+        if (!tok)
+            PyErr_Clear();
+        else
+            Py_DECREF(tok);
+        Py_DECREF(ob);
+    }
+} /* python_save_contextvar_value() */
 #endif
 
 /*-------------------------------------------------------------------------*/
@@ -8315,7 +9854,7 @@ python_save_context ()
 
 {
 #ifdef USE_PYTHON_CONTEXT
-    python_save_contextvar_object(&python_contextvar_current_object, "ldmud.current_object", current_object);
+    python_save_contextvar_value(&python_contextvar_current_object, "ldmud.current_object", current_object);
     python_save_contextvar_object(&python_contextvar_command_giver, "ldmud.command_giver", command_giver);
 #endif
 } /* python_save_context() */
@@ -8366,6 +9905,34 @@ python_restore_contextvar_object (PyObject* contextvar, object_t** object)
         Py_DECREF(val);
     }
 } /* python_restore_contextvar_object() */
+
+/*-------------------------------------------------------------------------*/
+static void
+python_restore_contextvar_value (PyObject* contextvar, svalue_t* dest)
+
+/* Restore an LPC value from the corresponding Python context variable.
+ */
+
+{
+    PyObject *val;
+
+    if (!contextvar)
+        return;
+
+    if (PyContextVar_Get(contextvar, NULL, &val) < 0)
+    {
+        PyErr_Clear();
+        *dest = const0;
+    }
+    else if (val == NULL)
+        *dest = const0;
+    else
+    {
+        if (python_to_svalue(dest, val) != NULL)
+            *dest = const0;
+        Py_DECREF(val);
+    }
+} /* python_restore_contextvar_object() */
 #endif
 
 /*-------------------------------------------------------------------------*/
@@ -8379,10 +9946,10 @@ python_restore_context ()
 
 {
 #ifdef USE_PYTHON_CONTEXT
-    python_restore_contextvar_object(python_contextvar_current_object, &current_object);
+    python_restore_contextvar_value(python_contextvar_current_object, &current_object);
     python_restore_contextvar_object(python_contextvar_command_giver, &command_giver);
 #else
-    current_object = NULL;
+    clear_current_object();
     command_giver = NULL;
 #endif
 } /* python_restore_context() */
@@ -8955,6 +10522,18 @@ closure_python_efun_to_string (int type)
 
 /*-------------------------------------------------------------------------*/
 void
+python_free_object (object_t *ob)
+
+/* Free the dictionary from <ob>.
+ */
+
+{
+    if (ob->python_dict != NULL)
+        Py_DECREF((PyObject*) ob->python_dict);
+} /* python_free_object() */
+
+/*-------------------------------------------------------------------------*/
+void
 python_free_replace_program_protector (replace_ob_t *r_ob)
 
 /* Free the python replace_program() protector and all references
@@ -8976,7 +10555,7 @@ python_free_replace_program_protector (replace_ob_t *r_ob)
 
 /*-------------------------------------------------------------------------*/
 static void
-python_replace_program_adjust_single_ref (ldmud_object_and_index_t* ref, replace_ob_t *r_ob, int (*convert_idx)(replace_ob_t*, int))
+python_replace_program_adjust_single_ref (ldmud_program_and_index_t* ref, replace_ob_t *r_ob, int (*convert_idx)(replace_ob_t*, int))
 
 /* Update a single reference after a replace_program().
  */
@@ -8987,8 +10566,9 @@ python_replace_program_adjust_single_ref (ldmud_object_and_index_t* ref, replace
     if (index < 0)
     {
         /* We set the object to NULL. */
-        free_object(ref->ob_base.lpc_object, "python_replace_program_adjust");
-        ref->ob_base.lpc_object = NULL;
+        free_svalue(&(ref->ob_base.lpc_object));
+        ref->ob_base.lpc_object = const0;
+        ref->ob_base.lpc_program = NULL;
         ref->index = 0;
     }
     else
@@ -9012,12 +10592,12 @@ python_replace_program_adjust (replace_ob_t *r_ob)
         /* At least one more reference, otherwise we don't need to care. */
         if (prpp->ref->ob_refcnt > 1)
         {
-            if (Py_TYPE(prpp->ref) == &ldmud_object_lfun_type)
-                python_replace_program_adjust_single_ref((ldmud_object_and_index_t*)prpp->ref
+            if (Py_TYPE(prpp->ref) == &ldmud_program_lfun_type)
+                python_replace_program_adjust_single_ref((ldmud_program_and_index_t*)prpp->ref
                                                        , r_ob
                                                        , replace_program_function_adjust);
-            else if (Py_TYPE(prpp->ref) == &ldmud_object_variable_type)
-                python_replace_program_adjust_single_ref((ldmud_object_and_index_t*)prpp->ref
+            else if (Py_TYPE(prpp->ref) == &ldmud_program_variable_type)
+                python_replace_program_adjust_single_ref((ldmud_program_and_index_t*)prpp->ref
                                                        , r_ob
                                                        , replace_program_variable_adjust);
         }
@@ -9051,6 +10631,21 @@ python_clear_refs ()
         object_t* ob = ((ldmud_object_t*)var)->lpc_object;
         if(ob != NULL)
             clear_object_ref(ob);
+    }
+
+    for(ldmud_gc_var_t* var = gc_lwobject_list; var != NULL; var = var->gcnext)
+    {
+        lwobject_t* lwob = ((ldmud_lwobject_t*)var)->lpc_lwobject;
+        if(lwob != NULL)
+            clear_lwobject_ref(lwob);
+    }
+
+    for(ldmud_gc_var_t* var = gc_program_list; var != NULL; var = var->gcnext)
+    {
+        ldmud_program_t* self = ((ldmud_program_t*)var);
+
+        clear_ref_in_vector(&(self->lpc_object), 1);
+        self->lpc_program = NULL; /* Will be restored by python_count_refs(). */
     }
 
     for(ldmud_gc_var_t* var = gc_array_list; var != NULL; var = var->gcnext)
@@ -9090,6 +10685,13 @@ python_clear_refs ()
     for(ldmud_gc_var_t* var = gc_closure_list; var != NULL; var = var->gcnext)
     {
         clear_ref_in_vector(&((ldmud_closure_t*)var)->lpc_closure, 1);
+    }
+
+    for(ldmud_gc_var_t* var = gc_coroutine_list; var != NULL; var = var->gcnext)
+    {
+        coroutine_t *cr = ((ldmud_coroutine_t*)var)->lpc_coroutine;
+        if(cr != NULL)
+            clear_coroutine_ref(cr);
     }
 
     for(ldmud_gc_var_t* var = gc_symbol_list; var != NULL; var = var->gcnext)
@@ -9155,6 +10757,34 @@ python_count_refs ()
         }
     }
 
+    for(ldmud_gc_var_t* var = gc_lwobject_list; var != NULL; var = var->gcnext)
+    {
+        lwobject_t* lwob = ((ldmud_lwobject_t*)var)->lpc_lwobject;
+        if(lwob != NULL)
+            count_lwobject_ref(lwob);
+    }
+
+    for(ldmud_gc_var_t* var = gc_program_list; var != NULL; var = var->gcnext)
+    {
+        ldmud_program_t* self = ((ldmud_program_t*)var);
+
+        count_ref_in_vector(&(self->lpc_object), 1);
+        switch (self->lpc_object.type)
+        {
+            case T_OBJECT:
+                self->lpc_program = self->lpc_object.u.ob->prog;
+                break;
+
+            case T_LWOBJECT:
+                self->lpc_program = self->lpc_object.u.lwob->prog;
+                break;
+
+            case T_NUMBER:
+            default:
+                self->lpc_program = NULL;
+        }
+    }
+
     for(ldmud_gc_var_t* var = gc_array_list; var != NULL; var = var->gcnext)
     {
         vector_t* arr = ((ldmud_array_t*)var)->lpc_array;
@@ -9202,6 +10832,13 @@ python_count_refs ()
         count_ref_in_vector(&((ldmud_closure_t*)var)->lpc_closure, 1);
     }
 
+    for(ldmud_gc_var_t* var = gc_coroutine_list; var != NULL; var = var->gcnext)
+    {
+        coroutine_t *cr = ((ldmud_coroutine_t*)var)->lpc_coroutine;
+        if(cr != NULL)
+            count_coroutine_ref(cr);
+    }
+
     for(ldmud_gc_var_t* var = gc_symbol_list; var != NULL; var = var->gcnext)
     {
         count_ref_in_vector(&((ldmud_symbol_t*)var)->lpc_symbol, 1);
@@ -9234,6 +10871,21 @@ count_python_extra_refs ()
         object_t* ob = ((ldmud_object_t*)var)->lpc_object;
         if(ob != NULL)
             count_extra_ref_in_object(ob);
+    }
+
+    for(ldmud_gc_var_t* var = gc_lwobject_list; var != NULL; var = var->gcnext)
+    {
+        lwobject_t* lwob = ((ldmud_lwobject_t*)var)->lpc_lwobject;
+        if(lwob != NULL)
+        {
+            svalue_t sv = { T_LWOBJECT, {}, { .lwob = lwob } };
+            count_extra_ref_in_vector(&sv, 1);
+        }
+    }
+
+    for(ldmud_gc_var_t* var = gc_program_list; var != NULL; var = var->gcnext)
+    {
+        count_extra_ref_in_vector(&(((ldmud_program_t*)var)->lpc_object), 1);
     }
 
     for(ldmud_gc_var_t* var = gc_array_list; var != NULL; var = var->gcnext)
@@ -9272,6 +10924,16 @@ count_python_extra_refs ()
     for(ldmud_gc_var_t* var = gc_closure_list; var != NULL; var = var->gcnext)
     {
         count_extra_ref_in_vector(&((ldmud_closure_t*)var)->lpc_closure, 1);
+    }
+
+    for(ldmud_gc_var_t* var = gc_coroutine_list; var != NULL; var = var->gcnext)
+    {
+        coroutine_t* cr = ((ldmud_coroutine_t*)var)->lpc_coroutine;
+        if(cr != NULL)
+        {
+            svalue_t sv = { T_COROUTINE, {}, { .coroutine = cr } };
+            count_extra_ref_in_vector(&sv, 1);
+        }
     }
 
     for(ldmud_gc_var_t* var = gc_symbol_list; var != NULL; var = var->gcnext)

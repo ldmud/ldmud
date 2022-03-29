@@ -74,6 +74,8 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "i-current_object.h"
+
 #include "../mudlib/sys/commands.h"
 #include "../mudlib/sys/driver_hook.h"
 
@@ -554,8 +556,8 @@ call_modify_command (char *buff)
             l = driver_hook[H_MODIFY_COMMAND].u.lambda;
             if (driver_hook[H_MODIFY_COMMAND].x.closure_type == CLOSURE_LAMBDA)
             {
-                free_object(l->ob, "call_modify_command");
-                l->ob = ref_object(command_giver, "call_modify_command");
+                free_svalue(&(l->ob));
+                put_ref_object(&(l->ob), command_giver, "call_modify_command");
             }
             push_c_string(inter_sp, buff);
             push_ref_object(inter_sp, command_giver, "call_modify_command");
@@ -672,8 +674,8 @@ notify_no_command (char *command, object_t *save_command_giver)
     {
         if (driver_hook[H_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
         {
-            free_object(driver_hook[H_NOTIFY_FAIL].u.lambda->ob, "notify_no_command");
-            driver_hook[H_NOTIFY_FAIL].u.lambda->ob = ref_object(command_giver, "notify_no_command");
+            free_svalue(&(driver_hook[H_NOTIFY_FAIL].u.lambda->ob));
+            put_ref_object(&(driver_hook[H_NOTIFY_FAIL].u.lambda->ob), command_giver, "notify_no_command");
         }
         push_c_string(inter_sp, command);
         push_ref_valid_object(inter_sp, save_command_giver, "notify_no_command");
@@ -726,8 +728,8 @@ notify_no_command (char *command, object_t *save_command_giver)
         {
             if (driver_hook[H_SEND_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
             {
-                free_object(driver_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob, "notify_no_command");
-                driver_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob = ref_object(command_giver, "notify_no_command");
+                free_svalue(&(driver_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob));
+                put_ref_object(&(driver_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob), command_giver, "notify_no_command");
             }
             call_lambda(&driver_hook[H_SEND_NOTIFY_FAIL], 3);
             pop_stack();
@@ -773,7 +775,7 @@ parse_command (char *buff, Bool from_efun)
     sentence_t *s;                 /* handy sentence pointer */
     action_t *marker_sent;         /* the marker sentence */
     ptrdiff_t length;              /* length of the verb */
-    object_t *save_current_object = current_object;
+    svalue_t  save_current_object = current_object;
     object_t *save_command_giver  = command_giver;
 
 #ifdef DEBUG
@@ -908,8 +910,8 @@ parse_command (char *buff, Bool from_efun)
          *
          * current_object is reset just after the call to apply().
          */
-        if (current_object == NULL)
-            current_object = sa->ob;
+        if (current_object.type == T_NUMBER)
+            current_object = svalue_object(sa->ob);
 
         /* Remember the object, to update score.
          */
@@ -965,11 +967,11 @@ parse_command (char *buff, Bool from_efun)
             if (strlen(buff) > mstrsize(sa->verb))
             {
                 push_c_string(inter_sp, &buff[mstrsize(sa->verb)]);
-                ret = execute_callback(&(sa->cb), 1, MY_TRUE, save_current_object == NULL);
+                ret = execute_callback(&(sa->cb), 1, MY_TRUE, save_current_object.type == T_NUMBER);
             }
             else
             {
-                ret = execute_callback(&(sa->cb), 0, MY_TRUE, save_current_object == NULL);
+                ret = execute_callback(&(sa->cb), 0, MY_TRUE, save_current_object.type == T_NUMBER);
             }
         }
         else if (s->type == SENT_NO_SPACE)
@@ -990,23 +992,23 @@ parse_command (char *buff, Bool from_efun)
                 last_verb = new_tabled(buff, STRING_UTF8);
                 buff[len] = ch;
                 push_c_string(inter_sp, &buff[len]);
-                ret = execute_callback(&(sa->cb), 1, MY_TRUE, save_current_object == NULL);
+                ret = execute_callback(&(sa->cb), 1, MY_TRUE, save_current_object.type == T_NUMBER);
                 free_mstring(last_verb);
                 last_verb = inter_sp->u.str; inter_sp--;
             }
             else
             {
-                ret = execute_callback(&(sa->cb), 0, MY_TRUE, save_current_object == NULL);
+                ret = execute_callback(&(sa->cb), 0, MY_TRUE, save_current_object.type == T_NUMBER);
             }
         }
         else if (buff[length] == ' ')
         {
             push_c_string(inter_sp, &buff[length+1]);
-            ret = execute_callback(&(sa->cb), 1, MY_TRUE, save_current_object == NULL);
+            ret = execute_callback(&(sa->cb), 1, MY_TRUE, save_current_object.type == T_NUMBER);
         }
         else
         {
-            ret = execute_callback(&(sa->cb), 0, MY_TRUE, save_current_object == NULL);
+            ret = execute_callback(&(sa->cb), 0, MY_TRUE, save_current_object.type == T_NUMBER);
         }
 
         /* Restore the old current_object and command_giver */
@@ -1147,8 +1149,8 @@ execute_command (char *str, object_t *ob)
         l = driver_hook[H_COMMAND].u.lambda;
         if (driver_hook[H_COMMAND].x.closure_type == CLOSURE_LAMBDA)
         {
-            free_object(l->ob, "execute_command");
-            l->ob = ref_object(ob, "execute_command");
+            free_svalue(&(l->ob));
+            put_ref_object(&(l->ob), ob, "execute_command");
         }
         push_c_string(inter_sp, str);
         push_ref_object(inter_sp, ob, "execute_command");
@@ -1184,11 +1186,11 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
     int error_index;
 
     /* Can't take actions from destructed objects */
-    if (current_object->flags & O_DESTRUCTED)
+    ob = get_current_object();
+    if (!ob || (ob->flags & O_DESTRUCTED))
         return MY_TRUE;
 
     shadow_ob = NULL;
-    ob = current_object;
 
     /* Check if the call comes from a shadow of the current object.
      * Get the real object and also check privileges.
@@ -1203,7 +1205,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
             if (str && find_function(str, ob->prog) >= 0)
             {
                 if (!privilege_violation4(
-                    STR_SHADOW_ADD_ACTION, ob, str, 0, inter_sp)
+                    STR_SHADOW_ADD_ACTION, svalue_object(ob), str, 0, inter_sp)
                 )
                     return MY_TRUE;
             }
@@ -1256,7 +1258,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
             }
         }
 
-        error_index = setup_function_callback(&(p->cb), ob, func->u.str
+        error_index = setup_function_callback(&(p->cb), svalue_object(ob), func->u.str
                                              , 0, NULL
                                              );
         /* setup_function_callback makes its own copy, so we free ours. */
@@ -1441,13 +1443,17 @@ v_command (svalue_t *sp, int num_arg)
 
     arg = sp - num_arg + 1;
     if (num_arg == 1)
-        ob = current_object;
+    {
+        ob = get_current_object();
+        if (!ob)
+            errorf("command for lightweight object.");
+    }
     else
         ob = arg[1].u.ob;
 
     rc = 0;
 
-    if (!(current_object->flags & O_DESTRUCTED)
+    if (!is_current_object_destructed()
      && !(ob->flags & O_DESTRUCTED))
     {
         size_t len;
@@ -1533,7 +1539,7 @@ f_execute_command (svalue_t *sp)
     res = MY_FALSE;  /* default result */
 
     /* Test if we are allowed to use this function */
-    if (privilege_violation4(STR_EXECUTE_COMMAND, origin, argp->u.str, 0, sp))
+    if (privilege_violation4(STR_EXECUTE_COMMAND, svalue_object(origin), argp->u.str, 0, sp))
     {
         marked_command_giver = origin;
         command_giver = player;
@@ -1874,9 +1880,12 @@ f_remove_action (svalue_t *sp)
     rc = 0;
     sentp = &ob->sent;
 
-    ob = current_object;
+    ob = get_current_object();
     shadow_ob = NULL;
-    
+
+    if (!ob)
+        errorf("remove_action() without current object.\n");
+
     /* Look for the underlying object, just as add_action does. */
     if (ob->flags & O_SHADOW && O_GET_SHADOW(ob)->shadowing)
     {
@@ -2208,10 +2217,13 @@ f_notify_fail (svalue_t *sp)
 {
     if (command_giver && !(command_giver->flags & O_DESTRUCTED))
     {
+        object_t *ob = get_current_object();
+        if (!ob)
+            errorf("notify_fail() without current object.\n");
         transfer_svalue(&error_msg, sp);
         if (error_obj)
             free_object(error_obj, "notify_fail");
-        error_obj = ref_object(current_object, "notify_fail");
+        error_obj = ref_object(ob, "notify_fail");
     }
     else
         free_svalue(sp);

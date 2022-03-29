@@ -1060,7 +1060,7 @@ v_read_bytes (svalue_t *sp, int num_arg)
 
         /* Determine the proper start and len to use */
         if (start < 0)
-            start = size + start;
+            start = size + start > 0 ? size + start : 0;
 
         if (start >= size) {
             close(f);

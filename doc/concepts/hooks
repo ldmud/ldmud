@@ -22,18 +22,21 @@ DESCRIPTION
 
         H_LOAD_UIDS
         H_CLONE_UIDS
-          Mandatory hooks to determine the uid and euid of loaded or cloned
-          objects.
+        H_LWOBJECT_UIDS
+          Mandatory hooks to determine the uid and euid of loaded,
+          cloned or lightweight objects.
 
 
         H_CREATE_SUPER
         H_CREATE_OB
         H_CREATE_CLONE
+        H_CREATE_LWOBJECT
           Optional hooks to initialize an object after creation.
 
           H_CREATE_SUPER is called for blueprints implicitly loaded
           by inheritance, H_CREATE_OB for explicitely loaded
-          blueprints/objects, and H_CREATE_CLONE for cloned objects.
+          blueprints/objects, H_CREATE_CLONE for cloned objects, and
+          H_CREATE_LWOBJECT for lightweight objects.
 
 
         H_RESET
@@ -149,6 +152,7 @@ HISTORY
         H_SEND_NOTIFY_FAIL and H_AUTO_INCLUDE were introduced in 3.2.9.
         H_DEFAULT_METHOD was introduced in 3.3.113.
         H_DEFAULT_PROMPT and H_PRINT_PROMPT were introduced in 3.3.163.
+        H_CREATE_LWOBJECT and H_LWOBJECT_UIDS were introduced in 3.6.5.
 
 SEE ALSO
         native(C), set_driver_hook(E), all in (H)

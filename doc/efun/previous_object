@@ -1,6 +1,6 @@
 SYNOPSIS
-        object previous_object()
-        object previous_object(int i)
+        object|lwobject previous_object()
+        object|lwobject previous_object(int i)
 
 DESCRIPTION
         Returns an object pointer to the object that did a call (call_other(),
@@ -19,7 +19,7 @@ DESCRIPTION
 
 EXAMPLES
         int security() {
-           object prev;
+           object|lwobject prev;
            if (!(prev=previous_object()));
            else if (getuid(prev)  != getuid(this_object()));
            else if (geteuid(prev) != geteuid(this_object()));

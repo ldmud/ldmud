@@ -18,7 +18,7 @@ def unwind_ptr(val):
     return (type, val)
 
 def print_ptr(val):
-    return "0x%x" % (val.cast(gdb.lookup_type('int')))
+    return "0x%x" % (val,)
 
 class MStringPrinter:
     "Print an mstring"
@@ -47,7 +47,16 @@ class MStringPrinter:
             result += '"'
             return result
         else:
-            return '"' + val["txt"].string(length = val["size"]) + '"'
+            # Some GDB versions have a broken implementation
+            # of gdb.Value.string(), therefore doing manually
+            # val["txt"].string('utf-8', length = val["size"])
+            b = []
+            for idx in range(val["size"]):
+                ch = val["txt"][idx]
+                if ch < 0:
+                    ch += 256
+                b.append(ch)
+            return '"' + bytes(b).decode('utf-8') + '"'
 
 class PtrNamePrinter:
     "Print an pointer to a struct with an name entry"
@@ -67,7 +76,7 @@ class PtrNamePrinter:
             if nameval.address == 0:
                 return print_ptr(val.address)
 
-        return print_ptr(val.address) + ' "' + nameval["txt"].string(length = nameval["size"]) + '"'
+        return print_ptr(val.address) + ' ' + MStringPrinter(nameval).to_string()
 
 class ArrayPrinter:
     "Print an LPC array"
@@ -214,10 +223,12 @@ class SValuePrinter:
     T_QUOTED_ARRAY                   = 0xa
     T_STRUCT                         = 0xb
     T_BYTES                          = 0xc
-    T_CALLBACK                       = 0xd
-    T_ERROR_HANDLER                  = 0xe
-    T_BREAK_ADDR                     = 0xf
-    T_NULL                           = 0x10
+    T_LWOBJECT                       = 0xd
+    T_COROUTINE                      = 0xe
+    T_CALLBACK                       = 0xf
+    T_ERROR_HANDLER                  = 0x10
+    T_BREAK_ADDR                     = 0x11
+    T_NULL                           = 0x12
 
     LVALUE_UNPROTECTED               = 0x00
     LVALUE_UNPROTECTED_CHAR          = 0x01
@@ -240,6 +251,8 @@ class SValuePrinter:
         T_QUOTED_ARRAY:                   "T_QUOTED_ARRAY",
         T_STRUCT:                         "T_STRUCT",
         T_BYTES:                          "T_BYTES",
+        T_LWOBJECT:                       "T_LWOBJECT",
+        T_COROUTINE:                      "T_COROUTINE",
         T_CALLBACK:                       "T_CALLBACK",
         T_ERROR_HANDLER:                  "T_ERROR_HANDLER",
         T_BREAK_ADDR:                     "T_BREAK_ADDR",
@@ -299,6 +312,8 @@ class SValuePrinter:
             return [(".u.vec", val["u"]["vec"])]
         elif stype == self.T_OBJECT:
             return [(".u.ob", val["u"]["ob"])]
+        elif stype == self.T_LWOBJECT:
+            return [(".u.lwob", val["u"]["lwob"])]
         elif stype == self.T_MAPPING:
             return [(".u.map", val["u"]["map"])]
         elif stype == self.T_FLOAT:
@@ -309,6 +324,8 @@ class SValuePrinter:
         elif stype == self.T_CLOSURE:
             return [(".u.lambda", val["u"]["lambda"]),
                     (".x.closure_type", val["x"]["closure_type"])]
+        elif stype == self.T_COROUTINE:
+            return [(".u.coroutine", val["u"]["coroutine"])]
         elif stype == self.T_SYMBOL:
             return [(".u.str", val["u"]["str"]),
                     (".x.quotes", val["x"]["quotes"])]
@@ -393,33 +410,37 @@ class TypePrinter:
 
     TCLASS_PRIMARY    = 0
     TCLASS_STRUCT     = 1
-    TCLASS_ARRAY      = 2
-    TCLASS_UNION      = 3
+    TCLASS_OBJECT     = 2
+    TCLASS_ARRAY      = 3
+    TCLASS_UNION      = 4
 
     TYPE_UNKNOWN      =  0
     TYPE_NUMBER       =  1
     TYPE_STRING       =  2
     TYPE_VOID         =  3
-    TYPE_OBJECT       =  4
-    TYPE_MAPPING      =  5
-    TYPE_FLOAT        =  6
-    TYPE_ANY          =  7
-    TYPE_CLOSURE      =  8
-    TYPE_SYMBOL       =  9
-    TYPE_QUOTED_ARRAY = 10
+    TYPE_MAPPING      =  4
+    TYPE_FLOAT        =  5
+    TYPE_ANY          =  6
+    TYPE_CLOSURE      =  7
+    TYPE_SYMBOL       =  8
+    TYPE_QUOTED_ARRAY =  9
+    TYPE_BYTES        = 10
+
+    OBJECT_REGULAR    =  0
+    OBJECT_LIGHTWEIGHT=  1
 
     type_names = {
         TYPE_UNKNOWN:      "unknown",
         TYPE_NUMBER:       "int",
         TYPE_STRING:       "string",
         TYPE_VOID:         "void",
-        TYPE_OBJECT:       "object",
         TYPE_MAPPING:      "mapping",
         TYPE_FLOAT:        "float",
         TYPE_ANY:          "mixed",
         TYPE_CLOSURE:      "closure",
         TYPE_SYMBOL:       "symbol",
         TYPE_QUOTED_ARRAY: "quoted_array",
+        TYPE_BYTES:        "bytes",
     }
 
     def __init__(self, val):
@@ -448,6 +469,18 @@ class TypePrinter:
             return "struct %s:%s" % (
                 progname["txt"].string(length = progname["size"]),
                 basename["txt"].string(length = basename["size"]))
+
+        elif tclass == self.TCLASS_OBJECT:
+            progname = val["t_object"]["program_name"].dereference()
+            if int(val["t_object"]["type"]) == self.OBJECT_LIGHTWEIGHT:
+                lw = "lightweight "
+            else:
+                lw = ""
+
+            if progname.address == 0:
+                return "any %sobject" % (lw,)
+
+            return '%sobject "%s"' % (lw, progname["txt"].string(length = progname["size"]))
 
         elif tclass == self.TCLASS_ARRAY:
             return self.calc_name(val["t_array"]["base"].dereference()) + "*"*int(val["t_array"]["depth"])
@@ -508,6 +541,7 @@ ptr_printers = {
     'mapping_s':     MappingPrinter,
     'svalue_s':      SValuePrinter,
     'object_s':      lambda val: PtrNamePrinter(val, ["name"]),
+    'lwobject_s':    lambda val: PtrNamePrinter(val, ["prog", "name"]),
     'program_s':     lambda val: PtrNamePrinter(val, ["name"]),
     'interactive_s': lambda val: PtrNamePrinter(val, ["ob", "name"]),
     'wiz_list_s':    lambda val: PtrNamePrinter(val, ["name"]),
@@ -517,4 +551,6 @@ ptr_printers = {
     'protected_range_lvalue': ProtRangePrinter,
 }
 
-direct_printers = {}
+direct_printers = {
+    'svalue_s':      SValuePrinter,
+}

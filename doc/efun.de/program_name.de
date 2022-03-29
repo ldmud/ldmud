@@ -1,6 +1,6 @@
 SYNOPSIS
         string program_name()
-        string program_name(object obj)
+        string program_name(object|lwobject obj)
 
 BESCHREIBUNG
         Liefert den Name des Programms, aus dem <obj> kompiliert wurde.

@@ -1,3 +1,5 @@
+#define OWN_PRIVILEGE_VIOLATION
+
 #include "/inc/base.inc"
 #include "/inc/testarray.inc"
 #include "/inc/gc.inc"
@@ -5,7 +7,9 @@
 #include "/sys/tls.h"
 #include "/sys/configuration.h"
 #include "/sys/functionlist.h"
+#include "/sys/input_to.h"
 #include "/sys/lpctypes.h"
+#include "/sys/object_info.h"
 #include "/sys/regexp.h"
 #include "/sys/struct_info.h"
 
@@ -37,8 +41,14 @@ string dhe_testdata =
   "VxyEwepMIUNDCOCPNP2nwwBXav10bGmZ0wIBBQ==\n"
   "-----END DH PARAMETERS-----\n";
 
+mixed global_var;
+
 int f(int arg);
 object clone = clonep() ? 0 : clone_object(this_object());
+
+string last_privi_op;
+mixed last_privi_who;
+mixed* last_privi_args;
 
 mixed *tests = ({
     // TODO: Add cases for indexing at string end ("abc"[3])
@@ -146,7 +156,12 @@ mixed *tests = ({
      * can't be a part of the regular test array. But they
      * should not crash and should not leak any memory.
      */
-    ({ "allocate 6a", TF_ERROR, (: allocate(0x1000000, ({ 1 })) :) }),
+    ({ "allocate 6a", TF_ERROR,
+        (:
+            configure_driver(DC_MEMORY_LIMIT, ({ 0x10000000, 0x20000000 }));
+            allocate(0x1000000, ({ 1 }));
+         :)
+    }),
     ({ "allocate 6b", TF_ERROR, (: allocate( ({0x100, 0x100, 0x100}), ({ 1 })); :) }),
 #endif
     ({ "asin 1", 0,        (: asin(0.0) == 0 :) }),
@@ -223,8 +238,55 @@ mixed *tests = ({
     ({ "call_direct_resolved array 1",  0, (: int* result; return deep_eq(call_direct_resolved(&result, ({clone,clone,object_name(clone),this_object(),0}), "f", 10, ({ 20 })), ({1, 1, 1, 1, 0})) && deep_eq(result, ({ 11, 11, 11, 11, 0})); :) }),
     ({ "call_direct_resolved array 2",  0, (: int* result; return deep_eq(call_direct_resolved(&result, ({clone,clone,object_name(clone),this_object(),0}), "g", 10, ({ 20 })), ({0, 0, 0, 0, 0})) && deep_eq(result, ({  0,  0,  0,  0, 0})); :) }),
     ({ "call_direct_resolved array 3",  0, (: int* result; return deep_eq(call_direct_resolved(&result, ({clone,clone,object_name(clone),this_object(),0}), "h", 10, ({ 20 })), ({0, 0, 0, 0, 0})) && deep_eq(result, ({  0,  0,  0,  0, 0})); :) }),
+    ({ "call_out", 0, (: last_rt_warning = 0; call_out("ThisFunctionDoesNotExist", 10); return sizeof(last_rt_warning); :) }),
     ({ "crypt", TF_ERROR,  (: crypt("ABC", "$$") :) }),
     ({ "ctime", TF_DONTCHECKERROR,  (: ctime(-1) :) }), /* This must be the first ctime call of this test suite. */
+    ({ "clone_object 1", 0,
+        (:
+            /* Check that our arguments went into the new object. */
+            set_driver_hook(H_CREATE_CLONE, "create_clone");
+
+            object o = clone_object(this_object(), 42, 10);
+            mixed res = o->get_args();
+            destruct(o);
+            return res == 52;
+        :)
+    }),
+    ({ "clone_object 2", 0,
+        (:
+            /* Check that our arguments went into the new object. */
+            set_driver_hook(H_CREATE_CLONE, unbound_lambda(({'ob, 'arg1, 'arg2}), ({#'call_other, 'ob, "create_clone", 'arg1, 20})));
+
+            object o = clone_object(this_object(), 42, 10);
+            mixed res = o->get_args();
+            destruct(o);
+            return res == 62;
+        :)
+    }),
+    ({ "configure_interactive (privileged)", 0,
+       (:
+            last_privi_op = 0;
+            configure_interactive(0, IC_ENCODING, "UTF-8");
+
+            if (last_privi_op != 0) // Master should always be privileged.
+                return 0;
+
+            return interactive_info(0, IC_ENCODING) == "UTF-8";
+        :)
+    }),
+    ({ "configure_interactive (unprivileged)", 0,
+       (:
+            last_privi_op = 0;
+            funcall(bind_lambda(#'configure_interactive, clone), 0, IC_ENCODING, "ASCII");
+
+            if (last_privi_op != "configure_interactive"
+             || last_privi_who != clone
+             || !deep_eq(last_privi_args, ({0, IC_ENCODING, "ASCII"})))
+                return 0;
+
+            return interactive_info(0, IC_ENCODING) == "ASCII";
+        :)
+    }),
     ({ "get_type_info(int,0)", 0, (: get_type_info(10,              0) == T_NUMBER       :) }),
     ({ "get_type_info(str,0)", 0, (: get_type_info("10",            0) == T_STRING       :) }),
     ({ "get_type_info(str,1)", 0, (: get_type_info("10",            1) == 0              :) }), /* Shared string */
@@ -245,6 +307,20 @@ mixed *tests = ({
     ({ "get_type_info(str,0)", 0, (: get_type_info((<test_struct>), 0) == T_STRUCT       :) }),
     ({ "get_type_info(str,1)", 0, (: get_type_info((<test_struct>), 1) == "test_struct"  :) }), /* Struct name */
     ({ "get_type_info(byt,0)", 0, (: get_type_info(b"10",           0) == T_BYTES        :) }),
+    ({ "input_to (privileged, no player)", 0,
+        (:
+            // This shouldn't crash.
+            input_to((::), INPUT_IGNORE_BANG);
+            return 1;
+        :)
+    }),
+    ({ "input_to (unprivileged, no player)", 0,
+        (:
+            // This shouldn't crash.
+            funcall(bind_lambda(#'input_to, clone), (::), INPUT_IGNORE_BANG);
+            return 1;
+        :)
+    }),
     ({ "save_object 1", 0, (: stringp(save_object()) :) }), /* Bug #594 */
     ({ "strstr 01", 0, (: strstr("","") == 0 :) }), /* Bug #536 */
     ({ "strstr 02", 0, (: strstr("","", 1) == -1 :) }),
@@ -371,6 +447,33 @@ mixed *tests = ({
     ({ "map mapping 5", 0, (: deep_eq(map(([1,2,3]), "f"), ([1:2,2:3,3:4])) :) }),
     ({ "map mapping 6", TF_ERROR, (: map(([]), unbound_lambda(0,0), ([1,2,3])) :) }),
 
+    ({ "lambda with many values", 0,
+      (:
+          mixed *prog = ({ #', });
+          foreach(int i: 65535)
+              prog += ({ sprintf("%04x", i) });
+          closure cl = lambda(0, prog);
+
+          /* This shouldn't crash. */
+          global_var = cl;
+          object_info(this_object(), OI_DATA_SIZE);
+
+          return funcall(cl) == "fffe";
+      :)
+    }),
+    ({ "lambda with too many values", TF_ERROR,
+      (:
+          mixed *prog = ({ #', });
+
+          configure_driver(DC_MEMORY_LIMIT, ({ 0, 0 }));
+
+          foreach(int i: 1048576) /* Lambdas can only have up to 65535 values. */
+              prog += ({ sprintf("%05x", i) });
+          closure cl = lambda(0, prog);
+          return 0;
+      :)
+    }),
+
     ({ "load_object 1", 0, (: load_object(__FILE__) == this_object() :) }),
     ({ "load_object 2", 0, (: load_object("/" __FILE__) == this_object() :) }),
     ({ "load_object 3", 0, (: load_object("./" __FILE__) == this_object() :) }),
@@ -387,6 +490,8 @@ mixed *tests = ({
     ({ "regmatch 9", 0, (: deep_eq(regmatch("", "^$", RE_MATCH_SUBS), ({"", 1})) :) }),
     ({ "regmatch 10", 0, (: deep_eq(regmatch("", "(a|)", RE_MATCH_SUBS), ({ "", "", 1})) :) }),
     ({ "regmatch 11", 0, (: regmatch("--A--B--", "A.*.B") == "A--B" :) }),
+    ({ "regmatch 12", 0, (: string result; return catch(result = regmatch("A"*100000, "(A|B)*", RE_TRADITIONAL)) || result; :) }),
+    ({ "regmatch 13", 0, (: string result; return catch(result = regmatch("A"*100000, "(B|A)*", RE_TRADITIONAL)) || result; :) }),
 
     ({ "sscanf 1", 0, (: sscanf("A10", "A%~d") == 1 :) }),
     ({ "sscanf 2", 0, (: sscanf("B10", "A%~d") == 0 :) }),
@@ -415,6 +520,83 @@ mixed *tests = ({
                                   }
                                   return sscanf(v, "%d", x) == 0;
                                :) }),
+    ({ "sscanf percent 1", 0, (: string x, y; return sscanf("te%st",     "%s%%%s",   x, y) == 2 && x == "te" && y == "st"; :) }),
+    ({ "sscanf percent 2", 0, (: string x, y; return sscanf("te%%st",    "%s%%%%%s", x, y) == 2 && x == "te" && y == "st"; :) }),
+    ({ "sscanf percent 3", 0, (: string x, y; return sscanf("%%s",       "%s%%%s",   x, y) == 2 && x == ""   && y == "%s"; :) }),
+    ({ "sscanf percent 4", 0, (: string x;    return sscanf("s%%%%%t%%", "%s%%t",    x) == 1    && x == "s%%%%";           :) }),
+    ({ "sscanf percent 5", 0, (: string x;    return sscanf("s%",        "%s%%",     x) == 1    && x == "s";               :) }),
+    ({ "sscanf percent 6", 0, (: string x;    return sscanf("s%%",       "%s%%%%",   x) == 1    && x == "s";               :) }),
+    ({ "sscanf percent 7", 0, (: string x;    return sscanf("s%%",       "%s%%%%%%", x) == 0;                              :) }),
+    ({ "sscanf percent 8", 0, (: string x;    return sscanf("%%s",       "%%%s",     x) == 1    && x == "%s";              :) }),
+    ({ "sscanf percent 9", 0, (: string x;    return sscanf("%s",        "%%%s",     x) == 1    && x == "s";               :) }),
+
+    ({ "sprintf 1", 0, (: sprintf("%=-4s\n", "A B C\n") == "A B\nC\n" :) }),
+    ({ "sprintf 2", 0, (: sprintf("%=-4s\n%s", "A B C\n", "X\n") == "A B\nC\nX\n" :) }),
+    ({ "sprintf 3", 0, (: sprintf("%=-4s %=-4s\n%s", "A B C\n", "1 2 3\n", "X\n") == "A B  1 2\nC    3\nX\n" :) }),
+    ({ "sprintf 4", 0, (: sprintf("abc%cdef", 0) == "abc\x00def" :) }),
+    ({ "sprintf 5", 0, (: sprintf("abc\x00def") == "abc\x00def" :) }),
+    ({ "sprintf 6", 0, (: sprintf("%s", "abc\x00def") == "abc\x00def" :) }),
+    ({ "sprintf 7", 0, (: sprintf("%-6s", "abc\x00def") == "abc\x00def" :) }),
+    ({ "sprintf 8", 0, (: sprintf("%-=6s", "abc\x00def") == "abc\x00def" :) }),
+    ({ "sprintf 9", 0, (: sprintf("%-#6.1s", "abc\x00def") == "abc\x00def" :) }),
+    ({ "sprintf 10", 0, (: sprintf("%-'\x00'6s", "abc") == "abc\x00\x00\x00" :) }),
+    ({ "sprintf 11", 0, (: sprintf("%=-4s\n", "A B\rC D E\n") == "A B\nC D\nE\n" :) }),
+    ({ "sprintf 12", 0, (: sprintf("%=-4s\n", "A B\rC D\rE F G\n") == "A B\nC D\nE F\nG\n" :) }),
+
+    ({ "sprintf doc01", 0, (: sprintf("foo")                     == "foo"           :) }),
+    ({ "sprintf doc02", 0, (: sprintf("%s","foo")                == "foo"           :) }),
+    ({ "sprintf doc03", 0, (: sprintf("%7s","foo")               == "    foo"       :) }),
+    ({ "sprintf doc04", 0, (: sprintf("%-7s","foo")              == "foo    "       :) }),
+    ({ "sprintf doc05", 0, (: sprintf("%|7s","foo")              == "  foo  "       :) }),
+    ({ "sprintf doc06", 0, (: sprintf("%7'.'s","foo")            == "....foo"       :) }),
+    ({ "sprintf doc07", 0, (: sprintf("%-7'+-'s","foo")          == "foo+-+-"       :) }),
+    ({ "sprintf doc08", 0, (: sprintf("%|9'-+'s","foo")          == "-+-foo-+-"     :) }),
+    ({ "sprintf doc09", 0, (: sprintf("%3s","foobarbloh")        == "foobarbloh"    :) }),
+    ({ "sprintf doc10", 0, (: sprintf("%3.6s","foobarbloh")      == "foobar"        :) }),
+    ({ "sprintf doc11", 0, (: sprintf("%6.3s","foobarbloh")      == "   foo"        :) }),
+    ({ "sprintf doc12", 0, (: sprintf("%:6s","foobarbloh")       == "foobar"        :) }),
+    ({ "sprintf doc13", 0, (: sprintf("%:3s","foobarbloh")       == "foo"           :) }),
+    ({ "sprintf doc14", 0, (: sprintf("%*.*s",-7,2,"foobarbloh") == "fo     "       :) }),
+    ({ "sprintf doc15", 0, (: sprintf("%=12s","this is a very long sentence\n")
+                              == "   this is a\n   very long\n    sentence\n"       :) }),
+    ({ "sprintf doc16", 0, (: sprintf("%=-12s","this is a very long sentence\n")
+                              == "this is a\nvery long\nsentence\n"                 :) }),
+    ({ "sprintf doc17", 0, (: sprintf("%=|12s","this is a very long sentence\n")
+                              == "  this is a\n  very long\n  sentence\n"           :) }),
+    ({ "sprintf doc18", 0, (: sprintf("%=10.6s","this is a very long sentence\n")
+                              == "      this\n      is a\n      very\n"
+                                 "      long\n    senten\n        ce\n"             :) }),
+    ({ "sprintf doc19", 0, (: sprintf("%#-40.3s\n", "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n")
+                              == "one          five         nine\n"
+                                 "two          six          ten\n"
+                                 "three        seven        \n"
+                                 "four         eight        \n"                     :) }),
+    ({ "sprintf doc20", 0, (: sprintf("%#-40s\n", "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n")
+                              == "one     three   five    seven   nine\n"
+                                 "two     four    six     eight   ten\n"            :) }),
+    ({ "sprintf doc21", 0, (: sprintf("%@-5s",({"foo","bar","bloh"}))
+                              == "foo  bar  bloh "                                  :) }),
+    ({ "sprintf doc22", 0, (: sprintf("%d",123)                  == "123"           :) }),
+    ({ "sprintf doc23", 0, (: sprintf("%7d",123)                 == "    123"       :) }),
+    ({ "sprintf doc24", 0, (: sprintf("%-7d",123)                == "123    "       :) }),
+    ({ "sprintf doc25", 0, (: sprintf("%d/%d",123,-123)          == "123/-123"      :) }),
+    ({ "sprintf doc26", 0, (: sprintf("% d/% d",123,-123)        == " 123/-123"     :) }),
+    ({ "sprintf doc27", 0, (: sprintf("%+d/%+d",123,-123)        == "+123/-123"     :) }),
+    ({ "sprintf doc28", 0, (: sprintf("%+5d/%5d",123,123)        == " +123/  123"   :) }),
+    ({ "sprintf doc29", 0, (: sprintf("%|6d",123)                == "  123 "        :) }),
+    ({ "sprintf doc30", 0, (: sprintf("%|10d",123)               == "    123   "    :) }),
+    ({ "sprintf doc31", 0, (: sprintf("%|10d%3s",123,"foo")      == "    123   foo" :) }),
+    ({ "sprintf doc32", 0, (: sprintf("%o",16)                   == "20"            :) }),
+    ({ "sprintf doc33", 0, (: sprintf("%'0'3o",8)                == "010"           :) }),
+    ({ "sprintf doc34", 0, (: sprintf("%x",123)                  == "7b"            :) }),
+    ({ "sprintf doc35", 0, (: sprintf("%X",123)                  == "7B"            :) }),
+    ({ "sprintf doc36", 0, (: sprintf("%f",123.5)                == "124"           :) }),
+    ({ "sprintf doc37", 0, (: sprintf("%8.3f",123.5)             == " 123.500"      :) }),
+    ({ "sprintf doc38", 0, (: sprintf("%E",123.5)                == "1E+02"         :) }),
+    ({ "sprintf doc39", 0, (: sprintf("%12.4e",123.5)            == "  1.2350e+02"  :) }),
+    ({ "sprintf doc40", 0, (: sprintf("%g",123.5)                == "1e+02"         :) }),
+    ({ "sprintf doc41", 0, (: sprintf("%8.3G",123.5)             == "     124"      :) }),
+    ({ "sprintf doc42", 0, (: sprintf("%8.6g",123.5)             == "   123.5"      :) }),
 
     ({ "to_text 1", 0, (: deep_eq(to_array(to_text( ({}) )), ({}) ) :) }),
     ({ "to_text 2", 0, (: deep_eq(to_array(to_text( ({0, 65, 66, 67}) )), ({0, 65, 66, 67}) ) :) }),
@@ -542,7 +724,7 @@ mixed *tests = ({
             return 1;
         :)
     }),
-    ({ "save_/restore_value", 0,
+    ({ "save_/restore_value 1", 0,
         (:
             mixed qa = '''({ 42 });
 
@@ -624,6 +806,24 @@ mixed *tests = ({
             return 1;
         :)
     }),
+    ({ "save_/restore_value 2", 0,
+        (:
+            /* We just check, that it works without throwing an error. */
+            foreach(mixed val:
+            ({
+                function int() : int x = 1234 { return x; },
+            }))
+            {
+                restore_value(save_value(val));
+                restore_value(save_value(({val})));
+                restore_value(save_value(([val])));
+                restore_value(save_value(([val:1;2])));
+                restore_value(save_value((["a":val;2])));
+            }
+
+            return 1;
+        :)
+    }),
     ({ "sort_array 1", 0, (: deep_eq(sort_array(({4,5,2,6,1,3,0}),#'>),
                                      ({0,1,2,3,4,5,6})) :) }),
     ({ "sort_array 2", 0, // sort in-place
@@ -635,12 +835,13 @@ mixed *tests = ({
         :)
     }),
 
-    ({ "variable_list 1", 0, (: deep_eq(variable_list(this_object()),                        ({ "last_rt_warning",            "json_testdata", "json_teststring", "b",              "dhe_testdata", "clone",     "tests"                   })) :) }),
+
+    ({ "variable_list 1", 0, (: deep_eq(variable_list(this_object()),                        ({ "last_rt_warning",            "json_testdata", "json_teststring", "b",              "dhe_testdata", "global_var", "clone",     "last_privi_op", "last_privi_who", "last_privi_args",          "tests",                   "args"      })) :) }),
     ({ "variable_list 2", 0, (: deep_eq(map(variable_list(this_object(), RETURN_FUNCTION_FLAGS), #'&, NAME_INHERITED|TYPE_MOD_NOSAVE|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|TYPE_MOD_VIRTUAL|TYPE_MOD_NO_MASK|TYPE_MOD_PUBLIC),
-                                                                                             ({ 0,                            0,               0,                 TYPE_MOD_NO_MASK, 0,              0,           0                         })) :) }),
-    ({ "variable_list 3", 0, (: deep_eq(variable_list(this_object(), RETURN_FUNCTION_TYPE),  ({ TYPE_MOD_POINTER|TYPE_STRING, TYPE_MAPPING,    TYPE_STRING,       TYPE_BYTES,       TYPE_STRING,    TYPE_OBJECT, TYPE_MOD_POINTER|TYPE_ANY })) :) }),
+                                                                                             ({ 0,                            0,               0,                 TYPE_MOD_NO_MASK, 0,              0,            0,           0,                0,                0,                         0,                         0           })) :) }),
+    ({ "variable_list 3", 0, (: deep_eq(variable_list(this_object(), RETURN_FUNCTION_TYPE),  ({ TYPE_MOD_POINTER|TYPE_STRING, TYPE_MAPPING,    TYPE_STRING,       TYPE_BYTES,       TYPE_STRING,    TYPE_ANY,     TYPE_OBJECT, TYPE_STRING,      TYPE_ANY,         TYPE_MOD_POINTER|TYPE_ANY, TYPE_MOD_POINTER|TYPE_ANY, TYPE_NUMBER })) :) }),
     ({ "variable_list 4", 0, (: deep_eq(variable_list(this_object(), RETURN_FUNCTION_NAME | RETURN_FUNCTION_TYPE), 
-                                ({ "last_rt_warning", TYPE_MOD_POINTER|TYPE_STRING, "json_testdata", TYPE_MAPPING, "json_teststring", TYPE_STRING, "b", TYPE_BYTES, "dhe_testdata", TYPE_STRING, "clone", TYPE_OBJECT, "tests", TYPE_MOD_POINTER|TYPE_ANY })) :) }),
+                                ({ "last_rt_warning", TYPE_MOD_POINTER|TYPE_STRING, "json_testdata", TYPE_MAPPING, "json_teststring", TYPE_STRING, "b", TYPE_BYTES, "dhe_testdata", TYPE_STRING, "global_var", TYPE_ANY, "clone", TYPE_OBJECT, "last_privi_op", TYPE_STRING, "last_privi_who", TYPE_ANY, "last_privi_args", TYPE_MOD_POINTER|TYPE_ANY, "tests", TYPE_MOD_POINTER|TYPE_ANY, "args", TYPE_NUMBER })) :) }),
     ({ "variable_list 5", 0, (: variable_list(this_object(), RETURN_VARIABLE_VALUE)[3] == b"\x00" :) }),
 
 #ifdef __JSON__
@@ -736,8 +937,6 @@ void run_test()
 
 string *epilog(int eflag)
 {
-    configure_driver(DC_MEMORY_LIMIT, ({ 0x10000000, 0x20000000 }));
-
     set_driver_hook(H_DEFAULT_METHOD, function int(mixed result, object ob, string fun, varargs mixed* args)
     {
         if (fun == "g")
@@ -753,7 +952,28 @@ string *epilog(int eflag)
     return 0;
 }
 
+int privilege_violation(string op, mixed who, varargs mixed* args)
+{
+    last_privi_op = op;
+    last_privi_who = who;
+    last_privi_args = args;
+
+    return 1;
+}
+
 int f(int arg)
 {
     return arg + 1;
+}
+
+// For the clone_object test.
+int args;
+void create_clone(int arg1, int arg2)
+{
+    args = arg1 + arg2;
+}
+
+int get_args()
+{
+    return args;
 }

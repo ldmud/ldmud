@@ -1,7 +1,10 @@
 SYNOPSIS
-        mixed unique_array(object *obarr, string|closure fun)
-        mixed unique_array(object *obarr, string|closure fun, mixed skip)
-        mixed unique_array(object *obarr, string|closure fun, mixed extra...
+        <object|lwobject>** unique_array(<object|lwobject> *obarr
+                                        , string|closure fun)
+        <object|lwobject>** unique_array(<object|lwobject> *obarr
+                                        , string|closure fun, mixed skip)
+        <object|lwobject>** unique_array(<object|lwobject> *obarr
+                                        , string|closure fun, mixed extra...
                                         , mixed skip)
 
 DESCRIPTION

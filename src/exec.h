@@ -242,6 +242,9 @@ struct instr_s
                          /* The efun might return an lvalue reference,
                           * which must be unravalled at the end.
                           */
+    bool no_lightweight; /* The efun is not allowed for lightweight
+                          * objects.
+                          */
     char *name;          /* The printable name of the instruction. */
     char *deprecated;    /* Usually NULL, for deprecated efuns this is
                           * the warning message to print.
@@ -264,17 +267,6 @@ struct instr_s
 typedef uint32 funflag_t;  /* Function flags */
 typedef int32 sfunflag_t;  /* signed version of Function flags */
 
-/* The visiblity is a 4-bit value within the function flags
- * masked by TYPE_MOD_VISIBILITY.
- */
-enum visibility_modifier {
-    VIS_PRIVATE        = 0x100000000,
-    VIS_PROTECTED      = 0x010000000,
-    VIS_STATIC         = 0x400000000,
-    VIS_VISIBLE        = 0x000000000,
-    VIS_PUBLIC         = 0x080000000,
-};
-
 enum function_flags {
     NAME_INHERITED     = 0x80000000,  /* defined by inheritance         */
     TYPE_MOD_STATIC    = 0x40000000,  /* Static function or variable    */
@@ -287,6 +279,7 @@ enum function_flags {
     TYPE_MOD_PROTECTED = 0x01000000,  /* cannot be called externally    */
     TYPE_MOD_XVARARGS  = 0x00800000,  /* accepts optional arguments     */
     TYPE_MOD_NOSAVE    = 0x00400000,  /* vars: can't be saved           */
+    TYPE_MOD_COROUTINE = 0x00400000,  /* lfun: is a coroutine           */
     NAME_CROSS_DEFINED = 0x00200000,
     TYPE_MOD_DEPRECATED  = 0x00100000, /* lfun is marked deprecated     */
   /* Two functions with the same name inherited from A and B into C.
@@ -390,6 +383,15 @@ struct variable_s
 };
 
 
+/* Constants for inherit_type in inherit_s */
+enum inherit_types {
+    INHERIT_TYPE_NORMAL    = 0x0000,  /* Type: Normal inherit */
+    INHERIT_TYPE_VIRTUAL   = 0x0001,  /* Type: Virtual inherit */
+    INHERIT_TYPE_EXTRA     = 0x0002,  /* Type: Extra inherit added by
+                                       * copy_variables()
+                                       */
+};
+
 /* --- struct inherit: description of one inherited program
  *
  * The information about inherited programs ("objects") for a given
@@ -400,6 +402,16 @@ struct variable_s
 struct inherit_s
 {
     program_t *prog;  /* Pointer to the inherited program */
+
+    struct
+    {
+        unsigned short inherit_depth    : 16;  /* Depth of inherit */
+        enum inherit_types inherit_type :  2;  /* Type of inherit  */
+        bool inherit_duplicate          :  1;  /* Flag: Duplicate virt inherit   */
+        bool inherit_mapped             :  1;  /* Flag: Obsoleted virt inherit   */
+        bool inherit_hidden             :  1;  /* Flag: Not visible to outsiders */
+        bool inherit_public             :  1;  /* Flag: Cannot be hidden         */
+    };
 
     unsigned short function_index_offset;
       /* Offset of the inherited program's function block within the
@@ -414,10 +426,6 @@ struct inherit_s
        * The NON_VIRTUAL_OFFSET_TAG marks the variables of non-virtual
        * inherits temporarily during compiles.
        */
-
-    unsigned short inherit_type;            /* Type of inherit */
-
-    unsigned short inherit_depth;           /* Depth of inherit */
 
     unsigned short updated_inherit;
       /* When INHERIT_TYPE_MAPPED this it the index of a newer, also
@@ -465,20 +473,6 @@ struct inherit_s
        */
 };
 
-/* Constants for inherit_type in inherit_s */
-enum inherit_types {
-    INHERIT_TYPE_NORMAL    = 0x0000,  /* Type: Normal inherit */
-    INHERIT_TYPE_VIRTUAL   = 0x0001,  /* Type: Virtual inherit */
-    INHERIT_TYPE_EXTRA     = 0x0002,  /* Type: Extra inherit added by
-                                       * copy_variables()
-                                       */
-
-    INHERIT_TYPE_MASK      = 0x0003,  /* Bitmask for the pure inherit type */
-
-    INHERIT_TYPE_DUPLICATE = 0x0004,  /* Flag: Duplicate virt inherit */
-    INHERIT_TYPE_MAPPED    = 0x0008,  /* Flag: Obsoleted virt inherit */
-};
-
 /* --- struct struct_def: description of one struct
  *
  * The information about structs visible in the program are stored
@@ -515,6 +509,41 @@ struct include_s
     int         depth;
       /* The absolute value is the include depth, counting from 1 upwards.
        * If the include did not generate code, the value is stored negative.
+       */
+};
+
+
+/* --- struct call_cache_s: A cache entry for calls into objects
+ *
+ * This structure contains call information for fast calls into objects.
+ * It is used in the program for calls to lightweight objects with the
+ * F_CALL_OTHER/STRICT_CACHED opcode and as general cache in the
+ * interpreter for all objects.
+ */
+
+struct call_cache_s
+{
+    string_t *name;
+      /* The name of the cached function, shared for existing functions,
+       * allocated if the object does not have the function.
+       * This pointer counts as reference.
+       * NULL for uninitialized entries.
+       */
+    program_t *progp;
+      /* The pointer to the program code of the function, or NULL if the
+       * object does not implement the function.
+       */
+    bytecode_p funstart;
+      /* Pointer to the function.
+       */
+    int32 id;
+      /* The id_number of the program. */
+    funflag_t flags;
+      /* Copy of the _MOD_STATIC and _MOD_PROTECTED flags of the function.
+       */
+    int function_index_offset;
+    int variable_index_offset;
+      /* Function and variable index offset.
        */
 };
 
@@ -596,6 +625,10 @@ struct program_s
     variable_t *variables;
       /* Array [.num_variables] with the flags, types and names of all
        * variables.
+       */
+    call_cache_t *lwo_call_cache;
+      /* The cache for lightweight object calls. The index is given
+       * with the F_CALL_OTHER/STRICT_CACHED opcode.
        */
     inherit_t *inherit;
       /* Array [.num_inherited] of descriptors for (directly) inherited programs.
@@ -680,11 +713,14 @@ enum program_flags {
        */
     P_NO_INHERIT      = 0x0002, /* Program must not be inherited */
     P_NO_CLONE        = 0x0004, /* No clones allowed */
-    P_NO_SHADOW       = 0x0008, /* No shadows allowed */
-    P_SHARE_VARIABLES = 0x0010, /* Clone vars are assigned from 
+    P_NO_LIGHTWEIGHT  = 0x0008, /* No lightweight objects allowed */
+    P_NO_SHADOW       = 0x0010, /* No shadows allowed */
+    P_SHARE_VARIABLES = 0x0020, /* Clone vars are assigned from
                                  * the current blueprint vars. */
-    P_RTT_CHECKS      = 0x0020, /* enable runtime type checks */
-    P_WARN_RTT_CHECKS = 0x0040, /* enable runtime type check warnings */
+    P_RTT_CHECKS      = 0x0040, /* enable runtime type checks */
+    P_WARN_RTT_CHECKS = 0x0080, /* enable runtime type check warnings */
+    P_USE_NONLW_EFUNS = 0x0100, /* the program uses efuns that are
+                                 * not suitable for lightweight objects. */
 };
 /* Special value for type_start in program_s designating that the function has
  * no type info. */
@@ -739,7 +775,14 @@ struct function_s
 {
     string_t *name;
        /* Name of function (shared string).
-        * The reference is counted.
+        * The reference is counted in the following instances:
+        *  - During compilation for functions defined in the
+        *    program (not inherited),
+        *  - As part of a program's .function_headers,
+        *  - In simul_efun management.
+        * It is not counted:
+        *  - During compilation for inherited functions.
+        *    (flags & NAME_INHERITED)
         */
 
     union {

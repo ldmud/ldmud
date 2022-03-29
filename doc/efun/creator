@@ -1,5 +1,5 @@
 SYNOPSIS
-        string creator(object ob)
+        string creator(object|lwobject ob)
 
 DESCRIPTION
         This efun is for backward compatibility only. It is only

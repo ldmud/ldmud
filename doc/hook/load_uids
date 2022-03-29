@@ -32,4 +32,4 @@ DESCRIPTION
 HISTORY
 
 SEE ALSO
-        hooks(C), uids(C), clone_uids(H)
+        hooks(C), uids(C), clone_uids(H), lwobject_uids(H)

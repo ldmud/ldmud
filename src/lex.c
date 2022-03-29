@@ -52,6 +52,7 @@
 #include "instrs.h"
 #include "interpret.h"
 #include "lang.h"
+#include "lwobject.h"
 #include "main.h"
 #include "mempools.h"
 #include "mstrings.h"
@@ -66,6 +67,7 @@
 #include "xalloc.h"
 
 #include "pkg-python.h"
+#include "i-current_object.h"
 #include "i-eval_cost.h"
 
 #include "../mudlib/sys/driver_hook.h"
@@ -155,10 +157,18 @@ Bool pragma_warn_missing_return;
    * does end with an explicit return statement.
    */
 
+Bool pragma_warn_dead_code;
+  /* True: generate a warning if dead code was detected.
+   */
+
 Bool pragma_check_overloads;
   /* TRUE if function redefinitions have to match the originals in their
    * types. This pragma is meant mainly to ease the adaption of old
    * mudlibs.
+   */
+
+bool pragma_warn_applied_functions;
+  /* True: Warn about applied lfuns with wrong declaration.
    */
 
 pragma_cttype_checks_e pragma_strict_types;
@@ -170,8 +180,24 @@ Bool pragma_save_types;
   /* True: save argument types after compilation.
    */
 
-Bool pragma_no_clone;
+bool pragma_save_local_names;
+  /* True: save local variable names in coroutines.
+   */
+
+bool pragma_no_clone;
   /* True: prevent the object from being clone.
+   */
+
+static bool pragma_no_clone_set;
+  /* True: pragma clone or no_clone was stated explicitely
+   */
+
+bool pragma_no_lightweight;
+  /* True: prevent lightweight objects.
+   */
+
+static bool pragma_no_lightweight_set;
+  /* True: pragma lightweight or no_lightweight was stated explicitely.
    */
 
 Bool pragma_no_inherit;
@@ -217,6 +243,14 @@ bool pragma_no_bytes_type;
 
 bool pragma_warn_unused_variables;
   /* True: Warn about declared but never used variables.
+   */
+
+bool pragma_warn_unused_values;
+  /* True: Warn about created but not used values.
+   */
+
+bool pragma_warn_lightweight;
+  /* True: Warn about efuns not suitable for lightweight objects.
    */
 
 string_t *last_lex_string;
@@ -480,12 +514,15 @@ struct s_reswords
 };
 
 static struct s_reswords reswords[]
- = { { "break",          L_BREAK         }
+ = { { "async",          L_ASYNC         }
+   , { "await",          L_AWAIT         }
+   , { "break",          L_BREAK         }
    , { "bytes",          L_BYTES_DECL    }
    , { "case",           L_CASE          }
    , { "catch",          L_CATCH         }
    , { "closure",        L_CLOSURE_DECL  }
    , { "continue",       L_CONTINUE      }
+   , { "coroutine",      L_COROUTINE     }
    , { "default",        L_DEFAULT       }
    , { "do",             L_DO            }
    , { "else",           L_ELSE          }
@@ -499,6 +536,7 @@ static struct s_reswords reswords[]
 #endif
    , { "inherit",        L_INHERIT       }
    , { "int",            L_INT           }
+   , { "lwobject",       L_LWOBJECT      }
    , { "mapping",        L_MAPPING       }
    , { "mixed",          L_MIXED         }
    , { "nomask",         L_NO_MASK       }
@@ -520,6 +558,7 @@ static struct s_reswords reswords[]
    , { "visible",        L_VISIBLE       }
    , { "void",           L_VOID          }
    , { "while",          L_WHILE         }
+   , { "yield",          L_YIELD         }
    };
 
 /*-------------------------------------------------------------------------*/
@@ -856,7 +895,9 @@ init_lexer(void)
     add_permanent_define_str("__DEPRECATED__", -1, "1");
 #endif
     add_permanent_define_str("__LPC_STRUCTS__", -1, "1");
+    add_permanent_define_str("__LPC_LWOBJECTS__", -1, "1");
     add_permanent_define_str("__LPC_INLINE_CLOSURES__", -1, "1");
+    add_permanent_define_str("__LPC_COROUTINES__", -1, "1");
     add_permanent_define_str("__LPC_ARRAY_CALLS__", -1, "1");
 #ifdef USE_TLS
     add_permanent_define_str("__TLS__", -1, "1");
@@ -1674,7 +1715,13 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, efun_override_t is_
 
                 sp->type = T_CLOSURE;
                 sp->x.closure_type = (short)(code + CLOSURE_OPERATOR);
-                sp->u.ob = ref_object(current_object, "symbol_efun");
+                if (current_object.type == T_OBJECT)
+                    sp->u.ob = ref_object(current_object.u.ob, "symbol_efun");
+                else /* current_object.type == T_LWOBJECT */
+                {
+                    sp->u.lwob = ref_lwobject(current_object.u.lwob);
+                    sp->x.closure_type += CLOSURE_LWO;
+                }
                 return;
             }
             if ( !(p = p->inferior) )
@@ -1706,12 +1753,12 @@ undefined_function:
          * Check it with a privilege violation.
          */
         if (!privileged && efun_override == OVERRIDE_EFUN && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-         && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK)
+         && get_simul_efun_header(p)->flags & TYPE_MOD_NO_MASK)
         {
             svalue_t *res;
 
             push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
-            push_ref_valid_object(inter_sp, current_object, "nomask simul_efun");
+            push_current_object(inter_sp, "nomask simul_efun");
             push_ref_string(inter_sp, p->name);
             res = apply_master(STR_PRIVILEGE, 3);
 
@@ -1733,31 +1780,40 @@ undefined_function:
         /* Symbol is ok - create the closure value */
 
         sp->type = T_CLOSURE;
+        if (current_object.type == T_OBJECT)
+        {
+            sp->u.ob = ref_object(current_object.u.ob, "symbol_efun");
+            sp->x.closure_type = 0;
+        }
+        else /* current_object.type == T_LWOBJECT */
+        {
+            sp->u.lwob = ref_lwobject(current_object.u.lwob);
+            sp->x.closure_type = CLOSURE_LWO;
+        }
+
         if (efun_override != OVERRIDE_EFUN && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER)
         {
             /* Handle non-overridden simul efuns */
-
-            sp->x.closure_type = (short)(p->u.global.sim_efun + CLOSURE_SIMUL_EFUN);
-            sp->u.ob = ref_object(current_object, "symbol_efun");
+            sp->x.closure_type += (short)(p->u.global.sim_efun + CLOSURE_SIMUL_EFUN);
         }
 #ifdef USE_PYTHON
         else if (is_python_efun(p))
         {
-            sp->x.closure_type = (short)(p->u.global.python_efun + CLOSURE_PYTHON_EFUN);
-            sp->u.ob = ref_object(current_object, "symbol_efun");
+            sp->x.closure_type += (short)(p->u.global.python_efun + CLOSURE_PYTHON_EFUN);
         }
 #endif
+        else if (p->u.global.efun <= LAST_INSTRUCTION_CODE)
+        {
+            /* Efuns. */
+            sp->x.closure_type += (short)(p->u.global.efun + CLOSURE_EFUN);
+        }
         else
         {
-            /* Handle efuns (possibly aliased).
+            /* Aliased efuns.
              * We know that p->u.global.efun != I_GLOBAL_EFUN_OTHER here.
              */
-            sp->x.closure_type = (short)(p->u.global.efun + CLOSURE_EFUN);
-            if (sp->x.closure_type > LAST_INSTRUCTION_CODE + CLOSURE_EFUN)
-                sp->x.closure_type = (short)(CLOSURE_EFUN +
-                  efun_aliases[
-                    sp->x.closure_type - CLOSURE_EFUN - LAST_INSTRUCTION_CODE - 1]);
-            sp->u.ob = ref_object(current_object, "symbol_efun");
+            sp->x.closure_type += (short)(CLOSURE_EFUN +
+                  efun_aliases[p->u.global.efun - LAST_INSTRUCTION_CODE - 1]);
         }
     }
     else
@@ -1782,7 +1838,16 @@ undefined_function:
         } else {
             sp->x.closure_type = (short)(i + CLOSURE_EFUN);
         }
-        sp->u.ob = ref_object(current_object, "symbol_efun");
+
+        if (current_object.type == T_OBJECT)
+        {
+            sp->u.ob = ref_object(current_object.u.ob, "symbol_efun");
+        }
+        else /* current_object.type == T_LWOBJECT */
+        {
+            sp->u.lwob = ref_lwobject(current_object.u.lwob);
+            sp->x.closure_type += CLOSURE_LWO;
+        }
     }
 } /* symbol_efun_str() */
 
@@ -3385,10 +3450,7 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
         push_c_string(inter_sp, name);
         push_c_string(inter_sp, current_loc.file->name);
         if (driver_hook[H_INCLUDE_DIRS].x.closure_type == CLOSURE_LAMBDA)
-        {
-            free_object(driver_hook[H_INCLUDE_DIRS].u.lambda->ob, "open_include_file");
-            driver_hook[H_INCLUDE_DIRS].u.lambda->ob = ref_object(current_object, "open_include_file");
-        }
+            assign_current_object(&(driver_hook[H_INCLUDE_DIRS].u.lambda->ob), "open_include_file");
         svp = secure_apply_lambda(&driver_hook[H_INCLUDE_DIRS], 2);
 
         /* The result must be legal relative pathname */
@@ -3867,6 +3929,16 @@ handle_pragma (char *str)
             pragma_save_types = MY_TRUE;
             validPragma = MY_TRUE;
         }
+        else if (wordcmp(base, "save_local_names", namelen) == 0)
+        {
+            pragma_save_local_names = true;
+            validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "no_save_local_names", namelen) == 0)
+        {
+            pragma_save_local_names = false;
+            validPragma = MY_TRUE;
+        }
         // the following two pragmas are ignored.
         else if (wordcmp(base, "combine_strings", namelen) == 0)
         {
@@ -3883,8 +3955,34 @@ handle_pragma (char *str)
         }
         else if (wordcmp(base, "no_clone", namelen) == 0)
         {
-            pragma_no_clone = MY_TRUE;
+            pragma_no_clone = true;
+            pragma_no_clone_set = true;
             validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "clone", namelen) == 0)
+        {
+            pragma_no_clone = false;
+            pragma_no_clone_set = true;
+            validPragma = MY_TRUE;
+
+            /* Because of the defaults this is not really needed. */
+            if (!pragma_no_lightweight_set)
+                pragma_no_lightweight = true;
+        }
+        else if (wordcmp(base, "no_lightweight", namelen) == 0)
+        {
+            pragma_no_lightweight = true;
+            pragma_no_lightweight_set = true;
+            validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "lightweight", namelen) == 0)
+        {
+            pragma_no_lightweight = false;
+            pragma_no_lightweight_set = true;
+            validPragma = MY_TRUE;
+
+            if (!pragma_no_clone_set)
+                pragma_no_clone = true;
         }
         else if (wordcmp(base, "no_inherit", namelen) == 0)
         {
@@ -3925,6 +4023,16 @@ handle_pragma (char *str)
             pragma_warn_missing_return = MY_FALSE;
             validPragma = MY_TRUE;
         }
+        else if (wordcmp(base, "warn_dead_code", namelen) == 0)
+        {
+            pragma_warn_dead_code = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "no_warn_dead_code", namelen) == 0)
+        {
+            pragma_warn_dead_code = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
         else if (wordcmp(base, "warn_function_inconsistent", namelen) == 0)
         {
             pragma_check_overloads = MY_TRUE;
@@ -3933,6 +4041,16 @@ handle_pragma (char *str)
         else if (wordcmp(base, "no_warn_function_inconsistent", namelen) == 0)
         {
             pragma_check_overloads = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "warn_applied_functions", namelen) == 0)
+        {
+            pragma_warn_applied_functions = true;
+            validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "no_warn_applied_functions", namelen) == 0)
+        {
+            pragma_warn_applied_functions = false;
             validPragma = MY_TRUE;
         }
         else if (wordcmp(base, "warn_deprecated", namelen) == 0)
@@ -3993,6 +4111,26 @@ handle_pragma (char *str)
         else if (wordcmp(base, "no_warn_unused_variables", namelen) == 0)
         {
             pragma_warn_unused_variables = false;
+            validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "warn_unused_values", namelen) == 0)
+        {
+            pragma_warn_unused_values = true;
+            validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "no_warn_unused_values", namelen) == 0)
+        {
+            pragma_warn_unused_values = false;
+            validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "warn_lightweight", namelen) == 0)
+        {
+            pragma_warn_lightweight = true;
+            validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "no_warn_lightweight", namelen) == 0)
+        {
+            pragma_warn_lightweight = false;
             validPragma = MY_TRUE;
         }
         else if (wordcmp(base, "share_variables", namelen) == 0)
@@ -4741,6 +4879,13 @@ closure (char *in_yyp)
                     , super_name, wordstart);
             ix = CLOSURE_EFUN_OFFS;
         }
+        if (ix >= CLOSURE_IDENTIFIER_OFFS)
+        {
+            yyerrorf("Too high function index of %.50s::%.50s for #'"
+                    , super_name, wordstart);
+            ix = CLOSURE_EFUN_OFFS;
+        }
+
         *yyp = c;
         *(wordstart-2) = ':';
 
@@ -4818,7 +4963,7 @@ closure (char *in_yyp)
      */
     if (efun_override == OVERRIDE_EFUN
      && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-     && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
+     && (get_simul_efun_header(p)->flags & TYPE_MOD_NO_MASK)
      && (p->u.global.efun != I_GLOBAL_EFUN_OTHER
 #ifdef USE_PYTHON
       || is_python_efun(p)
@@ -4872,12 +5017,14 @@ closure (char *in_yyp)
             int i;
 
             i = p->u.global.function;
-            yylval.closure.number = i;
             if (i >= CLOSURE_IDENTIFIER_OFFS)
-                yyerrorf(
-                  "Too high function index of %s for #'",
-                  get_txt(p->name)
-                );
+            {
+                yyerrorf("Too high function index of %s for #'"
+                        , get_txt(p->name));
+                i = CLOSURE_EFUN_OFFS;
+            }
+
+            yylval.closure.number = i;
             break;
         }
 
@@ -4885,9 +5032,8 @@ closure (char *in_yyp)
         if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_SEFUN)
          && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER && !disable_sefuns)
         {
-            yylval.closure.number =
-              p->u.global.sim_efun + CLOSURE_SIMUL_EFUN_OFFS;
-            break;
+            yylval.ident = p;
+            return L_SIMUL_EFUN_CLOSURE;
         }
 
 #ifdef USE_PYTHON
@@ -4895,7 +5041,14 @@ closure (char *in_yyp)
         if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_EFUN)
          && is_python_efun(p))
         {
-            yylval.closure.number = p->u.global.python_efun + CLOSURE_PYTHON_EFUN_OFFS;
+            if (p->u.global.python_efun >= CLOSURE_EFUN_OFFS - CLOSURE_PYTHON_EFUN_OFFS)
+            {
+                yyerrorf("Too high python efun index of %s for #'"
+                        , get_txt(p->name));
+                yylval.closure.number = CLOSURE_EFUN_OFFS;
+            }
+            else
+                yylval.closure.number = p->u.global.python_efun + CLOSURE_PYTHON_EFUN_OFFS;
             break;
         }
 #endif
@@ -4933,9 +5086,18 @@ closure (char *in_yyp)
                 yylval.closure.number = CLOSURE_IDENTIFIER_OFFS;
                 break;
             }
-            yylval.closure.number =
-              p->u.global.variable + num_virtual_variables +
-              CLOSURE_IDENTIFIER_OFFS;
+#ifdef USE_PYTHON
+            if (p->u.global.variable + num_virtual_variables >= CLOSURE_PYTHON_EFUN_OFFS - CLOSURE_IDENTIFIER_OFFS)
+#else
+            if (p->u.global.variable + num_virtual_variables >= CLOSURE_EFUN_OFFS - CLOSURE_IDENTIFIER_OFFS)
+#endif
+            {
+                yyerrorf("Too high variable index of %s for #'"
+                        , get_txt(p->name));
+                yylval.closure.number = CLOSURE_IDENTIFIER_OFFS;
+            }
+            else
+                yylval.closure.number = p->u.global.variable + num_virtual_variables + CLOSURE_IDENTIFIER_OFFS;
             break;
         }
 
@@ -6182,17 +6344,23 @@ start_new_file (int fd, const char * fname)
     lex_fatal = MY_FALSE;
 
     pragma_check_overloads = MY_TRUE;
+    pragma_warn_applied_functions = false;
     pragma_strict_types = PRAGMA_WEAK_TYPES;
     instrs[F_CALL_OTHER].ret_type = lpctype_mixed;
     instrs[F_CALL_DIRECT].ret_type = lpctype_mixed;
     instrs[F_CALL_STRICT].ret_type = lpctype_mixed;
     instrs[F_CALL_DIRECT_STRICT].ret_type = lpctype_mixed;
     pragma_save_types = MY_FALSE;
-    pragma_no_clone = MY_FALSE;
+    pragma_save_local_names = false;
+    pragma_no_clone = false;
+    pragma_no_clone_set = false;
+    pragma_no_lightweight = true;
+    pragma_no_lightweight_set = false;
     pragma_no_inherit = MY_FALSE;
     pragma_no_shadow = MY_FALSE;
     pragma_pedantic = MY_FALSE;
     pragma_warn_missing_return = MY_TRUE;
+    pragma_warn_dead_code = MY_FALSE;
     pragma_warn_deprecated = MY_TRUE;
     pragma_range_check = MY_FALSE;
     pragma_warn_empty_casts = MY_TRUE;
@@ -6201,6 +6369,8 @@ start_new_file (int fd, const char * fname)
     pragma_warn_rtt_checks = MY_FALSE;
     pragma_no_bytes_type = false;
     pragma_warn_unused_variables = false;
+    pragma_warn_unused_values = false;
+    pragma_warn_lightweight = true;
 
     nexpands = 0;
 

@@ -1,5 +1,5 @@
 SYNOPSIS
-        object this_object()
+        object|lwobject this_object()
 
 BESCHREIBUNG
         Liefert den Objektpointer auf dieses Objekt. Der Pointer darf nicht

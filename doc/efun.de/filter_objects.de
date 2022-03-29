@@ -1,5 +1,6 @@
 SYNOPSIS
-        object * filter_objects(object *arr, string fun, mixed extra, ...)
+        <object|lwobject> * filter_objects(<object|lwobject> *arr,
+                                           string fun, mixed extra, ...)
 
 BESCHREIBUNG
         Diese Efun ist aehnlich wie filter(), es wird aber

@@ -143,6 +143,25 @@ DESCRIPTION
                           One of the following:
                           VIS_PRIVATE, VIS_PROTECTED, VIS_VISIBLE, VIS_PUBLIC
 
+          - LWObject(filename)
+                Corresponds to the LPC lwobject type.
+                On instantiation a filename of a blueprint to create
+                a lightweight object from is required.
+
+                Has the following members:
+
+                  program_name
+                      The program name (file name it was created from)
+
+                  functions
+                      Contains all the visible functions (private functions
+                      are excluded) as attributes. They are similar to the
+                      same member of the Object type.
+
+                  variables
+                      Contains all variables as attributes. They are similar
+                      to the same member of the Object type.
+
           - Array([values | size])
                 Corresponds to an LPC array.
                 Can either be initialized with a list of values
@@ -188,45 +207,71 @@ DESCRIPTION
                           unknown or mixed).
 
           - Closure(object [,name [, lfun_object]])
-               Corresponds to an LPC closure.
-               On initialization a closure bound to <object> will be created,
-               like a call to symbol_function(<name> [, <lfun_object>]).
+                Corresponds to an LPC closure.
+                On initialization a closure bound to <object> will be created,
+                like a call to symbol_function(<name> [, <lfun_object>]).
 
-               Supports function calls.
+                Supports function calls.
+
+          - Coroutine()
+                Corresponds to an LPC coroutine.
+                They can only be created by LPC code and are not compatible
+                with Python coroutines.
+
+                Supports function calls and has the following members:
+
+                  object
+                      The object the coroutine belongs to.
+
+                  program_name
+                      The name of the program that defined the coroutine.
+
+                  function_name
+                      The name of the function that defined the coroutine.
+
+                  file_name
+                      The name of the file that contains the definition.
+
+                  line_number
+                      The current line where the coroutine is suspended.
+
+                  variables
+                      Contains all local variables as attributes with
+                      their current value.
 
           - Symbol(name [, quotes])
-              Corresponds to an LPC symbol.
-              On initialization the name of the symbol is required.
-              Optionally the number of quotes (at least 1) can be specified.
+                Corresponds to an LPC symbol.
+                On initialization the name of the symbol is required.
+                Optionally the number of quotes (at least 1) can be specified.
 
-              Has two members: name and quotes.
+                Has two members: name and quotes.
 
           - QuotedArray(array [, quotes])
-              Corresponds to an LPC quoted array.
-              On initialization an array is required.
-              Optionally the number of quotes (at least 1) can be specified.
+                Corresponds to an LPC quoted array.
+                On initialization an array is required.
+                Optionally the number of quotes (at least 1) can be specified.
 
-              Has two members: array and quotes.
+                Has two members: array and quotes.
 
           - Lvalue(value)
-              Creates an lvalue reference for the given value.
+                Creates an lvalue reference for the given value.
 
-              Has two member: value and members.
+                Has two member: value and members.
 
-              If the value is an array, mapping or string, then lvalues
-              to its elements can be created with [].
+                If the value is an array, mapping or string, then lvalues
+                to its elements can be created with [].
 
-              If the value is a struct, then lvalues to its members can
-              be created with the members attribute. It contains all
-              the struct members as attributes and will return an Lvalue
-              object to the struct member.
+                If the value is a struct, then lvalues to its members can
+                be created with the members attribute. It contains all
+                the struct members as attributes and will return an Lvalue
+                object to the struct member.
 
         This module contains the following sub-namespaces:
 
           - efuns
-              This namespace contains all original efuns (without any
-              registered python efuns or simul-efuns). These can be called
-              as a regular function.
+                This namespace contains all original efuns (without any
+                registered python efuns or simul-efuns). These can be called
+                as a regular function.
 
 
         There is mapping of LPC values to Python values for the following types:

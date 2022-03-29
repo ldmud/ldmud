@@ -102,6 +102,8 @@
 #define DI_NUM_REGEX                                        -427
 #define DI_NUM_REGEX_TABLE_SLOTS                            -428
 #define DI_NUM_LVALUES                                      -429
+#define DI_NUM_NAMED_OBJECT_TYPES                           -430
+#define DI_NUM_NAMED_OBJECT_TYPES_TABLE_SLOTS               -431
 
 #define DI_SIZE_ACTIONS                                     -450
 #define DI_SIZE_CALLOUTS                                    -451
@@ -125,6 +127,7 @@
 #define DI_SIZE_REGEX                                       -469
 #define DI_SIZE_BUFFER_FILE                                 -470
 #define DI_SIZE_BUFFER_SWAP                                 -471
+#define DI_SIZE_NAMED_OBJECT_TYPES_TABLE                    -472
 
 /* Memory swapper statistics */
 #define DI_NUM_SWAP_BLOCKS                                  -500
@@ -187,6 +190,9 @@
 #define DI_STATUS_TEXT_SWAP                                 -702
 #define DI_STATUS_TEXT_MALLOC                               -703
 #define DI_STATUS_TEXT_MALLOC_EXTENDED                      -704
+
+/* Misc Status */
+#define DI_NUM_SIMUL_EFUNS_TABLED                           -900
 
 /* Indices into the subarrays of DI_MEMORY_EXTENDED_STATISTICS (if given) */
 

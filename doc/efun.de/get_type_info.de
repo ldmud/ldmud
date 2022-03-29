@@ -13,18 +13,20 @@ BESCHREIBUNG
         Ist <flag> 0, wird nur das erste Element (d.h. der Datentyp) geliefert.
         Ist <flag> 1, wird nur das zweite Element geliefert.
 
-        Wenn <arg> eine Closure enthaelt, so kann get_type_info() das Objekt
-        der Closure liefern, wenn fuer <flag> 2 gesetzt ist. (Fuer 'alien
-        lfun closures' ist das das Objekt, in dem die Closure definiert ist,
-        nicht das Objekt, an das die Closure gebunden ist.)
+        Wenn <arg> eine Closure oder Coroutine enthaelt, so kann
+        get_type_info() das Objekt der Closure bzw. Coroutine liefern, wenn
+        fuer <flag> 2 gesetzt ist. (Fuer 'alien lfun closures' ist das das
+        Objekt, in dem die Closure definiert ist, nicht das Objekt, an das
+        die Closure gebunden ist.)
 
-        Wenn <arg> eine LFun/Context-Closure enthaelt, so kann get_type_info()
-        den Namen des definierenden Programmes liefern, wenn fuer <flag> 3
-        gesetzt ist. Fur andere Closures wird 0 zurueckgegeben.
+        Wenn <arg> eine LFun-, Context-Closure oder Coroutine enthaelt, so
+        kann get_type_info() den Namen des definierenden Programmes liefern,
+        wenn fuer <flag> 3 gesetzt ist. Fur andere Closures wird 0
+        zurueckgegeben.
 
-        Wenn <arg> eine LFun/Context-Closure enthaelt, so kann get_type_info()
-        den Namen der Funktion liefern, wenn fuer <flag> 4
-        gesetzt ist. Fur andere Closures wird 0 zurueckgegeben.
+        Wenn <arg> eine LFun-, Context-Closure oder Coroutine enthaelt, so
+        kann get_type_info() den Namen der Funktion liefern, wenn fuer
+        <flag> 4 gesetzt ist. Fur andere Closures wird 0 zurueckgegeben.
 
         Fuer jeden anderen Wert fuer <flag> liefert die Funktion -1.
 

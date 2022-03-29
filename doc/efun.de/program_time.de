@@ -1,6 +1,6 @@
 SYNOPSIS
         int program_time()
-        int program_time(object obj)
+        int program_time(object|lwobject obj)
 
 BESCHREIBUNG
         Gibt den Zeitpunkt an, zu dem das Objekt <obj> (bzw. this_object(),

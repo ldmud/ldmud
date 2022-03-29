@@ -3,7 +3,8 @@ SYNOPSIS
         #include <functionlist.h>
         #include <lpctypes.h>
 
-        mixed *variable_list(object obj, int flags = RETURN_FUNCTION_NAME)
+        mixed *variable_list(object|lwobject obj,
+                             int flags = RETURN_FUNCTION_NAME)
 
 BESCHREIBUNG
         Liefert ein Array mit Informationen ueber die Variablen von <obj>.

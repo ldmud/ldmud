@@ -2,8 +2,8 @@ SYNOPSIS
         #include <inherit_list.h>
 
         string * inherit_list()
-        string * inherit_list(object ob)
-        string * inherit_list(object ob, int flags)
+        string * inherit_list(object|lwobject ob)
+        string * inherit_list(object|lwobject ob, int flags)
 
 BESCHREIBUNG
         Liefert die Namen von allen Dateien, die von <ob> geerbt werden,

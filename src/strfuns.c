@@ -56,6 +56,7 @@
 #include "unidata.h"
 #include "xalloc.h"
 
+#include "i-current_object.h"
 
 #define MAX_UNICODE_CHAR 0x10ffff
     /* Per definition the unicode character with the highest codepoint. */
@@ -500,7 +501,7 @@ get_escaped_character (p_int c, char* buf, size_t buflen)
 /*--------------------------------------------------------------------*/
 
 size_t
-byte_to_char_index (char* text, size_t pos, bool* error)
+byte_to_char_index (const char* text, size_t pos, bool* error)
 
 /* Determines the character index in the string <text> at the
  * byte position <pos>. If there are errors in the encoding,
@@ -509,7 +510,7 @@ byte_to_char_index (char* text, size_t pos, bool* error)
  */
 
 {
-    char* dest = text + pos;
+    const char* dest = text + pos;
     size_t idx = 0;
 
     if (error)
@@ -552,7 +553,7 @@ byte_to_char_index (char* text, size_t pos, bool* error)
 /*--------------------------------------------------------------------*/
 
 size_t
-char_to_byte_index (char* text, size_t len, size_t pos, bool* error)
+char_to_byte_index (const char* text, size_t len, size_t pos, bool* error)
 
 /* Determines the byte position of the character with index <pos>
  * in the text <text> with length <len>.
@@ -561,8 +562,8 @@ char_to_byte_index (char* text, size_t len, size_t pos, bool* error)
  */
 
 {
-    char* dest = text;
-    char* end  = text + len;
+    const char* dest = text;
+    const char* end  = text + len;
     size_t idx = 0;
 
     if (error)
@@ -1103,7 +1104,7 @@ enum unicode_grapheme_cluster_break grapheme_state[GRAPHEME_BREAK][GRAPHEME_BREA
 /*--------------------------------------------------------------------*/
 
 size_t
-next_grapheme_break (char* str, size_t len, int* width)
+next_grapheme_break (const char* str, size_t len, int* width)
 
 /* Determines the position for the next break, i.e. the length of the
  * grapheme at the beginning of <str>.
@@ -1209,7 +1210,7 @@ next_grapheme_break (char* str, size_t len, int* width)
 /*--------------------------------------------------------------------*/
 
 int
-get_string_width (char* str, size_t len, bool* error)
+get_string_width (const char* str, size_t len, bool* error)
 
 /* Determines the displayed width of the given UTF-8 string.
  * If there are errors in the encoding returns the width up to the
@@ -1245,7 +1246,7 @@ get_string_width (char* str, size_t len, bool* error)
 /*--------------------------------------------------------------------*/
 
 size_t
-get_string_up_to_width (char* str, size_t len, int width, bool* error)
+get_string_up_to_width (const char* str, size_t len, int width, bool* error)
 
 /* Determines the length (in bytes) for <str> that will not exceed
  * the given width. If there are errors in the encoding returns the length
@@ -2431,13 +2432,13 @@ x_filter_string (svalue_t *sp, int num_arg)
 
             flags[cnt] = 0;
 
-            if (current_object->flags & O_DESTRUCTED)
+            if (is_current_object_destructed())
                 continue;
                 /* Don't call the filter anymore, but fill the
                  * flags array with 0es.
                  */
 
-            if (!callback_object(cb))
+            if (!valid_callback_object(cb))
             {
                 inter_sp = sp;
                 errorf("object used by filter(array) destructed");
@@ -2689,13 +2690,13 @@ x_map_string (svalue_t *sp, int num_arg)
                 chlen = 1;
             }
 
-            if (current_object->flags & O_DESTRUCTED)
+            if (is_current_object_destructed())
             {
                 src += chlen;
                 continue;
             }
 
-            if (!callback_object(cb))
+            if (!valid_callback_object(cb))
                 errorf("object used by map(string) destructed");
 
             push_number(inter_sp, num);

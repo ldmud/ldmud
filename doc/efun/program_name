@@ -1,6 +1,6 @@
 SYNOPSIS
         string program_name()
-        string program_name(object obj)
+        string program_name(object|lwobject obj)
 
 DESCRIPTION
         Returns the name of the program of <obj>, resp. the name of the

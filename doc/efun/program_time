@@ -1,6 +1,6 @@
 SYNOPSIS
         int program_time()
-        int program_time(object ob)
+        int program_time(object|lwobject ob)
 
 DESCRIPTION
         Returns the creation (compilation) time of the object's

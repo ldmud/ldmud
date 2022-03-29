@@ -33,3 +33,11 @@ string get_local_program()
 {
     return get_program();
 }
+
+/* To check the reference count of the function name string.
+ * In contrast to fun_a1() this function will not be called,
+ * so it will not end up in the apply cache.
+ */
+void a_disappearing_function()
+{
+}

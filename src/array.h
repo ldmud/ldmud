@@ -97,7 +97,6 @@ extern svalue_t *v_filter_objects(svalue_t *sp, int num_arg);
 extern svalue_t *v_map_objects(svalue_t *sp, int num_arg);
 extern svalue_t *v_unique_array(svalue_t *sp, int num_arg);
 
-extern void set_vector_user(vector_t *p, object_t *owner);
 extern long total_array_size(void);
 
 #if defined(GC_SUPPORT)
@@ -131,6 +130,16 @@ static INLINE void free_array(vector_t *a) {
  */
 static INLINE p_int deref_array(vector_t *a) {
     return --a->ref;
+}
+
+static INLINE void put_ref_array(svalue_t * const dest, vector_t * const vec)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_ref_array(svalue_t * const dest, vector_t * const vec)
+/* Put the array <vec> into <dest>, which is considered empty,
+ * and increment the refcount of <vec>.
+ */
+{
+    *dest = svalue_array(ref_array(vec));
 }
 
 

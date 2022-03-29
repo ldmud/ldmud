@@ -167,6 +167,17 @@ struct mvf_info
 
 #define deref_mapping(m) (--(m)->ref)
 
+static INLINE void put_ref_mapping(svalue_t * const dest, mapping_t * const map)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_ref_mapping(svalue_t * const dest, mapping_t * const map)
+/* Put the mapping <map> into <dest>, which is considered empty,
+ * and increment the refcount of <map>.
+ */
+{
+    *dest = svalue_mapping(ref_mapping(map));
+}
+
+
 /* --- Variables --- */
 
 extern mp_int num_mappings;
@@ -195,7 +206,6 @@ extern void walk_mapping(mapping_t *m, void (*func)(svalue_t *key, svalue_t *val
 extern Bool compact_mapping(mapping_t *m, Bool force);
 extern mp_int total_mapping_size(void);
 extern size_t mapping_overhead(mapping_t *m);
-extern void set_mapping_user(mapping_t *m, object_t *owner);
 
 extern svalue_t *f_m_allocate(svalue_t *sp);
 extern svalue_t *v_m_contains(svalue_t *sp, int num_arg);

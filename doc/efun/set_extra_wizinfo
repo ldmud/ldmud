@@ -1,13 +1,15 @@
 SYNOPSIS
-        void set_extra_wizinfo(object wiz, mixed extra)
-        void set_extra_wizinfo(string wiz, mixed extra)
-        void set_extra_wizinfo(int    wiz, mixed extra)
+        void set_extra_wizinfo(object   wiz, mixed extra)
+        void set_extra_wizinfo(lwobject wiz, mixed extra)
+        void set_extra_wizinfo(string   wiz, mixed extra)
+        void set_extra_wizinfo(int      wiz, mixed extra)
 
 DESCRIPTION
         Set the value <extra> as the 'extra' information for the wizlist
         entry of <wiz>.
 
-        If <wiz> is an object, the entry of its creator (uid) is used.
+        If <wiz> is a regular or lightweight object, the entry of its
+        creator (uid) is used.
         If <wiz> is a string (a creator aka uid), it names the entry
         to use.
         If <wiz> is the number 0, the data is set in the default wizlist

@@ -2,9 +2,11 @@ SYNOPSIS
         void tell_room(string|object ob, string str)
         void tell_room(string|object ob, string str, object *exclude)
 
-        void tell_room(string|object ob, mixed *|mapping|struct|object msg)
-        void tell_room(string|object ob, mixed *|mapping|struct|object msg
-                                       , object *exclude)
+        void tell_room(string|object ob,
+                       mixed *|mapping|struct|object|lwobject msg)
+        void tell_room(string|object ob,
+                       mixed *|mapping|struct|object|lwobject msg,
+                       object *exclude)
 
 DESCRIPTION
         Send a message <str> to all living objects in the room ob. ob

@@ -141,28 +141,28 @@ EXAMPLES
                             //         "      long\n"
                             //         "    senten\n"
                             //         "        ce\n"
-        sprintf("%#-40.3s",
+        sprintf("%#-40.3s\n",
                 "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n")
                             // returns "one          five         nine\n"
                             //         "two          six          ten\n"
                             //         "three        seven        \n"
-                            //         "four         eight        "
-        sprintf("%#-40s",
+                            //         "four         eight        \n"
+        sprintf("%#-40s\n",
                 "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n")
                             // returns "one     three   five    seven   nine\n"
-                            //         "two     four    six     eight   ten"
+                            //         "two     four    six     eight   ten\n"
 
         sprintf("%@-5s",({"foo","bar","bloh"})) // returns "foo  bar  bloh "
 
         sprintf("%d",123)                   // returns "123"
         sprintf("%7d",123)                  // returns "    123"
-        sprintf("%-7d",123)                 // returns "123" (yes, really)
+        sprintf("%-7d",123)                 // returns "123    "
         sprintf("%d/%d",123,-123)           // returns "123/-123"
         sprintf("% d/% d",123,-123)         // returns " 123/-123"
         sprintf("%+d/%+d",123,-123)         // returns "+123/-123"
-        sprintf("%+6d/%6d",123,123)         // returns " +123/  123"
-        sprintf("%|6d",123)                 // returns "  123" (yes, really)
-        sprintf("%|10d",123)                // returns "    123" (yes, really)
+        sprintf("%+5d/%5d",123,123)         // returns " +123/  123"
+        sprintf("%|6d",123)                 // returns "  123 "
+        sprintf("%|10d",123)                // returns "    123   "
         sprintf("%|10d%3s",123,"foo")       // returns "    123   foo"
 
         sprintf("%o",16)                    // returns "20"
@@ -175,7 +175,7 @@ EXAMPLES
         sprintf("%8.3f",123.5)              // returns " 123.500"
         sprintf("%E",123.5)                 // returns "1E+02"
         sprintf("%12.4e",123.5)             // returns "  1.2350e+02"
-        sprintf("%g",123.5)                 // returns "124"
+        sprintf("%g",123.5)                 // returns "1e+02"
         sprintf("%8.3G",123.5)              // returns "     124"
         sprintf("%8.6g",123.5)              // returns "   123.5"
 

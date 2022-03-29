@@ -840,6 +840,11 @@ void run_test()
                 return 1;
             :)
         }),
+        ({ "sprintf with unicode padding", 0,
+            (:
+                return sprintf("%7'\U0001F608's", "X") == "\U0001F608\U0001F608\U0001F608X";
+            :)
+        }),
         ({ "terminal_colour wrapping unicode characters 1", 0,
             (:
                 return terminal_colour("\u266a"*20+"\n", 0, 19, 5) == "\u266a"*19 + "\n     \u266a\n";
