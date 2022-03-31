@@ -2292,9 +2292,247 @@ chop_string (char* str, size_t oldsize, size_t newsize)
 } /* chop_string() */
 
 /*-------------------------------------------------------------------------*/
+#define CALLOCATE(num, type) ((type *)xalloc(sizeof(type[1]) * (num) ))
+  /* Allocate a block of <num> elements of <type>
+   */
+
+#define RESIZE(ptr, num, type) ((type *)rexalloc((void *)ptr, sizeof(type) * (num)))
+  /* Resize the block <ptr> to hold <num> elements of <type>.
+   */
+
+void
+_allocate_parts_lens(int num, char *** parts, p_int ** lens)
+{
+    (*parts) = CALLOCATE( num, char * );
+    if (!(*parts))
+    {
+        errorf("(terminal_colour) Out of memory (%lu bytes) "
+                "for %d parts.\n"
+                , (unsigned long) num * sizeof(char*), num);
+        /* NOTREACHED */
+        return;
+    }
+
+    (*lens) = CALLOCATE(num, p_int);
+    if (!(*lens))
+    {
+        xfree(*parts);
+        errorf("(terminal_colour) Out of memory (%lu bytes) "
+                "for %d parts.\n"
+                , (unsigned long) num * sizeof(p_int), num);
+        /* NOTREACHED */
+        return;
+    }
+}
+
+void
+_resize_parts_lens(int num, char *** parts, p_int ** lens)
+{
+    (*parts) = RESIZE((*parts), num, char * );
+    if (!(*parts))
+    {
+        errorf("(terminal_colour) Out of memory (%lu bytes) "
+                "for %d parts.\n"
+                , (unsigned long) num * sizeof(char*), num);
+        /* NOTREACHED */
+        return;
+    }
+    (*lens) = RESIZE((*lens), num, p_int );
+    if (!(*lens))
+    {
+        xfree(*parts);
+        errorf("(terminal_colour) Out of memory (%lu bytes) "
+                "for %d parts.\n"
+                , (unsigned long) num * sizeof(p_int), num);
+        /* NOTREACHED */
+        return;
+    }
+}
+#undef CALLOCATE
+#undef RESIZE
+
+/*-------------------------------------------------------------------------*/
+static size_t
+find_colour_delimiters (char * instr, char *** partsref, p_int ** lensref
+        , char * delimiter, int code_len)
+
+/* Auxiliary function for terminal_colour().
+ * Find the positions of all text and colour code parts, delimited by
+ * DELIMITER and store them and their lengths in parts and lens.
+ * This could also be used in a future colour_strlen() (which would just add
+ * up the lens at odd indices).
+ *
+ * To facilitate reallocation of memory, parts and lens have to be passed by
+ * reference! Both arrays are expected to already have NSTRSEGS allocated when
+ * the function is called.
+ *
+ * The parts array always starts with an 'uncoloured' string part (possibly of
+ * length 0), alternating with colour codes.
+ *
+ * If CODE_LEN is 0 the colour code can be of variable length and must be
+ * enclosed between delimiters, else a fixed length colour code of CODE_LEN
+ * chars after a delimiter is used.
+ *
+ * If two delimiters are directly adjacent they are interpreted as 'escaped'
+ * delimiter and the length of the previous part will be extended to include
+ * the first occurence. The length of the colour part will be set to 0.
+ *
+ * Returns the number of found parts.
+ *
+ * TODO:
+ * Implement the alternative escape syntax "%%^^", e.g. by simply
+ * parsing/replacing it with "%^%^" in a separate run. This would require
+ * copying the string though, as we dont want to modify the original.
+ * OTOH we could argue if support for this is really necessary, as it could be
+ * easily replaced in existing mud codebases.
+ */
+
+#define NSTRSEGS       32
+  /* Allocation increment. */
+
+{
+    char ** parts = (*partsref);
+    p_int * lens = (*lensref);
+
+    int num;  /* Number of delimited parts in <instr> */
+    char * cp;  /* workpointer */
+    char * prev_cp;  /* previous workpointer */
+    int delimiter_length = strlen(delimiter); /* length of the delimiter */
+
+    /* The string by definition starts with a non-keyword,
+     * which might be empty.
+     * Initialize our variables accordingly.
+     */
+    num = 0; /* found no delimiters so far */
+    parts[0] = instr; /* first part always at start of string */
+
+    /* find first delimiter */
+    cp = strstr(instr, delimiter);
+
+    if (!cp)
+    {
+        /* no delimiter found in string, bail out */
+        lens[0] = strlen(instr);
+        return 1;
+    }
+
+    /* length of part up to the first delimiter */
+    lens[0] = cp - instr;
+
+    /* skip colour delimiter */
+    prev_cp = cp + delimiter_length;
+
+    /* end of string */
+    char * term = instr + strlen(instr);
+
+    if (code_len > 0) /* fixed colour code length */
+    {
+        while (prev_cp < term)
+        {
+            num++;
+            /* resize arrays if necessary */
+            if (num % NSTRSEGS == 0)
+            {
+                _resize_parts_lens(num + NSTRSEGS, &parts, &lens);
+            }
+
+            /* store current position */
+            parts[num] = prev_cp;
+
+            /* every second turn it's a colour code */
+            if (num % 2)
+            {
+                if (strstr(prev_cp, delimiter) == prev_cp)
+                {
+                    /* found an escaped delimiter
+                       let the previous part include one copy */
+                    lens[num-1] += delimiter_length;
+
+                    /* the colour is empty in this case */
+                    lens[num] = 0;
+
+                    /* skip second delimiter */
+                    prev_cp += delimiter_length;
+                }
+                else
+                {
+                    /* fixed colour code length */
+                    lens[num] = code_len;
+
+                    /* skip colour code */
+                    prev_cp += code_len;
+                }
+            }
+            else
+            {
+                /* find next delimiter */
+                cp = strstr(prev_cp, delimiter);
+
+                if (!cp)
+                {
+                    /* no more delimiters, just use rest of string and bail out */
+                    lens[num] = term - prev_cp;
+
+                    break;
+                }
+
+                lens[num] = cp - prev_cp;
+
+                /* skip colour_delimiter */
+                prev_cp = cp + delimiter_length;
+            }
+        }
+    }
+    else /* variable colour code length */
+    {
+        while (prev_cp < term)
+        {
+            num++;
+            /* resize arrays if necessary */
+            if (num % NSTRSEGS == 0)
+            {
+                _resize_parts_lens(num + NSTRSEGS, &parts, &lens);
+            }
+
+            /* store current position */
+            parts[num] = prev_cp;
+
+            /* find next delimiter */
+            cp = strstr(prev_cp, delimiter);
+
+            if (!cp)
+            {
+                /* no more delimiters, just use rest of string and bail out */
+                lens[num] = term - prev_cp;
+
+                break;
+            }
+
+            lens[num] = cp - prev_cp;
+
+            if (num % 2 && cp == prev_cp)
+            {
+                /* found an escaped delimiter
+                   let the previous part include one copy */
+                lens[num-1] += delimiter_length;
+            }
+
+            /* skip colour_delimiter */
+            prev_cp = cp + delimiter_length;
+        }
+    }
+
+    (*partsref) = parts;
+    (*lensref) = lens;
+    return num + 1;
+}
+
+
+/*-------------------------------------------------------------------------*/
 static string_t *
 e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                   , int indent, int wrap
+                  , char * delimiter, int code_len
                   )
 
 /* Implementation of the efun terminal_colour().
@@ -2304,22 +2542,6 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
  */
 
 {
-#define CALLOCATE(num, type) ((type *)xalloc(sizeof(type[1]) * (num) ))
-  /* Allocate a block of <num> elements of <type>
-   */
-
-#define RESIZE(ptr, num, type) ((type *)rexalloc((void *)ptr, sizeof(type) * (num)))
-  /* Resize the block <ptr> to hold <num> elements of <type>.
-   */
-
-#define NSTRSEGS       32
-  /* Allocation increment. */
-
-#define TC_FIRST_CHAR  '%'
-#define TC_SECOND_CHAR '^'
-  /* The two magic characters.
-   */
-
 #define MAX_STRING_LENGTH 200000
   /* The maximum length of the result.
    */
@@ -2380,95 +2602,45 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
     instr = get_txt(text);
     num_tmp = 0;
 
-    /* Find the first occurance of the magic character pair.
-     * If found, duplicate the input string into instr and
-     * let cp point into that copy at the delimiter.
-     * If not found (or no mapping/closure given), cp will be NULL.
-     */
-
+    /* If we are requested to do color substitution, find all the
+       delimited parts. Else just fake one part containing the whole string. */
     if (map != NULL || cl != NULL)
     {
-        p_int left = mstrsize(text);
+        _allocate_parts_lens(NSTRSEGS, &parts, &lens);
 
-        cp = instr;
-        do {
-            char * last_cp = cp;
-            cp = memchr(cp, TC_FIRST_CHAR, (size_t)left);
-            if (cp)
-            {
-                if (cp[1] == TC_SECOND_CHAR)
-                {
-                    memsafe(savestr = dup_mstring(text), mstrsize(text)
-                           , "working string");
-                    cp = get_txt(savestr) + (cp - instr);
-                    instr = get_txt(savestr);
-
-                    /* Check for the special escape '%%^^'.
-                     * If found, modify it to '%^%^, and let cp
-                     * point to it.
-                     */
-                    if (cp > get_txt(savestr)
-                     && cp[-1] == TC_FIRST_CHAR
-                     && cp[2] == TC_SECOND_CHAR
-                       )
-                    {
-                        cp--;
-                        cp[1] = TC_SECOND_CHAR;
-                        cp[2] = TC_FIRST_CHAR;
-                    }
-                    break;
-                }
-
-                /* Single '%': skip it and continue searching */
-                cp++;
-                left -= (cp - last_cp);
-            }
-        } while (cp && left > 0);
-
-        if (left <= 0)
-            cp = NULL;
+        num = find_colour_delimiters(instr, &parts, &lens, delimiter, code_len);
     }
     else
-        cp = NULL;
+    {
+        num = 1;
 
-    /* If the delimiter was found, split up the instr into the
-     * parts and store them. If not found, just return.
-     */
+        _allocate_parts_lens(num, &parts, &lens);
+
+        parts[0] = instr;
+        lens[0] = strlen(instr);
+    }
+
     no_keys = MY_FALSE;
-    if (cp == NULL)
+    if (num == 1)
     {
         /* No delimiter found - but maybe we need to wrap */
         if (wrap)
         {
-            /* Yup, just fake one delimited part which just happens
-             * to not match anything in the mapping.
-             */
-            num = 1;
-            parts = CALLOCATE(1, char *);
-            parts[0] = instr;
-            lens = CALLOCATE(1, p_int);
-            lens[0] = mstrsize(text);
-            savestr = NULL;  /* should be NULL already anyway */
             no_keys = MY_TRUE;
         }
         else
         {
             /* no delimiter in string and no wrapping, so return the original.
              */
+            if ( lens )
+                xfree(lens);
+            if ( parts )
+                xfree(parts);
             return ref_mstring(text);
         }
     }
     else
     {
-        /* There are delimiters in the string. Find them all, let the
-         * pointers in *<parts> point to the strings delimited by
-         * them, and let those parts end with a '\0'.
-         * This means modifying the *<instr>, but it is already
-         * a copy.
-         */
-
-        p_int left;
-
         /* If we got a mapping, do a one-time lookup for the default
          * entry and store it in <cl>.
          */
@@ -2484,105 +2656,6 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 /* NOTREACHED */
                 return text;
             }
-        }
-
-        /* cp here points to the first delimiter found */
-
-        parts = CALLOCATE( NSTRSEGS, char * );
-        if (!parts)
-        {
-            errorf("(terminal_colour) Out of memory (%lu bytes) "
-                  "for %d parts.\n"
-                 , (unsigned long) NSTRSEGS * sizeof(char*), NSTRSEGS);
-            /* NOTREACHED */
-            return NULL;
-        }
-
-        lens = CALLOCATE(NSTRSEGS, p_int);
-        if (!lens)
-        {
-            xfree(parts);
-            errorf("(terminal_colour) Out of memory (%lu bytes) "
-                  "for %d parts.\n"
-                 , (unsigned long) NSTRSEGS * sizeof(p_int), NSTRSEGS);
-            /* NOTREACHED */
-            return NULL;
-        }
-
-        /* The string by definition starts with a non-keyword,
-         * which might be empty.
-         * Initialize our variables accordingly.
-         */
-        num = 1;
-        parts[0] = instr;
-        lens[0] = cp - instr;
-        left = mstrsize(text) - lens[0];
-
-        /* Search and find the other delimited segments.
-         * Loop variant: cp points to the last delimiter found,
-         * or cp is NULL (exit condition)
-         * Loop invariant: instr points to the begin of the last delimited
-         * segment, left is the number of characters left in the string.
-         */
-        while (cp && left > 0)
-        {
-            /* Skip the delimiter found last and search the next */
-            cp += 2;
-            instr = cp;
-            left -= 2;
-
-            do
-            {
-                char * last_cp = cp;
-                cp = memchr(cp, TC_FIRST_CHAR, left);
-                if (cp) {
-                    left -= (cp - last_cp);
-                    if (cp[1] == TC_SECOND_CHAR)
-                    {
-                        /* Check for the special escape '%%^^'.
-                         * If found, modify it to '%^%^, and let cp
-                         * point to it.
-                         */
-                        if (cp > get_txt(savestr)
-                         && cp[-1] == TC_FIRST_CHAR
-                         && cp[2] == TC_SECOND_CHAR
-                           )
-                        {
-                            cp--;
-                            cp[1] = TC_SECOND_CHAR;
-                            cp[2] = TC_FIRST_CHAR;
-                            left++;
-                        }
-                        break;
-                    }
-                    cp++;
-                    left--;
-                }
-            } while (cp && left > 0);
-            if (left <= 0)
-                cp = NULL;
-
-            if (cp)
-            {
-                /* Another delimiter found: put it into the parts array.
-                 */
-                parts[num] = instr;
-                lens[num] = cp - instr;
-                num++;
-                if (num % NSTRSEGS == 0)
-                {
-                    parts = RESIZE(parts, num + NSTRSEGS, char * );
-                    lens = RESIZE(lens, num + NSTRSEGS, p_int );
-                }
-            }
-        }
-
-        /* Trailing part, or maybe just a delimiter */
-        if (*instr)
-        {
-            parts[num] = instr;
-            lens[num] = strlen(instr); /* Note: left is 0 here */
-            num++;
         }
     } /* if (delimiter found or not) */
 
@@ -2602,36 +2675,42 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
      * The lengths are collected in the lens[] array to save the
      * need for repeated strlens().
      */
-    for (i = 0; i < num; i++)
+    if (!no_keys)
     {
-        string_t * str;
-        svalue_t * mdata;
-
-        /* If parts[i] is a valid colour key, there must exist a shared
-         * string for it. Is that the case, look up parts[i] in the
-         * mapping and set the result in mdata, otherwise save that effort.
-         * However, if i is even, parts[i] is by definition not a colour
-         * key.
-         */
-        mdata = NULL;
-        if (i % 2 && !no_keys)
+        /* skip over all the non-colour parts */
+        for (i = 1; i < num; i += 2)
         {
+            string_t * str;
+            svalue_t * mdata;
+
+            /* If parts[i] is a valid colour key, there must exist a shared
+             * string for it. Is that the case, look up parts[i] in the
+             * mapping and set the result in mdata, otherwise save that effort.
+             * However, if i is even, parts[i] is by definition not a colour
+             * key.
+             */
+            mdata = NULL;
+
             if (lens[i] == 0) /* Empty key - already handled */
-                str = NULL;
+            {
+                continue;
+                // str = NULL;
+            }
             else
             {
                 str = find_tabled_str_n(parts[i], lens[i], STRING_UTF8);
             }
+
             if (str != NULL && map != NULL)
             {
                 svalue_t mkey;
 
                 put_string(&mkey, str);
-                 /* The only use of mkey is to index a mapping - an
-                  * operation which will not decrement the refcount
-                  * for <str>. This makes it safe to not count the
-                  * ref by mkey here, and saves a bit time.
-                  */
+                /* The only use of mkey is to index a mapping - an
+                 * operation which will not decrement the refcount
+                 * for <str>. This makes it safe to not count the
+                 * ref by mkey here, and saves a bit time.
+                 */
 
                 /* now look for mapping data */
                 mdata = get_map_value(map, &mkey);
@@ -2667,28 +2746,19 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                     }
                 }
             }
-        }
-        else if (!(i % 2) && !no_keys
-              && i < num -1 && lens[i+1] == 0)
-        {
-            /* Special case: the following colour key is the empty "%^%^".
-             * We interpret it as literal "%^" and add it to this part.
-             * Both part[i] and part[i+1] will end with the same char.
-             */
-            lens[i] += 2;
-        }
 
-        /* If mdata found a string, use it instead of the old parts[i].
-         * Note its length, making it negative where necessary.
-         */
-        if ( mdata && mdata->type == T_STRING )
-        {
-            parts[i] = get_txt(mdata->u.str);
-            lens[i] = (p_int)mstrsize(mdata->u.str);
-            if (wrap)
-                lens[i] = -lens[i];
-        }
-    } /* for (i = 0..num) for length gathering */
+            /* If mdata found a string, use it instead of the old parts[i].
+             * Note its length, making it negative where necessary.
+             */
+            if ( mdata && mdata->type == T_STRING )
+            {
+                parts[i] = get_txt(mdata->u.str);
+                lens[i] = (p_int)mstrsize(mdata->u.str);
+                if (wrap)
+                    lens[i] = -lens[i];
+            }
+        } /* for (i = 0..2..num) for length gathering */
+    }
 
     /* Do the wrapping analysis.
      * In order to do this, we need to have all lengths already
@@ -3232,12 +3302,8 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 #endif
     return deststr;
 
-#undef CALLOCATE
-#undef RESIZE
-#undef NSTRSEGS
-#undef TC_FIRST_CHAR
-#undef TC_SECOND_CHAR
 } /* e_terminal_colour() */
+#undef NSTRSEGS
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -3246,7 +3312,8 @@ v_terminal_colour (svalue_t *sp, int num_arg)
 /* EFUN terminal_colour()
  *
  *   varargs string terminal_colour( string str, mapping|closure map,
- *                                   int wrap, int indent )
+ *                                   int wrap, int indent,
+ *                                   string delimiter, int code_len )
  *
  * Expands all colour-defines from the input-string and replaces them by the
  * apropriate values found for the color-key inside the given mapping. The
@@ -3285,11 +3352,41 @@ v_terminal_colour (svalue_t *sp, int num_arg)
     string_t * str;
     mapping_t * map = NULL;
     svalue_t * cl = NULL;
+    int        code_len = 0;
+    char *     delim = "%^";
 
+    /* if the last two arguments are string, int we have a delimiter config */
+    if ( num_arg >= 4 )
+    {
+        if (sp->type == T_NUMBER && sp[-1].type == T_STRING)
+        {
+            code_len = (sp--)->u.number;
+            if (code_len < 0)
+            {
+                errorf("terminal_colour() requires a code_len >= 0.\n");
+                /* NOTREACHED */
+                return sp;
+            }
+            delim = get_txt((sp--)->u.str);
+            num_arg -= 2;
+        }
+    }
+    if ( num_arg > 4 )
+    {
+        errorf("invalid number of arguments to terminal_colour().\n");
+        /* NOTREACHED */
+        return sp;
+    }
     if ( num_arg >= 3 )
     {
         if ( num_arg == 4 )
         {
+            if (sp->type != T_NUMBER)
+            {
+                errorf("terminal_colour() indent must be an int.\n");
+                /* NOTREACHED */
+                return sp;
+            }
             indent = (sp--)->u.number;
             if (indent < 0)
             {
@@ -3297,6 +3394,12 @@ v_terminal_colour (svalue_t *sp, int num_arg)
                 /* NOTREACHED */
                 return sp;
             }
+        }
+        if (sp->type != T_NUMBER)
+        {
+            errorf("terminal_colour() wrap must be an int.\n");
+            /* NOTREACHED */
+            return sp;
         }
         wrap = (sp--)->u.number;
         if (wrap < 0)
@@ -3311,7 +3414,6 @@ v_terminal_colour (svalue_t *sp, int num_arg)
     {
         map = sp->u.map;
         if (map->num_values < 1)
-
         {
             errorf("terminal_colour() requires a mapping with values.\n");
             /* NOTREACHED */
@@ -3332,7 +3434,8 @@ v_terminal_colour (svalue_t *sp, int num_arg)
 
     inter_sp = sp;
 
-    str = e_terminal_colour(sp[-1].u.str, map, cl, indent, wrap);
+    str = e_terminal_colour(sp[-1].u.str, map, cl, indent, wrap,
+            delim, code_len);
 
     free_svalue(sp--);
     free_svalue(sp);
