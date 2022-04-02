@@ -23005,6 +23005,22 @@ count_extra_ref_in_object (object_t *ob)
 
     if (was_swapped)
         swap_program(ob);
+
+    if (ob->sent)
+    {
+        sentence_t *sent = ob->sent;
+        if (ob->flags & O_SHADOW)
+            sent = sent->next;
+        if (sent)
+        {
+            for (action_t *action = (action_t*) sent;
+                 action != NULL;
+                 action = (action_t*)action->sent.next)
+            {
+                count_callback_extra_refs(&(action->cb));
+            }
+        }
+    }
 } /* count_extra_ref_in_object() */
 
 /*-------------------------------------------------------------------------*/
@@ -23046,6 +23062,7 @@ count_extra_ref_in_closure (lambda_t *l, ph_int type)
                 l->function.lfun.inhProg->extra_ref++;
                 count_extra_ref_in_prog(l->function.lfun.inhProg);
             }
+            count_extra_ref_in_vector(l->context, l->function.lfun.context_size);
         }
     }
 
@@ -23102,24 +23119,36 @@ count_extra_ref_in_vector (svalue_t *svp, size_t num)
 
         case T_COROUTINE:
         {
+            /* We'll check the complete waiting list. */
             coroutine_t *cr = p->u.coroutine;
+
+            while (cr->awaitee)
+                cr = cr->awaitee;
 
             if (NULL == register_pointer(ptable, cr))
                 continue;
-            if (cr->prog)
+
+            while (cr)
             {
-                cr->prog->extra_ref++;
-                count_extra_ref_in_prog(cr->prog);
+                if (cr->prog)
+                {
+                    cr->prog->extra_ref++;
+                    count_extra_ref_in_prog(cr->prog);
+                }
+                count_extra_ref_in_vector(&cr->ob, 1);
+                if (cr->closure && register_pointer(ptable, cr->closure) != NULL)
+                    count_extra_ref_in_closure(cr->closure, CLOSURE_LFUN);
+                if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
+                {
+                    count_extra_ref_in_vector(cr->variables, cr->num_variables);
+                    count_extra_ref_in_vector(cr->variables[cr->num_variables].u.lvalue, cr->num_values);
+                }
+                else
+                    count_extra_ref_in_vector(cr->variables, cr->num_variables
+                                                           + cr->num_values);
+
+                cr = cr->awaiter;
             }
-            count_extra_ref_in_vector(&cr->ob, 1);
-            if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
-            {
-                count_extra_ref_in_vector(cr->variables, cr->num_variables);
-                count_extra_ref_in_vector(cr->variables[cr->num_variables].u.lvalue, cr->num_values);
-            }
-            else
-                count_extra_ref_in_vector(cr->variables, cr->num_variables
-                                                       + cr->num_values);
             continue;
         }
 
@@ -23158,6 +23187,52 @@ count_extra_ref_in_vector (svalue_t *svp, size_t num)
               (void *)p->u.map->num_values
             );
             continue; /* no extra ref count implemented */
+
+        case T_LVALUE:
+            switch (p->x.lvalue_type)
+            {
+                case LVALUE_PROTECTED:
+                    if (NULL != register_pointer(ptable, p->u.protected_lvalue))
+                        count_extra_ref_in_vector(&p->u.protected_lvalue->val, 1);
+                    break;
+
+                case LVALUE_PROTECTED_CHAR:
+                    break;
+
+                case LVALUE_PROTECTED_RANGE:
+                    if (p->u.protected_range_lvalue->vec.type == T_POINTER
+                     && NULL != register_pointer(ptable, p->u.protected_range_lvalue))
+                    {
+                        count_extra_ref_in_vector(&p->u.protected_range_lvalue->vec, 1);
+                        count_extra_ref_in_vector(&p->u.protected_range_lvalue->var->val, 1);
+                    }
+                    break;
+
+                case LVALUE_PROTECTED_MAPENTRY:
+                    if (NULL != register_pointer(ptable, p->u.protected_mapentry_lvalue))
+                    {
+                        struct protected_mapentry_lvalue *e = p->u.protected_mapentry_lvalue;
+                        svalue_t map = { T_MAPPING };
+
+                        map.u.map = e->map;
+                        count_extra_ref_in_vector(&map, 1);
+                        count_extra_ref_in_vector(&(e->key), 1);
+
+                    }
+                    break;
+
+                case LVALUE_PROTECTED_MAP_RANGE:
+                    if (NULL != register_pointer(ptable, p->u.protected_map_range_lvalue))
+                    {
+                        struct protected_map_range_lvalue *r = p->u.protected_map_range_lvalue;
+                        svalue_t map = { T_MAPPING, {}, {.map = r->map} };
+
+                        count_extra_ref_in_vector(&map, 1);
+                        count_extra_ref_in_vector(&(r->key), 1);
+                    }
+                    break;
+            }
+            continue;
         }
     }
 } /* count_extra_ref_in_vector() */
@@ -23183,16 +23258,25 @@ check_extra_ref_in_vector (svalue_t *svp, size_t num)
           {
             coroutine_t *cr = p->u.coroutine;
 
+            while (cr->awaitee)
+                cr = cr->awaitee;
+
             if (NULL == register_pointer(ptable, cr))
                 continue;
-            if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
+
+            while (cr)
             {
-                check_extra_ref_in_vector(cr->variables, cr->num_variables);
-                check_extra_ref_in_vector(cr->variables[cr->num_variables].u.lvalue, cr->num_values);
+                if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
+                {
+                    check_extra_ref_in_vector(cr->variables, cr->num_variables);
+                    check_extra_ref_in_vector(cr->variables[cr->num_variables].u.lvalue, cr->num_values);
+                }
+                else
+                    check_extra_ref_in_vector(cr->variables, cr->num_variables
+                                                           + cr->num_values);
+
+                cr = cr->awaiter;
             }
-            else
-                check_extra_ref_in_vector(cr->variables, cr->num_variables
-                                                       + cr->num_values);
             continue;
           }
 
@@ -23224,6 +23308,52 @@ check_extra_ref_in_vector (svalue_t *svp, size_t num)
               (void *)((p_int)p->u.map->num_values)
             );
             continue; /* no extra ref count implemented */
+
+        case T_LVALUE:
+            switch (p->x.lvalue_type)
+            {
+                case LVALUE_PROTECTED:
+                    if (NULL != register_pointer(ptable, p->u.protected_lvalue))
+                        check_extra_ref_in_vector(&p->u.protected_lvalue->val, 1);
+                    break;
+
+                case LVALUE_PROTECTED_CHAR:
+                    break;
+
+                case LVALUE_PROTECTED_RANGE:
+                    if (p->u.protected_range_lvalue->vec.type == T_POINTER
+                     && NULL != register_pointer(ptable, p->u.protected_range_lvalue))
+                    {
+                        check_extra_ref_in_vector(&p->u.protected_range_lvalue->vec, 1);
+                        check_extra_ref_in_vector(&p->u.protected_range_lvalue->var->val, 1);
+                    }
+                    break;
+
+                case LVALUE_PROTECTED_MAPENTRY:
+                    if (NULL != register_pointer(ptable, p->u.protected_mapentry_lvalue))
+                    {
+                        struct protected_mapentry_lvalue *e = p->u.protected_mapentry_lvalue;
+                        svalue_t map = { T_MAPPING };
+
+                        map.u.map = e->map;
+                        check_extra_ref_in_vector(&map, 1);
+                        check_extra_ref_in_vector(&(e->key), 1);
+
+                    }
+                    break;
+
+                case LVALUE_PROTECTED_MAP_RANGE:
+                    if (NULL != register_pointer(ptable, p->u.protected_map_range_lvalue))
+                    {
+                        struct protected_map_range_lvalue *r = p->u.protected_map_range_lvalue;
+                        svalue_t map = { T_MAPPING, {}, {.map = r->map} };
+
+                        check_extra_ref_in_vector(&map, 1);
+                        check_extra_ref_in_vector(&(r->key), 1);
+                    }
+                    break;
+            }
+            continue;
         }
     }
 } /* check_extra_ref_in_vector() */

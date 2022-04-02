@@ -6630,6 +6630,12 @@ count_comm_extra_refs (void)
             count_extra_ref_in_object(ob);
         count_extra_ref_in_vector(&all_players[i]->prompt, 1);
     }
+
+    for (i = 0; i < MAX_OUTCONN; i++)
+    {
+        if (outconn[i].status != ocNotUsed && outconn[i].curr_obj)
+            count_extra_ref_in_object(outconn[i].curr_obj);
+    }
 } /* count_comm_extra_refs() */
 
 #endif /* DEBUG */
