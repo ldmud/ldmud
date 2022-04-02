@@ -20333,7 +20333,7 @@ assert_master_ob_loaded (void)
       /* Flag to notice recursive calls */
 
     static object_t *destructed_master_ob = NULL;
-      /* Old, destructed master object */
+      /* Old, destructed master object, ref-counted. */
 
     int i;
 
@@ -20520,7 +20520,7 @@ assert_master_ob_loaded (void)
             ob->next_inv = NULL;
 
             /* Reactivate the old master */
-            master_ob = ref_object(ob, "assert_master_ob_loaded");
+            master_ob = ob;
             if (get_current_object() == &dummy_current_object_for_loads)
                 set_current_object(master_ob);
             push_number(inter_sp, newly_removed);
@@ -20575,7 +20575,10 @@ assert_master_ob_loaded (void)
         ref_object(master_ob, "assert_master_ob_loaded");
 
         if (destructed_master_ob)
+        {
             free_object(destructed_master_ob, "assert_master_ob_loaded");
+            destructed_master_ob = NULL;
+        }
 
         fprintf(stderr, "%s Reloading done.\n", time_stamp());
     }
