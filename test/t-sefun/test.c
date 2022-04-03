@@ -4,6 +4,9 @@
 
 #include "/sys/driver_info.h"
 
+/* A struct with the same name as an sefun. */
+struct sefunF001 {};
+
 mixed* fun(string arg, int num)
 {
     return ({arg, num});
@@ -30,6 +33,11 @@ void run_test()
                 return sefunF000() == 0xf000;
             :)
         }),
+        ({ "Calling sefunF001", 0,
+            (:
+                return sefunF001() == 0xf001;
+            :)
+        }),
         ({ "Calling sefunFFFF", 0,
             (:
                 return sefunFFFF() == 0xffff;
@@ -45,6 +53,11 @@ void run_test()
                 return funcall(#'sefunF000) == 0xf000;
             :)
         }),
+        ({ "Calling #'sefunF001", 0,
+            (:
+                return funcall(#'sefunF001) == 0xf001;
+            :)
+        }),
         ({ "Calling #'sefunFFFF", 0,
             (:
                 return funcall(#'sefunFFFF) == 0xffff;
@@ -58,6 +71,11 @@ void run_test()
         ({ "Calling symbol_function(\"sefunF000\")", 0,
             (:
                 return funcall(symbol_function("sefunF000")) == 0xf000;
+            :)
+        }),
+        ({ "Calling symbol_function(\"sefunF001\")", 0,
+            (:
+                return funcall(symbol_function("sefunF001")) == 0xf001;
             :)
         }),
         ({ "Calling symbol_function(\"sefunFFFF\")", 0,
@@ -109,6 +127,17 @@ void run_test()
                rename("/master-old.c", "/master.c");
 
                return find_object("/master").is_old_master();
+           :)
+        }),
+        ({ "Cleanup of struct definitions after compilation 1", TF_ERROR,
+           (:
+               load_object("/struct1");
+           :)
+        }),
+        ({ "Cleanup of struct definitions after compilation 2", 0,
+           (:
+               load_object("/struct2");
+               return 1;
            :)
         }),
     }), #'shutdown);

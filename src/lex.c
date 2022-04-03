@@ -768,7 +768,7 @@ init_lexer(void)
             /* NOTREACHED */
             continue;
         }
-        init_global_identifier(p, /* bVariable: */ MY_FALSE);
+        init_global_identifier(p, /* bProgram: */ false);
         p->u.global.efun = (short)n;
         p->next_all = all_efuns;
         all_efuns = p;
@@ -2057,16 +2057,16 @@ cleanup_source_files (void)
 
 /*-------------------------------------------------------------------------*/
 void
-init_global_identifier (ident_t * ident, Bool bVariable)
+init_global_identifier (ident_t * ident, bool bProgram)
 
 /* The (newly created or to be reused) identifier <ident> is set up
  * to be a global identifier, with all the .global.* fields set to
  * a suitable default. The caller has to fill in the information specifying
  * what kind of global this is.
  *
- * <bVariable> is to be TRUE if the caller intends to use the identifier
- * for a (local or global) variable or lfun; and FALSE if it is for a
- * efun/sefun.
+ * <bProgram> is to be true if the caller intends to use the identifier
+ * for an identifier specific to an LPC program (variable, lfun or struct
+ * definition), and false if it is for a worldwide identifier (efun, sefun).
  *
  * The function is rather small, but having it here makes it easier to
  * guarantee that all fields are set to a proper default.
@@ -2075,10 +2075,10 @@ init_global_identifier (ident_t * ident, Bool bVariable)
 {
     ident->type = I_TYPE_GLOBAL;
     ident->u.global.function  = I_GLOBAL_FUNCTION_OTHER;
-    if (bVariable)
+    if (bProgram)
         ident->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
     else
-        ident->u.global.variable = I_GLOBAL_VARIABLE_FUN;
+        ident->u.global.variable = I_GLOBAL_VARIABLE_WORLDWIDE;
     ident->u.global.efun     = I_GLOBAL_EFUN_OTHER;
     ident->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
     ident->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
@@ -5192,7 +5192,7 @@ closure (char *in_yyp)
         /* object variable? */
         if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_VAR)
          && p->u.global.variable != I_GLOBAL_VARIABLE_OTHER
-         && p->u.global.variable != I_GLOBAL_VARIABLE_FUN)
+         && p->u.global.variable != I_GLOBAL_VARIABLE_WORLDWIDE)
         {
             if (p->u.global.variable & VIRTUAL_VAR_TAG) {
                 /* Handling this would require an extra coding of

@@ -4615,6 +4615,45 @@ store_argument_types ( int num_arg )
 } /* store_argument_types() */
 
 /*-------------------------------------------------------------------------*/
+static ident_t *
+add_global_name (ident_t *name)
+
+/* Creates a global identifier for <name> or returns <name> if it already is
+ * a global identifier.
+ */
+
+{
+    switch (name->type)
+    {
+        default:
+            /* Create a new identifier. */
+            name = make_shared_identifier_mstr(name->name, I_TYPE_GLOBAL, 0);
+            /* FALLTHROUGH */
+        case I_TYPE_UNKNOWN:
+            /* We can adapt this identifier. */
+            init_global_identifier(name, true);
+            name->next_all = all_globals;
+            all_globals = name;
+            return name;
+
+        case I_TYPE_GLOBAL:
+            /* If this is a driver-global identifier, remember this as shadowed,
+             * if we haven't done this already.
+             */
+            if (name->u.global.variable == I_GLOBAL_VARIABLE_WORLDWIDE)
+            {
+                efun_shadow_t *sh = xalloc(sizeof(efun_shadow_t));
+                sh->shadow = name;
+                sh->next = all_efun_shadows;
+                all_efun_shadows = sh;
+
+                name->u.global.variable = I_GLOBAL_VARIABLE_OTHER;
+            }
+            return name;
+    }
+} /* add_global_name() */
+
+/*-------------------------------------------------------------------------*/
 static int
 define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                     , p_int offset, funflag_t flags, fulltype_t type)
@@ -5035,39 +5074,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
     num = FUNCTION_COUNT;
 
-    if (p->type != I_TYPE_GLOBAL)
-    {
-        /* This is the first _GLOBAL use of this identifier:
-         * make an appropriate entry in the identifier table.
-         */
-
-        if (p->type != I_TYPE_UNKNOWN)
-        {
-            /* The ident has been used before otherwise, so
-             * get a fresh structure.
-             */
-            p = make_shared_identifier_mstr(p->name, I_TYPE_GLOBAL, 0);
-        }
-        /* should be I_TYPE_UNKNOWN now. */
-
-        init_global_identifier(p, /* bVariable: */ MY_TRUE);
-        p->next_all = all_globals;
-        all_globals = p;
-    }
-    else if (p->u.global.variable == I_GLOBAL_VARIABLE_FUN)
-    {
-        /* The previous _GLOBAL use is the permanent efun definition:
-         * mark the efun as shadowed.
-         */
-        efun_shadow_t *q;
-
-        q = xalloc(sizeof(efun_shadow_t));
-        q->shadow = p;
-        q->next = all_efun_shadows;
-        all_efun_shadows = q;
-    }
-    /* else: Other cases don't need special treatment */
-
+    p = add_global_name(p);
     p->u.global.function = num;
 
     /* Store the function_t in the functions area */
@@ -5152,44 +5159,7 @@ define_variable (ident_t *name, fulltype_t type)
                 , get_txt(name->name));
     }
 
-    if (name->type != I_TYPE_GLOBAL)
-    {
-        /* This is the first _GLOBAL use of this identifier:
-         * make an appropriate entry in the identifier table.
-         */
-
-        if (name->type != I_TYPE_UNKNOWN)
-        {
-            /* The ident has been used before otherwise, so
-             * get a fresh structure.
-             */
-            name = make_shared_identifier_mstr(name->name, I_TYPE_GLOBAL, 0);
-        }
-
-        init_global_identifier(name, /* bVariable: */ MY_TRUE);
-        name->next_all = all_globals;
-        all_globals = name;
-    }
-    else if (name->u.global.function == I_GLOBAL_FUNCTION_OTHER
-          && (name->u.global.efun != I_GLOBAL_EFUN_OTHER
-           || name->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-#ifdef USE_PYTHON
-           || is_python_efun(name)
-#endif
-             )
-            )
-    {
-        /* The previous _GLOBAL use is the permanent efun definition:
-         * mark the efun as shadowed.
-         */
-        efun_shadow_t *q;
-
-        q = xalloc(sizeof(efun_shadow_t));
-        q->shadow = name;
-        q->next = all_efun_shadows;
-        all_efun_shadows = q;
-    }
-
+    name = add_global_name(name);
     /* Prepare the new variable_t */
 
     if (flags & TYPE_MOD_NOSAVE)
@@ -5201,7 +5171,7 @@ define_variable (ident_t *name, fulltype_t type)
 
     /* If the variable already exists, make sure that we can redefine it */
     n = name->u.global.variable;
-    if (n != I_GLOBAL_VARIABLE_OTHER && n != I_GLOBAL_VARIABLE_FUN)
+    if (n != I_GLOBAL_VARIABLE_OTHER && n != I_GLOBAL_VARIABLE_WORLDWIDE)
     {
         typeflags_t vn_flags = VARIABLE(n)->type.t_flags;
 
@@ -5257,47 +5227,7 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
     typeflags_t varflags;
     variable_t *variable;
 
-    if (name->type != I_TYPE_GLOBAL)
-    {
-        /* This is the first _GLOBAL use of this identifier:
-         * make an appropriate entry in the identifier table.
-         */
-
-        if (name->type != I_TYPE_UNKNOWN)
-        {
-            /* The ident has been used before otherwise, so
-             * get a fresh structure.
-             */
-            name = make_shared_identifier_mstr(name->name, I_TYPE_GLOBAL, 0);
-        }
-
-        init_global_identifier(name, /* bVariable: */ MY_TRUE);
-        name->next_all = all_globals;
-        all_globals = name;
-    }
-    else if (name->u.global.function == I_GLOBAL_FUNCTION_OTHER
-          && (name->u.global.efun != I_GLOBAL_EFUN_OTHER
-           || name->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-#ifdef USE_PYTHON
-           || is_python_efun(name)
-#endif
-             )
-            )
-    {
-        /* The previous _GLOBAL use is the permanent efun definition:
-         * mark the efun as shadowed.
-         */
-        efun_shadow_t *q;
-
-        q = xalloc(sizeof(efun_shadow_t));
-        q->shadow = name;
-
-        q->next = all_efun_shadows;
-        all_efun_shadows = q;
-    }
-    /* else: the variable is inherited after it has been defined
-     * in the child program.
-     */
+    name = add_global_name(name);
 
     /* The variable is hidden, do nothing else */
     if (flags & NAME_HIDDEN)
@@ -5311,7 +5241,7 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
     }
 
     if (name->u.global.variable != I_GLOBAL_VARIABLE_OTHER
-     && name->u.global.variable != I_GLOBAL_VARIABLE_FUN
+     && name->u.global.variable != I_GLOBAL_VARIABLE_WORLDWIDE
      && name->u.global.variable != n)
     {
         check_variable_redefinition(name, flags);
@@ -5384,7 +5314,7 @@ get_initialized_variable (ident_t *p)
 
             case I_TYPE_GLOBAL:
                 if (result->u.global.variable != I_GLOBAL_VARIABLE_OTHER
-                 && result->u.global.variable != I_GLOBAL_VARIABLE_FUN)
+                 && result->u.global.variable != I_GLOBAL_VARIABLE_WORLDWIDE)
                 {
                     if (global_variable_initializing == result)
                         foundinitializing = true;
@@ -5667,7 +5597,7 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident, Bool is_inline)
     if (ident->type == I_TYPE_UNKNOWN)
     {
         /* prevent freeing by exotic name clashes */
-        init_global_identifier(ident, /* bVariable: */ MY_TRUE);
+        init_global_identifier(ident, /* bProgram: */ true);
         ident->next_all = all_globals;
         all_globals = ident;
     }
@@ -6116,28 +6046,11 @@ define_new_struct ( Bool proto, ident_t *p, const char * prog_name, funflag_t fl
 
     num = STRUCT_COUNT;
 
-    if (p->type != I_TYPE_GLOBAL)
-    {
-        /* This is the first _GLOBAL use of this identifier:
-         * make an appropriate entry in the identifier table.
-         */
-
-        if (p->type != I_TYPE_UNKNOWN)
-        {
-            /* The ident has been used before otherwise, so
-             * get a fresh structure.
-             */
-            p = make_shared_identifier_mstr(p->name, I_TYPE_GLOBAL, 0);
-        }
-        /* should be I_TYPE_UNKNOWN now. */
-
-        init_global_identifier(p, /* bVariable: */ MY_FALSE);
-        p->next_all = all_globals;
-        all_globals = p;
-    }
-
     if  (!(flags & NAME_HIDDEN))
+    {
+        p = add_global_name(p);
         p->u.global.struct_id = num;
+    }
 
     /* Store the function_t in the functions area */
     ADD_STRUCT_DEF(&sdef);
@@ -15248,7 +15161,7 @@ function_call:
           {
               /* prevent freeing by exotic name clashes */
               /* also makes life easier below */
-              init_global_identifier(real_name, /* bVariable: */ MY_TRUE);
+              init_global_identifier(real_name, /* bProgram: */ true);
               real_name->next_all = all_globals;
               all_globals = real_name;
           }
@@ -19144,6 +19057,8 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
          */
         do
         {
+            int32 n; /* existing function index */
+
             /* Ignore cross defines.
              * They are the only complete invisible entries.
              */
@@ -19155,234 +19070,172 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
             if (!p)
                 break;
 
-            if (p->type != I_TYPE_UNKNOWN)
+            p = add_global_name(p);
+            n = p->u.global.function;
+
+            /* If the identifier is (also) an lfun, handle it, even if
+             * it's overloaded by something else as well. If we didn't
+             * subsequent inheritors would receive illegal function
+             * start offsets.
+             */
+            if ( n != I_GLOBAL_FUNCTION_OTHER && n != first_func_index + i)
             {
-                /* We got this ident already somewhere */
-
-                int32 n; /* existing function index */
-
-                n = p->u.global.function;
-
-                /* If the identifier is (also) an lfun, handle it, even if
-                 * it's overloaded by something else as well. If we didn't
-                 * subsequent inheritors would receive illegal function
-                 * start offsets.
+                /* Already inherited from somewhere else.
+                 * Don't try to resolve cross-references inside the
+                 * currently inherited program; not only is this superflous,
+                 * but it can also lead to circular cross-inheritance
+                 * when there was a misplaced prototype or an explicit
+                 * directive to inherit a multiply inherited function
+                 * from a particular base class (the latter is not
+                 * implemented). In these cases, the information that lead
+                 * to the non-standard preference would be very hard to
+                 * reconstruct.
                  */
-                if ( n != I_GLOBAL_FUNCTION_OTHER && n != first_func_index + i)
+                if ((uint32)n < first_func_index || (uint32)n >= first_func_index + from->num_functions)
                 {
-                    /* Already inherited from somewhere else.
-                     * Don't try to resolve cross-references inside the
-                     * currently inherited program; not only is this superflous,
-                     * but it can also lead to circular cross-inheritance
-                     * when there was a misplaced prototype or an explicit
-                     * directive to inherit a multiply inherited function
-                     * from a particular base class (the latter is not
-                     * implemented). In these cases, the information that lead
-                     * to the non-standard preference would be very hard to
-                     * reconstruct.
+                    /* We already have a function definition/prototype
+                     * for this name.
                      */
-                    if ((uint32)n < first_func_index || (uint32)n >= first_func_index + from->num_functions)
+
+                    function_t *OldFunction = FUNCTION(n);
+
+                    if ( !(OldFunction->flags & NAME_INHERITED) )
                     {
-                        /* We already have a function definition/prototype
-                         * for this name.
+                        /* Since inherits are not possible after functions
+                         * have been compiled, there are two options:
+                         * 1. We had a prototype for the function.
+                         * 2. Virtual inherit update made an inherited
+                         *    function undefined.
+                         * In both cases we'll cross-define to the new
+                         * function.
                          */
-
-                        function_t *OldFunction = FUNCTION(n);
-
-                        if ( !(OldFunction->flags & NAME_INHERITED) )
-                        {
-                            /* Since inherits are not possible after functions
-                             * have been compiled, there are two options:
-                             * 1. We had a prototype for the function.
-                             * 2. Virtual inherit update made an inherited
-                             *    function undefined.
-                             * In both cases we'll cross-define to the new
-                             * function.
-                             */
-                            if (OldFunction->flags & NAME_PROTOTYPE)
-                                yywarnf(
-                                    "Misplaced prototype for %s in %s ignored.\n"
-                                    , get_txt(fun.name), current_loc.file->name
-                                );
-
-                            /* The function name was a counted reference,
-                             * but after cross-definition it shouldn't be.
-                             */
-                            free_mstring(OldFunction->name);
-
-                            cross_define( &fun, OldFunction
-                                        , current_func_index - n );
-                            p->u.global.function = current_func_index;
-                        }
-                        else if ( (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
-                                    == (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
-                        {
-                            /* There is already one function with this
-                            * name. Ignore the private one, as we
-                            * only need it for useful error messages.
-                            */
-
-                            break;
-                        }
-                        else if ( (OldFunction->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
-                                     == (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
-                        {
-                            /* The old one was invisible, ignore it
-                             * and take this one.
-                             */
-
-                            p->u.global.function = current_func_index;
-                        }
-                        else if ((fun.flags | funmodifier) & TYPE_MOD_VIRTUAL
-                              && OldFunction->flags & TYPE_MOD_VIRTUAL
-                          &&    get_virtual_function_id(funprogp, funprogidx)
-  == get_virtual_function_id(INHERIT(OldFunction->offset.inherit).prog
-                , n - INHERIT(OldFunction->offset.inherit).function_index_offset
-                     )
-                                 )
-                        {
-                            /* Entries denote the same function and both
-                             * entries are visible. We have to use
-                             * cross_define nonetheless, to get consistant
-                             * redefinition (and to avoid the nomask
-                             * checking that comes next), and we prefer
-                             * the first one.
-                             *
-                             * It is important, that both entries are
-                             * indeed visible, because otherwise invisible
-                             * (i.e. private) functions would be made
-                             * visible again by another visible occurrence
-                             * of the same function. The originally invisible
-                             * occurrence would then be subject to
-                             * redefinition and nomask checking.
-                             */
-                            OldFunction->flags |= fun.flags &
-                                (TYPE_MOD_PUBLIC|TYPE_MOD_NO_MASK);
-                            OldFunction->flags &= fun.flags |
-                                ~(TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|NAME_HIDDEN);
-                            cross_define( OldFunction, &fun
-                                        , n - current_func_index );
-                        }
-                        else if ( (fun.flags & OldFunction->flags & TYPE_MOD_NO_MASK)
-                             &&  !( (fun.flags|OldFunction->flags) & NAME_UNDEFINED ) )
-                        {
-                            yyerrorf(
-                              "Illegal to inherit 'nomask' function '%s' twice",
-                              get_txt(fun.name));
-                        }
-                        else if ((   fun.flags & TYPE_MOD_NO_MASK
-                                  || OldFunction->flags & NAME_UNDEFINED )
-                              && !(fun.flags & NAME_UNDEFINED)
-                                )
-                        {
-                            /* This function is visible and existing, but the
-                             * inherited one is not, or this one is also nomask:
-                             * prefer this one one.
-                             */
-                            cross_define( &fun, OldFunction
-                                        , current_func_index - n );
-                            p->u.global.function = current_func_index;
-                        }
-                        else
-                        {
-                            /* At least one of the functions is visible
-                             * or redefinable: prefer the first one.
-                             */
-
-                            cross_define( OldFunction, &fun
-                                        , n - current_func_index );
-                        }
-                    } /* if (n < first_func_index) */
-                    else if ( (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
-                                != (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
-                    {
-                        /* This is the dominant definition in the superclass,
-                         * inherit this one.
-                         */
-#ifdef DEBUG
-                        /* The definition we picked before can't be
-                         * cross-defined, because cross-defines won't
-                         * be registered as global identifiers.
-                         * So the previous definition should be
-                         * nominally invisible so we can redefine it.
-                         */
-                        if ( (FUNCTION(n)->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
-                                != (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
-                        {
-                            fatal(
-                              "Inconsistent definition of %s() within "
-                              "superclass '%s'.\n"
-                            , get_txt(fun.name), get_txt(from->name)
+                        if (OldFunction->flags & NAME_PROTOTYPE)
+                            yywarnf(
+                                "Misplaced prototype for %s in %s ignored.\n"
+                                , get_txt(fun.name), current_loc.file->name
                             );
-                        }
-#endif
+
+                        /* The function name was a counted reference,
+                         * but after cross-definition it shouldn't be.
+                         */
+                        free_mstring(OldFunction->name);
+
+                        cross_define( &fun, OldFunction
+                                    , current_func_index - n );
                         p->u.global.function = current_func_index;
                     }
-                }
+                    else if ( (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                                == (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
+                    {
+                        /* There is already one function with this
+                        * name. Ignore the private one, as we
+                        * only need it for useful error messages.
+                        */
 
-                /* Handle the non-lfun aspects of the identifier */
-                {
-                    if (n != I_GLOBAL_FUNCTION_OTHER
-                     || (p->u.global.efun == I_GLOBAL_EFUN_OTHER
-                      && p->u.global.sim_efun == I_GLOBAL_SEFUN_OTHER
-#ifdef USE_PYTHON
-                      && !is_python_efun(p)
-#endif
-                        )
-                     || (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
-                       )
-                     {
-                        /* This is not an inherited private function shadowing
-                         * a (simul-)efun.
-                         */
-
-                        if (p->u.global.efun != I_GLOBAL_EFUN_OTHER
-                         || p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-#ifdef USE_PYTHON
-                         || is_python_efun(p)
-#endif
-                           )
-                        {
-                            /* This inherited function shadows an efun */
-
-                            efun_shadow_t *q;
-
-                            q = xalloc(sizeof(efun_shadow_t));
-                            if (!q) {
-                                yyerrorf("Out of memory: efun shadow (%zu bytes)"
-                                        , sizeof(efun_shadow_t));
-                                break;
-                            }
-                            q->shadow = p;
-                            q->next = all_efun_shadows;
-                            all_efun_shadows = q;
-                        }
-
-                        /* Update the symbol table entry to point
-                         * to the newly read function, unless of course
-                         * the code above already took care of that change.
-                         */
-                        if (p->u.global.function == I_GLOBAL_FUNCTION_OTHER)
-                            p->u.global.function = current_func_index;
+                        break;
                     }
-                    /* else: inherited private defined function must not hide
-                     * the (simul-)efun and is thusly not added to
-                     * the symbol-table.
+                    else if ( (OldFunction->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                                 == (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
+                    {
+                        /* The old one was invisible, ignore it
+                         * and take this one.
+                         */
+
+                        p->u.global.function = current_func_index;
+                    }
+                    else if ((fun.flags | funmodifier) & TYPE_MOD_VIRTUAL
+                          && OldFunction->flags & TYPE_MOD_VIRTUAL
+                      &&    get_virtual_function_id(funprogp, funprogidx)
+                              == get_virtual_function_id(INHERIT(OldFunction->offset.inherit).prog
+                                , n - INHERIT(OldFunction->offset.inherit).function_index_offset
+                     ))
+                    {
+                        /* Entries denote the same function and both
+                         * entries are visible. We have to use
+                         * cross_define nonetheless, to get consistant
+                         * redefinition (and to avoid the nomask
+                         * checking that comes next), and we prefer
+                         * the first one.
+                         *
+                         * It is important, that both entries are
+                         * indeed visible, because otherwise invisible
+                         * (i.e. private) functions would be made
+                         * visible again by another visible occurrence
+                         * of the same function. The originally invisible
+                         * occurrence would then be subject to
+                         * redefinition and nomask checking.
+                         */
+                        OldFunction->flags |= fun.flags &
+                            (TYPE_MOD_PUBLIC|TYPE_MOD_NO_MASK);
+                        OldFunction->flags &= fun.flags |
+                            ~(TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|NAME_HIDDEN);
+                        cross_define( OldFunction, &fun
+                                    , n - current_func_index );
+                    }
+                    else if ( (fun.flags & OldFunction->flags & TYPE_MOD_NO_MASK)
+                         &&  !( (fun.flags|OldFunction->flags) & NAME_UNDEFINED ) )
+                    {
+                        yyerrorf(
+                          "Illegal to inherit 'nomask' function '%s' twice",
+                          get_txt(fun.name));
+                    }
+                    else if ((   fun.flags & TYPE_MOD_NO_MASK
+                              || OldFunction->flags & NAME_UNDEFINED )
+                          && !(fun.flags & NAME_UNDEFINED)
+                            )
+                    {
+                        /* This function is visible and existing, but the
+                         * inherited one is not, or this one is also nomask:
+                         * prefer this one one.
+                         */
+                        cross_define( &fun, OldFunction
+                                    , current_func_index - n );
+                        p->u.global.function = current_func_index;
+                    }
+                    else
+                    {
+                        /* At least one of the functions is visible
+                         * or redefinable: prefer the first one.
+                         */
+
+                        cross_define( OldFunction, &fun
+                                    , n - current_func_index );
+                    }
+                } /* if (n < first_func_index) */
+                else if ( (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                            != (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
+                {
+                    /* This is the dominant definition in the superclass,
+                     * inherit this one.
                      */
+#ifdef DEBUG
+                    /* The definition we picked before can't be
+                     * cross-defined, because cross-defines won't
+                     * be registered as global identifiers.
+                     * So the previous definition should be
+                     * nominally invisible so we can redefine it.
+                     */
+                    if ( (FUNCTION(n)->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                            != (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
+                    {
+                        fatal(
+                          "Inconsistent definition of %s() within "
+                          "superclass '%s'.\n"
+                        , get_txt(fun.name), get_txt(from->name)
+                        );
+                    }
+#endif
+                    p->u.global.function = current_func_index;
                 }
-            } /* if (p != I_TYPE_UNKNOWN) */
-
-            if (p->type == I_TYPE_UNKNOWN)
-            {
-                /* First time this function-ident was ever encountered.
-                 * Just make a new global.
-                 */
-
-                init_global_identifier(p, /* bVariable: */ MY_TRUE);
-                p->u.global.function  = current_func_index;
-                p->next_all = all_globals;
-                all_globals = p;
             }
+
+            /* Update the symbol table entry to point
+             * to the newly read function, unless of course
+             * the code above already took care of that change.
+             */
+            if (p->u.global.function == I_GLOBAL_FUNCTION_OTHER
+             && (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0)
+                p->u.global.function = current_func_index;
 
             /* Done with re/crossdefinition, now handle visibility.
              * Especially: public functions should not become private
@@ -20388,7 +20241,8 @@ epilog (void)
         for (t = all_efun_shadows; NULL != (s = t); )
         {
             s->shadow->u.global.function = I_GLOBAL_FUNCTION_OTHER;
-            s->shadow->u.global.variable = I_GLOBAL_VARIABLE_FUN;
+            s->shadow->u.global.variable = I_GLOBAL_VARIABLE_WORLDWIDE;
+            s->shadow->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
             t = s->next;
             xfree(s);
         }
