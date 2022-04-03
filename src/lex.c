@@ -1883,7 +1883,22 @@ undefined_function:
         /* Symbol is ok - create the closure value */
 
         sp->type = T_CLOSURE;
-        if (current_object.type == T_OBJECT)
+        if (efun_override != OVERRIDE_EFUN
+         && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
+         && p->u.global.sim_efun > USHRT_MAX - CLOSURE_SIMUL_EFUN_OFFS)
+        {
+            /* Special handling for simul-efuns with too big indices.
+             * We'll create an lfun closure here.
+             */
+            int fx = find_function(p->name, simul_efun_object->prog);
+            if (fx == -1)
+                fatal("Can't find simul_efun %s", get_txt(p->name));
+
+            closure_lfun(sp, svalue_object(simul_efun_object), simul_efun_object->prog, fx, 0, true);
+            assign_current_object(&(sp->u.lambda->ob), "symbol_efun");
+            return;
+        }
+        else if (current_object.type == T_OBJECT)
         {
             sp->u.ob = ref_object(current_object.u.ob, "symbol_efun");
             sp->x.closure_type = 0;

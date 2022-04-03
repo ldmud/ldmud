@@ -50,6 +50,21 @@ void run_test()
                 return funcall(#'sefunFFFF) == 0xffff;
             :)
         }),
+        ({ "Calling symbol_function(\"sefun0000\")", 0,
+            (:
+                return funcall(symbol_function("sefun0000")) == 0;
+            :)
+        }),
+        ({ "Calling symbol_function(\"sefunF000\")", 0,
+            (:
+                return funcall(symbol_function("sefunF000")) == 0xf000;
+            :)
+        }),
+        ({ "Calling symbol_function(\"sefunFFFF\")", 0,
+            (:
+                return funcall(symbol_function("sefunFFFF")) == 0xffff;
+            :)
+        }),
         ({ "Calling increment()", 0,
             (:
                 return increment(100) == 102;
