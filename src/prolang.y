@@ -6516,6 +6516,18 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool
             break;
 
         case TCLASS_STRUCT:
+            if (!unionmember->t_struct.name)
+            {
+                /* For any struct we can only do runtime lookup. */
+                *struct_index = FSM_AMBIGUOUS;
+                *member_index = -1;
+                fstruct = NULL;
+
+                /* Also we cannot guess the type. */
+                free_lpctype(result);
+                return lpctype_mixed;
+            }
+            else
             {
                 struct_type_t *pdef = unionmember->t_struct.def;
                 if (pdef == NULL)
