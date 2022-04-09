@@ -969,7 +969,8 @@ static bool warned_deprecated_in;
 
 static funflag_t default_varmod;
 static funflag_t default_funmod;
-  /* Default visibility modifiers for variables resp. function.
+static funflag_t default_structmod;
+  /* Default visibility modifiers for variables, function resp. structs.
    */
 
 static int heart_beat;
@@ -1178,7 +1179,7 @@ static void add_new_init_jump(void);
 static void transfer_init_control(void);
 static void copy_structs(program_t *, funflag_t);
 static void new_inline_closure (void);
-static int inherit_program(program_t *from, funflag_t funmodifier, funflag_t varmodifier);
+static int inherit_program(program_t *from, funflag_t funmodifier, funflag_t varmodifier, funflag_t structmodifier);
 static void fix_variable_index_offsets(program_t *);
 static short store_prog_string (string_t *str);
 
@@ -2991,6 +2992,60 @@ check_visibility_flags (funflag_t flags, funflag_t default_vis, bool function)
 
     return flags & ~TYPE_MOD_VISIBLE;
 } /* check_visibility_flags() */
+
+/*-------------------------------------------------------------------------*/
+static funflag_t
+combine_visibility_flags (funflag_t orig, funflag_t add)
+
+/* Combines visibility flags of two occurrences (eg. an element inherited
+ * twice with different visibility). Any other non-visibility flags in
+ * <orig> will be kept intact.
+ */
+
+{
+    if ((orig|add) & TYPE_MOD_PUBLIC)
+    {
+        orig &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED | NAME_HIDDEN);
+        orig |= TYPE_MOD_PUBLIC;
+    }
+    else if (!(add&(TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED)))
+    {
+        orig &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED | NAME_HIDDEN);
+    }
+    else if (!(orig&(TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED)))
+    {
+        /* It's already visible. */
+    }
+    else if (add & TYPE_MOD_PROTECTED)
+    {
+        orig &= ~(TYPE_MOD_PRIVATE | NAME_HIDDEN);
+        orig |= TYPE_MOD_PROTECTED;
+    }
+
+    return orig;
+} /* combine_visibility_flags() */
+
+/*-------------------------------------------------------------------------*/
+static funflag_t
+inherit_visibility_flags (funflag_t orig, funflag_t modifier)
+
+/* Calculates the resulting visibility when inheriting an element with <orig>
+ * visibility and applying the visibility modifier <modifier>.
+ */
+
+{
+    if (orig & TYPE_MOD_PUBLIC)
+        modifier &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED);
+    else if (orig & TYPE_MOD_PRIVATE)
+        orig |= NAME_HIDDEN;
+    orig |= modifier;
+    if (orig & (TYPE_MOD_PRIVATE | NAME_HIDDEN))
+        orig &= ~(TYPE_MOD_PROTECTED | TYPE_MOD_PUBLIC);
+    else if (orig & TYPE_MOD_PROTECTED)
+        orig &= ~(TYPE_MOD_PUBLIC);
+
+    return orig;
+} /* inherit_visibility_flags() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -5256,24 +5311,7 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
     assert(variable->type.t_type == type.t_type);
 
     /* The most visible modifier wins here. */
-    if ((flags|varflags) & TYPE_MOD_PUBLIC)
-    {
-        varflags &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED | NAME_HIDDEN);
-        varflags |= TYPE_MOD_PUBLIC;
-    }
-    else if (!(flags&(TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED)))
-    {
-        varflags &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED | NAME_HIDDEN);
-    }
-    else if (!(varflags&(TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED)))
-    {
-        /* It's already visible. */
-    }
-    else if (flags & TYPE_MOD_PROTECTED)
-    {
-        varflags &= ~(TYPE_MOD_PRIVATE | NAME_HIDDEN);
-        varflags |= TYPE_MOD_PROTECTED;
-    }
+    varflags = combine_visibility_flags(varflags, flags);
 
     /* Preserve nosave only, if both of them have it. */
     if (!(flags & varflags & TYPE_MOD_STATIC))
@@ -5941,11 +5979,14 @@ copy_default_value_block (int num_opt, p_int offset, p_int start, size_t size)
 
 /*-------------------------------------------------------------------------*/
 static int
-define_new_struct ( Bool proto, ident_t *p, const char * prog_name, funflag_t flags)
+define_struct (bool proto, ident_t *p, const char * prog_name, funflag_t flags, struct_type_t *stype)
 
 /* Define a new struct <p> with the visibility <flags>.
  * If <proto> is TRUE, the function is called for a struct forward
  * declaration; if <proto> is FALSE, the struct is about to be defined.
+ *
+ * <stype> points to an already existing definition (i.e. an inherited one),
+ * otherwise (for new definitions) it is NULL. The reference is not adopted.
  *
  * Result is the index (id) of the struct in the struct_defs table.
  * If the struct would be a duplicate, -1 is returned instead of the index.
@@ -5953,20 +5994,32 @@ define_new_struct ( Bool proto, ident_t *p, const char * prog_name, funflag_t fl
  * If a prototype is encountered, the struct definition is stored
  * with an additional visibility flag of NAME_PROTOTYPE.
  *
- * If NAME_HIDDEN is set in flags, the struct is added to the program
- * but no visibility checks occur - this is for inherited structs
- * which are no longer visible, but have to be kept in order to
- * keep the struct ids intact.
+ * This function should only be called for visible definitions.
  */
 
 {
     int          num;
     struct_def_t sdef;
+    lpctype_t *  type;
+
+    assert(!(flags & NAME_HIDDEN));
+    assert(!proto || stype == NULL);
+
+    /* Check visibility flags. */
+    flags = check_visibility_flags(flags, default_structmod, false);
+    if (flags & TYPE_MOD_STATIC)
+    {
+        yyerror("Can't declare a struct as static");
+        flags &= ~TYPE_MOD_STATIC;
+    }
+    if (flags & TYPE_MOD_VARARGS)
+    {
+        yyerror("Can't declare a struct as varargs");
+        flags &= ~TYPE_MOD_VARARGS;
+    }
 
     /* If this is a redeclaration, check for consistency. */
-    if (p->type == I_TYPE_GLOBAL && (num = p->u.global.struct_id) != I_GLOBAL_STRUCT_NONE
-     && !(flags & NAME_HIDDEN)
-      )
+    if (p->type == I_TYPE_GLOBAL && (num = p->u.global.struct_id) != I_GLOBAL_STRUCT_NONE)
     {
         struct_def_t *pdef;
 
@@ -5979,14 +6032,8 @@ define_new_struct ( Bool proto, ident_t *p, const char * prog_name, funflag_t fl
             ( TYPE_MOD_NO_MASK \
             | TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC \
             | TYPE_MOD_PROTECTED)
-            funflag_t f1 = pdef->flags;
-            funflag_t f2 = flags;
 
-            /* Smooth out irrelevant differences */
-            if (f1 & TYPE_MOD_STATIC) f1 |= TYPE_MOD_PROTECTED;
-            if (f2 & TYPE_MOD_STATIC) f2 |= TYPE_MOD_PROTECTED;
-
-            if ( ((f1 ^ f2) & TYPE_MOD_VIS) )
+            if ( ((pdef->flags ^ flags) & TYPE_MOD_VIS) )
             {
                 char buff[120];
 
@@ -6022,41 +6069,35 @@ define_new_struct ( Bool proto, ident_t *p, const char * prog_name, funflag_t fl
         return num;
     }
 
-    /* This is a new struct! */
-    flags = check_visibility_flags(flags, 0, false);
-    if (flags & TYPE_MOD_STATIC)
-    {
-        yyerror("Can't declare a struct as static");
-        flags &= ~TYPE_MOD_STATIC;
-    }
-    if (flags & TYPE_MOD_VARARGS)
-    {
-        yyerror("Can't declare a struct as varargs");
-        flags &= ~TYPE_MOD_VARARGS;
-    }
-
-    /* Fill in the struct_def_t */
-    sdef.type  = struct_new_prototype(ref_mstring(p->name)
-                                    , new_unicode_tabled(prog_name));
+    /* This is a new struct!
+     *
+     * Fill in the struct_def_t.
+     */
+    if (stype)
+        sdef.type = ref_struct_type(stype);
+    else
+        sdef.type = struct_new_prototype(ref_mstring(p->name)
+                                       , new_unicode_tabled(prog_name));
     sdef.flags = proto ? (flags | NAME_PROTOTYPE)
                        : (flags & ~NAME_PROTOTYPE);
     sdef.inh = -1;
 
-    update_struct_type(sdef.type->name->lpctype, sdef.type);
-
     num = STRUCT_COUNT;
 
-    if  (!(flags & NAME_HIDDEN))
-    {
-        p = add_global_name(p);
-        p->u.global.struct_id = num;
-    }
+    p = add_global_name(p);
+    p->u.global.struct_id = num;
 
-    /* Store the function_t in the functions area */
+    /* Store the definition in the struct area */
     ADD_STRUCT_DEF(&sdef);
 
+    /* We keep this reference until the end of compilation. */
+    type = get_struct_type(sdef.type);
+
+    update_struct_type(type, sdef.type);
+    type->t_struct.def_idx = num;
+
     return num;
-} /* define_new_struct() */
+} /* define_struct() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -6378,21 +6419,41 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
 /*-------------------------------------------------------------------------*/
 static short
-get_struct_index (struct_name_t * pName)
+get_struct_index (lpctype_t* stype)
 
-/* Return the index of struct name <pName> in this program's A_STRUCT_DEFS.
+/* Return the index of struct <stype> in this program's A_STRUCT_DEFS.
  * Return -1 if not found.
  */
 
 {
-    short i;
-
-    for (i = 0; (size_t)i < STRUCT_COUNT; i++)
+    unsigned short idx = stype->t_struct.def_idx;
+    if (idx == USHRT_MAX)
     {
-        if (STRUCT_DEF(i).type->name == pName)
-            return i;
+        struct_def_t sdef;
+
+        /* Do we know the exact definition from the name? */
+        if (stype->t_struct.def == NULL)
+            return -1;
+
+        /* Add this as a hidden struct to our program. */
+        idx = STRUCT_COUNT;
+        if (idx == USHRT_MAX)
+            return -1; /* Not enough space to do so. */
+
+        sdef.type = stype->t_struct.def;
+        sdef.flags = NAME_HIDDEN;
+        sdef.inh = -2;
+
+        ADD_STRUCT_DEF(&sdef);
+        ref_lpctype(stype); /* Epilog will free this. */
+        stype->t_struct.def_idx = idx;
+        return idx;
     }
-    return -1;
+
+    assert(idx < STRUCT_COUNT);
+    assert(STRUCT_DEF(idx).type->name == stype->t_struct.name);
+
+    return idx;
 } /* get_struct_index() */
 
 /*-------------------------------------------------------------------------*/
@@ -6549,7 +6610,7 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool
                 {
                     case FSM_NO_STRUCT:
                         fstruct = pdef;
-                        *struct_index = get_struct_index(fstruct->name);
+                        *struct_index = get_struct_index(unionmember);
                         *member_index = midx;
                         if (*struct_index == -1)
                         {
@@ -6569,7 +6630,7 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool
                         if (struct_baseof(pdef, fstruct))
                         {
                             fstruct = pdef;
-                            *struct_index = get_struct_index(fstruct->name);
+                            *struct_index = get_struct_index(unionmember);
                             *member_index = midx;
                             break;
                         }
@@ -6637,6 +6698,36 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool
 
 /*-------------------------------------------------------------------------*/
 static void
+record_struct_type (lpctype_t *t)
+
+/* Put all struct types in <t> into the struct definition blocks, so
+ * any inheriting programs have access to the definitions.
+ */
+
+{
+    lpctype_t *head = t;
+    while (true)
+    {
+        lpctype_t *member = head->t_class == TCLASS_UNION ? head->t_union.member : head;
+
+        if (member->t_class == TCLASS_STRUCT)
+        {
+            // If there is 'struct mixed' in there, there won't be another struct.
+            if (!member->t_struct.name)
+                break;
+
+            (void)get_struct_index(member);
+        }
+
+        if (head->t_class == TCLASS_UNION)
+            head = head->t_union.head;
+        else
+            break;
+    }
+} /* record_struct_type() */
+
+/*-------------------------------------------------------------------------*/
+static void
 struct_epilog (void)
 
 /* After a successful parse, make sure that all structs are defined,
@@ -6698,6 +6789,26 @@ struct_epilog (void)
             struct_publish_type(STRUCT_DEF(i).type);
     } /* for(i) */
 
+    /* For all non-private function and variables add their struct type
+     * to our definitions if there aren't there, yet.
+     */
+    for (i = 0; i < FUNCTION_COUNT; i++)
+    {
+        if (!(FUNCTION(i)->flags & (TYPE_MOD_PRIVATE | NAME_HIDDEN)))
+            record_struct_type(FUNCTION(i)->type);
+    }
+    for (i = 0; i < V_VARIABLE_COUNT; i++)
+    {
+        fulltype_t vartype = V_VARIABLE(i | VIRTUAL_VAR_TAG)->type;
+        if (!(vartype.t_flags & (TYPE_MOD_PRIVATE | NAME_HIDDEN)))
+            record_struct_type(vartype.t_type);
+    }
+    for (i = 0; i < NV_VARIABLE_COUNT; i++)
+    {
+        fulltype_t vartype = NV_VARIABLE(i)->type;
+        if (!(vartype.t_flags & (TYPE_MOD_PRIVATE | NAME_HIDDEN)))
+            record_struct_type(vartype.t_type);
+    }
 } /* struct_epilog() */
 
 
@@ -7588,10 +7699,12 @@ delete_prog_string (void)
       /* An LPC type without modifiers.
        */
 
-    funflag_t inh_flags[2];
-      /* Inheritance: [0]: code inheritance qualifiers
-       *              [1]: variable inheritance qualifiers
-       */
+    struct
+    {
+        funflag_t funmod;       /* Function inheritance modifiers. */
+        funflag_t varmod;       /* Variable inheritance modifiers. */
+        funflag_t structmod;    /* Struct inheritance modifiers.   */
+    } inh_flags;
 
     svalue_t *initialized;
       /* Position where to store the variable initializer.
@@ -8602,7 +8715,7 @@ struct_decl:
       type_modifier_list L_STRUCT L_IDENTIFIER ';'
       {
           check_identifier($3);
-          (void)define_new_struct(MY_TRUE, $3, compiled_file, $1);
+          (void)define_struct(true, $3, compiled_file, $1, NULL);
       }
     | type_modifier_list L_STRUCT L_IDENTIFIER
       {
@@ -8620,7 +8733,7 @@ struct_decl:
           }
           mem_block[A_STRUCT_MEMBERS].current_size = 0;
 
-          current_struct = define_new_struct(MY_FALSE, $3, compiled_file, $1);
+          current_struct = define_struct(false, $3, compiled_file, $1, NULL);
           if (current_struct < 0)
               YYACCEPT;
       }
@@ -8755,26 +8868,45 @@ inheritance:
            * A variable 'nosave' inherit is internally stored as 'static',
            * a functions 'nosave' inherit is not allowed.
            */
-          if ($1[1] & TYPE_MOD_NOSAVE)
+          if ($1.varmod & TYPE_MOD_NOSAVE)
           {
-              $1[1] |= TYPE_MOD_STATIC;
-              $1[1] ^= TYPE_MOD_NOSAVE;
+              $1.varmod |= TYPE_MOD_STATIC;
+              $1.varmod ^= TYPE_MOD_NOSAVE;
           }
 
-          if ($1[0] & TYPE_MOD_NOSAVE)
+          if ($1.funmod & TYPE_MOD_NOSAVE)
           {
-              $1[0] ^= TYPE_MOD_NOSAVE;
+              $1.funmod ^= TYPE_MOD_NOSAVE;
               yyerror("illegal to inherit code as 'nosave'");
           }
 
-          if ($1[1] & TYPE_MOD_VARARGS)
+          if ($1.varmod & TYPE_MOD_VARARGS)
           {
-              $1[1] ^= TYPE_MOD_VARARGS;
+              $1.varmod ^= TYPE_MOD_VARARGS;
               yyerror("illegal to inherit variables as 'varargs'");
           }
 
-          $1[0] = check_visibility_flags($1[0], 0, true);
-          $1[1] = check_visibility_flags($1[1], 0, false);
+          if ($1.structmod & TYPE_MOD_NOSAVE)
+          {
+              $1.structmod ^= TYPE_MOD_NOSAVE;
+              yyerror("illegal to inherit structs as 'nosave'");
+          }
+
+          if ($1.structmod & TYPE_MOD_STATIC)
+          {
+              $1.structmod ^= TYPE_MOD_STATIC;
+              yyerror("illegal to inherit structs as 'static'");
+          }
+
+          if ($1.structmod & TYPE_MOD_VARARGS)
+          {
+              $1.structmod ^= TYPE_MOD_VARARGS;
+              yyerror("illegal to inherit structs as 'varargs'");
+          }
+
+          $1.funmod = check_visibility_flags($1.funmod, 0, true);
+          $1.varmod = check_visibility_flags($1.varmod, 0, false);
+          $1.structmod = check_visibility_flags($1.structmod, 0, false);
 
           /* First, try to call master->inherit_file().
            * Since simulate::load_object() makes sure that the master has been
@@ -8905,7 +9037,7 @@ inheritance:
           /* Copy the functions and variables, and take
            * care of the initializer.
            */
-          int initializer = inherit_program(ob->prog, $1[0], $1[1]);
+          int initializer = inherit_program(ob->prog, $1.funmod, $1.varmod, $1.structmod);
           if (initializer > -1)
           {
               /* We inherited a __INIT() function: create a call */
@@ -8932,21 +9064,23 @@ inheritance_qualifiers:
 
       inheritance_modifier_list
       {
-          $$[0] = $$[1] = $1;
+          $$.funmod = $$.varmod = $$.structmod = $1;
 
           /* Allow 'static nosave inherit foo' as the short form
            * of 'static functions nosave variables inherit foo'; meaning
            * that we have to prevent the qualifier test in the
            * inheritance rule from triggering.
            */
-          $$[0] &= ~TYPE_MOD_NOSAVE;
-          $$[1] &= ~TYPE_MOD_VARARGS;
+          $$.funmod &= ~TYPE_MOD_NOSAVE;
+          $$.varmod &= ~TYPE_MOD_VARARGS;
+          $$.structmod &= ~(TYPE_MOD_STATIC|TYPE_MOD_NOSAVE|TYPE_MOD_VARARGS|TYPE_MOD_VIRTUAL);
       }
 
     | inheritance_qualifier inheritance_qualifiers
       {
-          $$[0] = $1[0] | $2[0];
-          $$[1] = $1[1] | $2[1];
+          $$.funmod = $1.funmod | $2.funmod;
+          $$.varmod = $1.varmod | $2.varmod;
+          $$.structmod = ($1.structmod | $2.structmod) & ~TYPE_MOD_VIRTUAL;
       }
 ; /* inheritance_qualifiers */
 
@@ -8998,7 +9132,7 @@ inheritance_qualifier:
                   if ($2 == last_identifier)
                   {
                       last_identifier = NULL;
-                      $$[0] = $$[1] = 0;
+                      $$.funmod = $$.varmod = $$.structmod = 0;
                       break;
                   }
               }
@@ -9012,19 +9146,27 @@ inheritance_qualifier:
               /* The L_IDENTIFIER must be one of "functions" or "variables" */
               if (mstreq(last_identifier->name, STR_FUNCTIONS))
               {
-                    $$[0] = last_modifier;
-                    $$[1] = 0;
+                    $$.funmod = last_modifier;
+                    $$.varmod = 0;
+                    $$.structmod = 0;
               }
               else if (mstreq(last_identifier->name, STR_VARIABLES))
               {
-                    $$[0] = 0;
-                    $$[1] = last_modifier;
+                    $$.funmod = 0;
+                    $$.varmod = last_modifier;
+                    $$.structmod = 0;
+              }
+              else if (mstreq(last_identifier->name, STR_STRUCTS))
+              {
+                    $$.funmod = 0;
+                    $$.varmod = 0;
+                    $$.structmod = last_modifier;
               }
               else
               {
                   yyerrorf("Unrecognized inheritance modifier '%s'"
                           , get_txt(last_identifier->name));
-                  $$[0] = $$[1] = 0;
+                  $$.funmod = $$.varmod = $$.structmod = 0;
               }
           } while(0);
       }
@@ -9040,8 +9182,8 @@ inheritance_qualifier:
 default_visibility:
     L_DEFAULT inheritance_qualifiers ';'
       {
-          if ($2[0] & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC | TYPE_MOD_VISIBLE
-                       | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC | TYPE_MOD_DEPRECATED)
+          if ($2.funmod & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC | TYPE_MOD_VISIBLE
+                           | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC | TYPE_MOD_DEPRECATED)
              )
           {
               yyerror("Default visibility specification for functions "
@@ -9050,8 +9192,8 @@ default_visibility:
               YYACCEPT;
           }
 
-          if ($2[1] & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC | TYPE_MOD_VISIBLE
-                       | TYPE_MOD_PROTECTED | TYPE_MOD_DEPRECATED)
+          if ($2.varmod & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC | TYPE_MOD_VISIBLE
+                           | TYPE_MOD_PROTECTED | TYPE_MOD_DEPRECATED)
              )
           {
               yyerror("Default visibility specification for variables "
@@ -9061,8 +9203,20 @@ default_visibility:
               YYACCEPT;
           }
 
-          default_funmod = check_visibility_flags($2[0], 0, true);
-          default_varmod = check_visibility_flags($2[1], 0, false);
+          if ($2.structmod & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC | TYPE_MOD_VISIBLE
+                              | TYPE_MOD_PROTECTED | TYPE_MOD_DEPRECATED)
+             )
+          {
+              yyerror("Default visibility specification for structs "
+                      "accepts only 'private', 'protected', 'visible', 'public' "
+                      "or 'deprecated'"
+                      );
+              YYACCEPT;
+          }
+
+          default_funmod = check_visibility_flags($2.funmod, 0, true);
+          default_varmod = check_visibility_flags($2.varmod, 0, false);
+          default_structmod = check_visibility_flags($2.structmod, 0, false);
       }
 ; /* default_visibility */
 
@@ -17627,21 +17781,26 @@ copy_structs (program_t *from, funflag_t flags)
         struct_def_t *pdef = from->struct_defs + struct_id;
         funflag_t f;
 
-        /* Combine the visibility flags. */
-        f = flags | pdef->flags;
-        if (pdef->flags & TYPE_MOD_PUBLIC)
-            f &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED);
-        else if (pdef->flags & TYPE_MOD_PRIVATE)
-            f |= NAME_HIDDEN;
+        if (pdef->flags & (TYPE_MOD_PRIVATE | NAME_HIDDEN))
+        {
+            /* Ignore it for now. Just record the definition in
+             * the type object (if there is one), so we can find
+             * it later on.
+             */
+            if (pdef->type->name->lpctype != NULL
+             && pdef->type->name->lpctype->t_struct.def_idx == USHRT_MAX)
+                update_struct_type(pdef->type->name->lpctype, pdef->type);
 
-        if (f & (TYPE_MOD_PRIVATE | NAME_HIDDEN))
-            f &= ~(TYPE_MOD_PROTECTED | TYPE_MOD_PUBLIC);
-        else if (f & TYPE_MOD_PROTECTED)
-            f &= ~(TYPE_MOD_PUBLIC);
+            continue;
+        }
+
+        /* Combine the visibility flags. */
+        f = inherit_visibility_flags(pdef->flags, flags);
+        assert(!(f & NAME_HIDDEN));
 
         /* Duplicate definition? */
         id = find_struct(struct_t_name(pdef->type));
-        if (!(f & NAME_HIDDEN) && id >= 0)
+        if (id >= 0)
         {
             /* We have a struct with this name. Check if we just
              * inherited it again, or if it's a name clash.
@@ -17666,8 +17825,12 @@ copy_structs (program_t *from, funflag_t flags)
                             );
                 continue;
             }
-
-            f |= NAME_HIDDEN;
+            else
+            {
+                /* Just combine visibility flags. */
+                STRUCT_DEF(id).flags = combine_visibility_flags(STRUCT_DEF(id).flags, f);
+                continue;
+            }
         }
 
         /* New struct */
@@ -17678,11 +17841,8 @@ copy_structs (program_t *from, funflag_t flags)
         /* Create a new struct entry, then replace the struct prototype
          * type with the one we inherited.
          */
-        current_struct = define_new_struct( MY_FALSE, p, get_txt(struct_t_pname(pdef->type)), f);
-        free_struct_type(STRUCT_DEF(current_struct).type);
-        STRUCT_DEF(current_struct).type = ref_struct_type(pdef->type);
+        current_struct = define_struct( MY_FALSE, p, get_txt(struct_t_pname(pdef->type)), f, pdef->type);
         STRUCT_DEF(current_struct).inh = INHERIT_COUNT;
-        update_struct_type(STRUCT_DEF(current_struct).type->name->lpctype, pdef->type);
     }
 } /* copy_structs() */
 
@@ -17815,17 +17975,7 @@ inherit_variable (variable_t *variable, funflag_t varmodifier, int redeclare)
         new_type &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED);
 
     fulltype_t vartype = variable->type;
-
-    vartype.t_flags |= new_type 
-                    | (variable->type.t_flags & TYPE_MOD_PRIVATE
-                       ? (NAME_HIDDEN|NAME_INHERITED)
-                       :  NAME_INHERITED
-                      );
-    /* The most restrictive visibility wins. */
-    if (vartype.t_flags & (TYPE_MOD_PRIVATE | NAME_HIDDEN))
-        vartype.t_flags &= ~(TYPE_MOD_PROTECTED | TYPE_MOD_PUBLIC);
-    else if (vartype.t_flags & TYPE_MOD_PROTECTED)
-        vartype.t_flags &= ~(TYPE_MOD_PUBLIC);
+    vartype.t_flags = inherit_visibility_flags(vartype.t_flags, varmodifier) | NAME_INHERITED;
 
     if (redeclare >= 0)
         redeclare_variable(p, vartype, VIRTUAL_VAR_TAG | redeclare);
@@ -18703,7 +18853,7 @@ inherit_obsoleted_variables  (inherit_t *newinheritp, program_t *from, int first
 
 /*-------------------------------------------------------------------------*/
 static int
-inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
+inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier, funflag_t structmodifier)
 
 /* Copies struct definitions, functions and variables from the program <from>
  * into our program. Functions are copied with visibility <funmodifier>,
@@ -19290,7 +19440,7 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
         fun_p[i] = fun;
     } /* for (inherited functions), pass 2 */
 
-    copy_structs(from, funmodifier & ~(TYPE_MOD_STATIC|TYPE_MOD_VIRTUAL));
+    copy_structs(from, structmodifier);
 
     if (from->flags & P_USE_NONLW_EFUNS)
     {
@@ -19724,6 +19874,7 @@ prolog (const char * fname, Bool isMasterObj)
     block_depth      = 0;
     default_varmod = 0;
     default_funmod = 0;
+    default_structmod = 0;
     current_inline = NULL;
     inline_closure_id = 0;
 
@@ -20265,9 +20416,16 @@ epilog (void)
     
     remove_unknown_identifier();
 
-    /* Remove the concrete struct definition from the lpctype object. */
+    /* Remove the concrete struct definition from the lpctype object
+     * and free the reference we took.
+     */
     for (i = 0; (size_t)i < STRUCT_COUNT; i++)
-        clean_struct_type(STRUCT_DEF(i).type->name->lpctype);
+    {
+        lpctype_t *t = STRUCT_DEF(i).type->name->lpctype;
+        clean_struct_type(t);
+        t->t_struct.def_idx = USHRT_MAX;
+        free_lpctype(t);
+    }
 
     /* Now create the program structure */
     switch (0) { default:

@@ -50,8 +50,9 @@ DEFINITION
         with the difference that all structs live in the same flat namespace.
         This means: a struct defined in a program is visible in _all_
         inherited programs, regardless of how deep the inheritance is
-        nested.  This also means that in one program there must not be
-        two structs, inherited or not, with the same name.
+        nested. This also means that in one program there must not be
+        two structs, inherited or not, with the same name. This does not
+        apply to structs declared as private.
 
 
         To declare a struct without defining it, write:

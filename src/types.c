@@ -125,6 +125,7 @@ get_struct_type (struct_type_t* def)
         name->lpctype = type = lpctype_new();
         type->t_class = TCLASS_STRUCT;
         type->t_struct.name = ref_struct_name(name);
+        type->t_struct.def_idx = USHRT_MAX;
     }
 
     type->t_struct.def = def;

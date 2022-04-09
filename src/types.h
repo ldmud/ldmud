@@ -87,6 +87,12 @@ struct struct_info_s
      * NULL otherwise.
      */
     struct_type_t *def;
+
+    /* Used during compilation. This is the index into
+     * the list of struct definitions that corresponds to
+     * this type. USHRT_MAX when not initialized.
+     */
+    unsigned short def_idx;
 };
 
 struct object_type_s
