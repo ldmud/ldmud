@@ -488,6 +488,14 @@ struct struct_def_s
                              */
 };
 
+/* --- enum struct_special_inh: Special values for struct_def_s->inh. */
+enum struct_special_inh
+{
+    STRUCT_INH_LOCAL = -1,  /* Local defined structs.                   */
+    STRUCT_INH_USAGE = -2,  /* Usage-only structs, derived from a type. */
+    STRUCT_INH_SEFUN = -3,  /* Structs taken from the simul-efun.       */
+};
+
 
 /* --- struct include_s: description of one include file
  *

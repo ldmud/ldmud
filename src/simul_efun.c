@@ -44,6 +44,7 @@
 #include "prolang.h" /* is_undef_function() */
 #include "simulate.h"
 #include "stdstrings.h"
+#include "structs.h"
 #include "svalue.h"
 #include "swap.h"
 #include "xalloc.h"
@@ -127,6 +128,7 @@ remove_efun_shadows (ident_t* list)
         }
 
         id->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
+        id->u.global.sefun_struct_id = I_GLOBAL_SEFUN_STRUCT_NONE;
     }
 } /* remove_efun_shadows() */
 
@@ -165,7 +167,7 @@ invalidate_simul_efuns (void)
 
         all_simul_efuns = all_simul_efuns->next_all;
 
-        if (j != I_GLOBAL_SEFUN_BY_NAME)
+        if (j != I_GLOBAL_SEFUN_OTHER && j != I_GLOBAL_SEFUN_BY_NAME && j < SIZE_SEFUN_TABLE)
         {
             simul_efun_table[j].function.offset.next_sefun = all_discarded_simul_efun;
             all_discarded_simul_efun = j;
@@ -447,6 +449,25 @@ assert_simul_efun_object (void)
             simul_efun_table[j].variable_index_offset = var_ix_offs;
         } /* if (function visible) */
     } /* for ( all functions) */
+
+    /* Register all non-protected/private structs. */
+    for (i = 0; i < ob->prog->num_structs; i++)
+    {
+        struct_def_t * s = ob->prog->struct_defs+i;
+        ident_t * p;
+
+        if (s->flags & (TYPE_MOD_PROTECTED|TYPE_MOD_PRIVATE|NAME_HIDDEN))
+            continue;
+
+        p = make_shared_identifier_mstr(struct_t_name(s->type), I_TYPE_GLOBAL, 0);
+        if (p->type == I_TYPE_UNKNOWN)
+        {
+            init_global_identifier(p, /* bProgram: */ false);
+            p->next_all = all_simul_efuns;
+            all_simul_efuns = p;
+        }
+        p->u.global.sefun_struct_id = i;
+    }
 
     simul_efun_object = ob;
 

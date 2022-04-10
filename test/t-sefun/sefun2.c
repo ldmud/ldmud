@@ -1,5 +1,20 @@
 #pragma strong_types
 
+struct NewStruct
+{
+    int new_member;
+};
+
+struct SomeStruct
+{
+    string text;
+};
+
+private struct PrivateStruct
+{
+    object ob;
+};
+
 nomask mixed call_strict(object ob, string fun, int arg)
 {
     mixed result;

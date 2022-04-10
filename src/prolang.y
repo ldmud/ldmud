@@ -437,6 +437,12 @@ enum e_internal_areas {
      * descriptors are collected here.
      */
 
+ , A_SEFUN_STRUCT_DEFS
+    /* (unsigned short) The indices into A_STRUCT_DEFS for any simul-efun
+     * struct that was used. (An entry is USHRT_MAX if the sefun struct
+     * was not put into A_STRUCT_DEFS, yet.)
+     */
+
  , A_LVALUE_CODE
     /* (bytecode_t): Area where to put lvalue bytecodes.
      * Used for <expr4> which compile rvalue and lvalue code simultaneously.
@@ -468,6 +474,7 @@ typedef global_variable_t A_GLOBAL_VARIABLES_t;
 typedef bytecode_t        A_INLINE_PROGRAM_t;
 typedef inline_closure_t  A_INLINE_CLOSURE_t;
 typedef struct_member_t   A_STRUCT_MEMBERS_t;
+typedef unsigned short    A_SEFUN_STRUCT_DEFS_t;
 typedef bytecode_t        A_LVALUE_CODE_t;
 typedef bytecode_t        A_DEFAULT_VALUES_t;
 typedef p_int             A_DEFAULT_VALUES_POSITION_t;
@@ -585,6 +592,14 @@ static mem_block_t mem_block[NUMAREAS];
 
 #define STRUCT_MEMBER_COUNT     GET_BLOCK_COUNT(A_STRUCT_MEMBERS)
   /* Return the number of struct members stored.
+   */
+
+#define SEFUN_STRUCT_DEF(n)     GET_BLOCK(A_SEFUN_STRUCT_DEFS)[n]
+  /* The index for a simul-efun struct <n> into our struct definitions.
+   */
+
+#define SEFUN_STRUCT_DEF_COUNT  GET_BLOCK_COUNT(A_SEFUN_STRUCT_DEFS)
+  /* Return the number of entries for sefun struct defs.
    */
 
 #define PROG_STRING(n)          GET_BLOCK(A_STRINGS)[n]
@@ -1500,12 +1515,14 @@ DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_VARIABLE, A_VARIABLES)
 DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_GLOBAL_VARIABLE_INFO, A_GLOBAL_VARIABLES)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_STRUCT_DEF, A_STRUCT_DEFS)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_STRUCT_MEMBER, A_STRUCT_MEMBERS)
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_SEFUN_STRUCT_DEF, A_SEFUN_STRUCT_DEFS);
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INLINE_CLOSURE, A_INLINE_CLOSURE)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INCLUDE, A_INCLUDES)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INHERIT, A_INHERITS)
 DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_DEFAULT_VALUE_POS, A_DEFAULT_VALUES_POSITION);
 
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_FUNCTIONS, A_FUNCTIONS);
+DEFINE_RESERVE_MEM_BLOCK(RESERVE_SEFUN_STRUCT_DEFS, A_SEFUN_STRUCT_DEFS);
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_UPDATE_INDEX_MAP, A_UPDATE_INDEX_MAP);
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_INHERITS, A_INHERITS);
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_DEFAULT_VALUE_POS, A_DEFAULT_VALUES_POSITION);
@@ -6080,7 +6097,7 @@ define_struct (bool proto, ident_t *p, const char * prog_name, funflag_t flags, 
                                        , new_unicode_tabled(prog_name));
     sdef.flags = proto ? (flags | NAME_PROTOTYPE)
                        : (flags & ~NAME_PROTOTYPE);
-    sdef.inh = -1;
+    sdef.inh = STRUCT_INH_LOCAL;
 
     num = STRUCT_COUNT;
 
@@ -6101,25 +6118,101 @@ define_struct (bool proto, ident_t *p, const char * prog_name, funflag_t flags, 
 
 /*-------------------------------------------------------------------------*/
 static int
-find_struct ( string_t * name )
+find_struct ( ident_t * name, efun_override_t override )
 
 /* Find the struct <name> and return its index. Return -1 if not found.
+ * <override> descibes whether to look at local (OVERRIDE_LFUN) or
+ * simul-efun (OVERRIDE_SEFUN) structs only.
  */
 
 {
-    ident_t * p;
-
-    p = find_shared_identifier_mstr(name, I_TYPE_GLOBAL, 0);
-
     /* Find the global struct identifier */
-    while (p != NULL && p->type != I_TYPE_GLOBAL)
-        p = p->inferior;
+    while (name != NULL && name->type != I_TYPE_GLOBAL)
+        name = name->inferior;
 
-    if (p == NULL || p->u.global.struct_id == I_GLOBAL_STRUCT_NONE)
+    if (name == NULL)
         return -1;
-    if (STRUCT_DEF(p->u.global.struct_id).flags & NAME_HIDDEN)
-        return -1;
-    return p->u.global.struct_id;
+
+    switch (override)
+    {
+        default:
+        case OVERRIDE_LFUN:
+            if (name->u.global.struct_id != I_GLOBAL_STRUCT_NONE
+             && !(STRUCT_DEF(name->u.global.struct_id).flags & NAME_HIDDEN))
+                return name->u.global.struct_id;
+
+            if (override == OVERRIDE_LFUN)
+                break;
+            /* else FALLTHROUGH */
+
+        case OVERRIDE_SEFUN:
+            if (name->u.global.sefun_struct_id != I_GLOBAL_SEFUN_STRUCT_NONE && !disable_sefuns)
+            {
+                unsigned short sefun_id = name->u.global.sefun_struct_id;
+                unsigned short id = (sefun_id < SEFUN_STRUCT_DEF_COUNT) ? SEFUN_STRUCT_DEF(sefun_id) : USHRT_MAX;
+                if (id == USHRT_MAX)
+                {
+                    struct_type_t *stype;
+                    lpctype_t *lpctype;
+                    struct_def_t sdef;
+                    unsigned short count = SEFUN_STRUCT_DEF_COUNT;
+                    if (sefun_id >= count)
+                    {
+                        /* Fill up the A_SEFUN_STRUCT_DEFS block. */
+                        RESERVE_SEFUN_STRUCT_DEFS(sefun_id - count);
+                        for(; count <= sefun_id; count++)
+                            ADD_SEFUN_STRUCT_DEF(USHRT_MAX);
+                    }
+
+                    /* Let's see if we already got this struct somehow. */
+                    stype = simul_efun_object->prog->struct_defs[sefun_id].type;
+                    lpctype = get_struct_type(stype);
+
+                    id = lpctype->t_struct.def_idx;
+                    if (id != USHRT_MAX && STRUCT_DEF(id).type == stype)
+                    {
+                        free_lpctype(lpctype);
+                        SEFUN_STRUCT_DEF(sefun_id) = id;
+                        return id;
+                    }
+
+                    for (unsigned short i = 0; i < STRUCT_COUNT; i++)
+                    {
+                        if (STRUCT_DEF(i).type == stype)
+                        {
+                            free_lpctype(lpctype);
+                            SEFUN_STRUCT_DEF(sefun_id) = id;
+                            return id;
+                        }
+                    }
+
+                    /* Add this as a hidden struct to our program. */
+                    id = STRUCT_COUNT;
+                    if (id == USHRT_MAX)
+                    {
+                        /* Not enough space to do so. */
+                        free_lpctype(lpctype);
+                        return -1;
+                    }
+
+                    sdef.type = ref_struct_type(stype);
+                    sdef.flags = NAME_HIDDEN;
+                    sdef.inh = STRUCT_INH_SEFUN;
+
+                    ADD_STRUCT_DEF(&sdef);
+                    SEFUN_STRUCT_DEF(sefun_id) = id;
+                    lpctype->t_struct.def_idx = id;
+                    /* Note we keep the reference of lpctype
+                     * for epilog() to free it.
+                     */
+                }
+
+                return id;
+            }
+            break;
+    }
+
+    return -1;
 } /* find_struct() */
 
 /*-------------------------------------------------------------------------*/
@@ -6442,7 +6535,7 @@ get_struct_index (lpctype_t* stype)
 
         sdef.type = stype->t_struct.def;
         sdef.flags = NAME_HIDDEN;
-        sdef.inh = -2;
+        sdef.inh = STRUCT_INH_USAGE;
 
         ADD_STRUCT_DEF(&sdef);
         ref_lpctype(stype); /* Epilog will free this. */
@@ -6760,7 +6853,7 @@ struct_epilog (void)
         struct_type_t *pSType = STRUCT_DEF(i).type;
         struct_type_t *pOld;
 
-        if (STRUCT_DEF(i).inh >= 0)
+        if (STRUCT_DEF(i).inh != STRUCT_INH_LOCAL)
             continue;
 
         pOld = struct_lookup_type(pSType);
@@ -6785,7 +6878,7 @@ struct_epilog (void)
      */
     for (i = 0; (size_t)i < STRUCT_COUNT; i++)
     {
-        if (STRUCT_DEF(i).inh < 0)
+        if (STRUCT_DEF(i).inh == STRUCT_INH_LOCAL)
             struct_publish_type(STRUCT_DEF(i).type);
     } /* for(i) */
 
@@ -7940,6 +8033,12 @@ delete_prog_string (void)
        */
 
     struct {
+        efun_override_t override; /* Qualifier for name lookup. */
+        ident_t *real;            /* The struct identifier */
+    } struct_name;
+      /* A qualified struct name: "<super>::<name>" */
+
+    struct {
         int length;            /* Number of initializers parsed */
         /* Description of initializers parsed: */
         struct struct_init_s * list;  /* Head of list */
@@ -8021,6 +8120,7 @@ delete_prog_string (void)
 %type <sh_string>    struct_member_name
 %type <function_name> function_name
 %type <function_call_result> function_call
+%type <struct_name>  struct_name
 %type <struct_member_operator> member_operator
 
 /* Special uses of <number> */
@@ -9307,22 +9407,20 @@ single_basic_non_void_type:
           free_mstring(last_string_constant);
           last_string_constant = NULL;
       }
-    | L_STRUCT identifier
+    | L_STRUCT struct_name
       {
           int num;
 
-          num = find_struct($2);
+          num = find_struct($2.real, $2.override);
           if (num < 0)
           {
-              yyerrorf("Unknown struct '%s'", get_txt($2));
+              yyerrorf("Unknown struct '%s'", get_txt($2.real->name));
               $$ = lpctype_any_struct;
           }
           else
           {
               $$ = get_struct_type(STRUCT_DEF(num).type);
           }
-
-          free_mstring($2);
       }
     | L_STRUCT L_MIXED
       {
@@ -13359,18 +13457,17 @@ expr4:
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.name =   NULL;
       }
-    | '(' '<' identifier '>'
+    | '(' '<' struct_name '>'
       {
           int num;
 
-          num = find_struct($3);
+          num = find_struct($3.real, $3.override);
           if (num < 0)
           {
-              yyerrorf("Unknown struct '%s'", get_txt($3));
+              yyerrorf("Unknown struct '%s'", get_txt($3.real->name));
               YYACCEPT;
           }
           $<number>$ = num;
-          free_mstring($3);
       }
 
       note_start opt_struct_init ')'
@@ -15155,6 +15252,35 @@ m_expr_values:
     | m_expr_values ';' expr0  { $$ = $1 + 1; add_arg_type($3.type); check_unknown_type($3.type.t_type); use_variable($3.name, VAR_USAGE_READ); free_lvalue_block($3.lvalue); }
 ; /* m_expr_values */
 
+
+
+struct_name:
+      L_IDENTIFIER
+      {
+          check_identifier($1);
+          $$.override = OVERRIDE_NONE;
+          $$.real = $1;
+      }
+    | L_COLON_COLON L_IDENTIFIER
+      {
+          check_identifier($2);
+          $$.override = OVERRIDE_LFUN;
+          $$.real = $2;
+      }
+    | L_IDENTIFIER L_COLON_COLON L_IDENTIFIER
+      {
+          check_identifier($3);
+
+          if (mstreq($1->name, STR_SEFUN))
+              $$.override = OVERRIDE_SEFUN;
+          else
+          {
+              $$.override = OVERRIDE_NONE;
+              yyerrorf("illegal struct name qualifier '%s'", get_txt($1->name));
+          }
+          $$.real = $3;
+      }
+; /* struct_name */
 
 
 /* Rule used to parse a static or dynamic member name in lookups */
@@ -17798,8 +17924,13 @@ copy_structs (program_t *from, funflag_t flags)
         f = inherit_visibility_flags(pdef->flags, flags);
         assert(!(f & NAME_HIDDEN));
 
+        /* Create an identifier, if there isn't one. */
+        p = make_global_identifier(get_txt(struct_t_name(pdef->type)), I_TYPE_GLOBAL);
+        if (p == NULL)
+            continue;
+
         /* Duplicate definition? */
-        id = find_struct(struct_t_name(pdef->type));
+        id = find_struct(p, OVERRIDE_LFUN);
         if (id >= 0)
         {
             /* We have a struct with this name. Check if we just
@@ -17832,11 +17963,6 @@ copy_structs (program_t *from, funflag_t flags)
                 continue;
             }
         }
-
-        /* New struct */
-        p = make_global_identifier(get_txt(struct_t_name(pdef->type)), I_TYPE_GLOBAL);
-        if (p == NULL)
-            continue;
 
         /* Create a new struct entry, then replace the struct prototype
          * type with the one we inherited.
