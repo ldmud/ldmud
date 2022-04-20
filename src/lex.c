@@ -208,6 +208,10 @@ Bool pragma_no_shadow;
   /* True: prevent the program from being shadowed.
    */
 
+bool pragma_no_simul_efuns;
+  /* True: Ignore simul-efuns.
+   */
+
 Bool pragma_pedantic;
   /* True: treat a number of sloppy language constructs as errors.
    */
@@ -4113,6 +4117,33 @@ handle_pragma (char *str)
             pragma_no_shadow = MY_TRUE;
             validPragma = MY_TRUE;
         }
+        else if (wordcmp(base, "no_simul_efuns", namelen) == 0)
+        {
+            /* Everything that is needed for the master to be loaded
+             * has permission to use this pragma.
+             */
+            if (master_ob && !(master_ob->flags & O_DESTRUCTED))
+            {
+                svalue_t *res;
+
+                push_ref_string(inter_sp, STR_PRAGMA_NO_SIMUL_EFUNS);
+                push_c_string(inter_sp, current_loc.file->name);
+                res = apply_master(STR_PRIVILEGE, 2);
+
+                if (!res || res->type != T_NUMBER || res->u.number < 0)
+                    lexerror("Privilege violation: pragma no_simul_efuns");
+                else if (res->u.number > 0)
+                    pragma_no_simul_efuns = true;
+            }
+            else
+                pragma_no_simul_efuns = true;
+            validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "simul_efuns", namelen) == 0)
+        {
+            pragma_no_simul_efuns = false;
+            validPragma = MY_TRUE;
+        }
         else if (wordcmp(base, "pedantic", namelen) == 0)
         {
             pragma_pedantic = MY_TRUE;
@@ -4961,7 +4992,7 @@ closure (char *in_yyp)
         efun_override = OVERRIDE_EFUN;
         super_name = NULL;
     }
-    else if (super_name != NULL && !disable_sefuns && !strncmp(super_name, "sefun::", 7))
+    else if (super_name != NULL && !pragma_no_simul_efuns && !strncmp(super_name, "sefun::", 7))
     {
         efun_override = OVERRIDE_SEFUN;
         super_name = NULL;
@@ -5088,7 +5119,7 @@ closure (char *in_yyp)
       || is_python_efun(p)
 #endif
         )
-     && master_ob && !disable_sefuns
+     && master_ob && !pragma_no_simul_efuns
      && (!EVALUATION_TOO_LONG())
        )
     {
@@ -5149,7 +5180,7 @@ closure (char *in_yyp)
 
         /* simul-efun? */
         if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_SEFUN)
-         && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER && !disable_sefuns)
+         && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER && !pragma_no_simul_efuns)
         {
             yylval.ident = p;
             return L_SIMUL_EFUN_CLOSURE;
@@ -6477,6 +6508,7 @@ start_new_file (int fd, const char * fname)
     pragma_no_lightweight_set = false;
     pragma_no_inherit = MY_FALSE;
     pragma_no_shadow = MY_FALSE;
+    pragma_no_simul_efuns = false;
     pragma_pedantic = MY_FALSE;
     pragma_warn_missing_return = MY_TRUE;
     pragma_warn_dead_code = MY_FALSE;

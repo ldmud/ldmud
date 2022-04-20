@@ -163,10 +163,6 @@ Bool variables_defined;
   /* TRUE: Variable definitions have been encountered.
    */
 
-bool disable_sefuns;
-  /* TRUE: Sefuns will be ignored.
-   */
-
 /*-------------------------------------------------------------------------*/
 /* Table which hook may be of which type.
  * It is here because make_func has to touch this file anyway, but
@@ -6146,7 +6142,7 @@ find_struct ( ident_t * name, efun_override_t override )
             /* else FALLTHROUGH */
 
         case OVERRIDE_SEFUN:
-            if (name->u.global.sefun_struct_id != I_GLOBAL_SEFUN_STRUCT_NONE && !disable_sefuns)
+            if (name->u.global.sefun_struct_id != I_GLOBAL_SEFUN_STRUCT_NONE && !pragma_no_simul_efuns)
             {
                 unsigned short sefun_id = name->u.global.sefun_struct_id;
                 unsigned short id = (sefun_id < SEFUN_STRUCT_DEF_COUNT) ? SEFUN_STRUCT_DEF(sefun_id) : USHRT_MAX;
@@ -15460,7 +15456,7 @@ function_call:
           else if ( ($1.super ? ( $<function_call_head>$.efun_override == OVERRIDE_SEFUN )
                               : ( real_name->u.global.function == I_GLOBAL_FUNCTION_OTHER ))
                 && real_name->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-                && !disable_sefuns)
+                && !pragma_no_simul_efuns)
           {
               /* It's a real simul-efun */
 
@@ -15535,7 +15531,7 @@ function_call:
                * afterwards
                */
 
-              if ( !disable_sefuns
+              if ( !pragma_no_simul_efuns
                && (simul_efun = $<function_call_head>2.simul_efun) >= 0)
               {
                   /* SIMUL EFUN */
@@ -16079,7 +16075,7 @@ function_call:
            */
 
           sefun = $2.strict_member ? call_strict_sefun : call_other_sefun;
-          if (!disable_sefuns && sefun == I_GLOBAL_SEFUN_BY_NAME)
+          if (!pragma_no_simul_efuns && sefun == I_GLOBAL_SEFUN_BY_NAME)
           {
               /* The simul-efun has to be called by name:
                * insert the extra args for the call_other
@@ -16131,7 +16127,7 @@ function_call:
            * the code and value have been already generated.
            */
 
-          if (!disable_sefuns && sefun >= 0)
+          if (!pragma_no_simul_efuns && sefun >= 0)
           {
               /* Create argument type list for type checking. */
               add_arg_type(ref_fulltype($1.type));
@@ -16155,7 +16151,7 @@ function_call:
           $$.might_lvalue = true;
           $$.needs_use = false;
 
-          if (!disable_sefuns && sefun >= 0)
+          if (!pragma_no_simul_efuns && sefun >= 0)
           {
               /* SIMUL EFUN */
 
@@ -19940,7 +19936,7 @@ get_simul_efun_index (string_t *name)
  */
 
 {
-    if (!disable_sefuns)
+    if (!pragma_no_simul_efuns)
     {
         ident_t *id = make_shared_identifier_mstr(name, I_TYPE_UNKNOWN, 0);
 
@@ -19961,7 +19957,7 @@ get_simul_efun_index (string_t *name)
                 return id->u.global.sim_efun;
             }
         }
-    } /* if (!disable_sefuns) */
+    } /* if (!pragma_no_simul_efuns) */
 
     return -1;
 } /* get_simul_efun_index() */
@@ -19973,7 +19969,8 @@ prolog (const char * fname, Bool isMasterObj)
 /* Initialize the compiler environment prior to a compile.
  * <fname> is the name of the top LPC file to be compiled.
  * <isMasterObj> is TRUE if this compile is part of the compilation of
- * the master object (in which case sefuns are disabled).
+ * the master object (in which case the master applied lfun
+ * declarations will be checked)).
  */
 
 {
@@ -19989,7 +19986,6 @@ prolog (const char * fname, Bool isMasterObj)
 
     /* Initialize all the globals */
     variables_defined = MY_FALSE;
-    disable_sefuns   = isMasterObj;
     last_expression  = -1;
     compiled_prog    = NULL;  /* NULL means fail to load. */
     heart_beat       = -1;
@@ -20957,6 +20953,7 @@ compile_file (int fd, const char * fname,  Bool isMasterObj)
 {
     prolog(fname, isMasterObj);
     start_new_file(fd, fname);
+    pragma_no_simul_efuns = isMasterObj;
     yyparse();
     /* If the parse failed, either num_parse_error != 0
      * or inherit_file != NULL here.

@@ -253,6 +253,7 @@ extern bool pragma_no_clone;
 extern bool pragma_no_lightweight;
 extern Bool pragma_no_inherit;
 extern Bool pragma_no_shadow;
+extern bool pragma_no_simul_efuns;
 extern Bool pragma_pedantic;
 extern Bool pragma_range_check;
 extern Bool pragma_warn_missing_return;

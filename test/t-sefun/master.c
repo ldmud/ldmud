@@ -1,3 +1,4 @@
+#define OWN_PRIVILEGE_VIOLATION
 #include "/inc/base.inc"
 
 int num;
@@ -18,6 +19,21 @@ string *epilog(int eflag)
 
     "/test"->run_test();
     return 0;
+}
+
+int privilege_violation(string op, string|object who, mixed arg, mixed arg2)
+{
+    switch (op)
+    {
+        case "pragma no_simul_efuns":
+            if ("unprivileged" in who)
+                return -1;
+            else
+                return 1;
+
+        default:
+            return 1;
+    }
 }
 
 int is_old_master()

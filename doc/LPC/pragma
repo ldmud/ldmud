@@ -23,6 +23,11 @@ DESCRIPTION
         share_variables: Clone variables are initialized from the
                 blueprint.
 
+        no_simul_efuns: Disable the use of simul-efuns. This pragma
+                raises a privilege_violation("no_simul_efuns").
+        simul_efuns: Enables the use of simul-efuns (this is the
+                default for all objects except the master).
+
         weak_types: no type checking (this is the default).
         strict_types: all functions must be declared with argument
                 prototypes, and the return values of call_other() must

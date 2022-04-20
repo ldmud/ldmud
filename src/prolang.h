@@ -71,7 +71,6 @@ extern string_t *inherit_file;
 extern int num_parse_error;
 extern program_t *compiled_prog;
 extern Bool variables_defined;
-extern bool disable_sefuns;
 
 /* --- Prototypes --- */
 extern int proxy_efun(int, int);
