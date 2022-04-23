@@ -29,6 +29,7 @@ int stats_is_updated;
 #define MAX_SCAR        10
 int scar;
 
+static int logon();
 static void move_player_to_start(mixed where);
 static void move_player_to_start2(mixed where);
 static void move_player_to_start3(mixed where);
@@ -47,6 +48,11 @@ void load_auto_obj(string str);
 void compute_auto_str();
 int vis();
 string check_access_list(string top, string dir, string file);
+
+#if defined(__TLS__)
+#include "/sys/configuration.h"
+void tls_init(int handshake_result);
+#endif
 
 /* Some functions to set moving messages. */
 
@@ -73,11 +79,29 @@ string version() {
     return "2.04.05";
 }
 
+#if defined(__TLS__)
+/* tls_init() is called when TLS connections are finished initializing. */
+void tls_init(int handshake_result) {
+    // Check that the initialization was successful.
+    if (handshake_result < 0) {
+        printf("Can't establish a TLS/SSL encrypted connection: %s\n",
+            tls_error(handshake_result));
+        destruct(this_object());
+        return;
+    }
+    // Turn Telnet back on.
+    configure_interactive(this_object(), IC_TELNET_ENABLED, 1);
+    // And proceed as if a regular telnet connection occurred.
+    logon();
+}
+#endif
+
 /* logon() is called when the players logges on. */
 
 static int logon() {
     time_to_save = 500;
     /* enable_commands(); */
+    write("Lars says: Let's get a body for your character ...\n");
     cat("/WELCOME");
     write("Version: " + version() + "\n");
     write("What is your name: ");
@@ -2770,5 +2794,21 @@ void add_standard_commands() {
     add_action("spell_fire_ball", "fireball");
     add_action("pose", "pose");
     add_action("who", "who");
+#if defined(__TLS__)
+    add_action("tls", "tls");
+#endif
 }
 
+#if defined(__TLS__)
+static int tls(string str) {
+    int secure_now = tls_query_connection_state(this_object()) > 0;
+    if(secure_now) {
+        printf("You are presently connected via a TLS secured connection.\n");
+        mixed *cipher_info = tls_query_connection_info(this_object());
+        printf("Protocol: %s Ciphersuite: %s\n", cipher_info[4], cipher_info[0]);
+    } else {
+        printf("You are presently connected via an insecure telnet connection.\n");
+    }
+    return 1;
+}
+#endif
