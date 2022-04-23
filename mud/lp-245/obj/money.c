@@ -44,6 +44,8 @@ int id(string str) {
 	return 1;
     if (str == "money")
 	return 1;
+
+  return 0;
 }
 
 void heart_beat() {

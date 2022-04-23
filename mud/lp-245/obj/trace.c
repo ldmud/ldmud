@@ -386,7 +386,7 @@ int Goto(string str) {
 /*
  * This will not work because command() only works for command_giver.
  */
-int in(string str) {
+int do_in(string str) {
     object mark, here;
     string path, cmd;
 

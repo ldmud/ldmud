@@ -537,6 +537,8 @@ int attack()
     alt_attacker_ob = 0;
     if (attacker_ob)
 	return 1;
+
+    return 0;
 }
 
 object query_attack() {
