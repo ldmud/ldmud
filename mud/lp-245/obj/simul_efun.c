@@ -201,6 +201,8 @@ varargs mixed snoop(mixed snoopee)
 	    break;
     }
     if (result > 0) return snoopee;
+
+    return 0;
 }
 
 //---------------------------------------------------------------------------

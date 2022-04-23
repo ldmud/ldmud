@@ -25,4 +25,6 @@ int go_down() {
 int id(string str) {
     if (str == "well")
 	return 1;
+
+    return 0;
 }

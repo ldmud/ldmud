@@ -1527,6 +1527,8 @@ int valid_snoop (object snoopee, object snooper)
     */
     if (object_name(previous_object()) == get_simul_efun())
         return 1;
+
+    return 0;
 }
 
 

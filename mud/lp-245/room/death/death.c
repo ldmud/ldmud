@@ -111,4 +111,5 @@ int take_it(string str)
 
 	}
 
+  return 0;
 }
