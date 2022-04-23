@@ -22,3 +22,9 @@ The topdirectory contains these files and directories:
   room/       : game rooms and include files
   sys/        : include files, including those from the driver distribution
 
+The mudlib also supports TLS connections when the driver is compiled with
+TLS support. The TLS port needs to be given as a define (as well as a regular
+port specification), e.g. with a command line option:  --define TLS_PORT=992
+The corresponding key and certificate should reside in the configured places
+(see --tls-* command line options).
+
