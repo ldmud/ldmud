@@ -19,6 +19,7 @@
 
 #include <input_to.h>            // INPUT_*
 #include <config.h>              // ROOTID
+#include <configuration.h>       // IC_*
 #include <properties.h>          // P_* macros
 #define NEED_PROTOTYPES
 #include <thing/properties.h>    // SetProp() proto
@@ -209,7 +210,7 @@ public int query_telnet(int option, mixed sb) {
 
 // Got telnet negotations from the driver
 void got_telnet(int command, int option, int *optargs) {
-  int state, i, j, c, l, *xx, full;
+  int state;
   mixed agree;
   string log;
 
@@ -570,6 +571,19 @@ void create() {
 
   set_callback(TELOPT_SGA,      #'neg_sga, #'neg_sga, #'cb_sga, 0);
   set_callback(TELOPT_ECHO,     #'neg_echo, WONT, #'cb_echo, 0);
+
+#ifdef __MCCP__
+  set_callback(TELOPT_COMPRESS2, DONT,      WILL,       #'start_mccp, 0);
+  set_callback(TELOPT_COMPRESS,  DONT,      #'neg_mccp, #'start_mccp, 0);
+#endif
+
+#ifdef __TLS__
+  if (tls_available())
+  {
+    set_callback(TELOPT_STARTTLS,       DO, WONT,       0,            #'sb_tls);
+    set_callback(TELOPT_AUTHENTICATION, DO, WONT,       #'start_auth, #'sb_auth);
+  }
+#endif
 }
 
 // Change the NOECHO and CHARMODE state, called indirectly thru input_to()
@@ -730,6 +744,15 @@ private int neg_tm(int command, int option) {
   return 1;
 }
 
+#ifdef __MCCP__
+private int neg_mccp(int command, int option) {
+
+    if(command == DO)
+        return 1;
+    return 0;
+}
+#endif
+
 // start_*() and cb_*() are called on/after succesfull option changes
 // We do the appropriate things then.
 
@@ -762,6 +785,28 @@ private void start_eor(int command, int option) {
   // Adjust prompt method to appropriate function
   if (command == DO || command == DONT) modify_prompt();
 }
+
+#ifdef __MCCP__
+private void start_mccp(int command, int option) {
+    if(command == DO)
+        efun::configure_interactive(this_object(), IC_MCCP, option);
+    else if(command == DONT) {
+        if(efun::interactive_info(this_object(), IC_MCCP))
+            efun::configure_interactive(this_object(), IC_MCCP, 0);
+        else if(option == TELOPT_COMPRESS2)
+            set_telnet(WILL, TELOPT_COMPRESS);
+    }
+}
+#endif
+
+#ifdef __TLS__
+private void start_auth(int command, int option) {
+    if (command == WILL)
+        send(({ IAC, SB, option, AUTH_SB_SEND,
+                AUTH_METHOD_SSL, AUTH_WHO_CLIENT_TO_SERVER|AUTH_HOW_ONE_WAY,
+                IAC, SE }));
+}
+#endif
 
 private void cb_sga(int command, int option) {
   switch (command) {
@@ -1232,6 +1277,60 @@ private void sb_line(int command, int option, int* optargs) {
         return;
   }
 }
+
+#ifdef __TLS__
+protected void tls_finished() {
+    // We do nothing here, but it may be overriden to check the certificate.
+}
+
+private void tls_callback(int error, object me) {
+    if (!error)
+        tls_finished();
+}
+
+private void sb_tls(int command, int option, int* optargs) {
+    if(optargs[0] != TELQUAL_SEND)
+        return;
+
+    if(Q_REMOTE(ts[TELOPT_STARTTLS, TS_STATE]) == YES) {
+        efun::call_out(function void() {
+            send(({ IAC, SB, option, TELQUAL_SEND, IAC, SE }));
+            efun::tls_init_connection(this_object(), #'tls_callback);
+        }, 0);
+    }
+    else if(efun::tls_query_connection_state()) {
+        efun::call_out(function void() {
+            send(({ IAC, SB, option, TELQUAL_SEND, IAC, SE }));
+            efun::tls_deinit_connection();
+        }, 0);
+    }
+}
+
+private void sb_auth(int command, int option, int* optargs) {
+    switch (optargs[0]) {
+        case AUTH_SB_IS:
+            if (Q_REMOTE(ts[option, TS_STATE]) != YES)
+                return;
+
+            if (optargs[1] != AUTH_METHOD_SSL ||
+                optargs[2] != AUTH_WHO_CLIENT_TO_SERVER|AUTH_HOW_ONE_WAY ||
+                optargs[3] != AUTH_SSL_START) {
+
+                set_telnet(DONT, option);
+                return;
+            }
+
+            efun::call_out(function void() {
+                send(({ IAC, SB, option, AUTH_SB_REPLY,
+                        AUTH_METHOD_SSL, AUTH_WHO_CLIENT_TO_SERVER|AUTH_HOW_ONE_WAY,
+                        AUTH_SSL_ACCEPT,
+                        IAC, SE }));
+                efun::tls_init_connection(this_object(), #'tls_callback);
+            }, 0);
+            break;
+    }
+}
+#endif
 
 // helper functions, called from mudlib
 void send_telopt_tm() {
