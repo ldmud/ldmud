@@ -999,7 +999,7 @@ static void define_local_variable (ident_t* name, lpctype_t* actual_type, struct
 static void init_local_variable (ident_t* name, struct lvalue_s *lv, int assign_op, fulltype_t type2);
 static Bool add_lvalue_code ( struct lvalue_s * lv, int instruction);
 static void insert_pop_value(void);
-static int insert_inherited(char *, string_t *, program_t **, function_t *, int, bytecode_p);
+static int insert_inherited(char *super_name, string_t *real_name, program_t **super_p, function_t *fun_p, int num_arg);
   /* Returnvalues from insert_inherited(): */
 #  define INHERITED_NOT_FOUND            (-1)
 #  define INHERITED_WILDCARDED_ARGS      (-2)
@@ -12491,8 +12491,6 @@ function_call:
               {
                   /* LFUN or INHERITED LFUN */
 
-                  PREPARE_INSERT(6)
-
                   function_t *funp;
                   function_t  inherited_function;
 
@@ -12507,7 +12505,7 @@ function_call:
 
                       ix = insert_inherited( $1.super, $1.real->name
                                            , &super_prog, &inherited_function
-                                           , $4, (bytecode_p)__PREPARE_INSERT__p
+                                           , $4
                                            );
 
                       if (ix < 0)
@@ -12550,6 +12548,8 @@ function_call:
                   else
                   {
                       /* Normal lfun in this program */
+
+                      PREPARE_INSERT(6)
 
                       ap_needed = MY_TRUE;
                       add_f_code(F_CALL_FUNCTION);
@@ -14220,7 +14220,7 @@ find_inherited_function ( const char * super_name
 static int
 insert_inherited (char *super_name, string_t *real_name
                  , program_t **super_p, function_t *fun_p
-                 , int num_arg, bytecode_p __prepare_insert__p
+                 , int num_arg
                  )
 
 /* The compiler encountered a <super_name>::<real_name>() call with
@@ -14258,7 +14258,7 @@ insert_inherited (char *super_name, string_t *real_name
     if (ip != NULL)
     {
         /* Found it! */
-        bytecode_p __PREPARE_INSERT__p = __prepare_insert__p;
+        PREPARE_INSERT(5)
 
         /* Generate the function call */
         add_f_code(F_CALL_INHERITED);
@@ -14287,6 +14287,7 @@ insert_inherited (char *super_name, string_t *real_name
         int ip_index;
         int first_index;
         short i;
+        p_uint code_start = CURRENT_PROGRAM_SIZE;
 
         /* Prepare wildcard calls with arguments. */
         if (num_arg)
@@ -14323,8 +14324,7 @@ insert_inherited (char *super_name, string_t *real_name
              * between consecutive calls can be omitted.
              */
 
-            /* 6 bytes are already reserved in the program. */
-            bytecode_p __PREPARE_INSERT__p = __prepare_insert__p;
+            PREPARE_INSERT(5)
 
             /* Create array for the return values. */
             add_f_code(F_ARRAY0);
@@ -14463,7 +14463,9 @@ insert_inherited (char *super_name, string_t *real_name
         else
         {
             /* Backpatch number of calls. */
-            put_short(__prepare_insert__p+1, calls);
+            bytecode_p orig_code = PROGRAM_BLOCK + code_start;
+
+            put_short(orig_code+1, calls);
 
             /* And now a lot of backpatching, depending on how
              * many calls we made.
@@ -14474,7 +14476,7 @@ insert_inherited (char *super_name, string_t *real_name
                  * remove the arguments and put an empty array
                  * as a result on the stack.
                  */
-                bytecode_p __PREPARE_INSERT__p = __prepare_insert__p;
+                bytecode_p __PREPARE_INSERT__p = orig_code;
 
                 add_f_code(F_POP_N);
                 add_byte(num_arg);
@@ -14488,10 +14490,10 @@ insert_inherited (char *super_name, string_t *real_name
                  * call above and patch the F_PUT_ARRAY_ELEMENT
                  * accordingly.
                  */
-                memmove(__prepare_insert__p + 5,  __prepare_insert__p + 9, 9);
-                put_short(__prepare_insert__p + 11,  1);
-                put_uint8(__prepare_insert__p + 14, instrs[F_MOVE_VALUE].opcode);
-                put_uint8(__prepare_insert__p + 15, 0);
+                memmove(orig_code + 5, orig_code + 9, 9);
+                put_short(orig_code + 11,  1);
+                put_uint8(orig_code + 14, instrs[F_MOVE_VALUE].opcode);
+                put_uint8(orig_code + 15, 0);
 
                 CURRENT_PROGRAM_SIZE -= 2;
             }
