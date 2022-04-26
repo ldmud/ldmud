@@ -1,0 +1,3 @@
+Apr 24 20:17:15 lpc start.sh[6835]: /obj/telopt.c:telopt_negotiate "action = 254 option = 46 optdata = 0"
+Apr 24 20:17:25 lpc start.sh[6835]: /obj/telopt.c:telopt_negotiate "action = 253 option = 6 optdata = 0"
+Apr 24 20:17:25 lpc start.sh[6835]: /obj/telopt.c:telopt_negotiate "action = 253 option = 6 optdata = 0"
