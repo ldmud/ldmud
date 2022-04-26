@@ -383,28 +383,6 @@ int Goto(string str) {
     return 1;
 }
 
-/*
- * This will not work because command() only works for command_giver.
- */
-int in(string str) {
-    object mark, here;
-    string path, cmd;
-
-    if (!str)
-	return 0;
-    if (sscanf(str, "%s %s", path, cmd) != 2)
-	return 0;
-    mark = parse_list(path);
-    if (!mark)
-	return 0;
-    here = environment(this_player());
-    move_object(this_player(), mark);
-    command(cmd);
-    move_object(this_player(), here);
-    write("Ok.\n");
-    return 1;
-}
-
 int In(string str) {
     string path, cmd;
     object ob, old_ob;
