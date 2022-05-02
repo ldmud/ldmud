@@ -121,6 +121,7 @@
 #include "mstrings.h"
 #include "object.h"
 #include "otable.h"
+#include "prolang.h"
 #include "ptrtable.h"
 #include "random.h"
 #include "sha1.h"
@@ -6608,6 +6609,35 @@ v_to_struct (svalue_t *sp, int num_arg)
             if (left > struct_size(argp[1].u.strct))
                 left = struct_size(argp[1].u.strct);
 
+            if (current_prog->flags & P_RTT_CHECKS)
+            {
+                /* Let's check the types of the values. */
+                struct_type_t *stype = argp[1].u.strct->type;
+                for (int i = 0; i < left; i++)
+                {
+                    struct_member_t *smember = stype->member+i;
+                    svalue_t *svp = argp->u.vec->item+i;
+
+                    if (!check_rtt_compatibility(smember->type, svp))
+                    {
+                        static char buff[512];
+                        lpctype_t *realtype = get_rtt_type(smember->type, svp);
+                        get_lpctype_name_buf(realtype, buff, sizeof(buff));
+                        free_lpctype(realtype);
+
+                        inter_sp = sp;
+                        if (current_prog->flags & P_WARN_RTT_CHECKS)
+                            warnf("Bad type for struct member '%s': got '%s', expected '%s'.\n",
+                               get_txt(smember->name), buff,
+                               get_lpctype_name(smember->type));
+                        else
+                            errorf("Bad type for struct member '%s': got '%s', expected '%s'.\n",
+                               get_txt(smember->name), buff,
+                               get_lpctype_name(smember->type));
+                    }
+                }
+            }
+
             st = struct_new(argp[1].u.strct->type);
         }
         else
@@ -6638,6 +6668,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                      , typename(argp[1].type));
 
             st = struct_new(argp[1].u.strct->type);
+            push_struct(inter_sp, st);
 
             /* Now loop over all members and assign the data */
             for (i  = 0; i < struct_size(st); i++)
@@ -6679,8 +6710,35 @@ v_to_struct (svalue_t *sp, int num_arg)
 
                         put_array(&st->member[i], vec);
                     } /* if (num_values) */
+
+                    if (current_prog->flags & P_RTT_CHECKS)
+                    {
+                        /* We check the types after the fact.
+                         * When there is an error, the struct will not survive.
+                         */
+                        struct_member_t *smember = st->type->member+i;
+                        svalue_t * svp = st->member + i;
+                        if (!check_rtt_compatibility(smember->type, svp))
+                        {
+                            static char buff[512];
+                            lpctype_t *realtype = get_rtt_type(smember->type, svp);
+                            get_lpctype_name_buf(realtype, buff, sizeof(buff));
+                            free_lpctype(realtype);
+
+                            if (current_prog->flags & P_WARN_RTT_CHECKS)
+                                warnf("Bad type for struct member '%s': got '%s', expected '%s'.\n",
+                                   get_txt(smember->name), buff,
+                                   get_lpctype_name(smember->type));
+                            else
+                                errorf("Bad type for struct member '%s': got '%s', expected '%s'.\n",
+                                   get_txt(smember->name), buff,
+                                   get_lpctype_name(smember->type));
+                        }
+                    }
                 } /* if (has data) */
             } /* for (all members) */
+
+            inter_sp--;
         }
         else
         {

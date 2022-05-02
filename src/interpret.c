@@ -17438,6 +17438,7 @@ again:
          * index for the topmost stack value comes first.
          */
         struct_t * st;
+        struct_type_t *pType;
         short idx;
         int num_values;
         Bool has_template;
@@ -17449,8 +17450,6 @@ again:
 
         if (idx < 0 && instruction == F_S_AGGREGATE)
         {
-            struct_type_t *pType;
-
             if ((sp - num_values)->type != T_STRUCT)
             {
                 ERRORF(("Bad template arg to #'(<: got %s, expected struct\n"
@@ -17472,12 +17471,56 @@ again:
                 /* NOTREACHED */
             }
             has_template = MY_TRUE;
-            st = struct_new(pType);
         }
         else
         {
-            st = struct_new(current_prog->struct_defs[idx].type);
+            pType = current_prog->struct_defs[idx].type;
         }
+
+        if (current_prog->flags & P_RTT_CHECKS)
+        {
+            bytecode_t *pix = pc;
+
+            /* Let's check the types of the values. */
+            for (int i = 0; i < num_values; i++)
+            {
+                struct_member_t *pMember;
+                int ix;
+
+                if (instruction == F_S_AGGREGATE)
+                {
+                    ix = i;
+                    svp = sp - num_values + i + 1;
+                }
+                else
+                {
+                    ix = load_uint8(&pix);
+                    svp = sp - i;
+                }
+
+                pMember = pType->member+ix;
+
+                if (!check_rtt_compatibility(pMember->type, svp))
+                {
+                    static char buff[512];
+                    lpctype_t *realtype = get_rtt_type(pMember->type, svp);
+                    get_lpctype_name_buf(realtype, buff, sizeof(buff));
+                    free_lpctype(realtype);
+
+                    inter_sp = sp;
+                    if (current_prog->flags & P_WARN_RTT_CHECKS)
+                        warnf("Bad type for struct member '%s': got '%s', expected '%s'.\n",
+                           get_txt(pMember->name), buff,
+                           get_lpctype_name(pMember->type));
+                    else
+                        errorf("Bad type for struct member '%s': got '%s', expected '%s'.\n",
+                           get_txt(pMember->name), buff,
+                           get_lpctype_name(pMember->type));
+                }
+            }
+        }
+
+        st = struct_new(pType);
         if  (!st)
             ERROR("Out of memory!\n");
 
