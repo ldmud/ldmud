@@ -107,6 +107,7 @@
 #define WORDEND   13   /* node  matching an end of a word           */
 #define NOTEDGE   14   /* node  matching anything not at word edge  */
 #define GRAPHEME  15   /* node  match a grapheme cluster            */
+#define NULLCHAR  16   /* no    Match a null character.             */
 #define OPEN      20   /* no    Mark this point in input as start of #n. */
   /* OPEN+1 is number 1, etc. */
 #define CLOSE (OPEN+NSUBEXP)    /* no        Analogous to OPEN. */
@@ -169,6 +170,7 @@
 #define RSHBRAC  ('>'|SPECIAL)
 #define SLASHB   ('B'|SPECIAL)
 #define SLASHX   ('X'|SPECIAL)
+#define NULLCH   (SPECIAL)
 #define FAIL(m)   { *ppErrMsg = m; return(NULL); }
 #define XFREE(m)  { if (m) xfree(m); m = NULL; }
 #define ISMULT(c) ((c) == ASTERIX || (c) == CROSS)
@@ -218,7 +220,7 @@ static void  regoptail (unsigned char *p, unsigned char *val);
 static void  reginsert (char op, unsigned char *opnd);
 static unsigned char *reg (Bool paren, int *flagp);
 
-static int regtry(regexp*, char *);
+static int regtry(regexp*, char *, size_t);
 static int regmatch(unsigned char *);
 static int regrepeat(unsigned char *);
 
@@ -482,6 +484,10 @@ regatom (int *flagp)
         ret = regnode(ANY);
         *flagp |= HASWIDTH | SIMPLE;
         break;
+    case NULLCH:
+        ret = regnode(NULLCHAR);
+        *flagp |= HASWIDTH | SIMPLE;
+        break;
     case LSHBRAC:
         ret = regnode(WORDSTART);
         break;
@@ -739,7 +745,7 @@ reg_nextchar (char* txt)
 
 /*-------------------------------------------------------------------------*/
 regexp *
-hs_regcomp (unsigned char *expr, Bool excompat
+hs_regcomp (unsigned char *expr, size_t exprlen, Bool excompat
            , char ** errmsg, int * erridx)
 
 /* Compile a regular expression in <expr> into internal code; if <excompat>
@@ -766,6 +772,7 @@ hs_regcomp (unsigned char *expr, Bool excompat
 {
     unsigned char   *scan;
     unsigned char   *longest;
+    size_t  remaining;
     int     len;
     int     flags;
     p_int  *dest, c;
@@ -798,22 +805,21 @@ hs_regcomp (unsigned char *expr, Bool excompat
         FAIL("NULL argument");
 
     /* Get some memory, maybe slightly more than needed */
-    expr2 = xalloc( (strlen((char *)expr)+1) * sizeof(p_int) );
+    expr2 = xalloc( (exprlen+1) * sizeof(p_int) );
     if (expr2 == NULL)
         FAIL("out of space");
 
     /* Copy the expression into expr2 for compilation, marking
      * the special characters.
      */
-    for (scan = expr, dest = expr2;;)
+    for (scan = expr, remaining = exprlen, dest = expr2; remaining > 0;)
     {
-        size_t clen = utf8_to_unicode((char*)scan, 4, &c);
+        size_t clen = utf8_to_unicode((char*)scan, remaining, &c);
         if (!clen)
             FAIL("Invalid character in regexp pattern");
-        if (!c)
-            break;
 
         scan += clen;
+        remaining -= clen;
 
         switch (c)
         {
@@ -821,6 +827,10 @@ hs_regcomp (unsigned char *expr, Bool excompat
         case ')':
             *dest++ = excompat ? c : c | SPECIAL;
             break;
+        case '\0':
+            // As we use the null byte to mark the end of an
+            // exact string, we need to encode an expected
+            // null character using a special opcode.
         case '.':
         case '*':
         case '+':
@@ -832,12 +842,19 @@ hs_regcomp (unsigned char *expr, Bool excompat
             *dest++ =  c | SPECIAL;
             break;
         case '\\':
+            if (!remaining)
+            {
+                *dest++ = c;
+                break;
+            }
+            remaining--;
             switch ( c = *scan++ )
             {
             case '(':
             case ')':
                 *dest++ = excompat ? c | SPECIAL : c;
                 break;
+            case '\0':
             case '<':
             case '>':
             case 'B':
@@ -851,7 +868,6 @@ hs_regcomp (unsigned char *expr, Bool excompat
             case 'b': *dest++ = '\b'; break;
             case 't': *dest++ = '\t'; break;
             case 'r': *dest++ = '\r'; break;
-            case '\0': scan--;
             default:
                 *dest++ = c;
             }
@@ -954,10 +970,10 @@ hs_regcomp (unsigned char *expr, Bool excompat
 
 /*-------------------------------------------------------------------------*/
 int
-hs_regexec (regexp *prog, char *string, char *start)
+hs_regexec (regexp *prog, char *string, char *start, char *end)
 
 /* Match the regexp <prog> against the <string> starting at the
- * position <start>.
+ * position <start>, ending at <end>.
  *
  * Return one of the RE_ERROR_ codes depending on the result.
  */
@@ -980,7 +996,7 @@ hs_regexec (regexp *prog, char *string, char *start)
     if (prog->regmust != NULL)
     {
         s = string;
-        while ((s = strchr(s, prog->regmust[0])) != NULL)
+        while ((s = memchr(s, prog->regmust[0], end - s)) != NULL)
         {
             if (strncmp(s, (char *)(prog->regmust), prog->regmlen) == 0)
                 break;                /* Found it. */
@@ -994,15 +1010,15 @@ hs_regexec (regexp *prog, char *string, char *start)
 
     /* Simplest case:  anchored match need be tried only once. */
     if (prog->reganch)
-        return regtry(prog, string);
+        return regtry(prog, string, end - string);
 
     /* Messy cases:  unanchored match. */
     s = string;
     if (prog->regstart != '\0')
         /* We know what char it must start with. */
-        while ((s = strchr(s, prog->regstart)) != NULL)
+        while ((s = memchr(s, prog->regstart, end - s)) != NULL)
         {
-            rc = regtry(prog,s);
+            rc = regtry(prog,s,end-s);
             if (rc != RE_NOMATCH)
                 return rc;
             s = reg_nextchar(s);
@@ -1011,7 +1027,7 @@ hs_regexec (regexp *prog, char *string, char *start)
         /* We don't -- general case. */
         while (true)
         {
-            rc = regtry(prog,s);
+            rc = regtry(prog,s,end-s);
             if (rc != RE_NOMATCH)
                 return rc;
             if (*s == '\0')
@@ -1025,7 +1041,7 @@ hs_regexec (regexp *prog, char *string, char *start)
 
 /*-------------------------------------------------------------------------*/
 static int
-regtry (regexp *prog, char *string)
+regtry (regexp *prog, char *string, size_t len)
 
 /* regtry - try match at specific point
  */
@@ -1036,7 +1052,7 @@ regtry (regexp *prog, char *string)
     char **ep;
 
     reginput = (unsigned char *)string;
-    reginputend = (unsigned char *)string + strlen(string);
+    reginputend = (unsigned char *)string + len;
     regstartp = prog->startp;
     regendp = prog->endp;
     regremainingdepth = LD_REGEXP_RECURSION_LIMIT;
@@ -1165,6 +1181,14 @@ regmatch_int (unsigned char *prog)
                 if (!len)
                     return RE_NOMATCH;
                 reginput += len;
+                break;
+            }
+        case NULLCHAR:
+            if (reginput == reginputend || *reginput)
+                return RE_NOMATCH;
+            else
+            {
+                reginput++;
                 break;
             }
         case WORDSTART:
@@ -1413,6 +1437,14 @@ regrepeat (unsigned char *p)
             break;
         }
 
+        case NULLCHAR:
+            while (scan < reginputend && !*scan)
+            {
+                count++;
+                scan++;
+            }
+            break;
+
         case EXACTLY:
             // Quick check
             if (*opnd == *scan)
@@ -1523,6 +1555,8 @@ regprop (unsigned char *op)
     case NOTEDGE:
         p = "NOTEDGE";
         break;
+    case NULLCHAR:
+        p = "NUL";
     default:
         if (OP(op) > OPEN && OP(op) < OPEN+NSUBEXP)
         {

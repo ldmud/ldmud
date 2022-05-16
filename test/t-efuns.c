@@ -492,6 +492,15 @@ mixed *tests = ({
     ({ "regmatch 11", 0, (: regmatch("--A--B--", "A.*.B") == "A--B" :) }),
     ({ "regmatch 12", 0, (: string result; return catch(result = regmatch("A"*100000, "(A|B)*", RE_TRADITIONAL)) || result; :) }),
     ({ "regmatch 13", 0, (: string result; return catch(result = regmatch("A"*100000, "(B|A)*", RE_TRADITIONAL)) || result; :) }),
+    ({ "regmatch 14", 0, (: regmatch("A\x00BC", "A\x00BC", RE_TRADITIONAL) == "A\x00BC" :) }),
+    ({ "regmatch 15", 0, (: regmatch("A\x00BC", "A\\x00BC", RE_PCRE) == "A\x00BC" :) }),
+    ({ "regmatch 16", 0, (: regmatch("A\x00BC", "BC", RE_TRADITIONAL) == "BC" :) }),
+    ({ "regmatch 17", 0, (: regmatch("A\x00BC", "BC", RE_PCRE) == "BC" :) }),
+
+    ({ "regreplace 1", 0, (: regreplace("A\x00BC", "\x00.", "X", RE_TRADITIONAL) == "AXC" :) }),
+    ({ "regreplace 2", 0, (: regreplace("A\x00BC", "\\x00.", "X", RE_PCRE) == "AXC" :) }),
+    ({ "regreplace 3", 0, (: regreplace("A\x00BC", "B", "X", RE_TRADITIONAL) == "A\x00XC" :) }),
+    ({ "regreplace 4", 0, (: regreplace("A\x00BC", "B", "X", RE_PCRE) == "A\x00XC" :) }),
 
     ({ "sscanf 1", 0, (: sscanf("A10", "A%~d") == 1 :) }),
     ({ "sscanf 2", 0, (: sscanf("B10", "A%~d") == 0 :) }),

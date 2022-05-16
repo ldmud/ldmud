@@ -48,8 +48,8 @@ extern Bool regnarrate;
 void hs_regdump(regexp *rg);
 #endif
 
-extern regexp *hs_regcomp(unsigned char *expr, Bool excompat, char ** errmsg, int * erridx);
-extern int hs_regexec(regexp *prog, char *string, char *start);
+extern regexp *hs_regcomp(unsigned char *expr, size_t exprlen, Bool excompat, char ** errmsg, int * erridx);
+extern int hs_regexec(regexp *prog, char *string, char *start, char *end);
 
 /* Return codes from regexec() */
 

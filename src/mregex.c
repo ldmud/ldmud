@@ -351,6 +351,7 @@ rx_compile_re (string_t * expr, int opt, Bool from_ed, regdata_t * rdata)
 
     /* Compile the RE */
     pRegexp = hs_regcomp((unsigned char *)get_txt(expr)
+                        , mstrsize(expr)
                         , opt & RE_EXCOMPATIBLE
                         , &pErrmsg, &erridx);
     if (NULL == pRegexp)
@@ -757,7 +758,7 @@ rx_exec (regexp_t *pRegexp, string_t * string, size_t start)
 #endif // HAS_PCRE
 
     /* Fallback: Traditional regexp */
-    return hs_regexec(prog->rx, get_txt(string)+start, get_txt(string));
+    return hs_regexec(prog->rx, get_txt(string)+start, get_txt(string), get_txt(string) + mstrsize(string));
 } /* rx_exec() */
 
 /*-------------------------------------------------------------------------*/
@@ -817,7 +818,7 @@ rx_exec_str (regexp_t *pRegexp, char * string, char * start)
 #endif // HAS_PCRE
 
     /* Fallback: Traditional regexp */
-    return hs_regexec(prog->rx, string, start);
+    return hs_regexec(prog->rx, string, start, start + strlen(start));
 } /* rx_exec_str() */
 
 /*-------------------------------------------------------------------------*/
