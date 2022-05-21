@@ -1520,17 +1520,13 @@ determine_uid (svalue_t ob, string_t* name, wiz_list_t **user, wiz_list_t **eff_
  */
 
 {
-    lambda_t *l;
     svalue_t *ret;
 
     *user = &default_wizlist_entry;  /* Default uid */
 
-    if ( NULL != (l = driver_hook[hook].u.lambda) )
+    if (driver_hook[hook].type == T_CLOSURE)
     {
-        if (driver_hook[hook].x.closure_type == CLOSURE_LAMBDA)
-            assign_object_svalue(&(l->ob), ob, "determine_uid");
-
-        call_lambda(&driver_hook[hook], numarg);
+        call_lambda_ob(&driver_hook[hook], numarg, &ob);
         ret = inter_sp;
 
         if (ret->type == T_STRING)
@@ -5170,22 +5166,19 @@ f_set_driver_hook (svalue_t *sp)
       }
 
     case T_CLOSURE:
-        if (sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA
+        /* Even if the hook type map doesn't specify so, we allow
+         * unbound lambdas that we can take ownership of.
+         * (We need ownership, because those hooks will rebind
+         * the closure before call.)
+         */
+        if ((hook_type_map[n] & TF_CLOSURE) == 0
+         && sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA
          && sp->u.lambda->ref == 1)
         {
             driver_hook[n] = *sp;
             driver_hook[n].x.closure_type = CLOSURE_LAMBDA;
             put_ref_object(&(driver_hook[n].u.lambda->ob), master_ob, "hook closure");
-            if (n == H_NOECHO)
-            {
-                mudlib_telopts();
-            }
             break;
-        }
-        else if (!CLOSURE_IS_LFUN(sp->x.closure_type))
-        {
-            errorf("Bad value for hook %"PRIdPINT": unbound lambda or "
-                  "lfun closure expected.\n", n);
         }
         /* FALLTHROUGH */
 

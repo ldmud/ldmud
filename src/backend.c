@@ -1438,17 +1438,9 @@ static Bool did_swap;
             trace_level = 0;
             if (driver_hook[H_CLEAN_UP].type == T_CLOSURE)
             {
-                lambda_t *l;
-
                 mark_start_evaluation();
-                l = driver_hook[H_CLEAN_UP].u.lambda;
-                if (driver_hook[H_CLEAN_UP].x.closure_type == CLOSURE_LAMBDA)
-                {
-                    free_svalue(&(l->ob));
-                    put_ref_object(&(l->ob), obj, "clean_up");
-                }
                 push_ref_object(inter_sp, obj, "clean up");
-                call_lambda(&driver_hook[H_CLEAN_UP], 2);
+                call_lambda_ob(&driver_hook[H_CLEAN_UP], 2, inter_sp);
                 svp = inter_sp;
                 pop_stack();
                 mark_end_evaluation();

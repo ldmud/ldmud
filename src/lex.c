@@ -2485,10 +2485,11 @@ set_input_source (int fd, const char* fname, string_t * str)
         else if (driver_hook[H_FILE_ENCODING].type == T_CLOSURE)
         {
             svalue_t *svp;
+            svalue_t master_sv = svalue_object(master_ob);
 
             /* Setup and call the closure */
             push_c_string(inter_sp, fname);
-            svp = secure_apply_lambda(driver_hook+H_FILE_ENCODING, 1);
+            svp = secure_apply_lambda_ob(driver_hook+H_FILE_ENCODING, 1, &master_sv);
 
             if (svp && svp->type == T_STRING)
                 encoding = svp->u.str;
@@ -3220,6 +3221,7 @@ add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
     else if (driver_hook[H_AUTO_INCLUDE].type == T_CLOSURE)
     {
         svalue_t *svp;
+        svalue_t master_sv = svalue_object(master_ob);
 
         /* Setup and call the closure */
         push_c_string(inter_sp, obj_file);
@@ -3233,7 +3235,7 @@ add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
             push_number(inter_sp, 0);
             push_number(inter_sp, 0);
         }
-        svp = secure_apply_lambda(driver_hook+H_AUTO_INCLUDE, 3);
+        svp = secure_apply_lambda_ob(driver_hook+H_AUTO_INCLUDE, 3, &master_sv);
         if (svp && svp->type == T_STRING)
         {
             auto_include_string = svp->u.str;
@@ -3568,13 +3570,12 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
          */
 
         svalue_t *svp;
+        svalue_t master_sv = svalue_object(master_ob);
 
         /* Setup and call the closure */
         push_c_string(inter_sp, name);
         push_c_string(inter_sp, current_loc.file->name);
-        if (driver_hook[H_INCLUDE_DIRS].x.closure_type == CLOSURE_LAMBDA)
-            assign_current_object(&(driver_hook[H_INCLUDE_DIRS].u.lambda->ob), "open_include_file");
-        svp = secure_apply_lambda(&driver_hook[H_INCLUDE_DIRS], 2);
+        svp = secure_apply_lambda_ob(&driver_hook[H_INCLUDE_DIRS], 2, &master_sv);
 
         /* The result must be legal relative pathname */
         if (!svp || svp->type != T_STRING)

@@ -140,15 +140,13 @@ reset_lwobject (lwobject_t *lwob, int hook, int num_arg)
 {
     if (driver_hook[hook].type == T_CLOSURE)
     {
-        lambda_t *l = driver_hook[hook].u.lambda;
-
-        if (l->function.code.num_arg)
+        if (driver_hook[hook].x.closure_type != CLOSURE_UNBOUND_LAMBDA
+         || driver_hook[hook].u.lambda->function.code.num_arg)
         {
             /* Closure accepts at least one argument,
              * so it gets the target object there and we execute
              * it in the context of the creator (current object).
              */
-            assign_current_object(&(l->ob), "reset_lwobject");
 
             /* We need to add the lightweight object as an
              * argument before all the others.
@@ -158,15 +156,14 @@ reset_lwobject (lwobject_t *lwob, int hook, int num_arg)
                 inter_sp[-i] = inter_sp[-i-1];
             put_ref_lwobject(inter_sp - num_arg, lwob);
 
-            call_lambda(&driver_hook[hook], num_arg+1);
+            call_lambda_ob(&driver_hook[hook], num_arg+1, &current_object);
             pop_stack(); /* Ignore result. */
         }
         else
         {
-            /* No arguments, just bind to target */
-            free_svalue(&(l->ob));
-            put_ref_lwobject(&(l->ob), lwob);
-            call_lambda(&driver_hook[hook], 0);
+            /* No arguments, just bind to target. */
+            svalue_t lwobsv = svalue_lwobject(lwob);
+            call_lambda_ob(&driver_hook[hook], 0, &lwobsv);
             inter_sp = pop_n_elems(num_arg+1, inter_sp); /* arguments & result */
         }
     }

@@ -1594,15 +1594,9 @@ add_discarded_message (interactive_t *ip)
 
     if (driver_hook[H_MSG_DISCARDED].type == T_CLOSURE)
     {
-        if (driver_hook[H_MSG_DISCARDED].x.closure_type == CLOSURE_LAMBDA)
-        {
-            free_svalue(&(driver_hook[H_MSG_DISCARDED].u.lambda->ob));
-            put_ref_object(&(driver_hook[H_MSG_DISCARDED].u.lambda->ob), ip->ob, "add_discarded_message");
-        }
-
         push_ref_valid_object(inter_sp, ip->ob, "add_discarded_message");
 
-        call_lambda(&driver_hook[H_MSG_DISCARDED], 1);
+        call_lambda_ob(&driver_hook[H_MSG_DISCARDED], 1, inter_sp);
 
         if (inter_sp->type == T_STRING)
         {
@@ -3778,15 +3772,8 @@ set_noecho (interactive_t *ip, char noecho, Bool local_change, Bool external)
                 push_number(inter_sp,  local_change ? 1 : 0);
                 if (driver_hook[H_NOECHO].type == T_STRING)
                     secure_apply_ob(driver_hook[H_NOECHO].u.str, ob, 3, external);
-                else 
-                {
-                    if (driver_hook[H_NOECHO].x.closure_type == CLOSURE_LAMBDA)
-                    {
-                        free_svalue(&(driver_hook[H_NOECHO].u.lambda->ob));
-                        put_ref_object(&(driver_hook[H_NOECHO].u.lambda->ob), ob, "set_noecho");
-                    }
-                    secure_call_lambda(&driver_hook[H_NOECHO], 3, external);
-                }
+                else
+                    secure_call_lambda(&driver_hook[H_NOECHO], 3, external, inter_sp-1);
                 if (~confirm & old & CHARMODE_MASK)
                 {
                     reset_input_buffer(ip);
@@ -4223,25 +4210,28 @@ print_prompt_string (string_t *prompt)
         previous_ob = const0;
         set_current_object(command_giver);
 
-        /* Check if the object the closure is bound to still exists.
-         * If not, erase the hook, print the prompt using add_message(),
-         * then throw an error.
-         */
-        ob = get_bound_object(*hook);
-        if (ob.type == T_OBJECT && (ob.u.ob->flags & O_DESTRUCTED))
+        if (hook->x.closure_type != CLOSURE_UNBOUND_LAMBDA)
         {
-            free_svalue(hook);
-            put_number(hook, 0);
-            clear_current_object(); /* So that catch_tell() can see it */
-            add_message_str(prompt);
-            errorf("H_PRINT_PROMPT for %s was a closure bound to a "
-                   "now-destructed object - hook removed.\n", 
-                   get_txt(command_giver->name));
-            /* NOTREACHED */
+            /* Check if the object the closure is bound to still exists.
+             * If not, erase the hook, print the prompt using add_message(),
+             * then throw an error.
+             */
+            ob = get_bound_object(*hook);
+            if (ob.type == T_OBJECT && (ob.u.ob->flags & O_DESTRUCTED))
+            {
+                free_svalue(hook);
+                put_number(hook, 0);
+                clear_current_object(); /* So that catch_tell() can see it */
+                add_message_str(prompt);
+                errorf("H_PRINT_PROMPT for %s was a closure bound to a "
+                       "now-destructed object - hook removed.\n", 
+                       get_txt(command_giver->name));
+                /* NOTREACHED */
+            }
         }
 
         push_ref_string(inter_sp, prompt);
-        call_lambda(hook, 1);
+        call_lambda_ob(hook, 1, &current_object);
         free_svalue(inter_sp--);
     }
     else if (hook->type == T_STRING)
@@ -4308,19 +4298,23 @@ print_prompt (void)
          * If not, restore the prompt to the default (this also works with
          * the default prompt driver hook), then throw an error.
          */
-        ob = get_bound_object(*prompt);
-        if (ob.type == T_OBJECT && (ob.u.ob->flags & O_DESTRUCTED))
+        if (!usingDefaultPrompt
+         || prompt->x.closure_type != CLOSURE_UNBOUND_LAMBDA)
         {
-            free_svalue(prompt);
-            put_ref_string(prompt, STR_DEFAULT_PROMPT);
-            print_prompt_string(prompt->u.str);
-            errorf("Prompt of %s was a closure bound to a now-destructed "
-                   "object - default prompt restored.\n", 
-                   get_txt(command_giver->name));
-            /* NOTREACHED */
+            ob = get_bound_object(*prompt);
+            if (ob.type == T_OBJECT && (ob.u.ob->flags & O_DESTRUCTED))
+            {
+                free_svalue(prompt);
+                put_ref_string(prompt, STR_DEFAULT_PROMPT);
+                print_prompt_string(prompt->u.str);
+                errorf("Prompt of %s was a closure bound to a now-destructed "
+                       "object - default prompt restored.\n", 
+                       get_txt(command_giver->name));
+                /* NOTREACHED */
+            }
         }
 
-        call_lambda(prompt, 0);
+        call_lambda_ob(prompt, 0, &current_object);
         prompt = inter_sp;
         if (prompt->type != T_STRING)
         {
@@ -4778,12 +4772,8 @@ h_telnet_neg (int n)
     }
     else if (driver_hook[H_TELNET_NEG].type == T_CLOSURE)
     {
-        if (driver_hook[H_TELNET_NEG].x.closure_type == CLOSURE_LAMBDA)
-        {
-            free_svalue(&(driver_hook[H_TELNET_NEG].u.lambda->ob));
-            put_ref_object(&(driver_hook[H_TELNET_NEG].u.lambda->ob), command_giver, "h_telnet_neg");
-        }
-        svp = secure_callback_lambda(&driver_hook[H_TELNET_NEG], n);
+        svalue_t cgsv = svalue_object(command_giver);
+        svp = secure_callback_lambda_ob(&driver_hook[H_TELNET_NEG], n, &cgsv);
     }
     else
     {
@@ -5828,8 +5818,10 @@ stop_erq_demon (Bool notify)
     {
         RESET_LIMITS;
         CLEAR_EVAL_COST;
-        if (driver_hook[H_ERQ_STOP].type == T_CLOSURE) {
-            secure_callback_lambda(&driver_hook[H_ERQ_STOP], 0);
+        if (driver_hook[H_ERQ_STOP].type == T_CLOSURE)
+        {
+            svalue_t master_sv = svalue_object(master_ob);
+            secure_callback_lambda_ob(&driver_hook[H_ERQ_STOP], 0, &master_sv);
         }
     }
 } /* stop_erq_demon() */

@@ -16,8 +16,8 @@ DESCRIPTION
 
         If the hook is a string, it is the name of a (possibly static)
         function to call in the current command giver. If the hook
-        is a closure, it is the function to be called. Lambda closures
-        are bound to the current command giver first.
+        is a closure, it is the function to be called. Unbound lambda
+        closures are bound to the current command giver first.
 
         The arguments to the call are:
          - <msg> is the notify fail message to be delivered.

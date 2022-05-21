@@ -551,17 +551,9 @@ call_modify_command (char *buff)
     {
         if (driver_hook[H_MODIFY_COMMAND].type == T_CLOSURE)
         {
-            lambda_t *l;
-
-            l = driver_hook[H_MODIFY_COMMAND].u.lambda;
-            if (driver_hook[H_MODIFY_COMMAND].x.closure_type == CLOSURE_LAMBDA)
-            {
-                free_svalue(&(l->ob));
-                put_ref_object(&(l->ob), command_giver, "call_modify_command");
-            }
             push_c_string(inter_sp, buff);
             push_ref_object(inter_sp, command_giver, "call_modify_command");
-            call_lambda(&driver_hook[H_MODIFY_COMMAND], 2);
+            call_lambda_ob(&driver_hook[H_MODIFY_COMMAND], 2, inter_sp);
             transfer_svalue(svp = &apply_return_value, inter_sp--);
             if (!command_giver)
                 return MY_TRUE;
@@ -589,7 +581,7 @@ call_modify_command (char *buff)
                 {
                     push_ref_string(inter_sp, sv.u.str);
                     push_ref_object(inter_sp, command_giver, "call_modify_command");
-                    call_lambda(svp, 2);
+                    call_lambda_ob(svp, 2, inter_sp);
                     transfer_svalue(svp = &apply_return_value, inter_sp--);
                     if (!command_giver)
                         return MY_TRUE;
@@ -675,14 +667,11 @@ notify_no_command (char *command, object_t *save_command_giver)
     }
     else if (driver_hook[H_NOTIFY_FAIL].type == T_CLOSURE)
     {
-        if (driver_hook[H_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
-        {
-            free_svalue(&(driver_hook[H_NOTIFY_FAIL].u.lambda->ob));
-            put_ref_object(&(driver_hook[H_NOTIFY_FAIL].u.lambda->ob), command_giver, "notify_no_command");
-        }
+        svalue_t cgsv = svalue_object(command_giver);
+
         push_c_string(inter_sp, command);
         push_ref_valid_object(inter_sp, save_command_giver, "notify_no_command");
-        call_lambda(&driver_hook[H_NOTIFY_FAIL], 2);
+        call_lambda_ob(&driver_hook[H_NOTIFY_FAIL], 2, &cgsv);
         if (inter_sp->type == T_STRING)
         {
             if (!useHook)
@@ -729,12 +718,8 @@ notify_no_command (char *command, object_t *save_command_giver)
         }
         else
         {
-            if (driver_hook[H_SEND_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
-            {
-                free_svalue(&(driver_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob));
-                put_ref_object(&(driver_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob), command_giver, "notify_no_command");
-            }
-            call_lambda(&driver_hook[H_SEND_NOTIFY_FAIL], 3);
+            svalue_t cgsv = svalue_object(command_giver);
+            call_lambda_ob(&driver_hook[H_SEND_NOTIFY_FAIL], 3, &cgsv);
             pop_stack();
         }
     }
@@ -1147,17 +1132,9 @@ execute_command (char *str, object_t *ob)
     }
     else if (driver_hook[H_COMMAND].type == T_CLOSURE)
     {
-        lambda_t *l;
-
-        l = driver_hook[H_COMMAND].u.lambda;
-        if (driver_hook[H_COMMAND].x.closure_type == CLOSURE_LAMBDA)
-        {
-            free_svalue(&(l->ob));
-            put_ref_object(&(l->ob), ob, "execute_command");
-        }
         push_c_string(inter_sp, str);
         push_ref_object(inter_sp, ob, "execute_command");
-        call_lambda(&driver_hook[H_COMMAND], 2);
+        call_lambda_ob(&driver_hook[H_COMMAND], 2, inter_sp);
         res = (inter_sp->type != T_NUMBER) || (inter_sp->u.number != 0);
         free_svalue(inter_sp);
         inter_sp--;

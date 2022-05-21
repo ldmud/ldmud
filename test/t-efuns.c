@@ -254,13 +254,58 @@ mixed *tests = ({
     }),
     ({ "clone_object 2", 0,
         (:
-            /* Check that our arguments went into the new object. */
-            set_driver_hook(H_CREATE_CLONE, unbound_lambda(({'ob, 'arg1, 'arg2}), ({#'call_other, 'ob, "create_clone", 'arg1, 20})));
+            /* Check that the hook lambda is bound correctly and
+             * our arguments went into the new object.
+             */
+            set_driver_hook(H_CREATE_CLONE, unbound_lambda(({'ob, 'arg1, 'arg2}), ({#'&&,
+                ({#'==, ({#'this_object}), this_object()}),
+                ({#'call_other, 'ob, "create_clone", 'arg1, 20})})));
 
             object o = clone_object(this_object(), 42, 10);
             mixed res = o->get_args();
             destruct(o);
             return res == 62;
+        :)
+    }),
+    ({ "clone_object 3", 0,
+        (:
+            /* Check that the hook lambda is bound correctly. */
+            closure cl;
+            set_driver_hook(H_CREATE_CLONE, cl=unbound_lambda(0,
+                ({#'call_other, ({#'this_object}), "create_clone", 42, 30})));
+
+            object o = clone_object(this_object());
+            mixed res = o->get_args();
+            destruct(o);
+            return res == 72;
+        :)
+    }),
+    ({ "clone_object 4", 0,
+        (:
+            /* Check that the lambda is not rebound. */
+            set_driver_hook(H_CREATE_CLONE, lambda(0, ({#'&&,
+                ({#'!=, ({#'this_object}), this_object()}),
+                ({#'raise_error, "Hook lambda was rebound.\n"})})));
+
+            object o = clone_object(this_object(), 42, 10);
+            destruct(o);
+            return 1;
+        :)
+    }),
+    ({ "clone_object 5", 0,
+        (:
+            /* Check that the hook got all the arguments. */
+            set_driver_hook(H_CREATE_CLONE,
+                function void(object ob, varargs int* args)
+                {
+                    if (sizeof(args) == 2)
+                        ob.create_clone(args...);
+                });
+
+            object o = clone_object(this_object(), 42, 10);
+            mixed res = o->get_args();
+            destruct(o);
+            return res == 52;
         :)
     }),
     ({ "configure_interactive (privileged)", 0,

@@ -5,16 +5,19 @@ SYNOPSIS
 
         <value> being:
 
-          void|int <closure> ( void )
           void <name>( void )
+          void|int <closure> ( void )
+          void|int <closure> (object obj_to_reset)
 
 DESCRIPTION
-        Optional hook to reset an object. Hook setting can be unbound
-        lambda closures, or the name of the function (static or public)
-        to call in the object.
+        Optional hook to reset an object. Hook setting can be any
+        closure, or the name of the function (static or public) to
+        call in the object.
 
-        If the hook is a closure, it is bound to the object to be
-        reset and called with no argument.
+        If the hook is an unbound lambda closure, it is bound to the
+        object to be reset and called with no argument. If the hook
+        is any other type of closure, it is called with the target
+        object as argument.
 
         If the result of this call is a positive number, it is used as
         the interval to wait before the next reset(). If the result

@@ -82,6 +82,22 @@ void run_test()
                 return lwob.pop() == "Y";
             }
         }),
+        ({ "closure as H_CREATE_LWOBJECT 3", 0,
+            function int()
+            {
+                lwobject lwob;
+
+                set_driver_hook(H_CREATE_LWOBJECT, function void(lwobject lwob, varargs mixed* values)
+                {
+                    foreach(mixed val: values)
+                        lwob.push(val);
+                });
+                lwob = new_lwobject("/lwo/stack", 11, 22);
+
+                set_driver_hook(H_CREATE_LWOBJECT, "new"); /* Reset it. */
+                return lwob.pop() == 22 && lwob.pop() == 11 && lwob.empty();
+            }
+        }),
         ({ "checking variable initialization with share_variables", 0,
             function int()
             {

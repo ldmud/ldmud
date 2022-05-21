@@ -1134,10 +1134,11 @@ get_file_encoding (string_t* filename, bool source)
     else if (driver_hook[H_FILE_ENCODING].type == T_CLOSURE)
     {
         svalue_t *svp;
+        svalue_t master_sv = svalue_object(master_ob);
 
         /* Setup and call the closure */
         push_ref_string(inter_sp, filename);
-        svp = secure_apply_lambda(driver_hook+H_FILE_ENCODING, 1);
+        svp = secure_apply_lambda_ob(driver_hook+H_FILE_ENCODING, 1, &master_sv);
 
         if (svp && svp->type == T_STRING)
             encoding = svp->u.str;

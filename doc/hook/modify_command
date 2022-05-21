@@ -22,8 +22,8 @@ DESCRIPTION
 
         If the hook is a closure, it is called with the entered
         command as first, and the command giving player as second
-        argument. Lambda closures are bound to the command giving player,
-        unbound-lambda closures remain unbound.
+        argument. Unbound lambda closures are bound to the command
+        giving player.
 
         If the hook is a string, it is used as the name of an lfun
         in the command giving player, which is called with the command

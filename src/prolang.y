@@ -175,34 +175,34 @@ short hook_type_map[NUM_DRIVER_HOOKS] =
 %hookmap \
     H_MOVE_OBJECT0: 0, \
     H_MOVE_OBJECT1: 0, \
-    H_LOAD_UIDS:      SH(T_CLOSURE), \
-    H_CLONE_UIDS:     SH(T_CLOSURE), \
-    H_LWOBJECT_UIDS:  SH(T_CLOSURE), \
-    H_CREATE_SUPER:                 SH(T_STRING), \
-    H_CREATE_OB:                    SH(T_STRING), \
-    H_CREATE_CLONE:                 SH(T_STRING), \
-    H_CREATE_LWOBJECT:              SH(T_STRING), \
-    H_CREATE_LWOBJECT_COPY:         SH(T_STRING), \
-    H_CREATE_LWOBJECT_RESTORE:      SH(T_STRING), \
-    H_RESET:                        SH(T_STRING), \
-    H_CLEAN_UP:       SH(T_CLOSURE) SH(T_STRING), \
-    H_MODIFY_COMMAND: SH(T_CLOSURE) SH(T_STRING) SH(T_MAPPING), \
-    H_NOTIFY_FAIL:    SH(T_CLOSURE) SH(T_STRING), \
-    H_NO_IPC_SLOT:                  SH(T_STRING), \
-    H_INCLUDE_DIRS:   SH(T_CLOSURE)              SH(T_POINTER), \
-    H_TELNET_NEG:     SH(T_CLOSURE) SH(T_STRING), \
-    H_NOECHO:         SH(T_CLOSURE) SH(T_STRING), \
-    H_ERQ_STOP:       SH(T_CLOSURE), \
-    H_MODIFY_COMMAND_FNAME: SH(T_STRING), \
-    H_COMMAND:        SH(T_CLOSURE) SH(T_STRING), \
-    H_SEND_NOTIFY_FAIL: SH(T_CLOSURE) SH(T_STRING), \
-    H_AUTO_INCLUDE:   SH(T_CLOSURE) SH(T_STRING), \
-    H_FILE_ENCODING:  SH(T_CLOSURE) SH(T_STRING), \
-    H_DEFAULT_METHOD: SH(T_CLOSURE) SH(T_STRING), \
-    H_DEFAULT_PROMPT: SH(T_CLOSURE) SH(T_STRING), \
-    H_PRINT_PROMPT:   SH(T_CLOSURE) SH(T_STRING), \
-    H_REGEXP_PACKAGE: SH(T_NUMBER), \
-    H_MSG_DISCARDED:  SH(T_CLOSURE) SH(T_STRING), \
+    H_LOAD_UIDS:                SH(T_CLOSURE), \
+    H_CLONE_UIDS:               SH(T_CLOSURE), \
+    H_LWOBJECT_UIDS:            SH(T_CLOSURE), \
+    H_CREATE_SUPER:             SH(T_CLOSURE) SH(T_STRING), \
+    H_CREATE_OB:                SH(T_CLOSURE) SH(T_STRING), \
+    H_CREATE_CLONE:             SH(T_CLOSURE) SH(T_STRING), \
+    H_CREATE_LWOBJECT:          SH(T_CLOSURE) SH(T_STRING), \
+    H_CREATE_LWOBJECT_COPY:     SH(T_CLOSURE) SH(T_STRING), \
+    H_CREATE_LWOBJECT_RESTORE:  SH(T_CLOSURE) SH(T_STRING), \
+    H_RESET:                    SH(T_CLOSURE) SH(T_STRING), \
+    H_CLEAN_UP:                 SH(T_CLOSURE) SH(T_STRING), \
+    H_MODIFY_COMMAND:           SH(T_CLOSURE) SH(T_STRING) SH(T_MAPPING), \
+    H_NOTIFY_FAIL:              SH(T_CLOSURE) SH(T_STRING), \
+    H_NO_IPC_SLOT:                            SH(T_STRING), \
+    H_INCLUDE_DIRS:             SH(T_CLOSURE)              SH(T_POINTER), \
+    H_TELNET_NEG:               SH(T_CLOSURE) SH(T_STRING), \
+    H_NOECHO:                   SH(T_CLOSURE) SH(T_STRING), \
+    H_ERQ_STOP:                 SH(T_CLOSURE), \
+    H_MODIFY_COMMAND_FNAME:                   SH(T_STRING), \
+    H_COMMAND:                  SH(T_CLOSURE) SH(T_STRING), \
+    H_SEND_NOTIFY_FAIL:         SH(T_CLOSURE) SH(T_STRING), \
+    H_AUTO_INCLUDE:             SH(T_CLOSURE) SH(T_STRING), \
+    H_FILE_ENCODING:            SH(T_CLOSURE) SH(T_STRING), \
+    H_DEFAULT_METHOD:           SH(T_CLOSURE) SH(T_STRING), \
+    H_DEFAULT_PROMPT:           SH(T_CLOSURE) SH(T_STRING), \
+    H_PRINT_PROMPT:             SH(T_CLOSURE) SH(T_STRING), \
+    H_REGEXP_PACKAGE:                                       SH(T_NUMBER), \
+    H_MSG_DISCARDED:            SH(T_CLOSURE) SH(T_STRING), \
 
 #undef SH
 

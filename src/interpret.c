@@ -16164,7 +16164,7 @@ again:
              */
             inter_pc = pc;
 
-            int_call_lambda(ap, num_arg, MY_FALSE);
+            int_call_lambda(ap, num_arg, false, &current_object);
 
             pc = inter_pc;
             sp = inter_sp;
@@ -19799,7 +19799,7 @@ int_apply (string_t *fun, object_t *ob, int num_arg
             }
             else /* hook->type == T_CLOSURE */
             {
-                int_call_lambda(hook, num_arg+num_extra-1, MY_TRUE);
+                int_call_lambda(hook, num_arg+num_extra-1, true, &current_object);
                 rc = 1; /* This call obviously succeeds */
             }
 
@@ -20632,11 +20632,12 @@ assert_master_ob_loaded (void)
 
 /*-------------------------------------------------------------------------*/
 void
-int_call_lambda (svalue_t *lsvp, int num_arg, Bool external)
+int_call_lambda (svalue_t *lsvp, int num_arg, bool external, svalue_t *bind_ob)
 
 /* Call the closure <lsvp> with <num_arg> arguments on the stack. On
  * success, the arguments are replaced with the result, else an errorf()
- * is generated.
+ * is generated. If <lsvp> is an unbound lambda, use <bind_ob> as the
+ * corresponding object (or generate an error when NULL).
  *
  * If <external> is TRUE, the eval_instruction is called to execute the
  * closure. Otherwise inter_pc is just set and int_call_lambda returns
@@ -20872,13 +20873,13 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool external)
     case CLOSURE_UNBOUND_LAMBDA:
       if (lsvp->x.closure_type == CLOSURE_UNBOUND_LAMBDA)
       {
-          if (external)
+          if (!bind_ob)
               break;
 
           /* Internal call of an unbound closure.
            * Bind it on the fly.
            */
-          l->ob = current_object;
+          l->ob = *bind_ob;
       }
       /* FALLTHROUGH */
 
@@ -21144,13 +21145,15 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool external)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-secure_call_lambda (svalue_t *closure, int num_arg, Bool external)
+secure_call_lambda (svalue_t *closure, int num_arg, bool external, svalue_t *bind_ob)
 
 /* Aliases:
- *   secure_apply_lambda(fun, num_arg)
- *     == secure_call_lambda(fun, num_arg, FALSE)
+ *   secure_apply_lambda_ob(fun, num_arg, ob)
+ *     == secure_call_lambda(fun, num_arg, FALSE, ob)
  *   secure_callback_lambda(fun, num_arg)
- *     == secure_call_lambda(fun, num_arg, TRUE)
+ *     == secure_call_lambda(fun, num_arg, TRUE, current_object)
+ *   secure_callback_lambda_ob(fun, num_arg, ob)
+ *     == secure_call_lambda(fun, num_arg, TRUE, ob)
  *
  * Call the closure <closure> with <num_arg> arguments on the stack.
  * On success, the functions returns a pointer to the result in the
@@ -21163,6 +21166,9 @@ secure_call_lambda (svalue_t *closure, int num_arg, Bool external)
  * function call (clearing the eval costs before calling runtime_error()).
  *
  * This error recovery is the difference to call_lambda().
+ *
+ * If the closure is an unbound lambda, then it is executed in the
+ * context of <bind_ob>.
  */
 
 {
@@ -21186,7 +21192,7 @@ secure_call_lambda (svalue_t *closure, int num_arg, Bool external)
     {
         if (external)
             mark_start_evaluation();
-        call_lambda(closure, num_arg);
+        call_lambda_ob(closure, num_arg, bind_ob);
         transfer_svalue((result = &apply_return_value), inter_sp);
         inter_sp--;
         if (external)

@@ -18,8 +18,8 @@ DESCRIPTION
         possible to the player informing about the lost transmission.
 
         If the hook is a closure, it is the function to be called
-        and the result is used as the message to be sent. Lambda
-        closures are bound to the interactive <user> first.
+        and the result is used as the message to be sent. Unbound
+        lambda closures are bound to the interactive <user> first.
 
 HISTORY
         Introduced in LDMud 3.3.719

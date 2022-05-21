@@ -29,8 +29,8 @@ DESCRIPTION
         desired include file as first, and the name of the compiled
         LPC file as second argument. Result has to be the complete
         path name of the include file to use. Leading slashes may be
-        omitted. If the closure is a lambda closure, it is bound to
-        this_object() prior to execution.
+        omitted. If the closure is an unbound lambda closure, it is
+        bound to this_object() prior to execution.
 
 HISTORY
 

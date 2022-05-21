@@ -830,35 +830,30 @@ reset_object (object_t *ob, int arg, int num_arg)
 
     if (driver_hook[arg].type == T_CLOSURE)
     {
-        lambda_t *l;
-
         if (arg == H_RESET)
         {
             set_current_object(ob);
             previous_ob = current_object;
         }
 
-        l = driver_hook[arg].u.lambda;
-        if (l->function.code.num_arg && arg != H_RESET)
+        if (driver_hook[arg].x.closure_type != CLOSURE_UNBOUND_LAMBDA
+         || driver_hook[arg].u.lambda->function.code.num_arg)
         {
-            /* closure accepts arguments, presumably one, so
-             * give it the target object and bind to the current
-             * object.
+            /* closure accepts arguments, so give it the target object
+             * and if necessary bind to the current object.
              */
-            assign_current_object(&(l->ob), "reset_object");
 
             /* We need to insert the object before the other arguments. */
             inter_sp++;
             memmove(inter_sp - num_arg + 1, inter_sp - num_arg, num_arg * sizeof(*inter_sp));
             put_ref_object(inter_sp - num_arg, ob, "reset");
-            call_lambda(&driver_hook[arg], 1 + num_arg);
+            call_lambda_ob(&driver_hook[arg], 1 + num_arg, &current_object);
         }
         else
         {
-            /* no arguments, just bind to target */
-            free_svalue(&(l->ob));
-            put_ref_object(&(l->ob), ob, "reset_object");
-            call_lambda(&driver_hook[arg], 0);
+            /* No arguments, bind to target. */
+            svalue_t obsv = svalue_object(ob);
+            call_lambda_ob(&driver_hook[arg], 0, &obsv);
             inter_sp = pop_n_elems(num_arg, inter_sp);
         }
 
