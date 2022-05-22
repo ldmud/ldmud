@@ -680,6 +680,8 @@ internal_get_common_type(lpctype_t *t1, lpctype_t* t2, bool find_one)
     case TCLASS_OBJECT:
         if (t2->t_class != TCLASS_OBJECT)
             return NULL;
+        else if (t1->t_object.type != t2->t_object.type)
+            return NULL;
         else if (t1->t_object.program_name == NULL)
             return ref_lpctype(t2);
         else if (t2->t_object.program_name == NULL)
@@ -956,7 +958,8 @@ lpctype_contains (lpctype_t* src, lpctype_t* dest)
                 if (destbase->t_class == TCLASS_OBJECT)
                 {
                     if (srcbase == destbase
-                     || destbase->t_object.program_name == NULL) /* Matches any object */
+                     || (destbase->t_object.program_name == NULL  /* Matches any (lw)object */
+                      && destbase->t_object.type == srcbase->t_object.type))
                         found = true;
                 }
                 break;
