@@ -285,15 +285,16 @@ extern svalue_t *push_error_handler(void (*errorhandler)(error_handler_t *), err
 extern void *xalloc_with_error_handler(size_t size);
 
 extern void init_interpret(void);
+extern const char *sv_typename(svalue_t *val);
 extern const char *typename(int type);
 extern const char *efun_arg_typename (long type);
 extern void vefun_bad_arg (int arg, svalue_t *sp) NORETURN;
-extern void efun_gen_arg_error (int arg, int got, svalue_t *sp) NORETURN;
-extern void vefun_gen_arg_error (int arg, int got, svalue_t *sp) NORETURN;
-extern void efun_arg_error (int arg, int expected, int got, svalue_t *sp) NORETURN;
-extern void efun_exp_arg_error (int arg, long expected, int got, svalue_t *sp) NORETURN;
-extern void vefun_arg_error (int arg, int expected, int got, svalue_t *sp) NORETURN;
-extern void vefun_exp_arg_error (int arg, long expected, int got, svalue_t *sp) NORETURN;
+extern void efun_gen_arg_error (int arg, svalue_t *got, svalue_t *sp) NORETURN;
+extern void vefun_gen_arg_error (int arg, svalue_t *got, svalue_t *sp) NORETURN;
+extern void efun_arg_error (int arg, int expected, svalue_t *got, svalue_t *sp) NORETURN;
+extern void efun_exp_arg_error (int arg, long expected, svalue_t *got, svalue_t *sp) NORETURN;
+extern void vefun_arg_error (int arg, int expected, svalue_t *got, svalue_t *sp) NORETURN;
+extern void vefun_exp_arg_error (int arg, long expected, svalue_t *got, svalue_t *sp) NORETURN;
 extern Bool privilege_violation(string_t *what, svalue_t *arg, svalue_t *sp);
 extern Bool privilege_violation2(string_t *what, svalue_t *arg, svalue_t *arg2, svalue_t *sp);
 extern Bool privilege_violation4(string_t *what, svalue_t whom, string_t *how_str, int how_num, svalue_t *sp);

@@ -1078,6 +1078,9 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
         case T_CLOSURE:
         case T_COROUTINE:
         case T_LVALUE:
+#ifdef USE_PYTHON
+        case T_PYTHON:
+#endif
 swap_opaque:
             /* opaque swapped data must be prevented from recursive freeing */
             CHECK_SPACE(sizeof(*svp))
@@ -1238,6 +1241,9 @@ check_swapped_values (mp_int num, unsigned char * p)
         case T_CLOSURE:
         case T_COROUTINE:
         case T_LVALUE:
+#ifdef USE_PYTHON
+        case T_PYTHON:
+#endif
             p += sizeof sv.x;
             p += sizeof sv.u;
             break;
@@ -1402,6 +1408,9 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
         case T_CLOSURE:
         case T_COROUTINE:
         case T_LVALUE:
+#ifdef USE_PYTHON
+        case T_PYTHON:
+#endif
             p += sizeof sv.x;
             p += sizeof sv.u;
             fprintf(stderr, " opaque\n");
@@ -1591,6 +1600,9 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_NUMBER:
         case T_FLOAT:
         case T_LVALUE:
+#ifdef USE_PYTHON
+        case T_PYTHON:
+#endif
 advance:
             /* Opaque storage: skip it */
             p += 1 + sizeof svp->x + sizeof svp->u;
@@ -2105,6 +2117,9 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_CLOSURE:
         case T_COROUTINE:
         case T_LVALUE:
+#ifdef USE_PYTHON
+        case T_PYTHON:
+#endif
             memcpy(&svp->x, p, sizeof svp->x);
             p += sizeof svp->x;
             memcpy(&svp->u, p, sizeof svp->u);

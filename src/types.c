@@ -10,6 +10,7 @@
 #include "lwobject.h"
 #include "main.h"
 #include "object.h"
+#include "pkg-python.h"
 #include "types.h"
 #include "simulate.h"
 #include "structs.h"
@@ -352,6 +353,33 @@ get_lwobject_type (string_t *prog)
 } /* get_lwobject_type() */
 
 /*-------------------------------------------------------------------------*/
+#ifdef USE_PYTHON
+lpctype_t *
+get_python_type (int python_type_id)
+
+/* Create an lpctype_t for a Python type.
+ *
+ * Returns NULL when out of memory.
+ */
+
+{
+    lpctype_t *type = lookup_python_type(python_type_id);
+
+    if (type == NULL)
+    {
+        type = lpctype_new();
+        type->t_class = TCLASS_PYTHON;
+        type->t_python.type_id = python_type_id;
+        enter_python_type(python_type_id, type);
+    }
+
+    ref_lpctype(type);
+
+    return type;
+} /* get_python_type() */
+
+#endif
+/*-------------------------------------------------------------------------*/
 static void
 remove_object_type (lpctype_t *type)
 
@@ -686,6 +714,11 @@ internal_get_common_type(lpctype_t *t1, lpctype_t* t2, bool find_one)
         else
             return NULL;
 
+#ifdef USE_PYTHON
+    case TCLASS_PYTHON:
+        return NULL;
+#endif
+
     case TCLASS_ARRAY:
         if (t2->t_class != TCLASS_ARRAY)
             return NULL;
@@ -789,6 +822,12 @@ make_static_type (lpctype_t *src, lpctype_t *dest)
         add_object_type(dest);
         break;
 
+#ifdef USE_PYTHON
+    case TCLASS_PYTHON:
+        /* Can't happen, Python types are not part of internal types. */
+        break;
+#endif
+
     case TCLASS_ARRAY:
         src->t_array.element->array_of = dest;
         break;
@@ -870,6 +909,12 @@ _free_lpctype (lpctype_t *t)
         if (t->t_object.program_name)
             free_mstring(t->t_object.program_name);
         break;
+
+#ifdef USE_PYTHON
+    case TCLASS_PYTHON:
+        /* Nothing to do. */
+        break;
+#endif
 
     case TCLASS_ARRAY:
         t->t_array.element->array_of = NULL;
@@ -960,6 +1005,13 @@ lpctype_contains (lpctype_t* src, lpctype_t* dest)
                         found = true;
                 }
                 break;
+
+#ifdef USE_PYTHON
+            case TCLASS_PYTHON:
+                if (destbase == srcbase)
+                    found = true;
+                break;
+#endif
 
             case TCLASS_ARRAY:
                 if (destbase->t_class == TCLASS_ARRAY)
@@ -1132,6 +1184,11 @@ get_type_compat_int (lpctype_t *t)
         case TCLASS_OBJECT:
             return t->t_object.type == OBJECT_REGULAR ? COMPAT_TYPE_OBJECT : COMPAT_TYPE_LWOBJECT;
 
+#ifdef USE_PYTHON
+        case TCLASS_PYTHON:
+            return TYPE_ANY;
+#endif
+
         case TCLASS_ARRAY:
             return get_type_compat_int(t->t_array.element) | COMPAT_MOD_POINTER;
 
@@ -1214,6 +1271,11 @@ clear_lpctype_ref (lpctype_t *t)
             t->t_object.program_name->info.ref = 0;
         break;
 
+#ifdef USE_PYTHON
+    case TCLASS_PYTHON:
+        break;
+#endif
+
     case TCLASS_ARRAY:
         clear_lpctype_ref(t->t_array.element);
         break;
@@ -1275,6 +1337,11 @@ count_lpctype_ref (lpctype_t *t)
                     count_ref_from_string(t->t_object.program_name);
                 break;
 
+#ifdef USE_PYTHON
+            case TCLASS_PYTHON:
+                break;
+#endif
+
             case TCLASS_ARRAY:
                 count_lpctype_ref(t->t_array.element);
                 break;
@@ -1294,6 +1361,9 @@ count_lpctype_ref (lpctype_t *t)
         case TCLASS_PRIMARY:
         case TCLASS_STRUCT:
         case TCLASS_OBJECT:
+#ifdef USE_PYTHON
+        case TCLASS_PYTHON:
+#endif
             break; /* Nothing to do. */
 
         case TCLASS_ARRAY:

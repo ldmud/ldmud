@@ -19,6 +19,9 @@ typedef enum primary_types   primary_types_t;
 typedef enum object_types    object_types_t;
 typedef struct struct_info_s struct_info_t;
 typedef struct object_type_s object_type_t;
+#ifdef USE_PYTHON
+typedef struct python_type_s python_type_t;
+#endif
 typedef struct array_type_s  array_type_t;
 typedef struct union_type_s  union_type_t;
 typedef uint32               typeflags_t;
@@ -46,6 +49,9 @@ enum type_classes
     TCLASS_PRIMARY,
     TCLASS_STRUCT,
     TCLASS_OBJECT,
+#ifdef USE_PYTHON
+    TCLASS_PYTHON,
+#endif
     TCLASS_ARRAY,
     TCLASS_UNION
 };
@@ -111,6 +117,15 @@ struct object_type_s
      */
     object_types_t type;
 };
+
+#ifdef USE_PYTHON
+struct python_type_s
+{
+    /* Index into the Python type table.
+     */
+    int type_id;
+};
+#endif
 
 struct array_type_s
 {
@@ -180,6 +195,9 @@ struct lpctype_s
         primary_types_t  t_primary;     /* TCLASS_PRIMARY */
         struct_info_t    t_struct;      /* TCLASS_STRUCT */
         object_type_t    t_object;      /* TCLASS_OBJECT */
+#ifdef USE_PYTHON
+        python_type_t    t_python;      /* TCLASS_PYTHON */
+#endif
         array_type_t     t_array;       /* TCLASS_ARRAY */
         union_type_t     t_union;       /* TCLASS_UNION */
     };
@@ -262,6 +280,9 @@ extern lpctype_t _lpctype_int, _lpctype_string, _lpctype_bytes,
 extern lpctype_t *get_struct_type(struct_type_t* def);
 extern lpctype_t *get_object_type(string_t* prog);
 extern lpctype_t *get_lwobject_type(string_t* prog);
+#ifdef USE_PYTHON
+extern lpctype_t *get_python_type(int python_type_id);
+#endif
 extern lpctype_t *get_array_type(lpctype_t *element);
 extern lpctype_t *get_array_type_with_depth(lpctype_t *element, int depth);
 extern lpctype_t *get_union_type(lpctype_t *head, lpctype_t* member);

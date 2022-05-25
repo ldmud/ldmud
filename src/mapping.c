@@ -4323,9 +4323,9 @@ v_m_contains (svalue_t *sp, int num_arg)
     /* Test the arguments */
     for (i = -num_arg; ++i < -1; )
         if (sp[i].type != T_LVALUE)
-            vefun_arg_error(num_arg + i, T_LVALUE, sp[i].type, sp);
+            vefun_arg_error(num_arg + i, T_LVALUE, sp+i, sp);
     if (sp[-1].type != T_MAPPING)
-        vefun_arg_error(num_arg-1, T_MAPPING, sp[-1].type, sp);
+        vefun_arg_error(num_arg-1, T_MAPPING, sp-1, sp);
     if (sp[-1].u.map->num_values != num_arg - 2)
         errorf("Not enough lvalues: given %d, required %"PRIdPINT".\n",
                num_arg-2, sp[-1].u.map->num_values);
@@ -4531,7 +4531,7 @@ v_mkmapping (svalue_t *sp, int num_arg)
         for (i = -num_arg; ++i <= 0; )
         {
             if ( sp[i].type != T_POINTER )
-                vefun_arg_error(i+num_arg, T_POINTER, sp[i].type, sp);
+                vefun_arg_error(i+num_arg, T_POINTER, sp+i, sp);
             if (length > VEC_SIZE(sp[i].u.vec))
                 length = VEC_SIZE(sp[i].u.vec);
         }
@@ -4579,7 +4579,7 @@ v_mkmapping (svalue_t *sp, int num_arg)
     if (m == NULL)
     {
         fatal("Illegal argument to mkmapping(): %s, expected array/struct.\n"
-             , typename(sp[-num_arg+1].type));
+             , sv_typename(sp-num_arg+1));
     }
 
     /* Clean up the stack and push the result */
@@ -4660,7 +4660,7 @@ f_widthof (svalue_t *sp)
         return sp;
 
     if (sp->type != T_MAPPING)
-        efun_arg_error(1, T_MAPPING, sp->type, sp);
+        efun_arg_error(1, T_MAPPING, sp, sp);
 
     width = sp->u.map->num_values;
     free_mapping(sp->u.map);

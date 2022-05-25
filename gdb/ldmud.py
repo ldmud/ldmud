@@ -225,11 +225,12 @@ class SValuePrinter:
     T_BYTES                          = 0xc
     T_LWOBJECT                       = 0xd
     T_COROUTINE                      = 0xe
-    T_CALLBACK                       = 0xf
-    T_ERROR_HANDLER                  = 0x10
-    T_BREAK_ADDR                     = 0x11
-    T_ARG_FRAME                      = 0x12
-    T_NULL                           = 0x13
+    T_PYTHON                         = 0xf
+    T_CALLBACK                       = 0x10
+    T_ERROR_HANDLER                  = 0x11
+    T_BREAK_ADDR                     = 0x12
+    T_ARG_FRAME                      = 0x13
+    T_NULL                           = 0x14
 
     LVALUE_UNPROTECTED               = 0x00
     LVALUE_UNPROTECTED_CHAR          = 0x01
@@ -258,6 +259,7 @@ class SValuePrinter:
         T_BYTES:                          "T_BYTES",
         T_LWOBJECT:                       "T_LWOBJECT",
         T_COROUTINE:                      "T_COROUTINE",
+        T_PYTHON:                         "T_PYTHON",
         T_CALLBACK:                       "T_CALLBACK",
         T_ERROR_HANDLER:                  "T_ERROR_HANDLER",
         T_BREAK_ADDR:                     "T_BREAK_ADDR",
@@ -354,6 +356,8 @@ class SValuePrinter:
                     (".x.quotes", val["x"]["quotes"])]
         elif stype == self.T_STRUCT:
             return [(".u.strct", val["u"]["strct"])]
+        elif stype == self.T_PYTHON:
+            return [(".u.generic", val["u"]["generic"])]
         elif stype == self.T_CALLBACK:
             return [(".u.cb", val["u"]["cb"]),
                     (".x.extern_args", val["x"]["extern_args"])]
@@ -478,6 +482,7 @@ class TypePrinter:
     TCLASS_OBJECT     = 2
     TCLASS_ARRAY      = 3
     TCLASS_UNION      = 4
+    TCLASS_PYTHON     = 5
 
     TYPE_UNKNOWN      =  0
     TYPE_NUMBER       =  1
@@ -559,6 +564,10 @@ class TypePrinter:
                 tclass = int(union["t_class"])
             typestr += self.calc_name(union)
             return "<" + typestr + ">"
+
+        elif tclass == self.TCLASS_PYTHON:
+            return "python type %d" % (int(val["t_python"]["type_id"]),)
+
         else:
             return "lpctype_t with unknown class %d" % (tclass,)
 

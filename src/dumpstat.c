@@ -587,6 +587,14 @@ svalue_size (svalue_t *v, mp_int * pTotal)
 
         } /* switch */
 
+#ifdef USE_PYTHON
+    case T_PYTHON:
+        /* Difficult to determine the memory consumption of a Python object,
+         * so we don't do that here.
+         */
+        return 0;
+#endif
+
     default:
         fatal("Illegal type: %d\n", v->type);
     }

@@ -1615,7 +1615,7 @@ v_function_exists (svalue_t *sp, int num_arg)
          */
         if (argp[1].type != T_OBJECT && argp[1].type != T_LWOBJECT)
         {
-            errorf("Bad argument 2 to function_exists(): got %s, expected object.\n", typename(argp[1].type));
+            errorf("Bad argument 2 to function_exists(): got %s, expected object.\n", sv_typename(argp+1));
             /* NOTREACHED */
             return sp;
         }
@@ -2130,7 +2130,7 @@ v_variable_exists (svalue_t *sp, int num_arg)
         if (argp[1].type != T_OBJECT && argp[1].type != T_LWOBJECT)
         {
             errorf("Bad argument 2 to variable_exists(): "
-                  "got %s, expected object/lwobject.\n", typename(argp[1].type));
+                  "got %s, expected object/lwobject.\n", sv_typename(argp+1));
             /* NOTREACHED */
             return sp;
         }
@@ -4602,7 +4602,7 @@ v_present (svalue_t *sp, int num_arg)
             if (ob != NULL)
             {
                 /* Two objects? No way. */
-                vefun_arg_error(2, T_NUMBER, T_OBJECT, sp);
+                vefun_arg_error(2, T_NUMBER, arg+1, sp);
                 /* NOTREACHED */
                 return sp;
             }
@@ -4811,6 +4811,9 @@ e_say (svalue_t *v, vector_t *avoid)
     case T_POINTER:
     case T_MAPPING:
     case T_STRUCT:
+#ifdef USE_PYTHON
+    case T_PYTHON:
+#endif
         /* tell_room()'s evil twin: send <v> to all recipients' catch_msg() lfun */
 
         for (curr_recipient = recipients; NULL != (ob = *curr_recipient++) ; )
@@ -4832,7 +4835,7 @@ e_say (svalue_t *v, vector_t *avoid)
     default:
         errorf("Invalid argument to say(): expected '%s', got '%s'.\n"
               , efun_arg_typename(TF_POINTER|TF_MAPPING|TF_STRUCT|TF_STRING|TF_OBJECT|TF_LWOBJECT)
-              , typename(v->type));
+              , sv_typename(v));
     }
 
     /* Now send the message to all recipients */
@@ -5015,6 +5018,9 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     case T_POINTER:
     case T_MAPPING:
     case T_STRUCT:
+#ifdef USE_PYTHON
+    case T_PYTHON:
+#endif
       {
         /* say()s evil brother: send <v> to all recipients'
          * catch_msg() lfun
@@ -5042,7 +5048,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     default:
         errorf("Invalid argument to tell_room(): expected '%s', got '%s'.\n"
               , efun_arg_typename(TF_POINTER|TF_MAPPING|TF_STRUCT|TF_STRING|TF_OBJECT)
-              , typename(v->type));
+              , sv_typename(v));
     }
 
     /* Now send the message to all recipients */
@@ -5482,6 +5488,27 @@ static void register_svalue(svalue_t *);
 #define SAVE_OBJECT_BUFSIZE 4096
   /* Size of the read/write buffer.
    */
+
+#ifdef USE_PYTHON
+static struct python_ob_save_data_s
+{
+    struct python_ob_save_data_s *next;
+        /* Linked list of all save data. */
+
+    string_t *type_name;
+        /* String of the Python type name (not refcounted). */
+
+    svalue_t value;
+        /* Value that should be saved (refcounted). */
+
+} *python_ob_save_data = NULL;
+    /* Saving is done in two passes (register_svalue and save_svalue).
+     * We need to remember the actual data to save for a Python object.
+     * We create this data structure for each object and remember it
+     * in the .data field of the ptrtable record. It is kept in a linked
+     * list so we can free it.
+     */
+#endif
 
 static int save_version = -1;
   /* The version of the savefile to write.
@@ -6611,7 +6638,7 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
                             break;
 
                         default:
-                             fatal("(save_lvalue) Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                             fatal("(save_lvalue) Illegal type for range lvalue '%s'.\n", sv_typename(&(r->vec)));
                              break;
                     }
 
@@ -6761,7 +6788,7 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
                         break;
 
                     default:
-                         fatal("(save_lvalue) Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                         fatal("(save_lvalue) Illegal type for range lvalue '%s'.\n", sv_typename(&(r->vec)));
                          break;
                 }
 
@@ -6939,6 +6966,45 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         break;
       }
 
+#ifdef USE_PYTHON
+    case T_PYTHON:
+      {
+        struct python_ob_save_data_s *data;
+
+        if (recall_pointer(v->u.generic))
+            break;
+
+        data = lookup_pointer(ptable,v->u.generic)->data;
+        if (data != NULL)
+        {
+            MY_PUTC('(')
+            MY_PUTC('%')
+
+            save_string(data->type_name, -1, -1, false);
+
+            MY_PUTC(',')
+
+            save_svalue(&data->value, ',', MY_FALSE);
+
+            MY_PUTC('%')
+            MY_PUTC(')')
+        }
+        else if (writable)
+        {
+            rc = MY_FALSE;
+        }
+        else
+        {
+            L_PUTC_PROLOG
+            L_PUTC('0');
+            L_PUTC(delimiter);
+            L_PUTC_EPILOG
+        }
+
+        break;
+      }
+#endif
+
     case T_CLOSURE:
         if (save_version >= SAVE_FORMAT_CLOSURES)
         {
@@ -7110,6 +7176,68 @@ register_closure (svalue_t *cl)
     }
 } /* register_closure() */
 
+#ifdef USE_PYTHON
+/*-------------------------------------------------------------------------*/
+static void
+register_python_ob (svalue_t *svp)
+
+/* Register Python object <svp> in the pointer table. If it was not
+ * in there, get the type name and actual save data and store a pointer
+ * to it in the pointer table.
+ */
+
+{
+    struct pointer_record *record;
+    svalue_t val;
+    string_t *name;
+
+    assert(svp->type == T_PYTHON);
+
+    record = register_pointer(ptable, svp->u.generic);
+    if (record == NULL)
+        return;
+
+    if (save_python_ob(&val, &name, svp))
+    {
+        struct python_ob_save_data_s *data = xalloc(sizeof(struct python_ob_save_data_s));
+        if (data)
+        {
+            data->next = python_ob_save_data;
+            data->type_name = name;
+            data->value = val;
+            python_ob_save_data = data;
+
+            record->data = data;
+
+            register_svalue(&(data->value));
+        }
+        else
+        {
+            free_mstring(name);
+            free_svalue(&val);
+        }
+    }
+} /* register_python_ob() */
+
+/*-------------------------------------------------------------------------*/
+static void
+cleanup_python_save_data ()
+
+/* Free the save data for any Python object.
+ */
+
+{
+    while (python_ob_save_data != NULL)
+    {
+        struct python_ob_save_data_s *data = python_ob_save_data;
+        python_ob_save_data = python_ob_save_data->next;
+
+        free_svalue(&data->value);
+        xfree(data);
+    }
+} /* cleanup_python_save_data() */
+#endif
+
 /*-------------------------------------------------------------------------*/
 static void
 register_svalue (svalue_t *svp)
@@ -7228,6 +7356,13 @@ register_svalue (svalue_t *svp)
                 break;
             }
         } /* switch (v->x.lvalue_type) */
+        break;
+
+#ifdef USE_PYTHON
+      case T_PYTHON:
+        register_python_ob(svp);
+        break;
+#endif
     } /* switch() */
 } /* register_svalue() */
 
@@ -7327,7 +7462,7 @@ v_save_object (svalue_t *sp, int numarg)
         }
         else
         {
-            vefun_gen_arg_error(1, sp->type, sp);
+            vefun_gen_arg_error(1, sp, sp);
             /* NOTREACHED */
             return sp;
         }
@@ -7335,9 +7470,9 @@ v_save_object (svalue_t *sp, int numarg)
 
     case 2:
         if (sp[-1].type != T_STRING)
-            vefun_arg_error(1, T_STRING, sp[-1].type, sp);
+            vefun_arg_error(1, T_STRING, sp-1, sp);
         if (sp->type != T_NUMBER)
-            vefun_arg_error(2, T_NUMBER, sp->type, sp);
+            vefun_arg_error(2, T_NUMBER, sp, sp);
 
         file = get_txt(sp[-1].u.str);
 
@@ -7532,6 +7667,9 @@ v_save_object (svalue_t *sp, int numarg)
         save_svalue(v, '\n', MY_FALSE);
     }
 
+#ifdef USE_PYTHON
+    cleanup_python_save_data();
+#endif
     free_pointer_table(ptable);
     ptable = NULL;
 
@@ -7709,7 +7847,7 @@ v_save_value (svalue_t *sp, int numarg)
         }
         else
         {
-            vefun_gen_arg_error(2, sp->type, sp);
+            vefun_gen_arg_error(2, sp, sp);
             /* NOTREACHED */
             return sp;
         }
@@ -7779,6 +7917,9 @@ v_save_value (svalue_t *sp, int numarg)
         strbuf_store(&save_string_buffer, sp);
 
     /* Clean up */
+#ifdef USE_PYTHON
+    cleanup_python_save_data();
+#endif
     free_pointer_table(ptable);
     ptable = NULL;
 
@@ -7875,6 +8016,7 @@ skip_element (char **str)
             if (pt[1] == '{'
              || pt[1] == '<'
              || pt[1] == '*'
+             || pt[1] == '%'
                )
                 tsiz = restore_size(&tmp_par.str);
             else if (pt[1] == '[')
@@ -8238,6 +8380,9 @@ restore_size (char **str)
         case '}':  /* End of array */
         case '>':  /* End of struct */
         case '*':  /* End of lightweight object */
+#ifdef USE_PYTHON
+        case '%':  /* End of Python object */
+#endif
           {
             if (pt[1] != ')')
                 return -1;
@@ -9597,7 +9742,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         break;
       }
 
-    case '(': /* Unshared mapping, struct or array */
+    case '(': /* Unshared complex data structure. */
         *pt = cp+2;
         switch ( cp[1] )
         {
@@ -9634,6 +9779,42 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                 return false;
             break;
          }
+
+#ifdef USE_PYTHON
+        case '%':
+         {
+            /* Format: (%"name of the Python type",save value,%) */
+
+            svalue_t name, value;
+
+            if (!restore_svalue(&name, pt, ','))
+                return false;
+            if (name.type != T_STRING)
+            {
+                free_svalue(&name);
+                return false;
+            }
+
+            if (!restore_svalue(&value, pt, ','))
+            {
+                free_svalue(&name);
+                return false;
+            }
+
+            if (**pt != '%' || *++*pt != ')')
+            {
+                free_svalue(&name);
+                free_svalue(&value);
+                return false;
+            }
+
+            ++*pt;
+            *svp = const0;
+            if (!restore_python_ob(svp, name.u.str, &value))
+                return false;
+            break;
+         }
+#endif
 
         default:
             *svp = const0;

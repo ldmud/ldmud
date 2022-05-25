@@ -154,6 +154,10 @@ struct ident_s
     ident_t *inferior;       /* Ident of same name, but lower type */
     union {                  /* Type-depend data: */
         struct defn define;  /*   Macro definition */
+#ifdef USE_PYTHON
+        unsigned short python_type_id;
+                             /* Index into python_type_table. */
+#endif
         int code;            /*   Reserved word: lexem code */
         struct {             /*   Global identifier: */
             unsigned short function;
@@ -213,7 +217,10 @@ struct ident_s
 #define I_TYPE_GLOBAL     2  /* function, variable or efuns/simul_efuns */
 #define I_TYPE_LOCAL      3
 #define I_TYPE_RESWORD    4  /* reserved word */
-#define I_TYPE_DEFINE     5
+#ifdef USE_PYTHON
+#  define I_TYPE_PYTHON_TYPE 5
+#endif
+#define I_TYPE_DEFINE     6
 
 /* ident_t.global magic values */
 

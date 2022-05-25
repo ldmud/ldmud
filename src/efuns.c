@@ -121,6 +121,7 @@
 #include "mstrings.h"
 #include "object.h"
 #include "otable.h"
+#include "pkg-python.h"
 #include "prolang.h"
 #include "ptrtable.h"
 #include "random.h"
@@ -292,7 +293,7 @@ f_explode (svalue_t * sp)
     vector_t *v;
 
     if (sp[-1].type != sp[0].type)
-        efun_arg_error(2, sp[-1].type, sp[0].type, sp);
+        efun_arg_error(2, sp[-1].type, sp, sp);
 
     v = explode_string((sp-1)->u.str, sp->u.str);
     free_string_svalue(sp);
@@ -1548,7 +1549,7 @@ f_regreplace (svalue_t *sp)
 
             if (apply_return_value.type != T_STRING)
             {
-                errorf("Invalid type for replacement pattern: %s, expected string.\n", typename(apply_return_value.type));
+                errorf("Invalid type for replacement pattern: %s, expected string.\n", sv_typename(&apply_return_value));
                 /* NOTREACHED */
                 return NULL;
             }
@@ -1910,7 +1911,7 @@ find_string (svalue_t *sp, bool forward)
     pattern = sp[-1].u.str;
 
     if (sp[-2].type != sp[-1].type)
-        efun_arg_error(2, sp[-2].type, sp[-1].type, sp);
+        efun_arg_error(2, sp[-2].type, sp-1, sp);
 
     if ( 0 != (start = sp->u.number) )
     {
@@ -2478,7 +2479,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 
             if (cl && cl->type != T_STRING && cl->type != T_CLOSURE)
             {
-                errorf("(terminal_colour) Illegal type for default entry: %s, expected string or closure.\n", typename(cl->type));
+                errorf("(terminal_colour) Illegal type for default entry: %s, expected string or closure.\n", sv_typename(cl));
                 /* NOTREACHED */
                 return text;
             }
@@ -4572,7 +4573,7 @@ f_blueprint (svalue_t *sp)
     }
     else
     {
-        efun_gen_arg_error(1, sp->type, sp);
+        efun_gen_arg_error(1, sp, sp);
         /* NOTREACHED */
         return sp;
     }
@@ -4703,7 +4704,7 @@ v_clones (svalue_t *sp, int num_arg)
             }
             else
             {
-                vefun_exp_arg_error(1, TF_STRING|TF_OBJECT, sp->type, sp);
+                vefun_exp_arg_error(1, TF_STRING|TF_OBJECT, sp, sp);
                 /* NOTREACHED */
             }
         }
@@ -4878,7 +4879,7 @@ f_configure_object (svalue_t *sp)
         if (!ob)
             errorf("Default value for OC_COMMANDS_ENABLED is not supported.\n");
         if (sp->type != T_NUMBER)
-            efun_arg_error(2, T_NUMBER, sp->type, sp);
+            efun_arg_error(2, T_NUMBER, sp, sp);
 
         if (sp->u.number)
             ob->flags |= O_ENABLE_COMMANDS;
@@ -4890,7 +4891,7 @@ f_configure_object (svalue_t *sp)
         if (!ob)
             errorf("Default value for OC_HEART_BEAT is not supported.\n");
         if (sp->type != T_NUMBER)
-            efun_arg_error(2, T_NUMBER, sp->type, sp);
+            efun_arg_error(2, T_NUMBER, sp, sp);
 
         set_heart_beat(ob, sp->u.number != 0);
         break;
@@ -4902,7 +4903,7 @@ f_configure_object (svalue_t *sp)
         if (sp->type == T_NUMBER)
         {
             if (sp->u.number != 0)
-                efun_arg_error(2, T_STRING, sp->type, sp);
+                efun_arg_error(2, T_STRING, sp, sp);
 
             ob->eff_user = 0;
         }
@@ -4911,7 +4912,7 @@ f_configure_object (svalue_t *sp)
             ob->eff_user = add_name(sp->u.str);
         }
         else
-            efun_arg_error(2, T_STRING, sp->type, sp);
+            efun_arg_error(2, T_STRING, sp, sp);
 
         break;
     }
@@ -5322,7 +5323,7 @@ v_present_clone (svalue_t *sp, int num_arg)
             // and we don't accept two numbers (as second and third arg)
             if (arg[1].u.number == 0 || count != -1)
             {
-                vefun_arg_error(2, T_OBJECT, T_NUMBER, sp);
+                vefun_arg_error(2, T_OBJECT, arg+1, sp);
                 return sp; /* NOTREACHED */
             }
             count = arg[1].u.number;
@@ -5418,7 +5419,7 @@ v_present_clone (svalue_t *sp, int num_arg)
         name = arg->u.ob->load_name;
     }
     else
-        vefun_exp_arg_error(1, TF_STRING|TF_OBJECT, arg->type, sp);
+        vefun_exp_arg_error(1, TF_STRING|TF_OBJECT, arg, sp);
 
     obj = NULL;
     if (name)
@@ -5554,10 +5555,10 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
                     errorf("Bad argument to %s(): array[%d] is a '%s', "
                           "expected '%s'.\n"
                          , fname, (int)VEC_SIZE(argp->u.vec) - left + 1
-                         , typename(item->type)
-                         , typename(rvaluep->type));
+                         , sv_typename(item)
+                         , sv_typename(rvaluep));
                 else
-                    vefun_arg_error(num_arg - left + 1, rvaluep->type, item->type, sp);
+                    vefun_arg_error(num_arg - left + 1, rvaluep->type, item, sp);
                 /* NOTREACHED */
             }
 
@@ -5591,9 +5592,9 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
                     errorf("Bad argument to %s(): array[%d] is a '%s', "
                           "expected 'int' or 'float'.\n"
                          , fname, (int)VEC_SIZE(argp->u.vec) - left + 1
-                         , typename(item->type));
+                         , sv_typename(item));
                 else
-                    vefun_exp_arg_error(num_arg - left + 1, TF_NUMBER|TF_FLOAT, item->type, sp);
+                    vefun_exp_arg_error(num_arg - left + 1, TF_NUMBER|TF_FLOAT, item, sp);
                 /* NOTREACHED */
             }
 
@@ -5628,9 +5629,9 @@ x_min_max (svalue_t *sp, int num_arg, Bool bMax)
         if (gotArray)
             errorf("Bad argument to %s(): array[0] is a '%s', "
                   "expected 'string', 'bytes', 'int' or 'float'.\n"
-                 , fname, typename(rvaluep->type));
+                 , fname, sv_typename(rvaluep));
         else
-            vefun_exp_arg_error(1, TF_STRING|TF_BYTES|TF_NUMBER|TF_FLOAT, rvaluep->type, sp);
+            vefun_exp_arg_error(1, TF_STRING|TF_BYTES|TF_NUMBER|TF_FLOAT, rvaluep, sp);
         /* NOTREACHED */
     }
 
@@ -6144,7 +6145,7 @@ f_to_int (svalue_t *sp)
     switch(sp->type)
     {
     default:
-        fatal("Bad arg 1 to to_int(): type %s\n", typename(sp->type));
+        fatal("Bad arg 1 to to_int(): type %s\n", sv_typename(sp));
         break;
 
     case T_FLOAT:
@@ -6237,7 +6238,7 @@ f_to_float (svalue_t *sp)
     switch(sp->type)
     {
     default:
-        fatal("Bad arg 1 to to_float(): type %s\n", typename(sp->type));
+        fatal("Bad arg 1 to to_float(): type %s\n", sv_typename(sp));
         break;
 
     case T_NUMBER:
@@ -6287,7 +6288,7 @@ f_to_string (svalue_t *sp)
     switch(sp->type)
     {
     default:
-        errorf("Bad arg 1 to to_string(): type %s\n", typename(sp->type));
+        errorf("Bad arg 1 to to_string(): type %s\n", sv_typename(sp));
         break;
 
     case T_NUMBER:
@@ -6420,7 +6421,7 @@ f_to_array (svalue_t *sp)
     switch (sp->type)
     {
     default:
-        fatal("Bad arg 1 to to_array(): type %s\n", typename(sp->type));
+        fatal("Bad arg 1 to to_array(): type %s\n", sv_typename(sp));
         break;
     case T_STRING:
     case T_BYTES:
@@ -6593,7 +6594,7 @@ v_to_struct (svalue_t *sp, int num_arg)
     switch (argp->type)
     {
     default:
-        fatal("Bad arg 1 to to_struct(): type %s\n", typename(argp->type));
+        fatal("Bad arg 1 to to_struct(): type %s\n", sv_typename(argp));
         break;
 
     case T_POINTER:
@@ -6605,7 +6606,7 @@ v_to_struct (svalue_t *sp, int num_arg)
         {
             if (argp[1].type != T_STRUCT)
                 fatal("Bad arg 2 to to_struct(): type %s\n"
-                     , typename(argp[1].type));
+                     , sv_typename(argp+1));
 
             if (left > struct_size(argp[1].u.strct))
                 left = struct_size(argp[1].u.strct);
@@ -6666,7 +6667,7 @@ v_to_struct (svalue_t *sp, int num_arg)
 
             if (argp[1].type != T_STRUCT)
                 fatal("Bad arg 2 to to_struct(): type %s\n"
-                     , typename(argp[1].type));
+                     , sv_typename(argp+1));
 
             st = struct_new(argp[1].u.strct->type);
             push_struct(inter_sp, st);
@@ -6837,7 +6838,7 @@ v_to_struct (svalue_t *sp, int num_arg)
 
                 if (argp[1].type != T_STRUCT)
                     fatal("Bad arg 2 to to_struct(): type %s\n"
-                          , typename(argp[1].type));
+                          , sv_typename(argp+1));
 
                 // a template struct was given for conversion
                 // check if template is a base of the old struct or the old struct is
@@ -6975,7 +6976,7 @@ f_to_object (svalue_t *sp)
             return sp;
         /* FALLTHROUGH */
     default:
-        errorf("Bad arg 1 to to_object(): type %s\n", typename(sp->type));
+        errorf("Bad arg 1 to to_object(): type %s\n", sv_typename(sp));
         break;
 
     case T_CLOSURE:
@@ -7119,6 +7120,15 @@ f_copy (svalue_t *sp)
         }
         break;
       }
+#ifdef USE_PYTHON
+    case T_PYTHON:
+      {
+        svalue_t orig = *sp;
+        copy_python_ob(sp, &orig);
+        free_svalue(&orig);
+        break;
+      }
+#endif
     }
 
     return sp;
@@ -7648,6 +7658,11 @@ copy_svalue (svalue_t *dest, svalue_t *src
         else
             assign_svalue_no_free(dest, src);
         break;
+#ifdef USE_PYTHON
+    case T_PYTHON:
+        copy_python_ob(dest, src);
+        break;
+#endif
     } /* switch(src->type) */
 } /* copy_svalue() */
 
@@ -7858,6 +7873,9 @@ f_deep_copy (svalue_t *sp)
     case T_STRUCT:
     case T_MAPPING:
     case T_LVALUE:
+#ifdef USE_PYTHON
+    case T_PYTHON:
+#endif
       {
         ptable = push_new_pointer_table();
         if (!ptable)
@@ -8155,6 +8173,14 @@ v_get_type_info (svalue_t *sp, int num_arg)
             str = ref_mstring(struct_name(sp->u.strct));
         }
         break;
+#ifdef USE_PYTHON
+    case T_PYTHON:
+        {
+            ident_t *name = get_python_type_name(argp->x.python_type);
+            str = ref_mstring(name->name);
+            break;
+        }
+#endif
     }
 
     /* Depending on flag, return the proper value */
@@ -8247,12 +8273,12 @@ v_map (svalue_t *sp, int num_arg)
         if (num_arg > 3) {
             inter_sp = sp;
             errorf("Too many arguments to map(%s, mapping).\n",
-                   typename(arg[0].type));
+                   sv_typename(arg));
         }
         if (arg[2].type != T_NUMBER) {
             inter_sp = sp;
             errorf("Bad arg 3 to map(): got '%s', expected 'number'.\n",
-                   typename(arg[2].type));
+                   sv_typename(arg+2));
         }
         p_int num_values = arg[1].u.map->num_values;
         if (arg[2].u.number < 0 || arg[2].u.number >= num_values) {
@@ -8448,6 +8474,9 @@ v_member (svalue_t *sp, int num_arg)
             case T_COROUTINE:
             case T_POINTER:
             case T_STRUCT:
+#ifdef USE_PYTHON
+            case T_PYTHON:
+#endif
               {
                 svalue_t *entry;
                 short type = sp->type;
@@ -8469,7 +8498,7 @@ v_member (svalue_t *sp, int num_arg)
             default:
                 if (sp->type == T_LVALUE)
                     errorf("Reference passed to member()\n");
-                fatal("Bad type to member(): %s\n", typename(sp->type));
+                fatal("Bad type to member(): %s\n", sv_typename(sp));
             }
         } /* if (startpos in range) */
 
@@ -8494,7 +8523,7 @@ v_member (svalue_t *sp, int num_arg)
         ptrdiff_t i;
 
         if (sp->type != T_NUMBER)
-            efun_arg_error(2, T_NUMBER, sp->type, sp);
+            efun_arg_error(2, T_NUMBER, sp, sp);
         str = sp[-1].u.str;
 
         if (str->info.unicode == STRING_UTF8)
@@ -8575,7 +8604,7 @@ v_member (svalue_t *sp, int num_arg)
 
     /* Otherwise it's not searchable */
 
-    fatal("Bad arg 1 to member(): type %s\n", typename(sp[-1].type));
+    fatal("Bad arg 1 to member(): type %s\n", sv_typename(sp-1));
     return sp;
 } /* f_member() */
 
@@ -8758,6 +8787,9 @@ v_rmember (svalue_t *sp, int num_arg)
         case T_COROUTINE:
         case T_POINTER:
         case T_STRUCT:
+#ifdef USE_PYTHON
+        case T_PYTHON:
+#endif
           {
             svalue_t *entry;
             short type = sp->type;
@@ -8782,7 +8814,7 @@ v_rmember (svalue_t *sp, int num_arg)
         default:
             if (sp->type == T_LVALUE)
                 errorf("Reference passed to member()\n");
-            fatal("Bad type to member(): %s\n", typename(sp->type));
+            fatal("Bad type to member(): %s\n", sv_typename(sp));
         } /* if (startpos in range) */
 
         /* cnt is the correct result */
@@ -8801,7 +8833,7 @@ v_rmember (svalue_t *sp, int num_arg)
         ptrdiff_t i;
 
         if (sp->type != T_NUMBER)
-            efun_arg_error(2, T_NUMBER, sp->type, sp);
+            efun_arg_error(2, T_NUMBER, sp, sp);
         str = sp[-1].u.str;
 
         if (str->info.unicode == STRING_UTF8)
@@ -8896,7 +8928,7 @@ v_rmember (svalue_t *sp, int num_arg)
 
     /* Otherwise it's not searchable */
 
-    fatal("Bad arg 1 to rmember(): type %s\n", typename(sp[-1].type));
+    fatal("Bad arg 1 to rmember(): type %s\n", sv_typename(sp-1));
     return sp;
 } /* f_rmember() */
 
@@ -8932,7 +8964,7 @@ f_quote (svalue_t *sp)
         break;
 
     default:
-        efun_gen_arg_error(1, sp->type, sp);
+        efun_gen_arg_error(1, sp, sp);
         /* NOTREACHED */
     }
 
@@ -8967,7 +8999,7 @@ f_unquote (svalue_t *sp)
         break;
 
     default:
-        efun_gen_arg_error(1, sp->type, sp);
+        efun_gen_arg_error(1, sp, sp);
         /* NOTREACHED */
     }
 
@@ -9072,7 +9104,7 @@ f_reverse(svalue_t *sp)
             inter_sp = sp;
             errorf("Bad arg 1 to reverse(): got '%s &', "
                   "expected 'string/string &/mixed */mixed * &'.\n"
-                 , typename(data->type));
+                 , sv_typename(data));
             /* NOTREACHED */
             return sp;
         }
@@ -9330,7 +9362,7 @@ f_reverse(svalue_t *sp)
         inter_sp = sp;
         errorf("Bad arg 1 to reverse(): got '%s &', "
               "expected 'string/mixed */mixed * &'.\n"
-             , typename(sp->type));
+             , sv_typename(sp));
         /* NOTREACHED */
         return sp;
     }
@@ -9430,17 +9462,17 @@ f_configure_driver (svalue_t *sp)
             return sp; /* NOTREACHED */
         case DC_MEMORY_LIMIT:
             if (sp->type != T_POINTER)
-                efun_arg_error(2, T_POINTER, sp->type, sp);
+                efun_arg_error(2, T_POINTER, sp, sp);
             if (VEC_SIZE(sp->u.vec) != 2)
                 errorf("Bad arg 2 to configure_driver(): Invalid array size %"PRIdPINT
                        ", expected 2.\n"
                        , VEC_SIZE(sp->u.vec));
             if (sp->u.vec->item[0].type != T_NUMBER)
                 errorf("Bad arg 2 to configure_driver(): Element 0 is '%s', expected 'int'.\n"
-                       , typename(sp->u.vec->item[0].type));
+                       , sv_typename(sp->u.vec->item+0));
             if (sp->u.vec->item[1].type != T_NUMBER)
                 errorf("Bad arg 2 to configure_driver(): Element 1 is '%s', expected 'int'.\n"
-                       , typename(sp->u.vec->item[1].type));
+                       , sv_typename(sp->u.vec->item+1));
             if (!set_memory_limit(MALLOC_SOFT_LIMIT, sp->u.vec->item[0].u.number))
                 errorf("Could not set the soft memory limit (%"PRIdPINT") in configure_driver()\n",
                        sp->u.vec->item[0].u.number);
@@ -9451,13 +9483,13 @@ f_configure_driver (svalue_t *sp)
 
         case DC_ENABLE_HEART_BEATS:
             if (sp->type != T_NUMBER)
-                efun_arg_error(2, T_NUMBER, sp->type, sp);
+                efun_arg_error(2, T_NUMBER, sp, sp);
             heart_beats_enabled = sp->u.number != 0 ? MY_TRUE : MY_FALSE;
             break;
 
         case DC_LONG_EXEC_TIME:
             if (sp->type != T_NUMBER)
-                efun_arg_error(2, T_NUMBER, sp->type, sp);
+                efun_arg_error(2, T_NUMBER, sp, sp);
             if (!set_profiling_time_limit(sp->u.number))
                 errorf("Could not set the profiling time limit for long executions "
                        "(%"PRIdPINT") in configure_driver()\n",
@@ -9466,7 +9498,7 @@ f_configure_driver (svalue_t *sp)
 
         case DC_DATA_CLEAN_TIME:
             if (sp->type != T_NUMBER)
-                efun_arg_error(2, T_NUMBER, sp->type, sp);
+                efun_arg_error(2, T_NUMBER, sp, sp);
             if (sp->u.number > 0 && sp->u.number < PINT_MAX/9)
                 time_to_data_cleanup = sp->u.number;
             else
@@ -9478,7 +9510,7 @@ f_configure_driver (svalue_t *sp)
 #ifdef USE_TLS
         case DC_TLS_CERTIFICATE:
             if (sp->type != T_STRING)
-                efun_arg_error(2, T_STRING, sp->type, sp);
+                efun_arg_error(2, T_STRING, sp, sp);
             else
             {
                 int len = mstrsize(sp->u.str);
@@ -9562,7 +9594,7 @@ f_configure_driver (svalue_t *sp)
             }
             else
             {
-                vefun_exp_arg_error(1, TF_STRING|TF_NUMBER, sp->type, sp);
+                vefun_exp_arg_error(1, TF_STRING|TF_NUMBER, sp, sp);
             }
             break;
 
@@ -9593,7 +9625,7 @@ f_configure_driver (svalue_t *sp)
             }
             else
             {
-                vefun_exp_arg_error(1, TF_STRING|TF_NUMBER, sp->type, sp);
+                vefun_exp_arg_error(1, TF_STRING|TF_NUMBER, sp, sp);
             }
             break;
 
@@ -9601,25 +9633,25 @@ f_configure_driver (svalue_t *sp)
 
         case DC_EXTRA_WIZINFO_SIZE:
             if (sp->type != T_NUMBER)
-                efun_arg_error(2, T_NUMBER, sp->type, sp);
+                efun_arg_error(2, T_NUMBER, sp, sp);
             wiz_info_extra_size = sp->u.number;
             break;
 
         case DC_DEFAULT_RUNTIME_LIMITS:
             if (sp->type != T_POINTER)
-                efun_arg_error(2, T_POINTER, sp->type, sp);
+                efun_arg_error(2, T_POINTER, sp, sp);
             set_default_limits(sp->u.vec);
             break;
 
         case DC_SWAP_COMPACT_MODE:
             if (sp->type != T_NUMBER)
-                efun_arg_error(2, T_NUMBER, sp->type, sp);
+                efun_arg_error(2, T_NUMBER, sp, sp);
             swap_compact_mode = (sp->u.number != 0);
             break;
 
         case DC_SWAP_TIME:
             if (sp->type != T_NUMBER)
-                efun_arg_error(2, T_NUMBER, sp->type, sp);
+                efun_arg_error(2, T_NUMBER, sp, sp);
             if (sp->u.number < 0)
             {
                 errorf("Time to swap programs must be >= 0!\n");
@@ -9629,7 +9661,7 @@ f_configure_driver (svalue_t *sp)
 
         case DC_SWAP_VAR_TIME:
             if (sp->type != T_NUMBER)
-                efun_arg_error(2, T_NUMBER, sp->type, sp);
+                efun_arg_error(2, T_NUMBER, sp, sp);
             if (sp->u.number < 0)
             {
                 errorf("Time to swap variables must be >= 0!\n");
@@ -9639,7 +9671,7 @@ f_configure_driver (svalue_t *sp)
 
         case DC_CLEANUP_TIME:
             if (sp->type != T_NUMBER)
-                efun_arg_error(2, T_NUMBER, sp->type, sp);
+                efun_arg_error(2, T_NUMBER, sp, sp);
             if (sp->u.number < 0)
             {
                 errorf("Time to call cleanup hook must be >= 0!\n");
@@ -9649,7 +9681,7 @@ f_configure_driver (svalue_t *sp)
 
         case DC_RESET_TIME:
             if (sp->type != T_NUMBER)
-                efun_arg_error(2, T_NUMBER, sp->type, sp);
+                efun_arg_error(2, T_NUMBER, sp, sp);
             if (sp->u.number < 0)
             {
                 errorf("Time to call reset hook must be >= 0!\n");
@@ -9659,7 +9691,7 @@ f_configure_driver (svalue_t *sp)
 
         case DC_DEBUG_FILE:
             if (sp->type != T_STRING)
-                efun_arg_error(2, T_STRING, sp->type, sp);
+                efun_arg_error(2, T_STRING, sp, sp);
             else
             {
                 char *native = convert_path_to_native_or_throw(get_txt(sp->u.str), mstrsize(sp->u.str));
@@ -9672,7 +9704,7 @@ f_configure_driver (svalue_t *sp)
 
         case DC_FILESYSTEM_ENCODING:
             if (sp->type != T_STRING)
-                efun_arg_error(2, T_STRING, sp->type, sp);
+                efun_arg_error(2, T_STRING, sp, sp);
             else
             {
                 /* We do a quick check. */
@@ -9691,7 +9723,7 @@ f_configure_driver (svalue_t *sp)
         case DC_SIGACTION_SIGUSR1:
         case DC_SIGACTION_SIGUSR2:
             if (sp->type != T_NUMBER)
-                efun_arg_error(2, T_NUMBER, sp->type, sp);
+                efun_arg_error(2, T_NUMBER, sp, sp);
             else if (sp->u.number < 0 || sp->u.number > DCS_THROW_EXCEPTION)
                 errorf("Illegal value for signal action in configure_driver()\n");
             else
@@ -10551,7 +10583,7 @@ v_objects (svalue_t *sp, int num_arg)
         while (ob && --i >= 0) ob = ob->next_all;
     }
     else
-        vefun_exp_arg_error(1, TF_NUMBER | TF_OBJECT, arg[0].type, sp);
+        vefun_exp_arg_error(1, TF_NUMBER | TF_OBJECT, arg, sp);
 
     /* Get the number of objects in the result array. */
     if (num_arg != 2)
@@ -10565,7 +10597,7 @@ v_objects (svalue_t *sp, int num_arg)
                  , num);
     }
     else
-        vefun_exp_arg_error(2, TF_NUMBER, arg[1].type, sp);
+        vefun_exp_arg_error(2, TF_NUMBER, arg+1, sp);
 
     /* First count how many objects that will be. */
     count = 0;
@@ -11144,7 +11176,7 @@ v_strftime(svalue_t *sp, int num_arg)
             }
             else if (arg[0].type == T_NUMBER) {
                 if (num_arg>1) // bei > 1 argument nur strings erlaubt
-                    vefun_exp_arg_error(1, TF_STRING, sp->type, sp);
+                    vefun_exp_arg_error(1, TF_STRING, sp, sp);
                 else if (arg[0].u.number >= 0)
                     clk = arg[0].u.number;
                 else

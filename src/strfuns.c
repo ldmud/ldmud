@@ -2741,7 +2741,7 @@ x_map_string (svalue_t *sp, int num_arg)
                 if (v[column].type != T_NUMBER)
                 {
                     errorf("(map_string) Illegal value type: %s, expected int\n"
-                         , typename(v[column].type)
+                         , sv_typename(v+column)
                          );
                 }
 
@@ -2837,7 +2837,7 @@ x_map_string (svalue_t *sp, int num_arg)
                 if (v->type != T_NUMBER)
                 {
                     errorf("(map_string) Illegal value: %s, expected string\n"
-                         , typename(v->type)
+                         , sv_typename(v)
                          );
                 }
 

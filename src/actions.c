@@ -1853,7 +1853,7 @@ f_remove_action (svalue_t *sp)
     }
     else
     {
-        efun_gen_arg_error(1, sp[-1].type, sp);
+        efun_gen_arg_error(1, sp-1, sp);
         /* NOTREACHED */
     }
     
@@ -2144,7 +2144,7 @@ f_query_actions (svalue_t *sp)
     else
     {
         if (arg->type != T_STRING)
-            efun_arg_error(1, T_STRING, arg->type, sp);
+            efun_arg_error(1, T_STRING, arg, sp);
         ob = get_object(arg[0].u.str);
         if (!ob)
             errorf("query_actions() failed\n");
@@ -2157,7 +2157,7 @@ f_query_actions (svalue_t *sp)
         v = e_get_all_actions(ob, arg[1].u.number);
     else {
         if (arg[1].type != T_OBJECT)
-            efun_arg_error(2, T_OBJECT, arg[1].type, sp);
+            efun_arg_error(2, T_OBJECT, arg+1, sp);
         v = e_get_object_actions(ob, arg[1].u.ob);
     }
 
@@ -2350,7 +2350,7 @@ f_set_this_player (svalue_t *sp)
     }
 
     if (sp->type != T_OBJECT)
-        efun_arg_error(1, T_OBJECT, sp->type, sp);
+        efun_arg_error(1, T_OBJECT, sp, sp);
 
     ob = sp->u.ob;
     command_giver = ob;
@@ -2529,7 +2529,7 @@ f_living (svalue_t *sp)
 
     if (sp->type != T_OBJECT)
     {
-        efun_arg_error(1, T_OBJECT, sp->type, sp);
+        efun_arg_error(1, T_OBJECT, sp, sp);
         return sp;
     }
 

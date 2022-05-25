@@ -1,4 +1,4 @@
-import sys,unittest,gc
+import sys,unittest,gc,functools,random
 import ldmud
 
 class TestModule(unittest.TestCase):
@@ -970,11 +970,110 @@ def ob_destroyed(ob):
 def get_hook_info():
     return ldmud.Array((num_hb, ldmud.Array(ob_list),))
 
+# Create a distinct class for use in LPC
+class bigint(int):
+    def __efun_to_int__(self) -> int:
+        return int(self)
+
+    def __efun_to_string__(self) -> str:
+        return str(self)
+
+    def __save__(self):
+        return str(self)
+
+    @staticmethod
+    def __restore__(val):
+        return bigint(val)
+
+# Modify all operations to return bigint instead of int.
+for funname in ( '__add__', '__radd__', '__sub__', '__rsub__', '__mul__', '__rmul__', '__truediv__', '__rtruediv__', '__mod__', '__rmod__', '__lshift__', '__rlshift__', '__rshift__', '__rrshift__', '__and__', '__rand__', '__or__', '__ror__', '__xor__', '__rxor__',):
+    def get_replacement_fun(f):
+        @functools.wraps(f)
+        def replacement(self, other: (int, bigint)) -> bigint:
+            return bigint(f(self, other))
+        return replacement
+
+    fun = getattr(bigint, funname, None)
+    if fun:
+        setattr(bigint, funname, get_replacement_fun(fun))
+
+for funname in ( '__neg__', '__invert__',):
+    def get_replacement_fun(f):
+        @functools.wraps(f)
+        def replacement(self) -> bigint:
+            return bigint(f(self))
+        return replacement
+
+    fun = getattr(bigint, funname, None)
+    if fun:
+        setattr(bigint, funname, get_replacement_fun(fun))
+
+# Add reverse comparison functions (and annotations to the existing one).
+for funname, rfunname in (('__lt__','__rgt__',),('__le__','__rge__',),('__eq__','__req__',),('__ne__','__rne__',),('__gt__','__rlt__'),('__ge__','__rle__',),):
+    def get_replacement_fun(f):
+        @functools.wraps(f)
+        def replacement(self, other: (int, bigint)) -> bool:
+            return f(self, other)
+        return replacement
+
+    fun = getattr(bigint, funname, None)
+    if fun:
+        setattr(bigint, funname, get_replacement_fun(fun))
+        setattr(bigint, rfunname, get_replacement_fun(fun))
+
+# Efuns to create and read bigint.
+def to_bigint(i: int) -> bigint:
+    return bigint(i)
+
+class random_generator(random.Random):
+    # Implement call_strict() to call functions in this object.
+    def __efun_call_strict__(self, funname: str, *args):
+        if not funname.startswith("_") and hasattr(self, funname):
+            return getattr(self, funname)(*args)
+        raise AttributeError("Function %s() not found." % (funname,))
+
+def create_random_generator(seed: int = None) -> random_generator:
+    return random_generator(None if seed == 0 else seed)
+
+class box:
+    def __init__(self, val):
+        self.value = val
+
+    def get_value(self):
+        return self.value
+
+    def set_value(self, val):
+        self.value = val
+
+    def __efun_call_strict__(self, funname: str, *args):
+        if not funname.startswith("_") and hasattr(self, funname):
+            return getattr(self, funname)(*args)
+        raise AttributeError("Function %s() not found." % (funname,))
+
+    def __copy__(self):
+        return box(self.value)
+
+    def __save__(self):
+        return self.value
+
+    @staticmethod
+    def __restore__(val):
+        return box(val)
+
+def create_box(value) -> box:
+    return box(value)
+
 ldmud.register_hook(ldmud.ON_HEARTBEAT, hb_hook)
 ldmud.register_hook(ldmud.ON_OBJECT_CREATED, ob_created)
 ldmud.register_hook(ldmud.ON_OBJECT_DESTRUCTED, ob_destroyed)
 
 ldmud.register_efun("python_get_hook_info", get_hook_info)
+ldmud.register_type("bigint", bigint)
+ldmud.register_efun("to_bigint", to_bigint)
+ldmud.register_type("random_generator", random_generator)
+ldmud.register_efun("create_random_generator", create_random_generator)
+ldmud.register_type("box", box)
+ldmud.register_efun("create_box", create_box)
 
 # Test loading objects at startup
 early_ob = ldmud.Object("/testob")

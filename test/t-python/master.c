@@ -1,4 +1,5 @@
 #include "/inc/base.inc"
+#include "/inc/deep_eq.inc"
 #include "/inc/testarray.inc"
 #include "/inc/gc.inc"
 
@@ -169,6 +170,146 @@ void run_test()
             (:
                 unregister_abs();
                 return funcall(symbol_function("abs"),-10) == 10;
+            :)
+        }),
+        ({
+            "using python type 1 (bigint)", 0,
+            (:
+                bigint val = to_bigint(1000);
+
+                // Check that it's really a big integer.
+                if (sprintf("%Q", val << 1000) != "10715086071862673209484250490600018105614048117055336074437503883703510511249361224931983788156958581275946729175531468251871452856923140435984577574698574803934567774824230985421074605062371141877954182153046474983581941267398767559165543946077062914571196477686542167660429831652624386837205668069376000")
+                    return 0;
+
+                // Check comparisons.
+                if (val != 1000
+                 || val > 1000
+                 || val >= 1001
+                 || val < 1000
+                 || val <= 999
+                 || val == 1
+                 || 1000 != val
+                 || 1000 < val
+                 || 1001 <= val
+                 || 1000 > val
+                 || 999 >= val
+                 || 1 == val)
+                    return 0;
+
+                // Check arithmetics
+                if (val + 5 != 1005
+                 || val - 5 != 995
+                 || val * 5 != 5000
+                 || val / 5 != 200
+                 || val % 6 != 4
+                 || val << 2 != 4000
+                 || val >> 2 != 250
+                 || (val & 10) != 8
+                 || (val | 10) != 1002
+                 || (val ^ 10) != 994
+                 || 5 + val != 1005
+                 || 5 - val != -995
+                 || 5 * val != 5000
+                 || 5000 / val != 5
+                 || 5500 % val != 500
+                 || 2 >> val != 0
+                 || (10 & val) != 8
+                 || (10 | val) != 1002
+                 || (10 ^ val) != 994
+                 || -val != -1000
+                 || ~val != -1001)
+                    return 0;
+
+                // Check efun override
+                int i = to_int(val);
+                string s = to_string(val << 1000);
+                if (intp(val)
+                 || !intp(i)
+                 || i != 1000
+                 || s != "10715086071862673209484250490600018105614048117055336074437503883703510511249361224931983788156958581275946729175531468251871452856923140435984577574698574803934567774824230985421074605062371141877954182153046474983581941267398767559165543946077062914571196477686542167660429831652624386837205668069376000")
+                    return 0;
+
+                val <<= 1000;
+                bigint val2 = restore_value(save_value(val));
+                if (val != val2)
+                    return 0;
+
+                return 1;
+            :)
+        }),
+        ({
+            "using python type 2 (random_generator)", 0,
+            (:
+                random_generator r = create_random_generator();
+
+                if (r.randint(10,20) < 10
+                 || r.randint(10,20) > 20)
+                     return 0;
+
+                if (r.uniform(20,30) < 20
+                 || r.uniform(20,30) > 30)
+                     return 0;
+
+                string *elems = ({"A","B","C","D"});
+                r.shuffle(elems);
+
+                string elem = r.choice(elems);
+                if (sizeof(elem) != 1 || elem[0] < 'A' || elem[0] > 'D')
+                    return 0;
+                return 1;
+            :)
+        }),
+        ({
+            "using python type 3 (box)", 0,
+            (:
+                box b = create_box(100);
+                box c = copy(b);
+                box d = deep_copy(b);
+                box e = deep_copy(({b}))[0];
+
+                /* Check that the copy contains the data. */
+                if (b.get_value() != 100
+                 || c.get_value() != 100
+                 || d.get_value() != 100
+                 || e.get_value() != 100)
+                     return 0;
+
+                /* Check that these are independed objects. */
+                b.set_value(101);
+                c.set_value(102);
+                d.set_value(103);
+                e.set_value(104);
+
+                if (b.get_value() != 101
+                 || c.get_value() != 102
+                 || d.get_value() != 103
+                 || e.get_value() != 104)
+                    return 0;
+
+                /* Check that save/restore retains the values. */
+                c = restore_value(save_value(b));
+                d = restore_value(save_value(({b})))[0];
+                e = restore_value(save_value((["A":b])))["A"];
+
+                if (c.get_value() != 101
+                 || d.get_value() != 101
+                 || e.get_value() != 101)
+                    return 0;
+
+                /* And works with complex data structures. */
+                b.set_value(({20,30}));
+                c = restore_value(save_value(b));
+                if (!deep_eq(c.get_value(), ({20,30})))
+                    return 0;
+
+                mapping m = ([1:({2})]);
+                b.set_value(m);
+                <mapping|box>* x = restore_value(save_value(({b,m})));
+                if (x[0].get_value() != x[1]
+                 || !deep_eq(x[1],m))
+                    return 0;
+
+                return 1;
             :)
         }),
         ({

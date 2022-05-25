@@ -4761,7 +4761,7 @@ f_destruct (svalue_t * sp)
     if (T_NUMBER != sp->type || sp->u.number)
     {
         if (sp->type != T_OBJECT)
-            efun_arg_error(1, T_OBJECT, sp->type, sp);
+            efun_arg_error(1, T_OBJECT, sp, sp);
         destruct_object(sp);
     }
     free_svalue(sp);
@@ -5192,7 +5192,7 @@ default_test:
         if ( !((1 << sp->type) & hook_type_map[n]) )
         {
             errorf("Bad value for hook %"PRIdPINT": got %s, expected %s.\n"
-                 , n, typename(sp->type), efun_arg_typename(hook_type_map[n]));
+                 , n, sv_typename(sp), efun_arg_typename(hook_type_map[n]));
             break; /* flow control hint */
         }
 
@@ -5288,7 +5288,7 @@ set_single_limit ( struct limits_context_s * result
 
     if (svp->type != T_NUMBER)
         errorf("Illegal %s value: got a %s, expected a number\n"
-             , limitnames[limit], typename(svp[limit].type));
+             , limitnames[limit], sv_typename(svp+limit));
 
     val = svp->u.number;
 
@@ -5420,7 +5420,7 @@ extract_limits ( struct limits_context_s * result
 
             if (svp[i].type != T_NUMBER)
                 errorf("Illegal limit value: got a %s, expected a number\n"
-                     , typename(svp[i].type));
+                     , sv_typename(svp+i));
             limit = svp[i].u.number;
             if (limit < 0 || limit >= LIMIT_MAX)
                 errorf("Illegal limit tag: %"PRIdPINT"\n", limit);

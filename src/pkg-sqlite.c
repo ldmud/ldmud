@@ -391,7 +391,7 @@ v_sl_exec (svalue_t * sp, int num_arg)
             sqlite3_finalize(stmt);
             db->busy = false;
             errorf("Bad argument %d to sl_exec(): type %s\n",
-                num+1, typename(argp->type));
+                num+1, sv_typename(argp));
             break; /* NOTREACHED */
 
         case T_FLOAT:

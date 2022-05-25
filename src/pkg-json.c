@@ -372,7 +372,7 @@ ldmud_json_walker(svalue_t *key, svalue_t *val, void *parent)
     if (key->type != T_STRING)
     {
         errorf("json_serialize(): JSON supports only string keys, but got: %s\n",
-               typename(key->type));
+               sv_typename(key));
         /* NOTREACHED */
         return;
     }
@@ -537,7 +537,7 @@ ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key)
 
     default: /* those are unimplemented */
         errorf("json_serialize(): can't serialize LPC type %s\n",
-               typename(sp->type));
+               sv_typename(sp));
         break;
     }
     return jobj;

@@ -6546,7 +6546,7 @@ f_lambda (svalue_t *sp)
          * with the null-vector.
          */
         if (sp[-1].type != T_NUMBER || sp[-1].u.number)
-            efun_arg_error(1, T_POINTER, sp->type, sp);
+            efun_arg_error(1, T_POINTER, sp, sp);
         args = ref_array(&null_vector);
     }
     else
@@ -6629,7 +6629,7 @@ f_symbol_function (svalue_t *sp)
         /* Find resp. load the object by name */
         if (sp->type != T_STRING)
         {
-            efun_exp_arg_error(2, TF_STRING|TF_OBJECT|TF_LWOBJECT, sp->type, sp);
+            efun_exp_arg_error(2, TF_STRING|TF_OBJECT|TF_LWOBJECT, sp, sp);
             /* NOTREACHED */
             return sp;
         }
@@ -6772,7 +6772,7 @@ f_symbol_variable (svalue_t *sp)
     switch(sp->type)
     {
     default:
-        fatal("Bad arg 1 to symbol_variable(): type %s\n", typename(sp->type));
+        fatal("Bad arg 1 to symbol_variable(): type %s\n", sv_typename(sp));
         break;
 
     case T_NUMBER:  /* The index is given directly */
@@ -6918,7 +6918,7 @@ f_unbound_lambda (svalue_t *sp)
     if (sp[-1].type != T_POINTER)
     {
         if (sp[-1].type != T_NUMBER || sp[-1].u.number)
-            efun_gen_arg_error(1, sp->type, sp);
+            efun_gen_arg_error(1, sp, sp);
         args = ref_array(&null_vector);
     }
     else

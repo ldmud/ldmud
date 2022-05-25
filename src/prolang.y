@@ -1712,6 +1712,26 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
             }
         }
 
+#ifdef USE_PYTHON
+    case TCLASS_PYTHON:
+        {
+            ident_t *name = get_python_type_name(type->t_python.type_id);
+            size_t len = mstrsize(name->name);
+
+            if(len < bufsize)
+            {
+                memcpy(buf, get_txt(name->name), len);
+                buf[len] = 0;
+                return len;
+            }
+            else
+            {
+                buf[0] = '\0';
+                return 0;
+            }
+        }
+#endif
+
     case TCLASS_ARRAY:
         {
             size_t sublen;
@@ -2415,6 +2435,13 @@ binary_op_types_t types_division[] = {
     { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
+/* Operator type table for one's complement.
+ */
+unary_op_types_t types_complement[] = {
+    { &_lpctype_int,                            &_lpctype_int,     NULL                  },
+    { NULL, NULL, NULL }
+};
+
 /* Operator type table for the unary minus, increment and decrement operation.
  */
 unary_op_types_t types_unary_math[] = {
@@ -2447,12 +2474,20 @@ unary_op_types_t types_foreach_iteration[] = {
 
 /*-------------------------------------------------------------------------*/
 static lpctype_t*
+#ifdef USE_PYTHON
+check_unary_op_type (lpctype_t* t, const char* op_name, unary_op_types_t* type_table, enum python_operation python_op, lpctype_t *error_type)
+#else
 check_unary_op_type (lpctype_t* t, const char* op_name, unary_op_types_t* type_table, lpctype_t *error_type)
+#endif
 
 /* Checks the argument <t> against the possible combinations in type_table.
  * The result is the union of all result types of matching entries.
  * If there are no matching entries, a compile error is thrown
  * (unless <op_name> is NULL) and <error_type> is returned.
+ *
+#ifdef USE_PYTHON
+ * For any Python types the types for <python_op> will also be looked up.
+#endif
  */
 
 {
@@ -2501,6 +2536,27 @@ check_unary_op_type (lpctype_t* t, const char* op_name, unary_op_types_t* type_t
         free_lpctype(oldresult);
     }
 
+#ifdef USE_PYTHON
+    /* Check any python types within t for possible result types. */
+    if (python_op != PYTHON_OP_NONE)
+    {
+        void* cur;
+        for (lpctype_t *pytype = get_first_python_type(t, &cur);
+             pytype != NULL;
+             pytype = get_next_python_type(&cur))
+        {
+            python_type_operation_t py_op = get_python_operation(pytype->t_python.type_id, python_op);
+
+            if (py_op.returntype != NULL)
+            {
+                lpctype_t *oldresult = result;
+                result = get_union_type(result, py_op.returntype);
+                free_lpctype(oldresult);
+            }
+        }
+    }
+#endif
+
     if (result != NULL || op_name == NULL)
         return result;
 
@@ -2533,12 +2589,23 @@ check_unary_op_type (lpctype_t* t, const char* op_name, unary_op_types_t* type_t
 
 /*-------------------------------------------------------------------------*/
 static lpctype_t*
+#ifdef USE_PYTHON
+check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary_op_types_t* type_table, enum python_operation left_op, enum python_operation right_op, enum python_operation assign_op, lpctype_t *error_type, lpctype_t **rttc2, bool t2_literal)
+#else
 check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary_op_types_t* type_table, lpctype_t *error_type, lpctype_t **rttc2, bool t2_literal)
+#endif
 
 /* Checks the arguments <t1> and <t2> against the possible combinations
  * in type_table. The result is the union of all result types of
  * matching entries. If there are no matching entries, a compile error
  * is thrown (unless <op_name> is NULL) and <error_type> is returned.
+ *
+#ifdef USE_PYTHON
+ * For any Python types the types for <assign_op> will be looked up.
+ * If <assign_op> is either PYTHON_OP_NONE or not existent for the type,
+ * use <left_op> (for Python object on the left hand side) or <right_op>
+ * (for Python object on the right side).
+#endif
  *
  * If <rttc2> is not NULL a type suitable for a runtime type check on the
  * second argument is stored there (a union of all allowed types for the
@@ -2569,6 +2636,9 @@ check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary
     if (check_unknown_type(t2))
         t2 = lpctype_mixed;
 
+    /* Search for matching entries in the type table and collect
+     * return and rttc2 type.
+     */
     for (binary_op_types_t* entry = type_table; entry->t1; ++entry)
     {
         /* Is there any commonality between our first
@@ -2640,6 +2710,85 @@ check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary
         free_lpctype(oldresult);
     }
 
+#ifdef USE_PYTHON
+    /* Check any python types within t1 for additional options. */
+    if (left_op != PYTHON_OP_NONE || assign_op != PYTHON_OP_NONE)
+    {
+        void* cur;
+        for (lpctype_t *pytype = get_first_python_type(t1, &cur);
+             pytype != NULL;
+             pytype = get_next_python_type(&cur))
+        {
+            python_type_operation_t py_op;
+
+            /* If there is an assignment op, this has precedence. */
+            if (assign_op != PYTHON_OP_NONE)
+            {
+                py_op = get_python_operation(pytype->t_python.type_id, assign_op);
+                if (py_op.returntype == NULL && left_op != PYTHON_OP_NONE)
+                    py_op = get_python_operation(pytype->t_python.type_id, left_op);
+            }
+            else
+                py_op = get_python_operation(pytype->t_python.type_id, left_op);
+
+            if (py_op.returntype != NULL && py_op.argtype != NULL)
+            {
+                lpctype_t *m2 = get_common_type(py_op.argtype, t2);
+
+                t1_matched = MY_TRUE;
+                if (m2 != NULL)
+                {
+                    lpctype_t *oldresult = result;
+                    result = get_union_type(result, py_op.returntype);
+                    free_lpctype(oldresult);
+
+                    if (rttc2)
+                    {
+                        lpctype_t *oldrttc2 = *rttc2;
+                        *rttc2 = get_union_type(*rttc2, py_op.argtype);
+                        free_lpctype(oldrttc2);
+                    }
+
+                    free_lpctype(m2);
+                }
+            }
+        }
+    }
+
+    /* Check any python types within t2 for additional options... */
+    if (right_op != PYTHON_OP_NONE && assign_op == PYTHON_OP_NONE)
+    {
+        void* cur;
+        for (lpctype_t *pytype = get_first_python_type(t2, &cur);
+             pytype != NULL;
+             pytype = get_next_python_type(&cur))
+        {
+            python_type_operation_t py_op = get_python_operation(pytype->t_python.type_id, right_op);
+            if (py_op.returntype != NULL && py_op.argtype != NULL)
+            {
+                lpctype_t *m1 = get_common_type(py_op.argtype, t1);
+
+                if (m1 != NULL)
+                {
+                    lpctype_t *oldresult = result;
+                    result = get_union_type(result, py_op.returntype);
+                    free_lpctype(oldresult);
+
+                    if (rttc2)
+                    {
+                        lpctype_t *oldrttc2 = *rttc2;
+                        *rttc2 = get_union_type(*rttc2, pytype);
+                        free_lpctype(oldrttc2);
+                    }
+
+                    free_lpctype(m1);
+                }
+            }
+        }
+    }
+#endif
+
+    /* Check that all types of a literal is handled. */
     if (t2_literal)
     {
         if (!lpctype_contains(t2, *rttc2))
@@ -2651,6 +2800,7 @@ check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary
         free_lpctype(t2check);
     }
 
+    /* We got a result (everything is fine) or don't want an error message. */
     if (result != NULL || op_name == NULL)
         return result;
 
@@ -2698,6 +2848,35 @@ check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary
             free_lpctype(newexpected);
         }
 
+#ifdef USE_PYTHON
+        if (left_op != PYTHON_OP_NONE || assign_op != PYTHON_OP_NONE)
+        {
+            void* cur;
+            for (lpctype_t *pytype = get_first_python_type(t1, &cur);
+                 pytype != NULL;
+                 pytype = get_next_python_type(&cur))
+            {
+                python_type_operation_t py_op;
+
+                if (assign_op != PYTHON_OP_NONE)
+                {
+                    py_op = get_python_operation(pytype->t_python.type_id, assign_op);
+                    if (py_op.returntype == NULL && left_op != PYTHON_OP_NONE)
+                        py_op = get_python_operation(pytype->t_python.type_id, left_op);
+                }
+                else
+                    py_op = get_python_operation(pytype->t_python.type_id, left_op);
+
+                if (py_op.returntype != NULL && py_op.argtype != NULL)
+                {
+                    lpctype_t *oldexpected = expected;
+                    expected = get_union_type(expected, py_op.argtype);
+                    free_lpctype(oldexpected);
+                }
+            }
+        }
+#endif
+
         get_lpctype_name_buf(expected, expbuff, sizeof(expbuff));
         free_lpctype(expected);
 
@@ -2715,6 +2894,25 @@ check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary
             expected = get_union_type(expected, entry->t1);
             free_lpctype(oldexpected);
         }
+
+#ifdef USE_PYTHON
+        if (right_op != PYTHON_OP_NONE && assign_op == PYTHON_OP_NONE)
+        {
+            void* cur;
+            for (lpctype_t *pytype = get_first_python_type(t2, &cur);
+                 pytype != NULL;
+                 pytype = get_next_python_type(&cur))
+            {
+                python_type_operation_t py_op = get_python_operation(pytype->t_python.type_id, right_op);
+                if (py_op.returntype != NULL && py_op.argtype != NULL)
+                {
+                    lpctype_t *oldexpected = expected;
+                    expected = get_union_type(expected, py_op.argtype);
+                    free_lpctype(oldexpected);
+                }
+            }
+        }
+#endif
 
         get_lpctype_name_buf(expected, expbuff, sizeof(expbuff));
         free_lpctype(expected);
@@ -7711,6 +7909,9 @@ delete_prog_string (void)
 %token L_PRIVATE
 %token L_PROTECTED
 %token L_PUBLIC
+%ifdef USE_PYTHON
+%token L_PYTHON_TYPE
+%endif
 %token L_QUOTED_AGGREGATE
 %token L_RANGE
 %token L_RETURN
@@ -8083,6 +8284,9 @@ delete_prog_string (void)
 %type <number>       L_QUOTED_AGGREGATE
 %type <ident>        L_IDENTIFIER L_SIMUL_EFUN_CLOSURE
 %type <typeflags>    type_modifier type_modifier_list
+%ifdef USE_PYTHON
+%type <number>       L_PYTHON_TYPE
+%endif
 
 %type <number>       optional_stars
 %type <fulltype>     type non_void_type
@@ -9433,6 +9637,12 @@ single_basic_non_void_type:
       {
           $$ = $2;
       }
+%ifdef USE_PYTHON
+    | L_PYTHON_TYPE
+      {
+          $$ = get_python_type($1);
+      }
+%endif
 ; /* single_basic_non_void_type */
 
 
@@ -10761,7 +10971,11 @@ foreach:
                    * are only used when iterating over mappings and there we
                    * don't know the type anyway.
                    */
-                  lpctype_t *expected = check_unary_op_type($7.expr_type, "foreach", types_foreach_iteration, lpctype_mixed);
+                  lpctype_t *expected = check_unary_op_type($7.expr_type, "foreach", types_foreach_iteration,
+#ifdef USE_PYTHON
+                                            PYTHON_OP_NONE,
+#endif
+                                            lpctype_mixed);
                   if (!has_common_type(expected, lvtype))
                   {
                       char buf[512];
@@ -11738,6 +11952,9 @@ expr0:
           const char* op_name;
           binary_op_types_t* op_table = NULL;
           lpctype_t *rttc2 = NULL;
+%ifdef USE_PYTHON
+          enum python_operation python_left_op = PYTHON_OP_NONE, python_right_op = PYTHON_OP_NONE, python_assign_op = PYTHON_OP_NONE;
+%endif
 %line
           $$ = $4;
           $$.lvalue = (lvalue_block_t) {0, 0};
@@ -11778,56 +11995,111 @@ expr0:
               case F_ADD_EQ:
                   op_name = "+=";
                   op_table = types_add_assignment;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_ADD;
+                  python_right_op = PYTHON_OP_RADD;
+                  python_assign_op = PYTHON_OP_IADD;
+%endif
                   break;
 
               case F_SUB_EQ:
                   op_name = "-=";
                   op_table = types_sub_assignment;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_SUB;
+                  python_right_op = PYTHON_OP_RSUB;
+                  python_assign_op = PYTHON_OP_ISUB;
+%endif
                   break;
 
               case F_MULT_EQ:
                   op_name = "*=";
                   op_table = types_mul_assignment;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_MUL;
+                  python_right_op = PYTHON_OP_RMUL;
+                  python_assign_op = PYTHON_OP_IMUL;
+%endif
                   break;
 
               case F_DIV_EQ:
                   op_name = "/=";
                   op_table = types_div_assignment;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_DIV;
+                  python_right_op = PYTHON_OP_RDIV;
+                  python_assign_op = PYTHON_OP_IDIV;
+%endif
                   break;
 
               case F_MOD_EQ:
                   op_name = "%=";
                   op_table = types_modulus;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_MOD;
+                  python_right_op = PYTHON_OP_RMOD;
+                  python_assign_op = PYTHON_OP_IMOD;
+%endif
                   break;
 
               case F_AND_EQ:
                   op_name = "&=";
                   op_table = types_binary_and_assignment;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_AND;
+                  python_right_op = PYTHON_OP_RAND;
+                  python_assign_op = PYTHON_OP_IAND;
+%endif
                   break;
 
               case F_OR_EQ:
                   op_name = "|=";
                   op_table = types_binary_or_assignment;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_OR;
+                  python_right_op = PYTHON_OP_ROR;
+                  python_assign_op = PYTHON_OP_IOR;
+%endif
                   break;
 
               case F_XOR_EQ:
                   op_name = "^=";
                   op_table = types_binary_or_assignment;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_XOR;
+                  python_right_op = PYTHON_OP_RXOR;
+                  python_assign_op = PYTHON_OP_IXOR;
+%endif
                   break;
 
               case F_LSH_EQ:
                   op_name = "<<=";
                   op_table = types_shift;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_LSH;
+                  python_right_op = PYTHON_OP_RLSH;
+                  python_assign_op = PYTHON_OP_ILSH;
+%endif
                   break;
 
               case F_RSH_EQ:
                   op_name = ">>=";
                   op_table = types_shift;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_RSH;
+                  python_right_op = PYTHON_OP_RRSH;
+                  python_assign_op = PYTHON_OP_IRSH;
+%endif
                   break;
 
               case F_RSHL_EQ:
                   op_name = ">>>=";
                   op_table = types_shift;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_RSH;
+                  python_right_op = PYTHON_OP_RRSH;
+                  python_assign_op = PYTHON_OP_IRSH;
+%endif
                   break;
 
               default:
@@ -11842,8 +12114,12 @@ expr0:
                */
               restype = ref_fulltype(type1);
 
-              free_lpctype(check_binary_op_types(type1.t_type, type2.t_type, op_name, op_table, NULL,
-                pragma_rtt_checks ? &rttc2 : NULL, (type2.t_flags & TYPE_MOD_LITERAL) ? true : false));
+              free_lpctype(check_binary_op_types(type1.t_type, type2.t_type, op_name, op_table,
+%ifdef USE_PYTHON
+                            python_left_op, python_right_op, python_assign_op,
+%endif
+                            NULL, pragma_rtt_checks ? &rttc2 : NULL,
+                            (type2.t_flags & TYPE_MOD_LITERAL) ? true : false));
           }
           else
           {
@@ -12140,7 +12416,11 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '|' expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "|", types_binary_or, lpctype_mixed, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "|", types_binary_or,
+%ifdef USE_PYTHON
+                                PYTHON_OP_OR, PYTHON_OP_ROR, PYTHON_OP_NONE,
+%endif
+                                lpctype_mixed, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -12162,7 +12442,11 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '^' expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "^", types_binary_or, lpctype_mixed, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "^", types_binary_or,
+%ifdef USE_PYTHON
+                                PYTHON_OP_XOR, PYTHON_OP_RXOR, PYTHON_OP_NONE,
+%endif
+                                lpctype_mixed, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -12184,7 +12468,11 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '&' expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "&", types_binary_and, lpctype_mixed, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "&", types_binary_and,
+%ifdef USE_PYTHON
+                                PYTHON_OP_AND, PYTHON_OP_RAND, PYTHON_OP_NONE,
+%endif
+                                lpctype_mixed, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -12206,7 +12494,11 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_EQ expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, NULL, types_equality, NULL, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, NULL, types_equality,
+%ifdef USE_PYTHON
+                                PYTHON_OP_EQ, PYTHON_OP_REQ, PYTHON_OP_NONE,
+%endif
+                                NULL, NULL, false);
 
           if (result == NULL)
           {
@@ -12235,7 +12527,11 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_NE expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, NULL, types_equality, NULL, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, NULL, types_equality,
+%ifdef USE_PYTHON
+                                PYTHON_OP_NE, PYTHON_OP_RNE, PYTHON_OP_NONE,
+%endif
+                                NULL, NULL, false);
 
           if (result == NULL)
           {
@@ -12264,7 +12560,11 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 keyword_in expr0 %prec L_EQ
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "in", types_in, lpctype_int, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "in", types_in,
+%ifdef USE_PYTHON
+                                PYTHON_OP_NONE, PYTHON_OP_NONE, PYTHON_OP_NONE,
+%endif
+                                lpctype_int, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -12285,7 +12585,11 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '>'  expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, ">", types_comparison, lpctype_int, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, ">", types_comparison,
+%ifdef USE_PYTHON
+                                PYTHON_OP_GT, PYTHON_OP_RGT, PYTHON_OP_NONE,
+%endif
+                                lpctype_int, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -12305,7 +12609,11 @@ expr0:
       }
     | expr0 L_GE  expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, ">=", types_comparison, lpctype_int, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, ">=", types_comparison,
+%ifdef USE_PYTHON
+                                PYTHON_OP_GE, PYTHON_OP_RGE, PYTHON_OP_NONE,
+%endif
+                                lpctype_int, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -12325,7 +12633,11 @@ expr0:
       }
     | expr0 '<'  expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "<", types_comparison, lpctype_int, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "<", types_comparison,
+%ifdef USE_PYTHON
+                                PYTHON_OP_LT, PYTHON_OP_RLT, PYTHON_OP_NONE,
+%endif
+                                lpctype_int, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -12345,7 +12657,11 @@ expr0:
       }
     | expr0 L_LE  expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "<=", types_comparison, lpctype_int, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "<=", types_comparison,
+%ifdef USE_PYTHON
+                                PYTHON_OP_LE, PYTHON_OP_RLE, PYTHON_OP_NONE,
+%endif
+                                lpctype_int, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -12368,10 +12684,14 @@ expr0:
     | expr0 L_LSH expr0
       {
           /* Just check the types. */
-          free_lpctype(check_binary_op_types($1.type.t_type, $3.type.t_type, "<<", types_shift, NULL, NULL, false));
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "<<", types_shift,
+%ifdef USE_PYTHON
+                                PYTHON_OP_LSH, PYTHON_OP_RLSH, PYTHON_OP_NONE,
+%endif
+                                NULL, NULL, false);
 
           $$ = $1;
-          $$.type = get_fulltype(lpctype_int);
+          $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.needs_use = true;
@@ -12390,10 +12710,14 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_RSH expr0
       {
-          free_lpctype(check_binary_op_types($1.type.t_type, $3.type.t_type, ">>", types_shift, NULL, NULL, false));
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, ">>", types_shift,
+%ifdef USE_PYTHON
+                                PYTHON_OP_RSH, PYTHON_OP_RRSH, PYTHON_OP_NONE,
+%endif
+                                NULL, NULL, false);
 
           $$ = $1;
-          $$.type = get_fulltype(lpctype_int);
+          $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.needs_use = true;
@@ -12412,10 +12736,14 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_RSHL expr0
       {
-          free_lpctype(check_binary_op_types($1.type.t_type, $3.type.t_type, ">>>", types_shift, NULL, NULL, false));
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, ">>>", types_shift,
+%ifdef USE_PYTHON
+                                PYTHON_OP_RSH, PYTHON_OP_RRSH, PYTHON_OP_NONE,
+%endif
+                                NULL, NULL, false);
 
           $$ = $1;
-          $$.type = get_fulltype(lpctype_int);
+          $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.needs_use = true;
@@ -12521,7 +12849,11 @@ expr0:
           else
           {
               /* Just add */
-              lpctype_t *result = check_binary_op_types($1.type.t_type, $4.type.t_type, "+", types_addition, lpctype_mixed, NULL, false);
+              lpctype_t *result = check_binary_op_types($1.type.t_type, $4.type.t_type, "+", types_addition,
+%ifdef USE_PYTHON
+                                    PYTHON_OP_ADD, PYTHON_OP_RADD, PYTHON_OP_NONE,
+%endif
+                                    lpctype_mixed, NULL, false);
               $$.type = get_fulltype(result);
 
               ins_f_code(F_ADD);
@@ -12545,7 +12877,11 @@ expr0:
       {
 %line
           $$ = $1;
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "-", types_subtraction, lpctype_mixed, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "-", types_subtraction,
+%ifdef USE_PYTHON
+                                PYTHON_OP_SUB, PYTHON_OP_RSUB, PYTHON_OP_NONE,
+%endif
+                                lpctype_mixed, NULL, false);
           $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
@@ -12565,7 +12901,11 @@ expr0:
     | expr0 '*' expr0
       {
           $$ = $1;
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "*", types_multiplication, lpctype_mixed, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "*", types_multiplication,
+%ifdef USE_PYTHON
+                                PYTHON_OP_MUL, PYTHON_OP_RMUL, PYTHON_OP_NONE,
+%endif
+                                lpctype_mixed, NULL, false);
           $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
@@ -12585,7 +12925,11 @@ expr0:
     | expr0 '%' expr0
       {
           $$ = $1;
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "%", types_modulus, lpctype_int, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "%", types_modulus,
+%ifdef USE_PYTHON
+                                PYTHON_OP_MOD, PYTHON_OP_RMOD, PYTHON_OP_NONE,
+%endif
+                                lpctype_int, NULL, false);
           $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
@@ -12604,7 +12948,11 @@ expr0:
     | expr0 '/' expr0
       {
           $$ = $1;
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "/", types_division, lpctype_int, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "/", types_division,
+%ifdef USE_PYTHON
+                                PYTHON_OP_DIV, PYTHON_OP_RDIV, PYTHON_OP_NONE,
+%endif
+                                lpctype_int, NULL, false);
           $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
@@ -12795,13 +13143,14 @@ expr0:
     | '~' expr0
       {
 %line
-          $$ = $2;
-          if (!check_unknown_type($2.type.t_type)
-           && exact_types && !lpctype_contains(lpctype_int, $2.type.t_type))
-              fulltype_error("Bad argument to ~", $2.type);
-
           ins_f_code(F_COMPL);
-          $$.type = get_fulltype(lpctype_int);
+
+          $$ = $2;
+          $$.type = get_fulltype(check_unary_op_type($2.type.t_type, "~", types_complement,
+#ifdef USE_PYTHON
+                                    PYTHON_OP_INVERT,
+#endif
+                                    lpctype_mixed));
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.needs_use = true;
 
@@ -12842,7 +13191,11 @@ expr0:
           }
 
           $$ = $2;
-          $$.type = get_fulltype(check_unary_op_type($2.type.t_type, "unary '-'", types_unary_math, lpctype_mixed));
+          $$.type = get_fulltype(check_unary_op_type($2.type.t_type, "unary '-'", types_unary_math,
+#ifdef USE_PYTHON
+                                    PYTHON_OP_NEG,
+#endif
+                                    lpctype_mixed));
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.needs_use = true;
 
@@ -12863,7 +13216,11 @@ expr0:
           }
 
           /* Check the types */
-          $$.type = get_fulltype(check_unary_op_type($1.type, "++", types_unary_math, lpctype_mixed));
+          $$.type = get_fulltype(check_unary_op_type($1.type, "++", types_unary_math,
+#ifdef USE_PYTHON
+                                    PYTHON_OP_NONE,
+#endif
+                                    lpctype_mixed));
           $$.name = $1.name;
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.needs_use = false;
@@ -12885,7 +13242,11 @@ expr0:
           }
 
           /* Check the types */
-          $$.type = get_fulltype(check_unary_op_type($1.type, "--", types_unary_math, NULL));
+          $$.type = get_fulltype(check_unary_op_type($1.type, "--", types_unary_math,
+#ifdef USE_PYTHON
+                                    PYTHON_OP_NONE,
+#endif
+                                    NULL));
           $$.name = $1.name;
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.needs_use = false;
@@ -13745,7 +14106,11 @@ expr4:
           ins_f_code($2.rvalue_inst);
 
           /* Check the types */
-          $$.type = get_fulltype(check_unary_op_type($1.type.t_type, "range index", types_range_index, lpctype_mixed));
+          $$.type = get_fulltype(check_unary_op_type($1.type.t_type, "range index", types_range_index,
+#ifdef USE_PYTHON
+                                    PYTHON_OP_NONE,
+#endif
+                                    lpctype_mixed));
           $$.name = NULL;
           $$.needs_use = true;
 
@@ -14049,7 +14414,11 @@ lvalue:
           last_expression = -1;
 
           /* Compute and check the types */
-          $$.type = check_unary_op_type($1.type.t_type, "range index", types_range_index, lpctype_mixed);
+          $$.type = check_unary_op_type($1.type.t_type, "range index", types_range_index,
+#ifdef USE_PYTHON
+                            PYTHON_OP_NONE,
+#endif
+                            lpctype_mixed);
 
           if (exact_types && !lpctype_contains(lpctype_int, $2.type1.t_type))
               fulltype_error("Bad type of index", $2.type1);
@@ -15783,6 +16152,9 @@ function_call:
                   PREPARE_INSERT(8)
 
                   fulltype_t *argp;
+%ifdef USE_PYTHON
+                  lpctype_t *first_aargp;
+%endif
                   int min, max, def, num_arg;
                   int f2;
 
@@ -15808,6 +16180,9 @@ function_call:
                              , instrs[f].name, instrs[f].deprecated);
 
                   num_arg = $4;
+%ifdef USE_PYTHON
+                  first_aargp = num_arg > 0 ? get_argument_types_start(num_arg)->t_type : NULL;
+%endif
 
                   /* Check and/or complete number of arguments */
                   if (def && num_arg == min-1 && !has_ellipsis)
@@ -15866,6 +16241,14 @@ function_call:
                                   if ( argp->t_type == NULL )
                                   {
                                       /* Possible types for this arg exhausted */
+
+%ifdef USE_PYTHON
+                                      /* Check for python type efun overrides. */
+                                      if (is_valid_arg_for_python_type_efun(first_aargp, f, argn + 1, aargp->t_type))
+                                        break;
+%endif
+
+                                      /* Nothing matched... */
                                       efun_argument_error(argn+1, f, beginArgp
                                                          , *aargp);
                                       break;
@@ -15929,6 +16312,10 @@ function_call:
                       add_f_code(F_CONST0);
                       CURRENT_PROGRAM_SIZE++;
                   }
+%ifdef USE_PYTHON
+                  else
+                      $$.type.t_type = add_result_for_python_type_efun(first_aargp, f, $$.type.t_type);
+%endif
                   $$.might_lvalue = instrs[f].might_return_lvalue;
               } /* efun */
 
@@ -16258,7 +16645,11 @@ function_call:
 
               if (!check_unknown_type($1.type.t_type)
                && !has_common_type(lpctype_string_object_lwobject, $1.type.t_type)
-               && !has_common_type(lpctype_string_object_lwobject_array, $1.type.t_type))
+               && !has_common_type(lpctype_string_object_lwobject_array, $1.type.t_type)
+#ifdef USE_PYTHON
+               && !is_valid_arg_for_python_type_efun($1.type.t_type, call_instr, 2, lpctype_string)
+#endif
+              )
               {
                   efun_argument_error(1, call_instr, efun_arg_types + instrs[call_instr].arg_index, $1.type);
               }

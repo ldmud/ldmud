@@ -6372,6 +6372,13 @@ yylex1 (void)
                             yyp=outp;
                             continue;
 
+#ifdef USE_PYTHON
+                        case I_TYPE_PYTHON_TYPE:
+                            outp = yyp;
+                            yylval.number = p->u.python_type_id;
+                            return L_PYTHON_TYPE;
+#endif
+
                         case I_TYPE_RESWORD:
                             outp = yyp;
                             return p->u.code;

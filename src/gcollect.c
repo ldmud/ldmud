@@ -3119,6 +3119,14 @@ show_array(int d, void *block, int depth)
             show_coroutine(d, (char *)svp->u.coroutine, 1);
             break;
 
+#ifdef USE_PYTHON
+        case T_PYTHON:
+            WRITES(d, "Python object 0x");
+            write_x(d, (p_uint)(svp->u.generic));
+            WRITES(d, "\n");
+            break;
+#endif
+
         default:
             WRITES(d, "Svalue type ");writed(d, svp->type);WRITES(d, "\n");
             break;
@@ -3252,6 +3260,14 @@ show_struct(int d, void *block, int depth)
         case T_COROUTINE:
             show_coroutine(d, (char *)svp->u.coroutine, 1);
             break;
+
+#ifdef USE_PYTHON
+        case T_PYTHON:
+            WRITES(d, "Python object 0x");
+            write_x(d, (p_uint)(svp->u.generic));
+            WRITES(d, "\n");
+            break;
+#endif
 
         default:
             WRITES(d, "Svalue type ");writed(d, svp->type);WRITES(d, "\n");

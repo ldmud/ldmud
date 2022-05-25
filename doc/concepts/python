@@ -44,6 +44,23 @@ LDMUD MODULE
                 already compiled code will produce errors when
                 calling this efun.
 
+          - register_type(name, class) -> None
+                Registers a type for use in LPC. This is not allowed
+                during compilation of an LPC object.
+
+                The type name will then be regarded as a reserved word
+                when compiling LPC code and can be used as a regular
+                LPC type. To actually create objects of the types,
+                additional registration of corresponding efuns is needed.
+
+                For details about the usage, see PYTHON TYPES below.
+
+          - unregister_type(name) -> None
+                Removes a python type from registration. This is not
+                allowed during compilation of an LPC object. The removal
+                will only affect newly compiled code. Already compiled
+                code will still work afterwards.
+
           - register_socket(fd, function [,eventmask]) -> None
                 Registers a socket <fd> to watch for events (like
                 poll/select). The socket must be either given as
@@ -299,6 +316,55 @@ LDMUD MODULE
         following mappings are done:
             void   <-> None
             union  <-> tuple of types
+
+PYTHON TYPES
+        Without any special functions Python types are treated opaque in LPC.
+        There is no introspection available, beside what get_type_info()
+        returns, and there is no facility to create those in LPC. Python
+        objects need to be created and processed by a registered Python efun.
+        But those types can be extended with special functions to make them
+        more usable in LPC.
+
+        Regular LPC operations can be applied to those python objects and
+        will call the corresponding special member functions. If those
+        member functions are not available, the corresponding LPC operations
+        aren't either. For compile time type checking those special member
+        functions can have type annotations just like efun functions.
+        The following operations are supported:
+            +, -, *, /, %, <<, >>, &, |, ^, >, >=, ==, !=, <, <=.
+        For each operation the lhs function (i.e. __add__), the rhs function
+        (i.e. __radd__), and the assignment function (i.e. __iadd__) is
+        supported. The rhs function is also supported for the comparison
+        operations (i.e. __rlt__, this is a non-standard extension to the
+        Python functions).
+
+        Python objects can also extend regular efuns. When the first argument
+        to an efun is a Python object, a function named __efun_<name>__ is
+        called in the Python object instead (when available). The function
+        must accept the same number of arguments as the original efun. (And
+        there must not be a registered Python efun of the same name.)
+
+        Additionally a Python type can implement the following support
+        functions for LPC efuns:
+
+            __repr__
+                Used by sprintf() for printing a Python object.
+                Should return a string.
+
+            __copy__
+                Used by copy() and deep_copy() for copying a Python object.
+                (Deep copying a Python object is currently not supported.)
+                Should return a Python object of the same type.
+
+            __save__
+                Used by save_value()/save_object() to save a Python object.
+                Should return an LPC type (e.g. a string).
+
+            __restore__
+                Used by restore_value()/restore_object() to restore a Python
+                object. This should be a static method that gets the value
+                from __save__ as the only argument and will return the
+                restored object.
 
 EXAMPLE
         import ldmud

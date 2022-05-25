@@ -6041,7 +6041,7 @@ f_send_erq (svalue_t *sp)
             {
                 xfree(arg);
                 errorf("Bad arg 2 to send_erq(): got %s*, "
-                      "expected string/int*.\n", typename(svp[-1].type));
+                      "expected string/int*.\n", sv_typename(svp-1));
                 /* NOTREACHED */
                 return sp;
             }
@@ -6700,7 +6700,7 @@ f_send_udp (svalue_t *sp)
                 if (item == NULL || item->type != T_NUMBER)
                 {
                     errorf("Bad arg 3 to send_udp(): got %s*, "
-                          "expected string/int*.\n", typename(svp[-1].type));
+                          "expected string/int*.\n", sv_typename(svp-1));
                     /* NOTREACHED */
                     return sp;
                 }
@@ -6850,7 +6850,7 @@ f_binary_message (svalue_t *sp)
             {
                 free_mstring(msg);
                 errorf("Bad arg 1 to binary_message(): got %s*, "
-                      "expected string/int*.\n", typename(svp->type));
+                      "expected string/int*.\n", sv_typename(svp));
                 /* NOTREACHED */
                 return sp;
             }
@@ -8479,7 +8479,7 @@ f_configure_interactive (svalue_t *sp)
             int max;
 
             if (sp->type != T_NUMBER)
-                efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+                efun_exp_arg_error(3, TF_NUMBER, sp, sp);
 
             max = sp->u.number;
             if (max < 0)
@@ -8496,7 +8496,7 @@ f_configure_interactive (svalue_t *sp)
         if (!ip)
             errorf("Default value for IC_SOCKET_BUFFER_SIZE is not supported.\n");
         if (sp->type != T_NUMBER)
-            efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+            efun_exp_arg_error(3, TF_NUMBER, sp, sp);
 #ifdef SO_SNDBUF
         {
             int size = sp->u.number;
@@ -8512,7 +8512,7 @@ f_configure_interactive (svalue_t *sp)
         {
             case T_NUMBER:
                 if (sp->u.number != 0)
-                    efun_exp_arg_error(3, TF_STRING, sp->type, sp);
+                    efun_exp_arg_error(3, TF_STRING, sp, sp);
                 set_default_combine_charset(ip->combine_cset);
                 break;
 
@@ -8521,7 +8521,7 @@ f_configure_interactive (svalue_t *sp)
                 break;
 
             default:
-                efun_exp_arg_error(3, TF_STRING, sp->type, sp);
+                efun_exp_arg_error(3, TF_STRING, sp, sp);
         }
 
         /* Never combine \n or \0. */
@@ -8536,7 +8536,7 @@ f_configure_interactive (svalue_t *sp)
         {
             case T_NUMBER:
                 if (sp->u.number != 0)
-                    efun_exp_arg_error(3, TF_POINTER, sp->type, sp);
+                    efun_exp_arg_error(3, TF_POINTER, sp, sp);
                 set_default_combine_charset(ip->combine_cset);
                 break;
 
@@ -8545,7 +8545,7 @@ f_configure_interactive (svalue_t *sp)
                 break;
 
             default:
-                efun_exp_arg_error(3, TF_POINTER, sp->type, sp);
+                efun_exp_arg_error(3, TF_POINTER, sp, sp);
         }
 
         /* Never combine \n or \0. */
@@ -8560,7 +8560,7 @@ f_configure_interactive (svalue_t *sp)
         {
             case T_NUMBER:
                 if (sp->u.number != 0)
-                    efun_exp_arg_error(3, TF_STRING, sp->type, sp);
+                    efun_exp_arg_error(3, TF_STRING, sp, sp);
                 set_default_conn_charset(ip->charset);
                 break;
 
@@ -8569,7 +8569,7 @@ f_configure_interactive (svalue_t *sp)
                 break;
 
             default:
-                efun_exp_arg_error(3, TF_STRING, sp->type, sp);
+                efun_exp_arg_error(3, TF_STRING, sp, sp);
         }
         break;
 
@@ -8580,7 +8580,7 @@ f_configure_interactive (svalue_t *sp)
         {
             case T_NUMBER:
                 if (sp->u.number != 0)
-                    efun_exp_arg_error(3, TF_POINTER, sp->type, sp);
+                    efun_exp_arg_error(3, TF_POINTER, sp, sp);
                 set_default_conn_charset(ip->charset);
                 break;
 
@@ -8589,7 +8589,7 @@ f_configure_interactive (svalue_t *sp)
                 break;
 
             default:
-                efun_exp_arg_error(3, TF_POINTER, sp->type, sp);
+                efun_exp_arg_error(3, TF_POINTER, sp, sp);
         }
         break;
 
@@ -8598,7 +8598,7 @@ f_configure_interactive (svalue_t *sp)
             errorf("Default value for IC_QUOTE_IAC is not supported.\n");
 
         if (sp->type != T_NUMBER)
-            efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+            efun_exp_arg_error(3, TF_NUMBER, sp, sp);
 
         ip->quote_iac = (char)sp->u.number;
         break;
@@ -8608,7 +8608,7 @@ f_configure_interactive (svalue_t *sp)
             errorf("Default value for IC_TELNET_ENABLED is not supported.\n");
 
         if (sp->type != T_NUMBER)
-            efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+            efun_exp_arg_error(3, TF_NUMBER, sp, sp);
 
         ip->tn_enabled = (sp->u.number != 0);
         break;
@@ -8619,7 +8619,7 @@ f_configure_interactive (svalue_t *sp)
             errorf("Default value for IC_MCCP is not supported.\n");
 
         if (sp->type != T_NUMBER)
-            efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+            efun_exp_arg_error(3, TF_NUMBER, sp, sp);
         else if(sp->u.number == 0)
         {
             /* Deactivating MCCP */
@@ -8657,7 +8657,7 @@ f_configure_interactive (svalue_t *sp)
             errorf("Default value for IC_PROMPT is not supported.\n");
 
         if (sp->type != T_STRING && sp->type != T_CLOSURE)
-            efun_exp_arg_error(3, TF_STRING|TF_CLOSURE, sp->type, sp);
+            efun_exp_arg_error(3, TF_STRING|TF_CLOSURE, sp, sp);
 
         if (sp->type == T_CLOSURE && sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA)
             errorf("Bad arg 3 for configure_interactive with IC_PROMPT: lambda closure not bound\n");
@@ -8684,7 +8684,7 @@ f_configure_interactive (svalue_t *sp)
             errorf("Default value for IC_MAX_COMMANDS is not supported.\n");
 
         if (sp->type != T_NUMBER)
-            efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+            efun_exp_arg_error(3, TF_NUMBER, sp, sp);
 
         if (sp->u.number < 0)
             ip->maxNumCmds = -1;
@@ -8697,7 +8697,7 @@ f_configure_interactive (svalue_t *sp)
             errorf("Default value for IC_MODIFY_COMMAND is not supported.\n");
 
         if (sp->type != T_OBJECT && (sp->type != T_NUMBER || sp->u.number != 0))
-            efun_exp_arg_error(3, TF_OBJECT, sp->type, sp);
+            efun_exp_arg_error(3, TF_OBJECT, sp, sp);
 
         if (ip->modify_command)
             free_object(ip->modify_command, "configure_interactive(IC_MODIFY_COMMAND)");
@@ -8710,7 +8710,7 @@ f_configure_interactive (svalue_t *sp)
 
     case IC_ENCODING:
         if (sp->type != T_STRING)
-            efun_exp_arg_error(3, TF_STRING, sp->type, sp);
+            efun_exp_arg_error(3, TF_STRING, sp, sp);
 
         if (mstrsize(sp->u.str) >= sizeof(default_player_encoding))
             errorf("Illegal value to arg 3 of configure_interactive with IC_ENCODING: Encoding name too long.\n");

@@ -523,7 +523,7 @@ found:
             return;
         }
         fatal("find_call_out() got %s, expected string/closure.\n"
-             , typename(fun->type));
+             , sv_typename(fun));
         /* NOTREACHED */
     }
 

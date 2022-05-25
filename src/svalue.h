@@ -75,6 +75,9 @@ union u {
     void *generic;
       /* Use read-only, this member is used to read the svalue generically
        * as "a pointer". It is mostly used in comparisons.
+       *
+       * T_PYTHON: This is an PyObject* really, but to avoid dependencies
+       *   on the Python library we treat it as void outside pkg-python.
        */
 
     svalue_t *lvalue;
@@ -159,6 +162,9 @@ struct svalue_s
 #endif
         ph_int closure_type; /* Type of a T_CLOSURE */
         ph_int lvalue_type;  /* Type of a T_LVALUE */
+#ifdef USE_PYTHON
+        ph_int python_type;  /* Type of a T_PYTHON, i.e. type table index */
+#endif
         ph_int quotes;       /* Number of quotes of a quoted array or symbol */
         ph_int num_arg;      /* used by call_out.c to for vararg callouts */
         ph_int generic;
@@ -201,33 +207,36 @@ struct svalue_s
 #define T_BYTES         0xc  /* a byte string */
 #define T_LWOBJECT      0xd  /* a lightweight object */
 #define T_COROUTINE     0xe
+#ifdef USE_PYTHON
+#define T_PYTHON        0xf  /* a Python object */
+#endif
 
-#define T_CALLBACK      0xf
+#define T_CALLBACK      0x10
   /* A callback structure referenced from the stack to allow
    * proper cleanup during error recoveries. The interpreter
    * knows how to free it, but that's all.
    */
 
-#define T_ERROR_HANDLER 0x10
+#define T_ERROR_HANDLER 0x11
   /* Not an actual value, this is used internally for cleanup
    * operations. See the description of the error_handler() member
    * for details.
    */
 
-#define T_BREAK_ADDR    0x11
+#define T_BREAK_ADDR    0x12
   /* Not an actual type, it's used internally for saving
    * the address where break statements within switch statements
    * should branch to.
    */
 
-#define T_ARG_FRAME     0x12
+#define T_ARG_FRAME     0x13
   /* Not an actual type, it's used internally for saving
    * the surrounding argument frame pointer, when a new
    * argument frame is created.
    */
 
 #undef T_NULL /* There is some T_NULL definition in system headers. */
-#define T_NULL          0x13
+#define T_NULL          0x14
   /* Not an actual type, this is used in the efun_lpc_types[] table
    * to encode the acceptance of '0' instead of the real datatype.
    */

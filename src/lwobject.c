@@ -477,7 +477,7 @@ f_configure_lwobject (svalue_t *sp)
             else if (sp->type == T_NUMBER && sp->u.number == 0)
                 lwob->eff_user = 0;
             else
-                efun_arg_error(2, T_STRING, sp->type, sp);
+                efun_arg_error(2, T_STRING, sp, sp);
         break;
     }
 

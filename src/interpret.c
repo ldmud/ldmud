@@ -436,6 +436,7 @@ static const char * svalue_typename[]
    , /* T_BYTES  */         "bytes"
    , /* T_LWOBJECT */       "lwobject"
    , /* T_COROUTINE */      "coroutine"
+   , /* T_PYTHON */         "python-object"
    , /* T_CALLBACK */       "callback"
    , /* T_ERROR_HANDLER */  "error-handler"
    , /* T_BREAK_ADDR */     "break-address"
@@ -1229,6 +1230,12 @@ int_free_svalue (svalue_t *v)
         free_coroutine(v->u.coroutine);
         break;
 
+#ifdef USE_PYTHON
+    case T_PYTHON:
+        free_python_ob(v);
+        break;
+#endif
+
     case T_CALLBACK:
         free_callback(v->u.cb);
         xfree(v->u.cb);
@@ -1427,6 +1434,12 @@ free_svalue (svalue_t *v)
             break;
         }
         break;
+
+#ifdef USE_PYTHON
+    case T_PYTHON:
+        needs_deserializing = python_ob_has_last_ref(v);
+        break;
+#endif
     }
 
     /* If the value doesn't need de-serializing, it can be
@@ -1730,6 +1743,11 @@ internal_assign_svalue_no_free (svalue_t *to, svalue_t *from)
 
         } /* switch */
         break;
+
+#ifdef USE_PYTHON
+    case T_PYTHON:
+        ref_python_ob(to);
+#endif
     }
 
 } /* internal_assign_svalue_no_free() */
@@ -7598,6 +7616,22 @@ const char * typename (int type) { return typename_inline(type); }
 
 /*-------------------------------------------------------------------------*/
 const char *
+sv_typename (svalue_t *val)
+
+/* Translate the type of svalue <val> into a readable string.
+ */
+
+{
+#ifdef USE_PYTHON
+    if (val->type == T_PYTHON)
+        return get_txt(get_python_type_name(val->x.python_type)->name);
+#endif
+
+    return typename(val->type);
+} /* sv_typename() */
+
+/*-------------------------------------------------------------------------*/
+const char *
 efun_arg_typename (long type)
 
 /* Translate the bit-encoded efun argument <type> into a readable
@@ -7713,15 +7747,15 @@ vefun_bad_arg (int arg, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-raise_arg_error (int instr, int arg, long expected, int got)
+raise_arg_error (int instr, int arg, long expected, svalue_t *got)
   NORETURN;
 
 static INLINE void
-raise_arg_error (int instr, int arg, long expected, int got)
+raise_arg_error (int instr, int arg, long expected, svalue_t *got)
 
 /* The argument <arg> to <instr> had the wrong type: expected was the
  * type <expected> (bit-encoded as in the efun_lpc_types[]), but
- * it got the type <got> (the svalue type tag).
+ * it got the svalue <got>.
  * If <instr> is negative, the instruction code is read from
  * inter_pc - <instr>; otherwise it is the instruction code itself.
  *
@@ -7739,16 +7773,16 @@ raise_arg_error (int instr, int arg, long expected, int got)
         expected = efun_lpc_types[instrs[instr].lpc_arg_index];
 
     errorf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
-         , arg, get_f_name(instr), typename(got), efun_arg_typename(expected)
+         , arg, get_f_name(instr), sv_typename(got), efun_arg_typename(expected)
          );
     /* NOTREACHED */
 } /* raise_arg_error() */
 
 /*-------------------------------------------------------------------------*/
 void
-efun_gen_arg_error (int arg, int got, svalue_t *sp)
+efun_gen_arg_error (int arg, svalue_t *got, svalue_t *sp)
 
-/* The argument <arg> to the current tabled efun had the wrong type <got>.
+/* The argument <arg> to the current tabled efun had the wrong svalue <got>.
  * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
  */
 
@@ -7760,9 +7794,9 @@ efun_gen_arg_error (int arg, int got, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-vefun_gen_arg_error (int arg, int got, svalue_t *sp)
+vefun_gen_arg_error (int arg, svalue_t *got, svalue_t *sp)
 
-/* The argument <arg> to the current tabled vefun had the wrong type <got>.
+/* The argument <arg> to the current tabled vefun had the wrong svalue <got>.
  * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
  */
 
@@ -7774,11 +7808,11 @@ vefun_gen_arg_error (int arg, int got, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-efun_arg_error (int arg, int expected, int got, svalue_t *sp)
+efun_arg_error (int arg, int expected, svalue_t *got, svalue_t *sp)
 
 /* The argument <arg> to the current tabled efun had the wrong type:
- * expected was the type <expected>, but it got the type <got>
- * (both values are the svalue type tag).
+ * expected was the type <expected> (an svalue type tag), but it got
+ * the svalue <got>
  * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
  */
 
@@ -7790,11 +7824,11 @@ efun_arg_error (int arg, int expected, int got, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-efun_exp_arg_error (int arg, long expected, int got, svalue_t *sp)
+efun_exp_arg_error (int arg, long expected, svalue_t *got, svalue_t *sp)
 
 /* The argument <arg> to the current tabled efun had the wrong type:
- * expected was the type <expected> (given as bitflags), but it got the type
- * <got> (given as svalue type tag).
+ * expected was the type <expected> (given as bitflags), but it got the
+ * svalue <got>.
  * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
  */
 
@@ -7806,11 +7840,11 @@ efun_exp_arg_error (int arg, long expected, int got, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-vefun_arg_error (int arg, int expected, int got, svalue_t *sp)
+vefun_arg_error (int arg, int expected, svalue_t *got, svalue_t *sp)
 
 /* The argument <arg> to the current tabled vefun had the wrong type:
- * expected was the type <expected>, but it got the type <got>
- * (both values are the svalue type tag).
+ * expected was the type <expected> (an svalue type tag), but it got
+ * the svalue <got>.
  * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
  */
 
@@ -7822,11 +7856,11 @@ vefun_arg_error (int arg, int expected, int got, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-vefun_exp_arg_error (int arg, long expected, int got, svalue_t *sp)
+vefun_exp_arg_error (int arg, long expected, svalue_t *got, svalue_t *sp)
 
 /* The argument <arg> to the current tabled vefun had the wrong type:
  * expected was the type <expected> (in the bit-encoded format), but
- * it got the type <got> (the svalue type tag).
+ * it got the svalue <got>.
  * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
  */
 
@@ -7838,15 +7872,15 @@ vefun_exp_arg_error (int arg, long expected, int got, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-code_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp)
+code_exp_arg_error (int arg, long expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
   NORETURN;
 
 static INLINE void
-code_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp)
+code_exp_arg_error (int arg, long expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
 
 /* The argument <arg> to the current one-byte instruction had the wrong type:
  * expected was the type <expected> (in bit-flag encoding), but it got the
- * type <got> (the svalue type tag).
+ * svalue <got>.
  * inter_pc will be set from <pc>, inter_sp will be set from <sp>.
  */
 
@@ -7859,22 +7893,22 @@ code_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp
     instr = complete_instruction(-1);
 
     errorf("Bad arg %d to %s: got '%s', expected '%s'.\n"
-         , arg, get_f_name(instr), typename(got), efun_arg_typename(expected)
+         , arg, get_f_name(instr), sv_typename(got), efun_arg_typename(expected)
          );
     /* NOTREACHED */
 } /* code_exp_arg_error() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-code_arg_error (int arg, int expected, int got, bytecode_p pc, svalue_t *sp)
+code_arg_error (int arg, int expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
   NORETURN;
 
 static INLINE void
-code_arg_error (int arg, int expected, int got, bytecode_p pc, svalue_t *sp)
+code_arg_error (int arg, int expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
 
 /* The argument <arg> to the current one-byte instruction had the wrong type:
- * expected was the type <expected>, but it got the type <got>
- * (both values are the svalue type tag).
+ * expected was the type <expected> (an svalue type tag), but it got the
+ * svalue <got>.
  * inter_pc will be set from <pc>, inter_sp will be set from <sp>.
  */
 
@@ -7885,15 +7919,15 @@ code_arg_error (int arg, int expected, int got, bytecode_p pc, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-op_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp)
+op_exp_arg_error (int arg, long expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
   NORETURN;
 
 static INLINE void
-op_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp)
+op_exp_arg_error (int arg, long expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
 
 /* The argument <arg> to the current one-byte operator had the wrong type:
  * expected was the type <expected> (bit-encoded as in efun_lpc_types[]),
- * but it got the type <got> (the svalue type tag).
+ * but it got the svalue <got>.
  * inter_pc will be set from <pc>, inter_sp will be set from <sp>.
  *
  * This function is to be used with binary operators like + or *; the
@@ -7910,22 +7944,22 @@ op_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp)
 
     errorf("Bad %s arg to %s: got '%s', expected '%s'.\n"
          , arg == 1 ? "left" : "right"
-         , get_f_name(instr), typename(got), efun_arg_typename(expected)
+         , get_f_name(instr), sv_typename(got), efun_arg_typename(expected)
          );
     /* NOTREACHED */
 } /* op_exp_arg_error() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-op_arg_error (int arg, int expected, int got, bytecode_p pc, svalue_t *sp)
+op_arg_error (int arg, int expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
   NORETURN;
 
 static INLINE void
-op_arg_error (int arg, int expected, int got, bytecode_p pc, svalue_t *sp)
+op_arg_error (int arg, int expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
 
 /* The argument <arg> to the current one-byte operator had the wrong type:
- * expected was the type <expected>, but it got the type <got>
- * (both values are the svalue type tag).
+ * expected was the type <expected> (an svalue type tag), but it got the
+ * svalue <got>.
  * inter_pc will be set from <pc>, inter_sp will be set from <sp>.
  *
  * This function is to be used with binary operators like + or *; the
@@ -7966,7 +8000,7 @@ test_efun_args (int instr, int args, svalue_t *argp)
             continue;
 
         if (!(exp_type & (1 << act_type)))
-            raise_arg_error(instr, i, exp_type, act_type);
+            raise_arg_error(instr, i, exp_type, argp);
     }
 } /* test_efun_args() */
 
@@ -8165,6 +8199,12 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
         case T_STRUCT:
             valuetype = get_struct_type(bsvp->u.strct->type);
             break;
+
+#ifdef USE_PYTHON
+        case T_PYTHON:
+            valuetype = get_python_type(bsvp->x.python_type);
+            break;
+#endif
     }
 
     if (valuetype)
@@ -9869,6 +9909,8 @@ eval_instruction (bytecode_p first_instruction
      *                It is either the left or the right argument to a
      *                one-byte operator.
      *
+     *   CALL_PYTHON_TYPE_EFUN(code, num_arg): if there is a Python
+     *                efun override for the argument, call it.
      */
 
 #   ifdef DEBUG
@@ -9912,11 +9954,11 @@ eval_instruction (bytecode_p first_instruction
        OP_ARG_ERROR_TEMPL(op_exp_arg_error, arg, expected, got)
 
 #   define TYPE_TEST_TEMPL(num, arg, t) \
-        if ( (arg)->type != t ) code_arg_error(num, t, (arg)->type, pc, sp); else NOOP;
+        if ( (arg)->type != t ) code_arg_error(num, t, arg, pc, sp); else NOOP;
 #   define OP_TYPE_TEST_TEMPL(num, arg, t) \
-        if ( (arg)->type != t ) op_arg_error(num, t, (arg)->type, pc, sp); else NOOP;
+        if ( (arg)->type != t ) op_arg_error(num, t, arg, pc, sp); else NOOP;
 #   define EXP_TYPE_TEST_TEMPL(num, arg, t) \
-        if (!( (1 << (arg)->type) & (t)) ) op_exp_arg_error(num, (t), (arg)->type, pc, sp); else NOOP;
+        if (!( (1 << (arg)->type) & (t)) ) op_exp_arg_error(num, (t), arg, pc, sp); else NOOP;
 
 #   define TYPE_TEST1(arg, t) TYPE_TEST_TEMPL(1, arg, t)
 #   define TYPE_TEST2(arg, t) TYPE_TEST_TEMPL(2, arg, t)
@@ -9930,6 +9972,18 @@ eval_instruction (bytecode_p first_instruction
 #   define TYPE_TEST_EXP_RIGHT(arg, t) EXP_TYPE_TEST_TEMPL(2, arg, t)
       /* Test the type of a certain argument.
        */
+
+#ifdef USE_PYTHON
+#   define CALL_PYTHON_TYPE_EFUN(code, num_arg) \
+        svalue_t *python_result = call_python_type_efun(sp, code, num_arg); \
+        if (python_result) \
+        { \
+            sp = python_result; \
+            break; \
+        }
+#else
+#   define CALL_PYTHON_TYPE_EFUN(code, num_arg) NOOP
+#endif
 
 #   ifdef MARK
 #        define CASE(x) case (x): MARK(x);
@@ -10280,6 +10334,7 @@ again:
             errorf("%s() from lightweight object.\n", instrs[instruction].name);
 
         assign_eval_cost_inl();
+        CALL_PYTHON_TYPE_EFUN(instruction, 1);
         test_efun_args(instruction, 1, sp);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
 #ifdef CHECK_OBJECT_REF
@@ -10334,6 +10389,7 @@ again:
             errorf("%s() from lightweight object.\n", instrs[instruction].name);
 
         assign_eval_cost_inl();
+        CALL_PYTHON_TYPE_EFUN(instruction, 2);
         test_efun_args(instruction, 2, sp-1);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
 #ifdef CHECK_OBJECT_REF
@@ -10389,6 +10445,7 @@ again:
             errorf("%s() from lightweight object.\n", instrs[instruction].name);
 
         assign_eval_cost_inl();
+        CALL_PYTHON_TYPE_EFUN(instruction, 3);
         test_efun_args(instruction, 3, sp-2);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
 #ifdef CHECK_OBJECT_REF
@@ -10443,6 +10500,7 @@ again:
             errorf("%s() from lightweight object.\n", instrs[instruction].name);
 
         assign_eval_cost_inl();
+        CALL_PYTHON_TYPE_EFUN(instruction, 4);
         test_efun_args(instruction, 4, sp-3);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
 #ifdef CHECK_OBJECT_REF
@@ -10493,6 +10551,8 @@ again:
         if (max_arg >= 0 && numarg > max_arg)
             ERRORF(("Too many args for %s: got %d, expected %d.\n"
                    , instrs[instruction].name, numarg, max_arg));
+
+        CALL_PYTHON_TYPE_EFUN(instruction, numarg);
 
         test_efun_args(instruction, numarg, sp-numarg+1);
         sp = (*vefun_table[instruction-EFUNV_OFFSET])(sp, numarg);
@@ -12164,6 +12224,13 @@ again:
          *   vector      + vector             -> vector
          *   mapping     + mapping            -> mapping
          */
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_ADD, PYTHON_OP_RADD, "+");
+            break;
+        }
+#endif
 
         switch ( sp[-1].type )
         {
@@ -12245,7 +12312,7 @@ again:
               }
 
             default:
-                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp);
                 /* NOTREACHED */
             }
             break;
@@ -12314,7 +12381,7 @@ again:
               }
 
             default:
-                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp);
                 /* NOTREACHED */
             }
             break;
@@ -12367,7 +12434,7 @@ again:
                 put_string(sp, res);
                 break;
             }
-            OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+            OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp);
             /* NOTREACHED */
           }
           /* End of case T_FLOAT */
@@ -12417,7 +12484,7 @@ again:
 
         default:
             OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_STRING|TF_BYTES|TF_FLOAT|TF_NUMBER
-                          , sp[-1].type);
+                          , sp-1);
             /* NOTREACHED */
         }
 
@@ -12441,6 +12508,14 @@ again:
          */
 
         p_int i;
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_SUB, PYTHON_OP_RSUB, "-");
+            break;
+        }
+#endif
 
         if ((sp-1)->type == T_NUMBER)
         {
@@ -12478,7 +12553,7 @@ again:
                 sp->type = T_FLOAT;
                 break;
             }
-            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
+            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp);
             /* NOTREACHED */
         }
         else if ((sp-1)->type == T_FLOAT)
@@ -12506,7 +12581,7 @@ again:
                 STORE_DOUBLE(sp, diff);
                 break;
             }
-            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
+            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp);
             /* NOTREACHED */
         }
         else if ((sp-1)->type == T_POINTER)
@@ -12530,7 +12605,7 @@ again:
                 sp--;
                 break;
             }
-            OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp->type);
+            OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp);
             /* NOTREACHED */
         }
         else if ((sp-1)->type == T_MAPPING)
@@ -12556,7 +12631,7 @@ again:
                 sp->u.map = m;
                 break;
             }
-            OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp->type);
+            OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp);
         }
         else if ((sp-1)->type == T_STRING || (sp-1)->type == T_BYTES)
         {
@@ -12574,7 +12649,7 @@ again:
         }
 
         OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_STRING|TF_BYTES|TF_FLOAT|TF_NUMBER
-                      , sp[-1].type);
+                      , sp-1);
         /* NOTREACHED */
     }
 
@@ -12598,6 +12673,14 @@ again:
          */
 
         p_int i;
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_MUL, PYTHON_OP_RMUL, "*");
+            break;
+        }
+#endif
 
         switch ( sp[-1].type )
         {
@@ -12744,7 +12827,7 @@ again:
                 break;
             }
             OP_ARG_ERROR(2, TF_POINTER|TF_STRING|TF_BYTES|TF_FLOAT|TF_NUMBER
-                          , sp->type);
+                          , sp);
             /* NOTREACHED */
         case T_FLOAT:
           {
@@ -12771,7 +12854,7 @@ again:
                 sp--;
                 break;
             }
-            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
+            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp);
             /* NOTREACHED */
           }
         case T_STRING:
@@ -12808,7 +12891,7 @@ again:
                 sp->u.str = result;
                 break;
             }
-            BAD_OP_ARG(2, T_NUMBER, sp->type);
+            BAD_OP_ARG(2, T_NUMBER, sp);
             /* NOTREACHED */
           }
         case T_POINTER:
@@ -12858,12 +12941,12 @@ again:
                 put_array(sp, result);
                 break;
               }
-            BAD_OP_ARG(2, T_NUMBER, sp->type);
+            BAD_OP_ARG(2, T_NUMBER, sp);
             /* NOTREACHED */
           }
         default:
             OP_ARG_ERROR(1, TF_POINTER|TF_STRING|TF_BYTES|TF_FLOAT|TF_NUMBER
-                          , sp[-1].type);
+                          , sp-1);
             /* NOTREACHED */
         }
         break;
@@ -12883,6 +12966,14 @@ again:
          */
 
         p_int i;
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_DIV, PYTHON_OP_RDIV, "/");
+            break;
+        }
+#endif
 
         if ((sp-1)->type == T_NUMBER)
         {
@@ -12915,7 +13006,7 @@ again:
                 sp->type = T_FLOAT;
                 break;
             }
-            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
+            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp);
             /* NOTREACHED */
         }
         else if ((sp-1)->type == T_FLOAT)
@@ -12953,10 +13044,10 @@ again:
                 STORE_DOUBLE(sp, dtmp);
                 break;
             }
-            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
+            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp);
             /* NOTREACHED */
         }
-        OP_ARG_ERROR(1, TF_FLOAT|TF_NUMBER, sp[-1].type);
+        OP_ARG_ERROR(1, TF_FLOAT|TF_NUMBER, sp-1);
         /* NOTREACHED */
         break;
     }
@@ -12973,6 +13064,14 @@ again:
          */
 
         p_int i;
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_MOD, PYTHON_OP_RMOD, "%");
+            break;
+        }
+#endif
 
         TYPE_TEST_LEFT((sp-1), T_NUMBER);
         TYPE_TEST_RIGHT(sp, T_NUMBER);
@@ -12998,6 +13097,14 @@ again:
          */
 
         int i;
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_GT, PYTHON_OP_RGT, ">");
+            break;
+        }
+#endif
 
         if (((sp-1)->type == T_STRING && sp->type == T_STRING)
          || ((sp-1)->type == T_BYTES  && sp->type == T_BYTES))
@@ -13060,6 +13167,14 @@ again:
 
         int i;
 
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_GE, PYTHON_OP_RGE, ">=");
+            break;
+        }
+#endif
+
         if (((sp-1)->type == T_STRING && sp->type == T_STRING)
          || ((sp-1)->type == T_BYTES  && sp->type == T_BYTES))
         {
@@ -13121,6 +13236,14 @@ again:
 
         int i;
 
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_LT, PYTHON_OP_RLT, "<");
+            break;
+        }
+#endif
+
         if (((sp-1)->type == T_STRING && sp->type == T_STRING)
          || ((sp-1)->type == T_BYTES  && sp->type == T_BYTES))
         {
@@ -13181,6 +13304,14 @@ again:
          */
 
         int i;
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_LE, PYTHON_OP_RLE, "<=");
+            break;
+        }
+#endif
 
         if (((sp-1)->type == T_STRING && sp->type == T_STRING)
          || ((sp-1)->type == T_BYTES  && sp->type == T_BYTES))
@@ -13245,6 +13376,14 @@ again:
 
         int i = 0;
 
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_EQ, PYTHON_OP_REQ, "==");
+            break;
+        }
+#endif
+
         if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
         {
             i = (double)((sp-1)->u.number) == READ_DOUBLE( sp );
@@ -13306,6 +13445,13 @@ again:
             case T_MAPPING:
                 i = (sp-1)->u.map == sp->u.map;
                 break;
+
+#ifdef USE_PYTHON
+            case T_PYTHON:
+                i = (sp-1)->u.generic == sp->u.generic;
+                break;
+#endif
+
             default:
                 if (sp->type == T_LVALUE)
                     errorf("Reference passed to ==\n");
@@ -13333,6 +13479,14 @@ again:
          */
 
         int i = 0;
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_NE, PYTHON_OP_RNE, "!=");
+            break;
+        }
+#endif
 
         if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
         {
@@ -13389,6 +13543,13 @@ again:
             case T_MAPPING:
                 i = (sp-1)->u.map != sp->u.map;
                 break;
+
+#ifdef USE_PYTHON
+            case T_PYTHON:
+                i = (sp-1)->u.generic != sp->u.generic;
+                break;
+#endif
+
             default:
                 if (sp->type == T_LVALUE)
                     errorf("Reference passed to !=\n");
@@ -13505,13 +13666,13 @@ again:
                         }
                         /* else FALLTHROUGH */
                     default:
-                        OP_ARG_ERROR(1, TF_NUMBER|(container->type == T_STRING ? TF_STRING : TF_BYTES), item->type);
+                        OP_ARG_ERROR(1, TF_NUMBER|(container->type == T_STRING ? TF_STRING : TF_BYTES), item);
                 }
                 break;
             }
 
             default:
-                OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING|TF_STRING|TF_BYTES, sp->type);
+                OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING|TF_STRING|TF_BYTES, sp);
                 /* NOTREACHED */
         }
 
@@ -13525,6 +13686,14 @@ again:
         /* Compute the binary complement of number sp[0] and leave
          * that on the stack.
          */
+#ifdef USE_PYTHON
+        if (sp->type == T_PYTHON)
+        {
+            sp = do_python_unary_operation(sp, PYTHON_OP_INVERT, "~");
+            break;
+        }
+#endif
+
         TYPE_TEST1(sp, T_NUMBER);
         sp->u.number = ~ sp->u.number;
         break;
@@ -13544,6 +13713,14 @@ again:
          *   mapping & mapping -> mapping
          *
          */
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_AND, PYTHON_OP_RAND, "&");
+            break;
+        }
+#endif
 
         if (sp->type == T_POINTER && (sp-1)->type == T_POINTER)
         {
@@ -13613,6 +13790,14 @@ again:
          * TODO: Extend this to mappings.
          */
 
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_OR, PYTHON_OP_ROR, "|");
+            break;
+        }
+#endif
+
         TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_POINTER);
         if ((sp-1)->type == T_NUMBER)
         {
@@ -13645,6 +13830,14 @@ again:
          * TODO: Extend this to mappings.
          */
 
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_XOR, PYTHON_OP_RXOR, "^");
+            break;
+        }
+#endif
+
         TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_POINTER);
         if ((sp-1)->type == T_NUMBER)
         {
@@ -13675,6 +13868,14 @@ again:
          * TODO: Implement an arithmetic shift.
          */
 
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_LSH, PYTHON_OP_RLSH, "<<");
+            break;
+        }
+#endif
+
         TYPE_TEST_LEFT((sp-1), T_NUMBER);
         TYPE_TEST_RIGHT(sp, T_NUMBER);
 
@@ -13694,6 +13895,14 @@ again:
          *
          * TODO: Extend this to vectors and mappings.
          */
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_RSH, PYTHON_OP_RRSH, ">>");
+            break;
+        }
+#endif
 
         TYPE_TEST_LEFT((sp-1), T_NUMBER);
         TYPE_TEST_RIGHT(sp, T_NUMBER);
@@ -13719,6 +13928,14 @@ again:
          *
          * TODO: Extend this to vectors and mappings.
          */
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_RSH, PYTHON_OP_RRSH, ">>>");
+            break;
+        }
+#endif
 
         TYPE_TEST_LEFT((sp-1), T_NUMBER);
         TYPE_TEST_RIGHT(sp, T_NUMBER);
@@ -13877,7 +14094,7 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, type2);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
@@ -13898,6 +14115,16 @@ again:
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || type2 == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IADD, PYTHON_OP_ADD, PYTHON_OP_RADD, "+=");
+            if (instruction == F_VOID_ADD_EQ)
+                pop_stack();
+            break;
+        }
+#endif
 
         /* Now do it */
         switch(argp->type)
@@ -13963,7 +14190,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, type2);
+                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
 
@@ -14025,7 +14252,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, type2);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -14033,7 +14260,7 @@ again:
         case T_MAPPING:  /* Add to a mapping */
             if (type2 != T_MAPPING)
             {
-                OP_ARG_ERROR(2, TF_MAPPING, type2);
+                OP_ARG_ERROR(2, TF_MAPPING, sp-1);
                 /* NOTREACHED */
             }
             else
@@ -14061,7 +14288,7 @@ again:
         case T_POINTER:  /* Add to an array */
             if (type2 != T_POINTER)
             {
-                OP_ARG_ERROR(2, TF_POINTER, type2);
+                OP_ARG_ERROR(2, TF_POINTER, sp-1);
                 /* NOTREACHED */
             }
             else
@@ -14104,14 +14331,14 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, type2);
+                OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
             OP_ARG_ERROR(1, TF_STRING|TF_BYTES|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
-                        , argp->type);
+                        , argp);
             /* NOTREACHED */
         } /* end of switch */
 
@@ -14197,7 +14424,7 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, type2);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
@@ -14218,6 +14445,14 @@ again:
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || type2 == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_ISUB, PYTHON_OP_SUB, PYTHON_OP_RSUB, "-=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -14254,7 +14489,7 @@ again:
             else
             {
                 /* type2 of the wrong type */
-                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, type2);
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -14272,7 +14507,7 @@ again:
             }
             else
             {
-                BAD_OP_ARG(2, argp->type, type2);
+                BAD_OP_ARG(2, argp->type, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -14301,7 +14536,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_POINTER, type2);
+                OP_ARG_ERROR(2, TF_POINTER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -14334,7 +14569,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, type2);
+                OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -14370,14 +14605,14 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_MAPPING, type2);
+                OP_ARG_ERROR(2, TF_MAPPING, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
             OP_ARG_ERROR(1, TF_STRING|TF_BYTES|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
-                        , argp->type);
+                        , argp);
             /* NOTREACHED */
         } /* end of switch */
 
@@ -14475,7 +14710,7 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
@@ -14496,6 +14731,14 @@ again:
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IMUL, PYTHON_OP_MUL, PYTHON_OP_RMUL, "*=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -14562,7 +14805,7 @@ again:
             else
             {
                 /* Unsupported type2 */
-                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -14592,7 +14835,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -14635,7 +14878,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -14689,14 +14932,14 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
             OP_ARG_ERROR(1, TF_STRING|TF_BYTES|TF_FLOAT|TF_POINTER|TF_NUMBER
-                        , argp->type);
+                        , argp);
             /* NOTREACHED */
             break;
         }
@@ -14757,15 +15000,18 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
 
             case LVALUE_UNPROTECTED_RANGE:
             case LVALUE_UNPROTECTED_MAP_RANGE:
-                OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, T_POINTER);
+            {
+                svalue_t error_vector = { T_POINTER, {}, {.vec = &null_vector} };
+                OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, &error_vector);
                 break; /* NOTREACHED */
+            }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
@@ -14775,6 +15021,14 @@ again:
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IDIV, PYTHON_OP_DIV, PYTHON_OP_RDIV, "/=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -14808,7 +15062,7 @@ again:
             else
             {
                 /* Unsupported type2 */
-                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -14845,13 +15099,13 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_FLOAT|TF_NUMBER, argp->type);
+            OP_ARG_ERROR(1, TF_FLOAT|TF_NUMBER, argp);
             /* NOTREACHED */
         }
 
@@ -14911,15 +15165,18 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
 
             case LVALUE_UNPROTECTED_RANGE:
             case LVALUE_UNPROTECTED_MAP_RANGE:
-                OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
+            {
+                svalue_t error_vector = { T_POINTER, {}, {.vec = &null_vector} };
+                OP_ARG_ERROR(2, TF_NUMBER, &error_vector);
                 break; /* NOTREACHED */
+            }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
@@ -14929,6 +15186,14 @@ again:
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IMOD, PYTHON_OP_MOD, PYTHON_OP_RMOD, "%=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -14942,13 +15207,13 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+            OP_ARG_ERROR(1, TF_NUMBER, argp);
             /* NOTREACHED */
         }
 
@@ -15007,7 +15272,7 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
@@ -15029,6 +15294,14 @@ again:
         if(argp == NULL) /* Already handled. */
             break;
 
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IAND, PYTHON_OP_AND, PYTHON_OP_RAND, "&=");
+            break;
+        }
+#endif
+
         /* Now do it */
         switch (argp->type)
         {
@@ -15039,7 +15312,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -15084,7 +15357,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp[-1].type);
+                OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -15099,7 +15372,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_MAPPING|TF_POINTER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_MAPPING|TF_POINTER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -15118,12 +15391,12 @@ again:
             }
             else
             {
-                BAD_OP_ARG(2, argp->type, sp[-1].type);
+                BAD_OP_ARG(2, argp->type, sp-1);
                 /* NOTREACHED */
             }
             break;
         default:
-            OP_ARG_ERROR(1, TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER, argp->type);
+            OP_ARG_ERROR(1, TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER, argp);
             /* NOTREACHED */
         }
 
@@ -15176,7 +15449,7 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
@@ -15198,6 +15471,14 @@ again:
         if(argp == NULL) /* Already handled. */
             break;
 
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IOR, PYTHON_OP_OR, PYTHON_OP_ROR, "|=");
+            break;
+        }
+#endif
+
         /* Now do it */
         switch (argp->type)
         {
@@ -15208,7 +15489,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -15231,13 +15512,13 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_POINTER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_POINTER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER, argp->type);
+            OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER, argp);
             /* NOTREACHED */
         }
 
@@ -15292,7 +15573,7 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
@@ -15314,6 +15595,14 @@ again:
         if(argp == NULL) /* Already handled. */
             break;
 
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IXOR, PYTHON_OP_XOR, PYTHON_OP_RXOR, "^=");
+            break;
+        }
+#endif
+
         /* Now do it */
         switch (argp->type)
         {
@@ -15324,7 +15613,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -15345,13 +15634,13 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_POINTER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_POINTER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER, argp->type);
+            OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER, argp);
             /* NOTREACHED */
         }
 
@@ -15409,15 +15698,18 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
 
             case LVALUE_UNPROTECTED_RANGE:
             case LVALUE_UNPROTECTED_MAP_RANGE:
-                OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
+            {
+                svalue_t error_vector = { T_POINTER, {}, {.vec = &null_vector} };
+                OP_ARG_ERROR(2, TF_NUMBER, &error_vector);
                 break; /* NOTREACHED */
+            }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
@@ -15427,6 +15719,14 @@ again:
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_ILSH, PYTHON_OP_LSH, PYTHON_OP_RLSH, "<<=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -15441,13 +15741,13 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+            OP_ARG_ERROR(1, TF_NUMBER, argp);
             /* NOTREACHED */
         }
 
@@ -15503,15 +15803,18 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
 
             case LVALUE_UNPROTECTED_RANGE:
             case LVALUE_UNPROTECTED_MAP_RANGE:
-                OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
+            {
+                svalue_t error_vector = { T_POINTER, {}, {.vec = &null_vector} };
+                OP_ARG_ERROR(2, TF_NUMBER, &error_vector);
                 break; /* NOTREACHED */
+            }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
@@ -15521,6 +15824,14 @@ again:
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IRSH, PYTHON_OP_RSH, PYTHON_OP_RRSH, ">>=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -15535,13 +15846,13 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+            OP_ARG_ERROR(1, TF_NUMBER, argp);
             /* NOTREACHED */
         }
 
@@ -15597,15 +15908,18 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
 
             case LVALUE_UNPROTECTED_RANGE:
             case LVALUE_UNPROTECTED_MAP_RANGE:
-                OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
+            {
+                svalue_t error_vector = { T_POINTER, {}, {.vec = &null_vector} };
+                OP_ARG_ERROR(2, TF_NUMBER, &error_vector);
                 break; /* NOTREACHED */
+            }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
@@ -15615,6 +15929,14 @@ again:
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IRSH, PYTHON_OP_RSH, PYTHON_OP_RRSH, ">>>=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -15629,13 +15951,13 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+            OP_ARG_ERROR(1, TF_NUMBER, argp);
             /* NOTREACHED */
         }
 
@@ -18655,6 +18977,8 @@ again:
 
         int i;
 
+        CALL_PYTHON_TYPE_EFUN(F_CLONEP, 1);
+
         if (sp->type == T_OBJECT)
         {
             i = (sp->u.ob->flags & O_CLONE);
@@ -18686,6 +19010,8 @@ again:
 
         int i;
 
+        CALL_PYTHON_TYPE_EFUN(F_CLOSUREP, 1);
+
         i = sp->type == T_CLOSURE;
         free_svalue(sp);
         put_number(sp, i);
@@ -18702,6 +19028,8 @@ again:
          */
 
         int i;
+
+        CALL_PYTHON_TYPE_EFUN(F_COROUTINEP, 1);
 
         i = sp->type == T_COROUTINE;
         free_svalue(sp);
@@ -18720,6 +19048,8 @@ again:
 
         int i;
 
+        CALL_PYTHON_TYPE_EFUN(F_FLOATP, 1);
+
         i = sp->type == T_FLOAT;
         free_svalue(sp);
         put_number(sp, i);
@@ -18736,6 +19066,8 @@ again:
          */
 
         int i;
+
+        CALL_PYTHON_TYPE_EFUN(F_INTP, 1);
 
         i = sp->type == T_NUMBER;
         free_svalue(sp);
@@ -18754,6 +19086,8 @@ again:
 
         int i;
 
+        CALL_PYTHON_TYPE_EFUN(F_MAPPINGP, 1);
+
         i = sp->type == T_MAPPING;
         free_svalue(sp);
         put_number(sp, i);
@@ -18770,6 +19104,8 @@ again:
          */
 
         int i;
+
+        CALL_PYTHON_TYPE_EFUN(F_OBJECTP, 1);
 
         i = sp->type == T_OBJECT;
         free_svalue(sp);
@@ -18788,6 +19124,8 @@ again:
 
         int i;
 
+        CALL_PYTHON_TYPE_EFUN(F_LWOBJECTP, 1);
+
         i = sp->type == T_LWOBJECT;
         free_svalue(sp);
         put_number(sp, i);
@@ -18804,6 +19142,8 @@ again:
          */
 
         int i;
+
+        CALL_PYTHON_TYPE_EFUN(F_POINTERP, 1);
 
         i = sp->type == T_POINTER;
         free_svalue(sp);
@@ -18822,6 +19162,9 @@ again:
          */
 
         int i = 0;
+
+        CALL_PYTHON_TYPE_EFUN(F_REFERENCEP, 1);
+
         if (sp->type == T_LVALUE)
         {
             /* It must be an protected lvalue with at least 3 references:
@@ -18874,6 +19217,8 @@ again:
 
         int i;
 
+        CALL_PYTHON_TYPE_EFUN(F_STRINGP, 1);
+
         i = sp->type == T_STRING;
         free_svalue(sp);
         put_number(sp, i);
@@ -18890,6 +19235,8 @@ again:
          */
 
         int i;
+
+        CALL_PYTHON_TYPE_EFUN(F_BYTESP, 1);
 
         i = sp->type == T_BYTES;
         free_svalue(sp);
@@ -18908,6 +19255,8 @@ again:
 
         int i;
 
+        CALL_PYTHON_TYPE_EFUN(F_STRUCTP, 1);
+
         i = sp->type == T_STRUCT;
         free_svalue(sp);
         put_number(sp, i);
@@ -18925,6 +19274,8 @@ again:
 
         int i;
 
+        CALL_PYTHON_TYPE_EFUN(F_SYMBOLP, 1);
+
         i = sp->type == T_SYMBOL;
         free_svalue(sp);
         put_number(sp, i);
@@ -18940,6 +19291,8 @@ again:
          * Returns a code for the type of the argument, as defined in
          * <sys/lpctypes.h>
          */
+
+        CALL_PYTHON_TYPE_EFUN(F_TYPEOF, 1);
 
         mp_int i = sp->type;
         free_svalue(sp);
@@ -18957,6 +19310,13 @@ again:
          * it sees the unary '-' used.
          */
 
+#ifdef USE_PYTHON
+        if (sp->type == T_PYTHON)
+        {
+            sp = do_python_unary_operation(sp, PYTHON_OP_NEG, "-");
+            break;
+        }
+#endif
         if (sp->type == T_NUMBER)
         {
             if (sp->u.number == PINT_MIN)
@@ -18993,12 +19353,15 @@ again:
          * anywhere.
          */
 
+        CALL_PYTHON_TYPE_EFUN(F_RAISE_ERROR, 1);
+
         TYPE_TEST1(sp, T_STRING);
 
         ERRORF(("%s", get_txt(sp->u.str)));
       }
 
     CASE(F_THROW);                  /* --- throw               --- */
+    {
         /* EFUN throw()
          *
          *   void throw(mixed arg)
@@ -19008,10 +19371,14 @@ again:
          */
 
         assign_eval_cost_inl();
+
+        CALL_PYTHON_TYPE_EFUN(F_THROW, 1);
+
         inter_sp = --sp;
         inter_pc = pc;
         throw_error(sp+1); /* do the longjump, with extra checks... */
         break;
+    }
 
     /* --- Efuns: Arrays and Mappings --- */
 
@@ -19029,6 +19396,8 @@ again:
          */
 
         p_int i;
+
+        CALL_PYTHON_TYPE_EFUN(F_SIZEOF, 1);
 
         if (sp->type == T_STRING || sp->type == T_BYTES)
         {
@@ -19074,7 +19443,7 @@ again:
         if (sp->type == T_NUMBER && sp->u.number == 0)
             break;
 
-        RAISE_ARG_ERROR(1, TF_STRING|TF_BYTES|TF_STRUCT|TF_MAPPING|TF_POINTER, sp->type);
+        RAISE_ARG_ERROR(1, TF_STRING|TF_BYTES|TF_STRUCT|TF_MAPPING|TF_POINTER, sp);
         /* NOTREACHED */
     }
 
@@ -19140,6 +19509,8 @@ again:
          * If <dont_load> is true, the function just returns the current
          * master object, or 0 if the current master has been destructed.
          */
+
+        CALL_PYTHON_TYPE_EFUN(F_MASTER, 1);
 
         TYPE_TEST1(sp, T_NUMBER)
 
@@ -19245,11 +19616,13 @@ again:
         object_t *ob;
         int flags;
 
+        CALL_PYTHON_TYPE_EFUN(F_SWAP, 2);
+
         /* Test the arguments */
         if (sp[-1].type != T_OBJECT)
-            RAISE_ARG_ERROR(1, TF_OBJECT, sp[-1].type);
+            RAISE_ARG_ERROR(1, TF_OBJECT, sp-1);
         if (sp[0].type != T_NUMBER)
-            RAISE_ARG_ERROR(1, TF_NUMBER, sp[0].type);
+            RAISE_ARG_ERROR(1, TF_NUMBER, sp);
 
         ob = sp[-1].u.ob;
         flags = sp[0].u.number;
@@ -19379,6 +19752,7 @@ again:
 #   undef TYPE_TEST_TEMPL
 #   undef OP_TYPE_TEST_TEMPL
 #   undef EXP_TYPE_TEST_TEMPL
+#   undef CALL_PYTHON_TYPE_EFUN
 
 } /* eval_instruction() */
 

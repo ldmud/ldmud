@@ -38,6 +38,7 @@
 #define T_BYTES         0xc
 #define T_LWOBJECT      0xd
 #define T_COROUTINE     0xe
+#define T_PYTHON        0xf
 
 /* Closure types, stored as secondary type info */
 

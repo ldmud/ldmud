@@ -36,7 +36,8 @@ BESCHREIBUNG
           - fuer Symbole und gequotete Arrays die Anzahl Quotes.
           - fuer Closures den (internen) Typ der Closure.
           - fuer gemeinsam verwendete Strings 0, ungleich 0 fuer andere Strings
-          - fuer structs der eindeutige Identifizierungsstring
+          - fuer structs der eindeutige Identifizierungsstring.
+          - fuer Python-Objekte den Namen des Typs.
           - -1 fuer alle anderen Datentypen
 
 FEHLER

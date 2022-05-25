@@ -1962,7 +1962,7 @@ v_allocate (svalue_t *sp, int num_arg)
             {
                 errorf("Bad argument to allocate(): size[%d] is a '%s', "
                       "expected 'int'.\n"
-                     , (int)dim, typename(item->type));
+                     , (int)dim, sv_typename(item));
                 /* NOTREACHED */
             }
 
@@ -2061,7 +2061,7 @@ v_allocate (svalue_t *sp, int num_arg)
     {
         /* The type checker should prevent this case */
         fatal("Illegal arg 1 to allocate(): got '%s', expected 'int|int*'.\n"
-             , typename(argp->type));
+             , sv_typename(argp));
     } /* if (argp->type) */
 
     if (num_arg == 2)
@@ -2462,7 +2462,7 @@ v_sort_array (svalue_t * sp, int num_arg)
                         inter_sp = sp;
                         errorf("Bad arg 1 to sort_array(): got '%s[..] &', "
                                "expected 'mixed * / mixed *&'.\n"
-                               , typename(r->vec.type));
+                               , sv_typename(&(r->vec)));
                         // NOTREACHED
                         return sp;
                     }
@@ -2510,7 +2510,7 @@ v_sort_array (svalue_t * sp, int num_arg)
             inter_sp = sp;
             errorf("Bad arg 1 to sort_array(): got '%s &', "
                    "expected 'mixed * / mixed *&'.\n"
-                   , typename(svp->type));
+                   , sv_typename(svp));
             // NOTREACHED
             return sp;
         }

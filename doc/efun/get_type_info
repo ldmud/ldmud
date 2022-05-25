@@ -39,7 +39,8 @@ DESCRIPTION
           - for closures, the (internal) closure type, as defined in
             <lpctypes.h>.
           - for strings 0 for shared strings, and non-0 for others.
-          - for structs the unique identifier string
+          - for structs the unique identifier string.
+          - for Python objects the name of the type.
           - -1 for all other datatypes.
 
 BUGS
