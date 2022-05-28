@@ -4503,8 +4503,15 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
             l = 0;
             max_shiftable = ULONG_MAX / 2;
             --cp;
-            while('0' == (c = *++cp) || '1' == c)
+            while((c = *(++cp)))
             {
+                if ( c == '_' && *(cp-1) != '_' )
+                {
+                    continue;
+                } else if ('0' != c && '1' != c) {
+                    break;
+                }
+
                 *p_overflow = *p_overflow || (l > max_shiftable);
                 l <<= 1;
                 l += c - '0';
@@ -4541,8 +4548,15 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
         max_shiftable = ULONG_MAX / 16;
         l = 0;
         --cp;
-        while(leXdigit(c = *++cp))
+        while((c = *(++cp)))
         {
+            if ( c == '_' && *(cp-1) != '_' )
+            {
+                continue;
+            } else if ( !leXdigit(c) ) {
+                break;
+            }
+
             *p_overflow = *p_overflow || (l > max_shiftable);
             if (c > '9')
                 c = (char)((c & 0xf) + ( '9' + 1 - ('a' & 0xf) ));
@@ -4557,8 +4571,15 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
 
     max_shiftable = ULONG_MAX / base;
     l = c - '0';
-    while (lexdigit(c = *cp++) && c < (char)('0'+base))
+    while ((c = *(cp++)))
     {
+        if ( c == '_' && *(cp-2) != '_' )
+        {
+            continue;
+        } else if ( !lexdigit(c) || c >= (char)('0'+base) ) {
+            break;
+        }
+
         *p_overflow = *p_overflow || (l > max_shiftable);
         c -= '0';
         l = l * base + c;

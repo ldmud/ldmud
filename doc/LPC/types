@@ -15,7 +15,10 @@ DESCRIPTION
                 when preceeded by '0b' (e.g. 0b00010001), octal when
                 preceded by '0o' (e.g. 0o21) and as character
                 yielding the charset value for the character as the number
-                to use (e.g. '0' yields 48 on ASCII machines).
+                to use (e.g. '0' yields 48 on ASCII machines). Single
+                underscores between digits of a numeric literal can be used to
+                make large values easier to read (e.g. 0b1111_0110, 1_000_000,
+                0xC0_FF_EE).
 
                 Character values are enclosed in single-quotes ('),
                 with the sequence ''' returning the single-quote
