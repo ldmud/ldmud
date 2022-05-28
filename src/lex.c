@@ -4505,7 +4505,7 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
             --cp;
             while((c = *(++cp)))
             {
-                if ( c == '_' && *(cp-1) != '_' )
+                if ( c == '\'' && *(cp-1) != '\'' )
                 {
                     continue;
                 } else if ('0' != c && '1' != c) {
@@ -4550,7 +4550,7 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
         --cp;
         while((c = *(++cp)))
         {
-            if ( c == '_' && *(cp-1) != '_' )
+            if ( c == '\'' && *(cp-1) != '\'' )
             {
                 continue;
             } else if ( !leXdigit(c) ) {
@@ -4573,7 +4573,7 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
     l = c - '0';
     while ((c = *(cp++)))
     {
-        if ( c == '_' && *(cp-2) != '_' )
+        if ( c == '\'' && *(cp-2) != '\'' )
         {
             continue;
         } else if ( !lexdigit(c) || c >= (char)('0'+base) ) {
