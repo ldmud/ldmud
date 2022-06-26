@@ -1115,12 +1115,13 @@ v_read_bytes (svalue_t *sp, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 static iconv_t
-get_file_encoding (string_t* filename, bool source)
+get_file_encoding (string_t* filename, bool source, bool* ignore, bool* replace)
 
 /* Determines the file's encoding via H_FILE_ENCODING hook.
  * Returns an iconv conversion descriptor if successful.
  * (Otherwise an error is thrown.)
- * If <source> is true, the file is opened for reading.
+ * If <source> is true, the file is opened for reading (in that case
+ * ignore and replace are set to the corresponding error handling scheme).
  */
 
 {
@@ -1145,7 +1146,30 @@ get_file_encoding (string_t* filename, bool source)
     }
 
     if (source)
-        cd = iconv_open("utf-8", encoding == NULL ? "ascii" : get_txt(encoding));
+    {
+        if (encoding == NULL)
+        {
+            cd = iconv_open("utf-8", "ascii");
+            *ignore = false;
+            *replace = false;
+        }
+        else
+        {
+            int encoding_len = parse_input_encoding(encoding, ignore, replace);
+            char *encoding_txt = get_txt(encoding);
+
+            if (encoding_len < mstrsize(encoding))
+            {
+                char save = encoding_txt[encoding_len];
+
+                encoding_txt[encoding_len] = 0;
+                cd = iconv_open("utf-8", encoding_txt);
+                encoding_txt[encoding_len] = save;
+            }
+            else
+                cd = iconv_open("utf-8", encoding_txt);
+        }
+    }
     else
         cd = iconv_open(encoding == NULL ? "ascii" : get_txt(encoding), "utf-8");
 
@@ -1165,6 +1189,8 @@ struct iconv_file_info
     size_t left;    /* Number of bytes left to process. */
     iconv_t cd;     /* Conversion descriptor. */
     char *error;    /* Error message. */
+    bool ignore;    /* Ignore encoding errors. */
+    bool replace;   /* Replace wrong codes with replacement char. */
 };
 
 static size_t
@@ -1237,6 +1263,41 @@ read_file_iconv (struct iconv_file_info* info, char* dest, size_t len, char* pre
             /* So we're finished for now? */
             if (errno == E2BIG)
                 break;
+
+            if ((errno == EILSEQ || errno == EINVAL)
+             && (info->ignore || info->replace))
+            {
+                /* Own error handling. */
+                if (info->ignore)
+                {
+                    if (ineof)
+                        break;
+
+                    bufstart++;
+                    bufleft--;
+                    continue;
+                }
+
+                if (info->replace)
+                {
+                    /* We need to add the replacement char,
+                     * which is 3 bytes long.
+                     */
+                    if (destleft < 3)
+                        break;
+
+                    memcpy(deststart, "\xef\xbf\xbd", 3);
+                    deststart += 3;
+                    destleft -= 3;
+
+                    if (ineof)
+                        break;
+
+                    bufstart++;
+                    bufleft--;
+                    continue;
+                }
+            }
 
             if (errno != EILSEQ)
                 info->error = strerror(errno);
@@ -1337,6 +1398,7 @@ v_read_file (svalue_t *sp, int num_arg)
     svalue_t *arg;
     int start, len;
     iconv_t cd;
+    bool conv_ignore, conv_replace;
 
     arg = sp- num_arg + 1;
 
@@ -1353,7 +1415,18 @@ v_read_file (svalue_t *sp, int num_arg)
             len = arg[2].u.number;
             if (num_arg == 4)
             {
-                cd = iconv_open("utf-8", get_txt(arg[3].u.str));
+                int enc_name_len = parse_input_encoding(arg[3].u.str, &conv_ignore, &conv_replace);
+                if (enc_name_len < mstrsize(arg[3].u.str))
+                {
+                    char *enc_name = get_txt(arg[3].u.str);
+                    char save = enc_name[enc_name_len];
+
+                    enc_name[enc_name_len] = 0;
+                    cd = iconv_open("utf-8", enc_name);
+                    enc_name[enc_name_len] = save;
+                }
+                else
+                    cd = iconv_open("utf-8", get_txt(arg[3].u.str));
                 if (!iconv_valid(cd))
                     errorf("Unsupported encoding '%s'.\n", get_txt(arg[3].u.str));
 
@@ -1398,7 +1471,7 @@ v_read_file (svalue_t *sp, int num_arg)
         if (!iconv_valid(cd))
         {
             push_string(inter_sp, file); /* In case of an error. */
-            iec->cd = cd = get_file_encoding(arg[0].u.str, true);
+            iec->cd = cd = get_file_encoding(arg[0].u.str, true, &conv_ignore, &conv_replace);
             inter_sp--;
         }
 
@@ -1459,6 +1532,8 @@ v_read_file (svalue_t *sp, int num_arg)
         conv.left = 0;
         conv.cd = cd;
         conv.error = NULL;
+        conv.ignore = conv_ignore;
+        conv.replace = conv_replace;
 
         /* Search for the first line to read.
          * For this, the file is read in chunks of <size> bytes, st.st_size
@@ -1861,7 +1936,7 @@ v_write_file (svalue_t *sp, int num_arg)
         native = convert_path_str_to_native_or_throw(file);
 
         if (!iconv_valid(cd))
-            iec->cd = cd = get_file_encoding(arg[0].u.str, false);
+            iec->cd = cd = get_file_encoding(arg[0].u.str, false, NULL, NULL);
 
         if (flags & 1)
             if (remove(native) && errno != ENOENT)

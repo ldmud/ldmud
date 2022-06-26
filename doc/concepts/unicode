@@ -44,6 +44,30 @@ DESCRIPTION
         output character can not be converted to/from the configured
         encoding it will be silently discarded.
 
+        -- Encoding error handling --
+
+        When reading from a specific encoding or writing to specific encodings
+        several errors may happen: The source material might contain invalid
+        codes or the target encoding might not support all characters. The
+        specified encoding can contain a suffix to determine how errors
+        should be handled. Without any suffix runtime errors will be raised.
+
+        For reading these are:
+            //IGNORE    Ignore any illegal codes (skip them).
+            //REPLACE   Replace any illegal codes with '\ufffd'.
+
+        For writing the following suffixes are available (these may depend
+        on the local iconv library, the suffixes listed here are commonly
+        available):
+            //IGNORE    Ignore any unsupported characters (skip them).
+            //TRANSLIT  Transliterate any unsupported characters if possible.
+                        (If no transliteration is available, replace them
+                        with '?'.)
+
+        For interactives only the ouput suffixes can be specified. If no
+        suffix is specified, //IGNORE is the default handling. For the input
+        encoding //IGNORE is the fixed setting.
+
         -- ERQ / UDP --
 
         Only byte sequences can be sent to the ERQ or via UDP,

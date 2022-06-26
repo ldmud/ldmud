@@ -969,6 +969,16 @@ void run_test()
         }),
         ({ "read_file 3", 0,
             (:
+                return read_file("/data.bin", 2, 1, "ascii//ignore") == "\n";
+            :)
+        }),
+        ({ "read_file 4", 0,
+            (:
+                return read_file("/data.bin", 2, 1, "ascii//replace") == (6*"\ufffd") + "\n";
+            :)
+        }),
+        ({ "read_file 5", 0,
+            (:
                 int success;
 
                 write_file("/test.bin", "", 1);
@@ -981,7 +991,7 @@ void run_test()
                 return success;
             :)
         }),
-        ({ "read_file 4", 0,
+        ({ "read_file 6", 0,
             (:
                 int success;
 
@@ -995,7 +1005,7 @@ void run_test()
                 return success;
             :)
         }),
-        ({ "read_file 5", 0,
+        ({ "read_file 7", 0,
             (:
                 int success;
 
@@ -1009,7 +1019,7 @@ void run_test()
                 return success;
             :)
         }),
-        ({ "read_file 6", 0,
+        ({ "read_file 8", 0,
             (:
                 int success;
 
@@ -1119,9 +1129,34 @@ void run_test()
             :)
         }),
 #endif
-        ({ "Illegal characters in UTF-8 sequences", TF_ERROR,
+        ({ "Illegal characters in UTF-8 sequences 1", TF_ERROR,
             (:
                 to_text(({0xf8,0x80,0x80,0x80,0x80}), "UTF-8");
+            :)
+        }),
+        ({ "Illegal characters in UTF-8 sequences 1", TF_ERROR,
+            (:
+                to_text(({0xc2}), "UTF-8");
+            :)
+        }),
+        ({ "Illegal characters in UTF-8 sequences with //IGNORE 1", 0,
+            (:
+                return to_text(({0xf8,0x80,0x80,0x80,0x80,0x40}), "UTF-8//IGNORE") == "@";
+            :)
+        }),
+        ({ "Illegal characters in UTF-8 sequences with //IGNORE 2", 0,
+            (:
+                return to_text(({0xc2, 0x40}), "UTF-8//IGNORE") == "@";
+            :)
+        }),
+        ({ "Illegal characters in UTF-8 sequences with //REPLACE 1", 0,
+            (:
+                return to_text(({0xf8,0x80,0x80,0x80,0x80,0x40}), "UTF-8//REPLACE") == "\ufffd\ufffd\ufffd\ufffd\ufffd@";
+            :)
+        }),
+        ({ "Illegal characters in UTF-8 sequences with //REPLACE 2", 0,
+            (:
+                return to_text(({0xc2,0x40}), "UTF-8//REPLACE") == "\ufffd@";
             :)
         }),
         ({ "Illegal characters with to_text(array)", TF_ERROR,
