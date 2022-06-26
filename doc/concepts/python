@@ -10,8 +10,23 @@ DESCRIPTION
         or at compile time with the --with-python-script configuration
         option.
 
-        The python script can import the builtin ldmud module.
-        This module provides the following functions:
+        The python script can import the builtin ldmud module for
+        extending LDMud and accessing LDMud information.
+
+STARTUP SCRIPT
+        The startup script can be a single Python script file. This script
+        is executed as the main routine (i.e. __name__ == '__main__') when
+        ldmud starts and before the master object is loaded.
+
+        It's also possible to specify a package with a __main__ module
+        (currently this may be a directory or a zip file). In this case
+        the __main__ submodule will be executed at startup. The package
+        itself will be placed into sys.path, so additional content can
+        be imported.
+
+LDMUD MODULE
+        The ldmud module is only available for Python programs executed
+        inside the ldmud process and provides the following functions:
 
           - register_efun(name, function) -> None
                 Registers a new efun name. This is not allowed during

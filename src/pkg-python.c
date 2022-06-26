@@ -10238,7 +10238,7 @@ pkg_python_init (char* prog_name)
  */
 
 {
-    FILE *script_file;
+    PyObject *name, *importer = NULL;
 
     /** Python3 requires now wchar_t?!
      * Py_SetProgramName(prog_name);
@@ -10247,12 +10247,83 @@ pkg_python_init (char* prog_name)
     PyImport_AppendInittab("ldmud", &init_ldmud_module);
     Py_Initialize();
 
-    script_file = fopen(python_startup_script, "rt");
-    if(script_file != NULL)
+    /* Check, whether the startup script is a module
+     * (eg. directory or archive).
+     */
+    name = PyUnicode_DecodeFSDefault(python_startup_script);
+    if (name != NULL)
     {
-        PyCompilerFlags flags;
-        flags.cf_flags = 0;
-        PyRun_SimpleFileExFlags(script_file, python_startup_script, 1, &flags);
+        importer = PyImport_GetImporter(name);
+        if (importer == Py_None)
+        {
+            Py_DECREF(importer);
+            importer = NULL;
+        }
+        else if (importer == NULL)
+            PyErr_Clear();
+    }
+    else
+        PyErr_Clear();
+
+    if (importer != NULL)
+    {
+        /* The file can be loaded as a module.
+         * So first put it into sys.path at the beginning.
+         */
+        PyObject *path = PySys_GetObject("path");
+        if (path != NULL)
+        {
+            if (PyList_Insert(path, 0, name))
+            {
+                PyErr_Print();
+                PyErr_Clear();
+            }
+        }
+
+        /* Remove the default __main__ module. */
+        PyObject *main_name = PyUnicode_FromString("__main__");
+        if (main_name == NULL)
+        {
+            PyErr_Print();
+            PyErr_Clear();
+            Py_DECREF(importer);
+            return;
+        }
+        PyObject *modules = PySys_GetObject("modules");
+        if (modules != NULL)
+        {
+            if (PyMapping_DelItem(modules, main_name) < 0)
+            {
+                PyErr_Print();
+                PyErr_Clear();
+            }
+        }
+
+        /* And load __main__ hopefully from the first module in sys.path.
+         */
+        PyObject *main_mod = PyImport_Import(main_name);
+        if (main_mod != NULL)
+            Py_DECREF(main_mod);
+        else
+        {
+            PyErr_Print();
+            PyErr_Clear();
+        }
+        Py_DECREF(main_name);
+        Py_DECREF(importer);
+    }
+    else
+    {
+        /* Not a module, then just execute the file. */
+        FILE *script_file = fopen(python_startup_script, "rt");
+        if(script_file != NULL)
+        {
+            PyCompilerFlags flags;
+            flags.cf_flags = 0;
+            PyRun_SimpleFileExFlags(script_file, python_startup_script, 1, &flags);
+        }
+
+        Py_XDECREF(name);
     }
 } /* pkg_python_init() */
 
