@@ -1,6 +1,7 @@
 #pragma save_types, strong_types, rtt_checks
 
 #include "/sys/configuration.h"
+#include "/sys/driver_info.h"
 #include "/sys/object_info.h"
 
 #include "/inc/base.inc"
@@ -19,6 +20,18 @@ void run_test()
           "-------------------------------------\n");
 
     run_array(({
+        ({ "driver_info(DI_NUM_LWOBJECTS) without lwobjects", 0,
+            function int()
+            {
+                return driver_info(DI_NUM_LWOBJECTS) == 0;
+            }
+        }),
+        ({ "driver_info(DI_SIZE_LWOBJECTS) without lwobjects", 0,
+            function int()
+            {
+                return driver_info(DI_SIZE_LWOBJECTS) == 0;
+            }
+        }),
         ({ "creating a lightweight object", 0,
             function int()
             {
@@ -573,6 +586,28 @@ void run_test()
             {
                 return object_info(this_object(), OI_NO_LIGHTWEIGHT)
                    && !object_info(find_object("/lwo/stack"), OI_NO_LIGHTWEIGHT);
+            }
+        }),
+        ({ "driver_info(DI_NUM_LWOBJECTS) with lwobjects", 0,
+            function int()
+            {
+                int prev = driver_info(DI_NUM_LWOBJECTS);
+                lwobject lwob = new_lwobject("/lwo/stack");
+
+                return driver_info(DI_NUM_LWOBJECTS) == prev + 1;
+            }
+        }),
+        ({ "driver_info(DI_SIZE_LWOBJECTS) with lwobjects", 0,
+            function int()
+            {
+                /* Clear the trace. */
+                foreach (int i: 65536)
+                    this_object()->noop();
+
+                int prev = driver_info(DI_SIZE_LWOBJECTS);
+                lwobject lwob = new_lwobject("/lwo/stack");
+
+                return driver_info(DI_SIZE_LWOBJECTS) > prev;
             }
         }),
         ({ "running internal tests", 0,

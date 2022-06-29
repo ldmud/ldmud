@@ -27,6 +27,10 @@
 #include "../mudlib/sys/lwobject_info.h"
 
 /*-------------------------------------------------------------------------*/
+long num_lwobjects = 0;
+long total_lwobject_size = 0;
+
+/*-------------------------------------------------------------------------*/
 void
 _free_lwobject (lwobject_t *lwob)
 
@@ -36,6 +40,9 @@ _free_lwobject (lwobject_t *lwob)
 
 {
     int num_vars = lwob->prog->num_variables;
+
+    num_lwobjects--;
+    total_lwobject_size -=  sizeof(lwobject_t) + sizeof(svalue_t) * lwob->prog->num_variables;
 
     for (int i = 0; i < num_vars; i++)
         free_svalue(lwob->variables + i);
@@ -64,6 +71,9 @@ create_empty_lwobject (int num_variables)
     result->eff_user = NULL;
     for (int i = 0; i < num_variables; i++)
         result->variables[i] = svalue_number(0);
+
+    num_lwobjects++;
+    total_lwobject_size += sizeof(lwobject_t) + sizeof(svalue_t) * num_variables;
 
     return result;
 } /* create_empty_lwobject() */
@@ -499,6 +509,9 @@ free_sample_lwobject (lwobject_t* lwob)
 
 {
     xfree(lwob);
+
+    num_lwobjects--;
+    total_lwobject_size -=  sizeof(lwobject_t);
 } /* free_sample_lwobject() */
 
 /*-------------------------------------------------------------------------*/

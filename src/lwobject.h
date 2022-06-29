@@ -25,6 +25,11 @@ struct lwobject_s
     svalue_t variables[]; /* The variables    */
 };
 
+extern long num_lwobjects;
+  /* Number of lwobject_s. */
+extern long total_lwobject_size;
+  /* Size of all lwobject_s. */
+
 extern void _free_lwobject(lwobject_t *lwob);
 extern lwobject_t *create_lwobject(object_t *blueprint);
 extern lwobject_t *copy_lwobject(lwobject_t *orig, bool copy_variables);

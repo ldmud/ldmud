@@ -104,6 +104,7 @@
 #define DI_NUM_LVALUES                                      -429
 #define DI_NUM_NAMED_OBJECT_TYPES                           -430
 #define DI_NUM_NAMED_OBJECT_TYPES_TABLE_SLOTS               -431
+#define DI_NUM_LWOBJECTS                                    -432
 
 #define DI_SIZE_ACTIONS                                     -450
 #define DI_SIZE_CALLOUTS                                    -451
@@ -128,6 +129,7 @@
 #define DI_SIZE_BUFFER_FILE                                 -470
 #define DI_SIZE_BUFFER_SWAP                                 -471
 #define DI_SIZE_NAMED_OBJECT_TYPES_TABLE                    -472
+#define DI_SIZE_LWOBJECTS                                   -473
 
 /* Memory swapper statistics */
 #define DI_NUM_SWAP_BLOCKS                                  -500

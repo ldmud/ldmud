@@ -10177,6 +10177,10 @@ f_driver_info (svalue_t *sp)
             types_driver_info(&result, what);
             break;
 
+        case DI_NUM_LWOBJECTS:
+            put_number(&result, num_lwobjects);
+            break;
+
         case DI_SIZE_ACTIONS:
             simulate_driver_info(&result, what);
             break;
@@ -10251,6 +10255,10 @@ f_driver_info (svalue_t *sp)
             /* FALLTHROUGH */
         case DI_SIZE_BUFFER_SWAP:
             mempools_driver_info(&result, what);
+            break;
+
+        case DI_SIZE_LWOBJECTS:
+            put_number(&result, total_lwobject_size);
             break;
 
 
