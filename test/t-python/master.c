@@ -223,6 +223,8 @@ void run_test()
             shutdown(1);
         else
         {
+            object tmp_ob = clone_object(this_object());
+
             python_set((<test_struct> 
                 705948522,
                 -1000000.0,
@@ -230,7 +232,7 @@ void run_test()
                 this_object(),
                 new_lwobject("/testob"),
                 ({ 5, 3, 1}),
-                ([2,3,5]),
+                ([2:2,3:3,5:5,tmp_ob:({2,3,5})]),
                 quote("abc"+"gc"),
                 quote(({11, 13, 17})),
                 "/testob"->testcoroutine(),
@@ -242,6 +244,9 @@ void run_test()
                 shutdown(1);
                 return 0;
             }
+
+            /* Check whether mapping cleanup works across Python boundary. */
+            destruct(tmp_ob);
 
             start_gc(function void(int result)
             {
@@ -260,7 +265,7 @@ void run_test()
                     val->t_object != this_object() ||
                     !lwobjectp(val->t_lwobject) || program_name(val->t_lwobject) != "/testob.c" ||
                     val->t_array[0] != 5 || val->t_array[1] != 3 || val->t_array[2] != 1 ||
-                    sizeof(val->t_mapping) != 3 || widthof(val->t_mapping) != 0 ||
+                    sizeof(val->t_mapping) != 3 || widthof(val->t_mapping) != 1 ||
                     !member(val->t_mapping, 2) || !member(val->t_mapping, 3) || !member(val->t_mapping, 5) ||
                     unquote(val->t_symbol) != "ab" + "cgc" ||
                     sizeof(unquote(val->t_quoted_array)) != 3 ||

@@ -65,6 +65,8 @@ extern void python_free_object(object_t *ob);
 extern void python_free_replace_program_protector(replace_ob_t *r_ob);
 extern void python_replace_program_adjust(replace_ob_t *r_ob);
 
+extern void cleanup_python_data(cleanup_t * context);
+
 #ifdef GC_SUPPORT
 extern void python_clear_refs();
 extern void python_count_refs();

@@ -10948,6 +10948,104 @@ python_replace_program_adjust (replace_ob_t *r_ob)
     }
 } /* python_replace_program_adjust() */
 
+/*-------------------------------------------------------------------------*/
+void
+cleanup_python_data (cleanup_t * context)
+
+/* Cleanup any Python-held LPC values. */
+
+{
+    for(ldmud_gc_var_t* var = gc_object_list; var != NULL; var = var->gcnext)
+    {
+        object_t* ob = ((ldmud_object_t*)var)->lpc_object;
+        if(ob != NULL && (ob->flags & O_DESTRUCTED))
+        {
+            free_object(ob, "cleanup_python_data");
+            ((ldmud_object_t*)var)->lpc_object = NULL;
+        }
+    }
+
+    for(ldmud_gc_var_t* var = gc_lwobject_list; var != NULL; var = var->gcnext)
+    {
+        lwobject_t* lwob = ((ldmud_lwobject_t*)var)->lpc_lwobject;
+        if(lwob != NULL)
+            cleanup_vector(lwob->variables, lwob->prog->num_variables, context);
+    }
+
+    for(ldmud_gc_var_t* var = gc_program_list; var != NULL; var = var->gcnext)
+    {
+        ldmud_program_t* self = ((ldmud_program_t*)var);
+        cleanup_vector(&(self->lpc_object), 1, context);
+    }
+
+    for(ldmud_gc_var_t* var = gc_array_list; var != NULL; var = var->gcnext)
+    {
+        vector_t* arr = ((ldmud_array_t*)var)->lpc_array;
+        if (arr != NULL)
+            cleanup_vector(arr->item, VEC_SIZE(arr), context);
+    }
+
+    for(ldmud_gc_var_t* var = gc_mapping_list; var != NULL; var = var->gcnext)
+    {
+        mapping_t* m = ((ldmud_mapping_t*)var)->lpc_mapping;
+        if (m != NULL)
+        {
+            /* Let cleanup_vector do that. */
+            svalue_t mapping = svalue_mapping(m);
+            cleanup_vector(&mapping, 1, context);
+        }
+    }
+
+    for(ldmud_gc_var_t* var = gc_mapping_list_list; var != NULL; var = var->gcnext)
+    {
+        /* Let cleanup_vector do that. */
+        svalue_t values[2] = { svalue_mapping(((ldmud_mapping_list_t*)var)->map),
+                               svalue_array(((ldmud_mapping_list_t*)var)->indices) };
+        cleanup_vector(values, 2, context);
+    }
+
+    for(ldmud_gc_var_t* var = gc_struct_list; var != NULL; var = var->gcnext)
+    {
+        struct_t* s = ((ldmud_struct_t*)var)->lpc_struct;
+        if(s != NULL)
+            cleanup_vector(s->member, struct_size(s), context);
+    }
+
+    for(ldmud_gc_var_t* var = gc_closure_list; var != NULL; var = var->gcnext)
+    {
+        cleanup_vector(&((ldmud_closure_t*)var)->lpc_closure, 1, context);
+    }
+
+    for(ldmud_gc_var_t* var = gc_coroutine_list; var != NULL; var = var->gcnext)
+    {
+        coroutine_t *cr = ((ldmud_coroutine_t*)var)->lpc_coroutine;
+        if(cr != NULL)
+        {
+            svalue_t coroutine = svalue_coroutine(cr);
+            cleanup_vector(&coroutine, 1, context);
+
+            if (coroutine.type != T_COROUTINE)
+                ((ldmud_coroutine_t*)var)->lpc_coroutine = NULL;
+        }
+    }
+
+    for(ldmud_gc_var_t* var = gc_symbol_list; var != NULL; var = var->gcnext)
+    {
+        cleanup_vector(&((ldmud_symbol_t*)var)->lpc_symbol, 1, context);
+    }
+
+    for(ldmud_gc_var_t* var = gc_quoted_array_list; var != NULL; var = var->gcnext)
+    {
+        cleanup_vector(&((ldmud_quoted_array_t*)var)->lpc_quoted_array, 1, context);
+    }
+
+    for(ldmud_gc_var_t* var = gc_lvalue_list; var != NULL; var = var->gcnext)
+    {
+        cleanup_vector(&((ldmud_lvalue_t*)var)->lpc_lvalue, 1, context);
+    }
+
+} /* cleanup_python_data() */
+
 #ifdef GC_SUPPORT
 
 /*-------------------------------------------------------------------------*/
