@@ -17,6 +17,10 @@
 #include "i-current_object.h"
 
 /*-------------------------------------------------------------------------*/
+long num_coroutines = 0;
+long total_coroutine_size = 0;
+
+/*-------------------------------------------------------------------------*/
 static void
 clear_coroutine (coroutine_t *cr, bool clear_variables)
 
@@ -48,6 +52,8 @@ clear_coroutine (coroutine_t *cr, bool clear_variables)
                 free_svalue(extra + i);
             xfree(extra);
             cr->num_values = 0;
+
+            total_coroutine_size -= sizeof(svalue_t) * cr->variables[cr->num_variables+1].u.number;
         }
         else
             num_vars += num_vals;
@@ -83,13 +89,24 @@ _free_coroutine (coroutine_t *cr)
     for (coroutine_t *next = cr->awaitee; next; next = next->awaitee)
     {
         clear_coroutine(next, next->state != CS_FINISHED);
+
+        num_coroutines--;
+        total_coroutine_size -= sizeof(coroutine_t) + sizeof(svalue_t) * (next->num_variables + CR_RESERVED_EXTRA_VALUES);
+
         xfree(next);
     }
     for (coroutine_t *prev = cr->awaiter; prev; prev = prev->awaiter)
     {
         clear_coroutine(prev, prev->state != CS_FINISHED);
+
+        num_coroutines--;
+        total_coroutine_size -= sizeof(coroutine_t) + sizeof(svalue_t) * (prev->num_variables + CR_RESERVED_EXTRA_VALUES);
+
         xfree(prev);
     }
+
+    num_coroutines--;
+    total_coroutine_size -= sizeof(coroutine_t) + sizeof(svalue_t) * (cr->num_variables + CR_RESERVED_EXTRA_VALUES);
 
     xfree(cr);
 } /* _free_coroutine() */
@@ -115,6 +132,9 @@ create_empty_coroutine (int num_variables)
 #ifdef DEBUG
     result->num_hidden_variables = 0;
 #endif
+
+    num_coroutines++;
+    total_coroutine_size += sizeof(coroutine_t) + sizeof(svalue_t) * (num_variables + CR_RESERVED_EXTRA_VALUES);
 
     return result;
 } /* create_empty_coroutine() */
@@ -214,6 +234,7 @@ suspend_coroutine (coroutine_t *cr, svalue_t *fp)
                 if (!extra)
                     return false;
                 xfree(cr->variables[cr->num_variables].u.lvalue);
+                total_coroutine_size += sizeof(svalue_t) * (num_values - cr->variables[cr->num_variables+1].u.number);
                 cr->variables[cr->num_variables].u.lvalue = extra;
                 cr->variables[cr->num_variables+1].u.number = num_values;
             }
@@ -225,6 +246,7 @@ suspend_coroutine (coroutine_t *cr, svalue_t *fp)
             extra = xalloc(sizeof(svalue_t) * num_values);
             if (!extra)
                 return false;
+            total_coroutine_size += sizeof(svalue_t) * num_values;
             cr->variables[cr->num_variables].u.lvalue = extra;
             cr->variables[cr->num_variables+1].u.number = num_values;
         }
@@ -233,7 +255,10 @@ suspend_coroutine (coroutine_t *cr, svalue_t *fp)
     {
         /* We can save any extra values in the structure itself. */
         if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
+        {
             xfree(cr->variables[cr->num_variables].u.lvalue);
+            total_coroutine_size -= sizeof(svalue_t) * cr->variables[cr->num_variables+1].u.number;
+        }
         extra = cr->variables + cr->num_variables;
     }
 
@@ -399,7 +424,11 @@ finish_coroutine (coroutine_t *cr)
     assert(cr->awaitee == NULL);
 
     if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
+    {
         xfree(cr->variables[cr->num_variables].u.lvalue);
+        total_coroutine_size -= sizeof(svalue_t) * cr->variables[cr->num_variables+1].u.number;
+    }
+    total_coroutine_size -= sizeof(svalue_t) * cr->num_variables;
     cr->num_values = 0;
     cr->num_variables = 0;
 
@@ -547,6 +576,9 @@ free_sample_coroutine (coroutine_t* cr)
 
 {
     xfree(cr);
+
+    num_coroutines--;
+    total_coroutine_size -= sizeof(coroutine_t) + sizeof(svalue_t) * CR_RESERVED_EXTRA_VALUES;
 } /* free_sample_coroutine() */
 
 /*-------------------------------------------------------------------------*/

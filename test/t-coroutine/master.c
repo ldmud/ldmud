@@ -1,5 +1,6 @@
 #pragma save_types, strong_types, rtt_checks
 
+#include "/sys/driver_info.h"
 #include "/sys/lpctypes.h"
 #include "/inc/base.inc"
 #include "/inc/deep_eq.inc"
@@ -75,6 +76,18 @@ void run_test()
     call_out(#'shutdown, 5*__ALARM_TIME__, 1);
 
     errors = run_array_without_callback(({
+        ({ "driver_info(DI_NUM_COROUTINES) without coroutines", 0,
+            function int()
+            {
+                return driver_info(DI_NUM_COROUTINES) == 0;
+            }
+        }),
+        ({ "driver_info(DI_SIZE_COROUTINES) without coroutines", 0,
+            function int()
+            {
+                return driver_info(DI_SIZE_COROUTINES) == 0;
+            }
+        }),
         ({ "creating a coroutine", 0,
             function int()
             {
@@ -196,6 +209,32 @@ void run_test()
                     return 0;
                 return 1;
             },
+        }),
+        ({ "driver_info(DI_NUM_COROUTINES) after some tests", 0,
+            function int()
+            {
+                return driver_info(DI_NUM_COROUTINES) == 0;
+            }
+        }),
+        ({ "driver_info(DI_SIZE_COROUTINES) after some tests", 0,
+            function int()
+            {
+                return driver_info(DI_SIZE_COROUTINES) == 0;
+            }
+        }),
+        ({ "driver_info(DI_NUM_COROUTINES) with a coroutine", 0,
+            function int()
+            {
+                coroutine cr = async function void() {};
+                return driver_info(DI_NUM_COROUTINES) == 1;
+            }
+        }),
+        ({ "driver_info(DI_SIZE_COROUTINES) with a coroutine", 0,
+            function int()
+            {
+                coroutine cr = async function void() {};
+                return driver_info(DI_SIZE_COROUTINES) > 0;
+            }
         }),
         ({ "Caught errors within coroutine 1", TF_ERROR,
             function void()

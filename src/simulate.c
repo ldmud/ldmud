@@ -44,6 +44,7 @@
 #include "call_out.h"
 #include "closure.h"
 #include "comm.h"
+#include "coroutine.h"
 #include "ed.h"
 #include "filestat.h"
 #include "gcollect.h"
@@ -3292,6 +3293,8 @@ status_parse (strbuf_t * sbuf, char * buff)
                             , num_vb_swapped, total_vb_bytes_swapped / 1024);
             strbuf_addf(sbuf, "Lightweight Objects:\t\t%8ld %9ld\n"
                             , num_lwobjects, total_lwobject_size);
+            strbuf_addf(sbuf, "Coroutines:\t\t\t%8ld %9ld\n"
+                            , num_coroutines, total_coroutine_size);
             strbuf_addf(sbuf, "Prog blocks:\t\t\t%8"PRIdMPINT" %9"PRIdMPINT
                               " (%"PRIdMPINT" swapped: %"PRIdMPINT" Kbytes)\n"
                             , total_num_prog_blocks + num_swapped - num_unswapped

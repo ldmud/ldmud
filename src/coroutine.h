@@ -93,6 +93,11 @@ struct coroutine_s
     svalue_t variables[];           /* The variables.                 */
 };
 
+extern long num_coroutines;
+  /* Number of coroutine_s. */
+extern long total_coroutine_size;
+  /* Size of all coroutine_s. */
+
 extern void _free_coroutine(coroutine_t *cr);
 extern coroutine_t *create_coroutine(svalue_t *closure);
 extern bool suspend_coroutine(coroutine_t *cr, svalue_t *fp);

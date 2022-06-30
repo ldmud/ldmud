@@ -10181,6 +10181,10 @@ f_driver_info (svalue_t *sp)
             put_number(&result, num_lwobjects);
             break;
 
+        case DI_NUM_COROUTINES:
+            put_number(&result, num_coroutines);
+            break;
+
         case DI_SIZE_ACTIONS:
             simulate_driver_info(&result, what);
             break;
@@ -10259,6 +10263,10 @@ f_driver_info (svalue_t *sp)
 
         case DI_SIZE_LWOBJECTS:
             put_number(&result, total_lwobject_size);
+            break;
+
+        case DI_SIZE_COROUTINES:
+            put_number(&result, total_coroutine_size);
             break;
 
 
