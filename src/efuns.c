@@ -10220,6 +10220,16 @@ f_driver_info (svalue_t *sp)
             put_number(&result, num_coroutines);
             break;
 
+#ifdef USE_PYTHON
+        case DI_NUM_LPC_PYTHON_REFS:
+            put_number(&result, num_lpc_python_references);
+            break;
+
+        case DI_NUM_PYTHON_LPC_REFS:
+            put_number(&result, num_python_lpc_references);
+            break;
+#endif
+
         case DI_SIZE_ACTIONS:
             simulate_driver_info(&result, what);
             break;

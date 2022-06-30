@@ -110,6 +110,12 @@ extern ident_t *all_python_efuns;
    * (All shadowed efuns are in the all_efuns list.)
    */
 
+extern long num_lpc_python_references;
+  /* Number of references to Python objects from LPC values. */
+
+extern long num_python_lpc_references;
+  /* Number of references from Python to LPC values. */
+
 /* --- Prototypes --- */
 extern void pkg_python_init(char* prog_name);
 

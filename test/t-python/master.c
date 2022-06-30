@@ -1,3 +1,4 @@
+#include "/sys/driver_info.h"
 #include "/inc/base.inc"
 #include "/inc/deep_eq.inc"
 #include "/inc/testarray.inc"
@@ -25,6 +26,22 @@ void run_test()
           "-----------------------------\n");
 
     run_array(({
+        ({ "driver_info(DI_NUM_LPC_PYTHON_REFS) at the beginning", 0,
+            function int()
+            {
+                return driver_info(DI_NUM_LPC_PYTHON_REFS) == 0;
+            }
+        }),
+        ({ "driver_info(DI_NUM_PYTHON_LPC_REFS) at the beginning", 0,
+            function int()
+            {
+                clean_early_ob();
+                /* There should only be one reference:
+                 * The master object startup.ob_list.
+                 */
+                return driver_info(DI_NUM_PYTHON_LPC_REFS) == 1;
+            }
+        }),
         ({ "passing int", 0,
             (:
                 return python_return(0) == 0 &&
@@ -311,6 +328,32 @@ void run_test()
 
                 return 1;
             :)
+        }),
+        ({ "driver_info(DI_NUM_LPC_PYTHON_REFS) after some tests", 0,
+            function int()
+            {
+                return driver_info(DI_NUM_LPC_PYTHON_REFS) == 0;
+            }
+        }),
+        ({ "driver_info(DI_NUM_PYTHON_LPC_REFS) after some tests", 0,
+            function int()
+            {
+                return driver_info(DI_NUM_PYTHON_LPC_REFS) == 1;
+            }
+        }),
+        ({ "driver_info(DI_NUM_LPC_PYTHON_REFS) with a Python object", 0,
+            function int()
+            {
+                box b = create_box(100);
+                return driver_info(DI_NUM_LPC_PYTHON_REFS) == 1;
+            }
+        }),
+        ({ "driver_info(DI_NUM_PYTHON_LPC_REFS) with an LPC reference", 0,
+            function int()
+            {
+                box b = create_box(({100}));
+                return driver_info(DI_NUM_PYTHON_LPC_REFS) == 2;
+            }
         }),
         ({
             "Python object hook 1", 0,

@@ -106,6 +106,8 @@
 #define DI_NUM_NAMED_OBJECT_TYPES_TABLE_SLOTS               -431
 #define DI_NUM_LWOBJECTS                                    -432
 #define DI_NUM_COROUTINES                                   -433
+#define DI_NUM_LPC_PYTHON_REFS                              -434
+#define DI_NUM_PYTHON_LPC_REFS                              -435
 
 #define DI_SIZE_ACTIONS                                     -450
 #define DI_SIZE_CALLOUTS                                    -451

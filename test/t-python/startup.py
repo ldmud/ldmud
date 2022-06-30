@@ -1079,6 +1079,12 @@ ldmud.register_efun("create_box", create_box)
 early_ob = ldmud.Object("/testob")
 if early_ob is not None and early_ob.name == "/testob":
     early_ob_worked = True
-    ldmud.efuns.destruct(early_ob)
 else:
     early_ob_worked = False
+
+def destruct_early_ob():
+    global early_ob
+    if early_ob:
+        ldmud.efuns.destruct(early_ob)
+        early_ob = None
+ldmud.register_efun("clean_early_ob", destruct_early_ob)

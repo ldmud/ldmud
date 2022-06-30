@@ -391,6 +391,12 @@ DESCRIPTION
         <what> == DI_NUM_LWOBJECTS:
           Number of lightweight objects.
 
+        <what> == DI_NUM_LPC_PYTHON_REFS:
+          Number of references to Python objects from LPC.
+
+        <what> == DI_NUM_PYTHON_LPC_REFS:
+          Number of references to LPC values from Python.
+
         <what> == DI_SIZE_ACTIONS:
           Total size of allocated actions.
 

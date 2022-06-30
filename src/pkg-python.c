@@ -236,6 +236,10 @@ int num_python_type = 0;
 
 ident_t *all_python_types = NULL;
 
+long num_lpc_python_references = 0;
+
+long num_python_lpc_references = 0;
+
 static python_type_entry_t* python_type_table[PYTHON_TYPE_TABLE_SIZE];
   /* Information about all defined Python types.
    *
@@ -1352,6 +1356,8 @@ add_gc_object (ldmud_gc_var_t** list, ldmud_gc_var_t* var)
         (*list)->gcprev = var;
     }
     *list = var;
+
+    num_python_lpc_references++;
 } /* add_gc_object() */
 
 /*-------------------------------------------------------------------------*/
@@ -1378,6 +1384,8 @@ remove_gc_object (ldmud_gc_var_t** list, ldmud_gc_var_t* var)
         if(var->gcnext)
             var->gcnext->gcprev = var->gcprev;
     }
+
+    num_python_lpc_references--;
 } /* remove_gc_object() */
 
 /*-------------------------------------------------------------------------*/
@@ -10272,6 +10280,7 @@ python_to_svalue (svalue_t *dest, PyObject* val)
             dest->u.generic = val;
 
             Py_INCREF(val);
+            num_lpc_python_references++;
             return NULL;
         }
     }
@@ -11097,6 +11106,7 @@ call_python_efun (int idx, int num_arg)
     python_is_external = false;
     python_save_context();
     result = PyObject_CallObject(python_efun_entry->callable, args);
+    python_clear_context();
     python_is_external = was_external;
     Py_XDECREF(args);
 
@@ -11310,6 +11320,7 @@ python_call_hook (int hook, bool is_external)
         Py_DECREF(result);
     }
 
+    python_clear_context();
     python_is_external = was_external;
 } /* python_call_hook() */
 
@@ -11370,6 +11381,7 @@ python_call_hook_object (int hook, bool is_external, object_t *ob)
 
     Py_DECREF(args);
 
+    python_clear_context();
     python_is_external = was_external;
 } /* python_call_hook_object() */
 
@@ -11694,6 +11706,7 @@ ref_python_ob (svalue_t *pval)
 
 {
     Py_INCREF((PyObject*)pval->u.generic);
+    num_lpc_python_references++;
 } /* ref_python_ob() */
 
 /*-------------------------------------------------------------------------*/
@@ -11705,6 +11718,7 @@ free_python_ob (svalue_t *pval)
 
 {
     Py_DECREF((PyObject*)pval->u.generic);
+    num_lpc_python_references--;
 } /* free_python_ob() */
 
 /*-------------------------------------------------------------------------*/
@@ -11735,6 +11749,8 @@ copy_python_ob (svalue_t *dest, svalue_t *src)
         python_save_context();
 
         result = PyObject_CallObject(fun, NULL);
+
+        python_clear_context();
         python_is_external = was_external;
         Py_DECREF(fun);
 
@@ -11791,6 +11807,8 @@ save_python_ob (svalue_t *dest, string_t **name, svalue_t *ob)
         python_save_context();
 
         result = PyObject_CallObject(fun, NULL);
+
+        python_clear_context();
         python_is_external = was_external;
         Py_DECREF(fun);
 
@@ -11902,6 +11920,7 @@ restore_python_ob (svalue_t *dest, string_t *name, svalue_t *value)
     PyTuple_SET_ITEM(args, 0, arg);
     ob = PyObject_CallObject(fun, args);
 
+    python_clear_context();
     python_is_external = was_external;
     Py_DECREF(fun);
     Py_DECREF(args);
@@ -12013,6 +12032,7 @@ do_single_python_operation (svalue_t *sp, svalue_t *arg1, svalue_t *arg2, bool r
             python_is_external = false;
             python_save_context();
             result = PyObject_CallObject(fun, args);
+            python_clear_context();
             python_is_external = was_external;
 
             if (result == NULL)
@@ -12110,6 +12130,7 @@ do_python_unary_operation (svalue_t *sp, enum python_operation op, const char* o
             python_is_external = false;
             python_save_context();
             result = PyObject_CallObject(fun, NULL);
+            python_clear_context();
             python_is_external = was_external;
 
             Py_DECREF(fun);
@@ -12289,6 +12310,7 @@ call_python_type_efun(svalue_t *sp, int efun, int num_arg)
     python_is_external = false;
     python_save_context();
     result = PyObject_CallObject(fun, args);
+    python_clear_context();
     python_is_external = was_external;
     Py_XDECREF(fun);
     Py_XDECREF(args);
