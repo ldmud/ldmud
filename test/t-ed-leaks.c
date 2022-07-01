@@ -8,8 +8,8 @@ void run_ed()
     // Just to make sure.
     call_out(#'shutdown, __ALARM_TIME__ * 2, 1);
 
-    rm("/dummy");
-    ed("/dummy","ed_ends");
+    rm("/dummy-ed-leaks");
+    ed("/dummy-ed-leaks","ed_ends");
 }
 
 void ed_ends()
@@ -19,13 +19,13 @@ void ed_ends()
 
 void check_test()
 {
-    rm("/dummy");
+    rm("/dummy-ed-leaks");
     start_gc(#'shutdown);
 }
 
 void send_ed_cmds()
 {
-    write("f\nf /dummy2\ne /dummy3\nQ\n");
+    write("f\nf /dummy2-ed-leaks\ne /dummy3-ed-leaks\nQ\n");
 }
 
 void run_test()

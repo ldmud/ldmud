@@ -110,18 +110,18 @@ coroutine ed_cb;
 void start_ed(string content, coroutine cb)
 {
     if (content)
-        write_file("/dummy", content, 1);
+        write_file("/dummy-ed", content, 1);
     else
-        rm("/dummy");
+        rm("/dummy-ed");
 
     ed_cb = cb;
-    ed("/dummy", "ed_ends");
+    ed("/dummy-ed", "ed_ends");
 }
 
 void ed_ends()
 {
-    string result = read_file("/dummy");
-    rm("/dummy");
+    string result = read_file("/dummy-ed");
+    rm("/dummy-ed");
     call_coroutine(ed_cb, result);
 }
 

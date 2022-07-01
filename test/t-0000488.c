@@ -2,10 +2,9 @@
 #include "/inc/gc.inc"
 #include "/inc/client.inc"
 
-
 void run_server()
 {
-    ed("/dummy","ed_ends");
+    ed("/dummy-0000488","ed_ends");
 }
 
 void ed_ends()
@@ -13,12 +12,12 @@ void ed_ends()
     __MASTER_OBJECT__->check_test();
 }
 
-int fnamecounter;
 void run_client()
 {
-    fnamecounter = random(1000);
-    write_file("/dummy"+fnamecounter, "");
-    write("r /dummy"+fnamecounter+"\nQ\n");
+    int fnamecounter = random(1000);
+    write_file("/dummy-0000488-"+fnamecounter, "");
+    write("r /dummy-0000488-"+fnamecounter+"\nQ\n");
+    __MASTER_OBJECT__->set_fnamecounter(fnamecounter);
 }
 
 void run_test()
@@ -29,11 +28,17 @@ void run_test()
     connect_self("run_server", "run_client");
 }
 
+int fnamecounter;
+void set_fnamecounter(int counter)
+{
+    fnamecounter = counter;
+}
+
 void check_test()
 {
     start_gc(
 	(:
-	    rm("/dummy"+fnamecounter);
+	    rm("/dummy-0000488-"+fnamecounter);
 	    shutdown($1);
 	    return;
 	:));
