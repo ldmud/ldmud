@@ -287,6 +287,16 @@ cleanup_reset (cleanup_t * context)
         return MY_FALSE;
     }
 
+    context->mlist = NULL;
+    if (context->mtable)
+        free_pointer_table(context->mtable);
+    context->mtable = new_pointer_table();
+    if (context->ptable == NULL)
+    {
+        outofmemory("mapping compaction pointertable");
+        return MY_FALSE;
+    }
+
     return MY_TRUE;
 } /* cleanup_reset() */
 
@@ -889,12 +899,13 @@ cleanup_all_objects (void)
         object_t   * ob;
         for (ob = obj_list; ob; ob = ob->next_all)
         {
-            /* If the object is swapped for the cleanup, throw away
-             * the pointertable afterwards as the memory locations
-             * are no longer unique.
+            cleanup_single_object(ob, context);
+            cleanup_compact_mappings(context);
+
+            /* Reset the ptr table after each object
+             * to reduce memory usage.
              */
-            if ( cleanup_single_object(ob, context)
-             && !cleanup_reset(context))
+            if (!cleanup_reset(context))
             {
                 cleanup_free(context);
                 return;
