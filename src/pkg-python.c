@@ -9669,61 +9669,93 @@ python_to_svalue (svalue_t *dest, PyObject* val)
     /* First we check our own types. */
     if (PyObject_TypeCheck(val, &ldmud_object_type))
     {
-        put_ref_object(dest, ((ldmud_object_t*)val)->lpc_object, "python_to_svalue");
+        object_t *ob = ((ldmud_object_t*)val)->lpc_object;
+        if (ob != NULL && !(ob->flags & O_DESTRUCTED))
+            put_ref_object(dest, ((ldmud_object_t*)val)->lpc_object, "python_to_svalue");
+        else
+            put_number(dest, 0);
         return NULL;
     }
 
     if (PyObject_TypeCheck(val, &ldmud_lwobject_type))
     {
-        put_ref_lwobject(dest, ((ldmud_lwobject_t*)val)->lpc_lwobject);
+        lwobject_t *lwob = ((ldmud_lwobject_t*)val)->lpc_lwobject;
+        if (lwob != NULL)
+            put_ref_lwobject(dest, lwob);
+        else
+            put_number(dest, 0);
         return NULL;
     }
 
     if (PyObject_TypeCheck(val, &ldmud_array_type))
     {
-        put_ref_array(dest, ((ldmud_array_t*)val)->lpc_array);
+        vector_t* arr = ((ldmud_array_t*)val)->lpc_array;
+        if (arr != NULL)
+            put_ref_array(dest, arr);
+        else
+            put_number(dest, 0);
         return NULL;
     }
 
     if (PyObject_TypeCheck(val, &ldmud_mapping_type))
     {
-        put_ref_mapping(dest, ((ldmud_mapping_t*)val)->lpc_mapping);
+        mapping_t* m = ((ldmud_mapping_t*)val)->lpc_mapping;
+        if (m != NULL)
+            put_ref_mapping(dest, m);
+        else
+            put_number(dest, 0);
         return NULL;
     }
 
     if (PyObject_TypeCheck(val, &ldmud_struct_type))
     {
-        put_ref_struct(dest, ((ldmud_struct_t*)val)->lpc_struct);
+        struct_t* s = ((ldmud_struct_t*)val)->lpc_struct;
+        if (s != NULL)
+            put_ref_struct(dest, s);
+        else
+            put_number(dest, 0);
         return NULL;
     }
 
     if (PyObject_TypeCheck(val, &ldmud_closure_type))
     {
         assign_svalue_no_free(dest, &((ldmud_closure_t*)val)->lpc_closure);
+        if (dest->type == T_INVALID)
+            put_number(dest, 0);
         return NULL;
     }
 
     if (PyObject_TypeCheck(val, &ldmud_coroutine_type))
     {
-        put_ref_coroutine(dest, ((ldmud_coroutine_t*)val)->lpc_coroutine);
+        coroutine_t *cr = ((ldmud_coroutine_t*)val)->lpc_coroutine;
+        if(cr != NULL)
+            put_ref_coroutine(dest, cr);
+        else
+            put_number(dest, 0);
         return NULL;
     }
 
     if (PyObject_TypeCheck(val, &ldmud_symbol_type))
     {
         assign_svalue_no_free(dest, &((ldmud_symbol_t*)val)->lpc_symbol);
+        if (dest->type == T_INVALID)
+            put_number(dest, 0);
         return NULL;
     }
 
     if (PyObject_TypeCheck(val, &ldmud_quoted_array_type))
     {
         assign_svalue_no_free(dest, &((ldmud_quoted_array_t*)val)->lpc_quoted_array);
+        if (dest->type == T_INVALID)
+            put_number(dest, 0);
         return NULL;
     }
 
     if (PyObject_TypeCheck(val, &ldmud_lvalue_type))
     {
         assign_svalue_no_free(dest, &((ldmud_lvalue_t*)val)->lpc_lvalue);
+        if (dest->type == T_INVALID)
+            put_number(dest, 0);
         return NULL;
     }
 

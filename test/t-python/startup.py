@@ -114,6 +114,10 @@ class TestObject(unittest.TestCase):
         with self.assertRaises(AttributeError):
             ob.doesntExist
 
+    def testUninitializedObject(self):
+        ob = ldmud.Object.__new__(ldmud.Object)
+        self.assertEqual(ldmud.efuns.copy(ob), 0)
+
 class TestLWObject(unittest.TestCase):
     def testInitLoaded(self):
         blueprint = ldmud.Object("/testob")
@@ -192,6 +196,10 @@ class TestLWObject(unittest.TestCase):
         with self.assertRaises(TypeError):
             var.value = "42"
         self.assertEqual(var.value, 84)
+
+    def testUninitializedLWObject(self):
+        lwob = ldmud.LWObject.__new__(ldmud.LWObject)
+        self.assertEqual(ldmud.efuns.copy(lwob), 0)
 
 class TestArray(unittest.TestCase):
     def testInitEmpty(self):
@@ -291,6 +299,11 @@ class TestArray(unittest.TestCase):
         del parr[10:0:-3]
         self.assertEqual(list(arr), parr)
 
+    def testUninitializedArray(self):
+        arr = ldmud.Array.__new__(ldmud.Array)
+        ca = ldmud.efuns.copy(arr)
+        self.assertIsNotNone(ca)
+        self.assertEqual(len(ca), 0)
 
 class TestMapping(unittest.TestCase):
     def testInitEmpty(self):
@@ -430,6 +443,12 @@ class TestMapping(unittest.TestCase):
         self.assertEqual(set(m.keys()), set(("One", "Two", "Three",)))
         self.assertEqual(set(m.values()), set((1,2,3,)))
 
+    def testUninitializedMapping(self):
+        m = ldmud.Mapping.__new__(ldmud.Mapping)
+        cm = ldmud.efuns.copy(m)
+        self.assertIsNotNone(cm)
+        self.assertEqual(len(cm), 0)
+
 class TestStruct(unittest.TestCase):
     def setUp(self):
         self.master = ldmud.efuns.find_object("/master")
@@ -485,6 +504,10 @@ class TestStruct(unittest.TestCase):
         self.assertEqual(s.members.t_int.value, 123)
         self.assertEqual(s.members.t_float.value, 5.5)
         self.assertEqual(s.members.t_string.value, 'Hello!')
+
+    def testUninitializedStruct(self):
+        s = ldmud.Struct.__new__(ldmud.Struct)
+        self.assertEqual(ldmud.efuns.copy(s), 0)
 
 class TestClosure(unittest.TestCase):
     def setUp(self):
@@ -545,6 +568,7 @@ class TestClosure(unittest.TestCase):
         with self.assertRaises(Exception):
             s()
         self.assertFalse(s)
+        self.assertEqual(ldmud.efuns.copy(s), 0)
 
 class TestCoroutine(unittest.TestCase):
     def setUp(self):
@@ -623,6 +647,7 @@ class TestCoroutine(unittest.TestCase):
         with self.assertRaises(Exception):
             c()
         self.assertFalse(c)
+        self.assertEqual(ldmud.efuns.copy(c), 0)
 
 class TestSymbol(unittest.TestCase):
     def testSymbolInit(self):
@@ -649,6 +674,10 @@ class TestSymbol(unittest.TestCase):
         self.assertEqual(s1, s2)
         self.assertNotEqual(s1, s3)
         self.assertNotEqual(s1, s4)
+
+    def testUninitializedSymbol(self):
+        s = ldmud.Symbol.__new__(ldmud.Symbol)
+        self.assertEqual(ldmud.efuns.copy(s), 0)
 
 class TestQuotedArray(unittest.TestCase):
     def testQuotedArrayInit(self):
@@ -679,6 +708,10 @@ class TestQuotedArray(unittest.TestCase):
     def testQuotedArrayInitInvalid(self):
         with self.assertRaises(TypeError):
             ldmud.QuotedArray(1.5, 1)
+
+    def testUninitializedQuotedArray(self):
+        qa = ldmud.QuotedArray.__new__(ldmud.QuotedArray)
+        self.assertEqual(ldmud.efuns.copy(qa), 0)
 
 class TestLvalue(unittest.TestCase):
     def testLvalueInit(self):
@@ -795,6 +828,10 @@ class TestLvalue(unittest.TestCase):
         self.assertEqual(s.members.t_int.value, 100)
         s.members.t_int.value = 1000
         self.assertEqual(lv.members.t_int.value, 1000)
+
+    def testUninitializedLvalue(self):
+        lv = ldmud.Lvalue.__new__(ldmud.Lvalue)
+        self.assertEqual(ldmud.efuns.copy(lv), 0)
 
 class TestEfuns(unittest.TestCase):
     def testDir(self):
