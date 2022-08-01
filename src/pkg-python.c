@@ -4614,11 +4614,12 @@ ldmud_mapping_init (ldmud_mapping_t *self, PyObject *args, PyObject *kwds)
                 err = python_to_svalue(svalues + i, PyTuple_GetItem(item, i + 1));
                 if (err != NULL)
                 {
-                    Py_DECREF(item);
                     PyErr_SetString(PyExc_ValueError, err);
                     break;
                 }
             }
+
+            Py_DECREF(item);
 
             if (PyErr_Occurred())
                 break;

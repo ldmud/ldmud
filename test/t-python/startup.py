@@ -449,6 +449,16 @@ class TestMapping(unittest.TestCase):
         self.assertIsNotNone(cm)
         self.assertEqual(len(cm), 0)
 
+    def testInitLeak(self):
+        DI_NUM_MAPPINGS = -415
+        num_arr = ldmud.efuns.driver_info(DI_NUM_MAPPINGS)
+
+        m = ldmud.Mapping({"A": ldmud.Mapping() })
+        self.assertEqual(ldmud.efuns.driver_info(DI_NUM_MAPPINGS), num_arr+2)
+
+        del m
+        self.assertEqual(ldmud.efuns.driver_info(DI_NUM_MAPPINGS), num_arr)
+
 class TestStruct(unittest.TestCase):
     def setUp(self):
         self.master = ldmud.efuns.find_object("/master")
