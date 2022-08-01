@@ -400,6 +400,15 @@ void run_test()
                 return capitalize("\u00e4gyptisch") == "\u00c4gyptisch";
             :)
         }),
+        ({ "capitalize with change in length", 0,
+            (:
+                // We're assuming that the current local gives 'S' for '\u017f'.
+                // And we're building an untabled string, so the garbage
+                // collection will detect unreferenced strings.
+                string str = "_"; str[0] = '\u017f';
+                return capitalize(str) == "S";
+            :)
+        }),
         ({ "lower_case", 0,
             (:
                 return lower_case("\u00c4\u00d6\u00dc") == "\u00e4\u00f6\u00fc";

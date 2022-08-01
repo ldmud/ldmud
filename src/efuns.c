@@ -210,6 +210,7 @@ f_capitalize(svalue_t *sp)
                 new->info.unicode = STRING_UTF8;
             else
                 new->info.unicode = STRING_ASCII;
+            free_mstring(str);
         }
 
         sp->u.str = new;
