@@ -9,6 +9,7 @@
 
 #define OWN_RUNTIME_WARNING
 #include "/inc/base.inc"
+#include "/inc/gc.inc"
 
 int got_warning, got_rt_warning;
 
@@ -81,7 +82,10 @@ void run_test()
 	}
     }
 
-    shutdown(errors && 1); 
+    if (errors)
+        shutdown(1);
+    else
+        start_gc(#'shutdown);
 }
 
 string *epilog(int eflag)

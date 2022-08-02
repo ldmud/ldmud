@@ -12950,7 +12950,8 @@ expr0:
             || ((type2.t_flags & TYPE_MOD_LITERAL) && !lpctype_contains(type2.t_type, type1.t_type))))
           {
               yyerrorf("Bad assignment %s", get_two_fulltypes(type1, type2));
-              restype = ref_fulltype(type1);
+              if (!restype.t_type)
+                  restype = ref_fulltype(type1);
           }
 
           /* Special checks for struct assignments */
