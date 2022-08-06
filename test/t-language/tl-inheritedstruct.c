@@ -1,3 +1,4 @@
+// Not for compile_string()
 /* Even though we inherit private, the struct should be visible here. */
 private structs inherit "ti-struct";
 

@@ -10,6 +10,7 @@
 #define OWN_RUNTIME_WARNING
 #include "/inc/base.inc"
 #include "/inc/gc.inc"
+#include "/sys/compile_string.h"
 
 int got_warning, got_rt_warning;
 
@@ -65,6 +66,61 @@ void run_test()
 	{
 	    msg(" Success.\n");
 	}
+    }
+
+    foreach(string file: get_dir("/tl-*.c"))
+    {
+        object ob;
+        string err;
+
+        msg("Running String Compiler Test %s...", file[0..<3]);
+
+        got_warning = 0;
+        got_rt_warning = 0;
+
+        ob = find_object(file[0..<3]);
+        if (ob)
+            destruct(ob);
+
+        if((err = catch(ob = load_object(file[0..<3]);nolog)))
+        {
+            errors++;
+            msg(" FAILURE! (%s)\n", err[1..<2]);
+        }
+        else
+        {
+            int res;
+            string code = read_file(file);
+            string* fun = explode(code, "int run_test()");
+            if (sizeof(fun) != 2 || "// Not for compile_string()" in code)
+            {
+                msg(" Skipped.\n");
+                continue;
+            }
+
+            err = catch(res = funcall(function closure()
+            {
+                set_this_object(ob);
+                return compile_string(0,
+                    implode(regexp(explode(code,"\n"), "#include \"/sys"),"\n")+"\n"+fun[1],
+                    CS_COMPILE_BLOCK|CS_USE_OBJECT_VARIABLES|CS_USE_OBJECT_FUNCTIONS|CS_USE_OBJECT_STRUCTS);
+            }));
+
+            if (err)
+            {
+                errors++;
+                msg(" FAILURE! (%s)\n", err[1..<2]);
+            }
+            else if (!res)
+            {
+                errors++;
+                msg(" FAILURE! (Wrong result)\n");
+            }
+            else
+            {
+                msg(" Success.\n");
+            }
+        }
     }
 
     foreach(string file: get_dir("/tf-*.c"))

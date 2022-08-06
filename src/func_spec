@@ -179,6 +179,7 @@
         call_inherited_noargs
         call_closure
         context_closure
+        context_lambda
         context_identifier
         transform_to_coroutine
         await
@@ -491,6 +492,7 @@ closure lambda(null|mixed *, mixed);
 closure symbol_function(symbol|string, null|string|object|lwobject default: F_CONST0);
 closure symbol_variable(symbol|string|int);
 closure unbound_lambda(null|mixed *, mixed);
+closure compile_string(null|symbol*, string, void|int, void|null|mapping|closure, void|null|mapping|closure, void|null|mapping|closure);
 
 void    call_out(string|closure, int, void|mixed, ...);
 mixed  *call_out_info();

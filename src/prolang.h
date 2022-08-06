@@ -9,6 +9,7 @@
 /* --- Types --- */
 
 typedef struct lvalue_block_s      lvalue_block_t;
+typedef struct code_context_s      code_context_t;
 
 /* --- struct lvalue_block_s: Store code for an lvalue expression ---
  *
@@ -40,6 +41,27 @@ struct statement_s
     bool warned_dead_code   : 1;  /* We already warned about dead code.  */
 };
 
+/* --- struct code_context_s: Context for string compilations ---
+ *
+ * Contains parameters and callbacks for string compilation.
+ */
+struct code_context_s
+{
+    int num_args;               /* The number of arguments.                */
+    svalue_t *arg_names;        /* The name of the arguments as symbols.   */
+    program_t *prog;            /* Program to use for lookups.             */
+    svalue_t *var_lookup;       /* Mapping or closure for variable lookup. */
+    svalue_t *fun_lookup;       /* Mapping or closure for function lookup. */
+    svalue_t *struct_lookup;    /* Mapping or closure for struct lookup.   */
+
+    bool use_prog_for_variables : 1;  /* Search <prog> for variables.      */
+    bool use_prog_for_functions : 1;  /* Search <prog> for functions.      */
+    bool use_prog_for_structs   : 1;  /* Search <prog> for struct defs.    */
+
+    bool make_async             : 1;  /* Create a coroutine.               */
+
+    char error_msg[5120];       /* Returning error message (if any).       */
+};
 
 /* --- Variables --- */
 
@@ -52,7 +74,7 @@ extern lpctype_t _lpctype_unknown_array, _lpctype_any_array,    _lpctype_int_flo
                  _lpctype_any_object_or_lwobject_array,
                  _lpctype_any_object_or_lwobject_array_array,
                  _lpctype_int_or_string, _lpctype_string_or_string_array,
-                 _lpctype_catch_msg_arg;
+                 _lpctype_symbol_array, _lpctype_catch_msg_arg;
 extern lpctype_t *lpctype_unknown_array, *lpctype_any_array,    *lpctype_int_float,
                  *lpctype_int_array,     *lpctype_string_array, *lpctype_object_array,
                  *lpctype_bytes_array,   *lpctype_string_bytes, *lpctype_string_or_bytes_array,
@@ -62,7 +84,7 @@ extern lpctype_t *lpctype_unknown_array, *lpctype_any_array,    *lpctype_int_flo
                  *lpctype_any_object_or_lwobject_array,
                  *lpctype_any_object_or_lwobject_array_array,
                  *lpctype_int_or_string, *lpctype_string_or_string_array,
-                 *lpctype_catch_msg_arg;
+                 *lpctype_symbol_array, *lpctype_catch_msg_arg;
 
 extern int yychar;
 extern int32 current_id_number;
@@ -86,6 +108,8 @@ extern void store_line_number_backward(int offset);
 extern mp_uint store_include_info(char *name, char *file, char delim, int inc_depth);
 extern void store_include_end(mp_uint inc_offset, int include_line);
 extern void compile_file(int fd, const char * fname, Bool isMasterObj);
+extern lambda_t *compile_expr(string_t *expr, code_context_t *context);
+extern lambda_t *compile_block(string_t *block, code_context_t *context);
 extern Bool is_undef_function (bytecode_p fun);
 extern unsigned short find_inherited_function (const char * super_name, const char * real_name , unsigned short * pInherit, funflag_t *flags);
 extern const char *get_current_function_name();
@@ -93,6 +117,12 @@ extern char *get_lpctype_name (lpctype_t *type);
 extern size_t get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize);
 extern char *get_fulltype_name (fulltype_t type);
 extern void init_compiler();
+extern bool lookup_function(ident_t *ident, char* super, efun_override_t override);
+extern int get_function_index(ident_t *ident);
+extern int get_function_closure(ident_t *ident);
+extern bool lookup_global_variable(ident_t *ident);
+extern int get_global_variable_index(ident_t *ident, bool no_virtual);
+extern int get_global_variable_lvalue(ident_t *ident);
 
 #if defined( DEBUG ) && defined ( TRACE_CODE )
 extern void set_code_window(void);

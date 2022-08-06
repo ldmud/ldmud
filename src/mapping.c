@@ -237,6 +237,7 @@
 
 #include "i-current_object.h"
 #include "i-svalue_cmp.h"
+#include "i-svalue_hash.h"
 
 #define TIME_TO_COMPACT (600) /* 10 Minutes */
    /* TODO: Make this configurable.
@@ -695,44 +696,7 @@ mhash (svalue_t * svp)
  */
 
 {
-    mp_int i;
-
-    switch (svp->type)
-    {
-    case T_STRING:
-    case T_BYTES:
-        i = mstr_get_hash(svp->u.str);
-        break;
-
-    case T_CLOSURE:
-        if (CLOSURE_REFERENCES_CODE(svp->x.closure_type))
-        {
-            i = (p_int)(svp->u.lambda) ^ *SVALUE_FULLTYPE(svp);
-        }
-        else if (CLOSURE_MALLOCED(svp->x.closure_type))
-        {
-            i = (svp->u.lambda->base.ob.type == T_OBJECT
-               ? (p_int)svp->u.lambda->base.ob.u.ob
-               : (p_int)svp->u.lambda->base.ob.u.lwob) ^ *SVALUE_FULLTYPE(svp);
-        }
-        else /* Efun, Simul-Efun, Operator closure */
-        {
-            i = *SVALUE_FULLTYPE(svp);
-        }
-        break;
-
-#ifdef FLOAT_FORMAT_2
-    case T_FLOAT:
-        /* We have no additional type information. */
-        i = svp->u.number;
-        break;
-#endif
-
-    default:
-        i = svp->u.number ^ *SVALUE_FULLTYPE(svp);
-        break;
-    }
-
+    int i = svalue_hash(svp, 32);
     i = i ^ i >> 16;
     i = i ^ i >> 8;
 

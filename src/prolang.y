@@ -107,7 +107,10 @@
 #include "xalloc.h"
 
 #include "pkg-python.h"
+#include "i-current_object.h"
 #include "i-eval_cost.h"
+#include "i-svalue_cmp.h"
+#include "i-svalue_hash.h"
 
 #include "../mudlib/sys/driver_hook.h"
 
@@ -130,6 +133,8 @@ typedef struct efun_shadow_s       efun_shadow_t;
 typedef struct mem_block_s         mem_block_t;
 typedef struct local_variable_s    local_variable_t;
 typedef struct global_variable_s   global_variable_t;
+typedef struct lambda_ident_s      lambda_ident_t;
+typedef struct lambda_struct_ident_s lambda_struct_ident_t;
 
 /*-------------------------------------------------------------------------*/
 /* Exported result variables */
@@ -197,6 +202,8 @@ short hook_type_map[NUM_DRIVER_HOOKS] =
     H_COMMAND:                  SH(T_CLOSURE) SH(T_STRING), \
     H_SEND_NOTIFY_FAIL:         SH(T_CLOSURE) SH(T_STRING), \
     H_AUTO_INCLUDE:             SH(T_CLOSURE) SH(T_STRING), \
+    H_AUTO_INCLUDE_EXPRESSION:  SH(T_CLOSURE) SH(T_STRING), \
+    H_AUTO_INCLUDE_BLOCK:       SH(T_CLOSURE) SH(T_STRING), \
     H_FILE_ENCODING:            SH(T_CLOSURE) SH(T_STRING), \
     H_DEFAULT_METHOD:           SH(T_CLOSURE) SH(T_STRING), \
     H_DEFAULT_PROMPT:           SH(T_CLOSURE) SH(T_STRING), \
@@ -298,6 +305,39 @@ struct global_variable_s
     enum variable_usage usage;  /* How the variable was used. */
 };
 
+/* --- struct lambda_ident_s: Identifier during string compilation ---
+ *
+ * This structure records lookup information for string compilation.
+ */
+
+struct lambda_ident_s
+{
+    enum
+    {
+        LAMBDA_IDENT_UNDEF,  /* Did a lookup, found nothing.            */
+        LAMBDA_IDENT_OBJECT, /* Native function of the current program. */
+        LAMBDA_IDENT_VALUE   /* Closure stored as a lambda value.       */
+    } kind;
+
+    union
+    {
+        unsigned short object_index; /* kind == LAMBDA_IDENT_OBJECT     */
+        unsigned short value_index;  /* kind == LAMBDA_IDENT_VALUE      */
+    };
+};
+
+
+/* --- struct lambda_struct_ident_s: Structs in during string compilation ---
+ *
+ * Needed to record lookup information for structs. We save also the
+ * resulting struct type for easier access to the underlying type.
+ */
+
+struct lambda_struct_ident_s
+{
+    lambda_ident_t index;
+    struct_type_t* type;        /* Refcounted struct type to use. */
+};
 
 /*-------------------------------------------------------------------------*/
 /* Macros */
@@ -458,6 +498,51 @@ enum e_internal_areas {
      * for function <n>. This is only used for function prototypes.
      */
 
+ , A_DEFAULT_LAMBDA_VALUES
+    /* (svalue_t) Area to store any lambda values needed for initialization
+     * of function arguments with their default values.
+     */
+
+ , A_LAMBDA_VALUES
+    /* (svalue_t) Values to be stored in a lambda closure for string
+     * compilation. They are refcounted.
+     */
+
+ , A_LAMBDA_VALUES_TABLE
+    /* (int) Hash table for lambda values. This table maps the hash
+     * to an index into A_LAMBDA_VALUES and A_LAMBDA_VALUES_NEXT.
+     * LAMBDA_VALUE_NEXT(idx) returns the following index in the
+     * hash chain. A table has 0x100 entries, this block may contain
+     * multiple tables when compiling nested closures.
+     */
+
+ , A_LAMBDA_VALUES_NEXT
+    /* (int) All values in A_LAMBDA_VALUES are in the hash table
+     * lambda_values_table. Hash chains are linked using the indices
+     * in this area. A negative value denotes the end of the chain.
+     */
+
+ , A_LAMBDA_FUNCTIONS
+    /* (lambda_ident_t) Function call information when compiling
+     * a lambda closure. This is used instead of A_FUNCTION for
+     * string compilation when looking up u.global.function from
+     * identifiers.
+     */
+
+ , A_LAMBDA_VARIABLES
+    /* (lambda_ident_t) Global variable information when compiling
+     * a lambda closure. This is used instead of (N)V_VARIABLE for
+     * string compilation when looking up u.global.variable from
+     * identifiers.
+     */
+
+ , A_LAMBDA_STRUCTS
+    /* (lambda_ident_t) Struct lookup information when compiling
+     * a lambda closure. This is used instead of STRUCT_DEF for
+     * string compilation when looking up u.global.struct_id from
+     * identifiers.
+     */
+
  , NUMAREAS  /* Total number of areas */
 };
 
@@ -474,6 +559,13 @@ typedef unsigned short    A_SEFUN_STRUCT_DEFS_t;
 typedef bytecode_t        A_LVALUE_CODE_t;
 typedef bytecode_t        A_DEFAULT_VALUES_t;
 typedef p_int             A_DEFAULT_VALUES_POSITION_t;
+typedef svalue_t          A_DEFAULT_LAMBDA_VALUES_t;
+typedef svalue_t          A_LAMBDA_VALUES_t;
+typedef int               A_LAMBDA_VALUES_TABLE_t;
+typedef int               A_LAMBDA_VALUES_NEXT_t;
+typedef lambda_ident_t    A_LAMBDA_FUNCTIONS_t;
+typedef lambda_ident_t    A_LAMBDA_VARIABLES_t;
+typedef lambda_struct_ident_t A_LAMBDA_STRUCTS_t;
 
 /* --- struct mem_block_s: One memory area ---
  * Every mem_block keeps one memory area. As it grows by using realloc(),
@@ -680,6 +772,67 @@ static mem_block_t mem_block[NUMAREAS];
    * default values.
    */
 
+#define DEFAULT_LAMBDA_VALUE(n)    GET_BLOCK(A_DEFAULT_LAMBDA_VALUES)[n]
+  /* Return the lambda value for the default values code block at
+   * position <n>.
+   */
+
+#define DEFAULT_LAMBDA_VALUES_COUNT GET_BLOCK_COUNT(A_DEFAULT_LAMBDA_VALUES)
+  /* Return the number of lambda values for the default values code block.
+   */
+
+#define LAMBDA_VALUE(n)           GET_BLOCK(A_LAMBDA_VALUES)[n]
+  /* Return the lambda value at position <n>.
+   */
+
+#define LAMBDA_VALUES_COUNT       GET_BLOCK_COUNT(A_LAMBDA_VALUES)
+  /* Return the number of lambda values.
+   */
+
+#define LAMBDA_VALUE_ENTRY(l,h)   GET_BLOCK(A_LAMBDA_VALUES_TABLE)[l*0x100 + (h)]
+  /* Return the index of the first lambda value with the given hash <h>.
+   * The lookup is done in the table at level <l>.
+   */
+
+#define LAMBDA_VALUE_TABLE_SIZE   GET_BLOCK_COUNT(A_LAMBDA_VALUES_TABLE)
+  /* The size of the table. (Should always be a multiple of 0x100).
+   */
+
+#define LAMBDA_VALUE_NEXT(n)      GET_BLOCK(A_LAMBDA_VALUES_NEXT)[n]
+  /* Return the index of the next lambda value with the same has
+   * as the lambda value at position <n>.
+   */
+
+#define LAMBDA_FUNCTION(n)        GET_BLOCK(A_LAMBDA_FUNCTIONS)[n]
+  /* Return the function call information at index <n> when
+   * doing a string compilation.
+   */
+
+#define LAMBDA_FUNCTIONS_COUNT    GET_BLOCK_COUNT(A_LAMBDA_FUNCTIONS)
+  /* Return the number of function call information entries when
+   * doing a string compilation.
+   */
+
+#define LAMBDA_VARIABLE(n)        GET_BLOCK(A_LAMBDA_VARIABLES)[n]
+  /* Return the variable information at index <n> when doing a
+   * string compilation.
+   */
+
+#define LAMBDA_VARIABLES_COUNT    GET_BLOCK_COUNT(A_LAMBDA_VARIABLES)
+  /* Return the number of variable information entries when doing
+   * a string compilation.
+   */
+
+#define LAMBDA_STRUCT(n)          GET_BLOCK(A_LAMBDA_STRUCTS)[n]
+  /* Return the strict information at index <n> when doing a
+   * string compilation.
+   */
+
+#define LAMBDA_STRUCTS_COUNT      GET_BLOCK_COUNT(A_LAMBDA_STRUCTS)
+  /* Return the number of struct information entries when doing
+   * a string compilation.
+   */
+
 #if MAX_LOCAL > 256
   /* There are only 8 bit opcodes for accessing
    * local variables.
@@ -772,6 +925,9 @@ struct inline_closure_s
     int num_args;
       /* Number of arguments.
        */
+    int num_opt_args;
+      /* Number of optional arguments.
+       */
     Bool parse_context;
       /* TRUE if the context variable definitions are parsed.
        */
@@ -812,6 +968,10 @@ struct inline_closure_s
        */
     mp_uint full_local_var_size;
       /* Current size of the A_LOCAL_VARIABLES memblocks.
+       */
+
+    mp_uint lambda_values_start;
+      /* Start index of lambda values (when compiling into a lambda).
        */
 };
 
@@ -1084,6 +1244,15 @@ static int prog_string_indizes[0x100];
    * for the hash chains.
    */
 
+static int lambda_values_table_level = 0;
+  /* The table to use for lambda value lookup.
+   */
+
+static int lambda_values_offset = 0;
+  /* Offset into the A_LAMBDA_VALUES block. Every current lambda
+   * value index is relative to this offset.
+   */
+
 static string_t *last_string_constant = NULL;
   /* The current (last) string constant, a tabled string.
    * It is also used to optimize "foo"+"bar" constructs.
@@ -1132,6 +1301,11 @@ static const char * compiled_file;
    * the program's name. Set by prolog().
    */
 
+static code_context_t* string_context;
+  /* Context information for compiling a string.
+   * NULL when we are compiling a program.
+   */
+
   /* A few standard types we often need.
    * We'll initialize them later (using the type functions, so all pointers
    * are correctly set) and then put them into a static storage (and set
@@ -1147,7 +1321,7 @@ lpctype_t _lpctype_unknown_array, _lpctype_any_array,    _lpctype_int_float,
           _lpctype_any_object_or_lwobject_array,
           _lpctype_any_object_or_lwobject_array_array,
           _lpctype_int_or_string, _lpctype_string_or_string_array,
-          _lpctype_catch_msg_arg;
+          _lpctype_symbol_array, _lpctype_catch_msg_arg;
 lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_any_array     = &_lpctype_any_array,
           *lpctype_int_float     = &_lpctype_int_float,
@@ -1166,6 +1340,7 @@ lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_any_object_or_lwobject_array_array = &_lpctype_any_object_or_lwobject_array_array,
           *lpctype_int_or_string = &_lpctype_int_or_string,
           *lpctype_string_or_string_array = &_lpctype_string_or_string_array,
+          *lpctype_symbol_array = &_lpctype_symbol_array,
           *lpctype_catch_msg_arg = &_lpctype_catch_msg_arg;
 
 
@@ -1174,6 +1349,7 @@ lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
 
 struct lvalue_s; /* Defined within YYSTYPE aka %union */
 
+static void decrease_lambda_values_table_level();
 static ident_t* define_local_variable (ident_t* name, lpctype_t* actual_type, struct lvalue_s *lv, Bool redeclare, Bool with_init);
 static void init_local_variable (ident_t* name, struct lvalue_s *lv, int assign_op, fulltype_t type2);
 static void use_variable (ident_t* name, enum variable_usage usage);
@@ -1195,6 +1371,9 @@ static void new_inline_closure (void);
 static int inherit_program(program_t *from, funflag_t funmodifier, funflag_t varmodifier, funflag_t structmodifier);
 static void fix_variable_index_offsets(program_t *);
 static short store_prog_string (string_t *str);
+static int store_lambda_value(svalue_t *svp);
+static int ins_lambda_value(svalue_t *svp);
+static svalue_t* lookup_entity(svalue_t *dict, ident_t* name, ph_int exp_type);
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1211,6 +1390,17 @@ yyerror (const char *str)
     if (num_parse_error > 5)
         return;
     context = lex_error_context();
+
+    if (string_context)
+    {
+        /* Return the error in the context, don't call master. */
+        if (string_context->error_msg[0] == 0)
+            snprintf(string_context->error_msg, sizeof(string_context->error_msg)
+                    , "%s%s\n", str, context);
+        num_parse_error++;
+        return;
+    }
+
     fprintf(stderr, "%s %s line %d: %s%s.\n"
                   , time_stamp(), current_loc.file->name, current_loc.line
                   , str, context);
@@ -1257,6 +1447,14 @@ yywarn (const char *str)
     char *context;
 
     context = lex_error_context();
+
+    if (string_context)
+    {
+        /* Change that to a runtime warning. */
+        warnf("%s%s\n", str, context);
+        return;
+    }
+
     fprintf(stderr, "%s %s line %d: Warning: %s%s.\n"
                   , time_stamp(), current_loc.file->name, current_loc.line
                   , str, context);
@@ -1513,17 +1711,27 @@ DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_VARIABLE, A_VARIABLES)
 DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_GLOBAL_VARIABLE_INFO, A_GLOBAL_VARIABLES)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_STRUCT_DEF, A_STRUCT_DEFS)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_STRUCT_MEMBER, A_STRUCT_MEMBERS)
-DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_SEFUN_STRUCT_DEF, A_SEFUN_STRUCT_DEFS);
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_SEFUN_STRUCT_DEF, A_SEFUN_STRUCT_DEFS)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INLINE_CLOSURE, A_INLINE_CLOSURE)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INCLUDE, A_INCLUDES)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INHERIT, A_INHERITS)
-DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_DEFAULT_VALUE_POS, A_DEFAULT_VALUES_POSITION);
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_DEFAULT_VALUE_POS, A_DEFAULT_VALUES_POSITION)
+DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_DEFAULT_LAMBDA_VALUE, A_DEFAULT_LAMBDA_VALUES)
+DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_LAMBDA_VALUE, A_LAMBDA_VALUES)
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_LAMBDA_VALUE_NEXT, A_LAMBDA_VALUES_NEXT)
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_LAMBDA_FUNCTION, A_LAMBDA_FUNCTIONS)
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_LAMBDA_VARIABLE, A_LAMBDA_VARIABLES)
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_LAMBDA_STRUCT, A_LAMBDA_STRUCTS)
 
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_FUNCTIONS, A_FUNCTIONS);
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_SEFUN_STRUCT_DEFS, A_SEFUN_STRUCT_DEFS);
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_UPDATE_INDEX_MAP, A_UPDATE_INDEX_MAP);
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_INHERITS, A_INHERITS);
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_DEFAULT_VALUE_POS, A_DEFAULT_VALUES_POSITION);
+DEFINE_RESERVE_MEM_BLOCK(RESERVE_DEFAULT_LAMBDA_VALUES, A_DEFAULT_LAMBDA_VALUES)
+DEFINE_RESERVE_MEM_BLOCK(RESERVE_LAMBDA_VALUES, A_LAMBDA_VALUES)
+DEFINE_RESERVE_MEM_BLOCK(RESERVE_LAMBDA_VALUES_TABLE, A_LAMBDA_VALUES_TABLE)
+DEFINE_RESERVE_MEM_BLOCK(RESERVE_LAMBDA_VALUES_NEXT, A_LAMBDA_VALUES_NEXT)
 
 #define byte_to_mem_block(n, b) \
     ((void)((mem_block[n].current_size == mem_block[n].max_size \
@@ -3585,7 +3793,6 @@ read_jump_offset (bc_offset_t offset)
 } /* read_jump_offset() */
 
 /*-------------------------------------------------------------------------*/
-#ifndef FLOAT_FORMAT_2
 static void
 ins_uint32 (uint32_t l)
  // Add the uint32_t <l> to the A_PROGRAM area.
@@ -3602,8 +3809,8 @@ ins_uint32 (uint32_t l)
                 , CURRENT_PROGRAM_SIZE + sizeof(uint32_t));
     }
  } // ins_uint32()
-#else
 /*-------------------------------------------------------------------------*/
+#ifdef FLOAT_FORMAT_2
 static void
 ins_double (double d)
 /* Add the double <d> to the A_PROGRAM area.
@@ -4739,7 +4946,7 @@ ins_local_names ()
  */
 
 {
-    if (pragma_save_local_names)
+    if (pragma_save_local_names && !string_context)
     {
         bytecode_t *p;
         ident_t *var;
@@ -4891,12 +5098,12 @@ add_global_name (ident_t *name)
  */
 
 {
+    if (name->type != I_TYPE_UNKNOWN
+     && name->type != I_TYPE_GLOBAL)
+        name = insert_shared_identifier_mstr(name->name, I_TYPE_GLOBAL, 0);
+
     switch (name->type)
     {
-        default:
-            /* Create a new identifier. */
-            name = make_shared_identifier_mstr(name->name, I_TYPE_GLOBAL, 0);
-            /* FALLTHROUGH */
         case I_TYPE_UNKNOWN:
             /* We can adapt this identifier. */
             init_global_identifier(name, true);
@@ -4918,6 +5125,10 @@ add_global_name (ident_t *name)
                 name->u.global.variable = I_GLOBAL_VARIABLE_OTHER;
             }
             return name;
+
+        default:
+            fatal("insert_shared_identifier_mstr() returned identifier of type %d.\n", name->type);
+            return name; /* NOTREACHED */
     }
 } /* add_global_name() */
 
@@ -5568,14 +5779,20 @@ get_initialized_variable (ident_t *p)
                  && result->u.global.variable != I_GLOBAL_VARIABLE_WORLDWIDE)
                 {
                     if (global_variable_initializing == result)
+                    {
+                        result = NULL;
                         foundinitializing = true;
-                    else
-                        break;
+                    }
+                    else if (string_context
+                          && LAMBDA_VARIABLE(result->u.global.variable).kind == LAMBDA_IDENT_UNDEF)
+                        result = NULL;
+                    break;
                 }
 
                 /* FALLTHROUGH */
             default:
-                result = NULL;
+                if (!string_context || !lookup_global_variable(result))
+                    result = NULL;
                 break;
         }
 
@@ -5845,14 +6062,6 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident, Bool is_inline)
         returntype.t_flags &= ~TYPE_MOD_NOSAVE;
     }
 
-    if (ident->type == I_TYPE_UNKNOWN)
-    {
-        /* prevent freeing by exotic name clashes */
-        init_global_identifier(ident, /* bProgram: */ true);
-        ident->next_all = all_globals;
-        all_globals = ident;
-    }
-
     /* Store the data */
     if (is_inline)
     {
@@ -5868,37 +6077,22 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident, Bool is_inline)
 
 /*-------------------------------------------------------------------------*/
 static void
-def_function_prototype (int num_args, Bool is_inline)
+def_function_argument_check (bool is_inline)
 
-/* Called after parsing '<type> <name> ( <args> ) of a function definition,
- * this function creates the function prototype entry.
- *
- * If <is_inline> is TRUE, the function to be compiled is an inline closure,
- * which requires a slightly different handling. This function is called
- * after 'func <type> <arguments> <context>' has been parsed.
+/* Check the types of the arguments (the current locals).
+ * Right now we only process varargs arguments, verifying it's an array
+ * type and modifying the function type accordingly.
  */
 
 {
-    ident_t * ident;
     fulltype_t * returntype;
-    bool coroutine;
-    int fun;
 
     if (is_inline)
-    {
-        ident = current_inline->ident;
         returntype = &current_inline->returntype;
-        coroutine = current_inline->coroutine;
-    }
     else
-    {
-        ident = def_function_ident;
         returntype = &def_function_returntype;
-        coroutine = def_function_coroutine;
-    }
 
-    /* We got the complete prototype: define it */
-
+    /* Check the last argument for the varargs modifier. */
     if ( current_number_of_locals
      && (local_variables[current_number_of_locals-1].type.t_flags
          & TYPE_MOD_VARARGS)
@@ -5920,18 +6114,49 @@ def_function_prototype (int num_args, Bool is_inline)
             t->type.t_type = lpctype_mixed;
         }
     }
+} /* def_function_argument_check() */
 
-    /* Define a prototype. If it is a real function, then the
-     * prototype will be updated below.
+/*-------------------------------------------------------------------------*/
+static void
+def_function_prototype (int num_args, Bool is_inline)
+
+/* Called after parsing '<type> <name> ( <args> ) of a function definition,
+ * this function creates the function prototype entry.
+ *
+ * If <is_inline> is TRUE, the function to be compiled is an inline closure,
+ * which requires a slightly different handling. This function is called
+ * after 'func <type> <arguments> <context>' has been parsed.
+ */
+
+{
+    ident_t * ident;
+    fulltype_t returntype;
+    bool coroutine;
+    int fun;
+
+    if (is_inline)
+    {
+        ident = current_inline->ident;
+        returntype = current_inline->returntype;
+        coroutine = current_inline->coroutine;
+    }
+    else
+    {
+        ident = def_function_ident;
+        returntype = def_function_returntype;
+        coroutine = def_function_coroutine;
+    }
+
+    /* We got the complete prototype: Define it.
+     * If it is a real function, then the prototype will be updated below.
      */
     fun = define_new_function( MY_FALSE, ident, num_args, 0, 0
                              , NAME_UNDEFINED|NAME_PROTOTYPE|(coroutine?TYPE_MOD_COROUTINE:0)
-                             , *returntype);
+                             , returntype);
 
     /* Store the data */
     if (is_inline)
     {
-        current_inline->num_args = num_args;
         current_inline->function = fun;
     }
     else
@@ -5942,7 +6167,57 @@ def_function_prototype (int num_args, Bool is_inline)
 
 /*-------------------------------------------------------------------------*/
 static void
-def_function_complete (bool has_code, p_uint body_start, struct statement_s statements, bool is_inline)
+def_function_check_return (fulltype_t returntype, struct statement_s statements)
+
+/* Checks whether the current function needs a return statement and
+ * inserts that in such case.
+ */
+
+{
+    /* Catch a missing return if the function has a return type */
+    if (returntype.t_type != lpctype_void
+     && (   returntype.t_type != lpctype_unknown
+         || pragma_strict_types
+        )
+       )
+    {
+        /* Check if the statement block has a return, or
+         * at least a non-continuing instruction.
+         */
+        if (!statements.may_finish)
+        {
+            /* Good. Just in case our information is wrong,
+             * insert a proper default return as well.
+             */
+            if (pragma_warn_missing_return)
+                ins_f_code(F_DEFAULT_RETURN);
+            else
+                ins_f_code(F_RETURN0);
+        }
+        else
+        {
+            /* There is no 'return' here: most likely it is missing
+             * altogether.
+             * If warn_missing_return is enabled, issue the warning,
+             * but always insert a normal F_RETURN0: with the pragma
+             * active it's no use to warn again at runtime, and without
+             * the pragma no warning is desired anyway.
+             */
+            if (pragma_warn_missing_return)
+                yywarnf("Missing 'return <value>' statement");
+
+            ins_f_code(F_RETURN0);
+        }
+    }
+    else
+    {
+        ins_f_code(F_RETURN0);
+    }
+} /* def_function_check_return() */
+
+/*-------------------------------------------------------------------------*/
+static void
+def_function_complete (bool has_code, p_uint body_start, bool is_inline)
 
 /* Called after completely parsing a function definition,
  * this function updates the function header and closes all scopes..
@@ -6010,46 +6285,6 @@ def_function_complete (bool has_code, p_uint body_start, struct statement_s stat
                             , body_start + FUNCTION_PRE_HDR_SIZE
                             , coroutine?TYPE_MOD_COROUTINE:0
                             , returntype);
-
-        /* Catch a missing return if the function has a return type */
-        if (returntype.t_type != lpctype_void
-         && (   returntype.t_type != lpctype_unknown
-             || pragma_strict_types
-            )
-           )
-        {
-            /* Check if the statement block has a return, or
-             * at least a non-continuing instruction.
-             */
-            if (!statements.may_finish)
-            {
-                /* Good. Just in case our information is wrong,
-                 * insert a proper default return as well.
-                 */
-                if (pragma_warn_missing_return)
-                    ins_f_code(F_DEFAULT_RETURN);
-                else
-                    ins_f_code(F_RETURN0);
-            }
-            else
-            {
-                /* There is no 'return' here: most likely it is missing
-                 * altogether.
-                 * If warn_missing_return is enabled, issue the warning,
-                 * but always insert a normal F_RETURN0: with the pragma
-                 * active it's no use to warn again at runtime, and without
-                 * the pragma no warning is desired anyway.
-                 */
-                if (pragma_warn_missing_return)
-                    yywarnf("Missing 'return <value>' statement");
-
-                ins_f_code(F_RETURN0);
-            }
-        }
-        else
-        {
-            ins_f_code(F_RETURN0);
-        }
     }
 
     /* Clean up for normal functions.
@@ -6314,7 +6549,7 @@ define_struct (bool proto, ident_t *p, const char * prog_name, funflag_t flags, 
 
 /*-------------------------------------------------------------------------*/
 static int
-find_struct ( ident_t * name, efun_override_t override )
+find_struct ( ident_t * ident, efun_override_t override )
 
 /* Find the struct <name> and return its index. Return -1 if not found.
  * <override> descibes whether to look at local (OVERRIDE_LFUN) or
@@ -6323,18 +6558,96 @@ find_struct ( ident_t * name, efun_override_t override )
 
 {
     /* Find the global struct identifier */
+    ident_t *name = ident;
     while (name != NULL && name->type != I_TYPE_GLOBAL)
         name = name->inferior;
 
-    if (name == NULL)
-        return -1;
+    if (string_context && override != OVERRIDE_SEFUN)
+    {
+        if (name == NULL)
+            name = add_global_name(insert_shared_identifier_mstr(ident->name, I_TYPE_GLOBAL, 0));
+        else
+            name = add_global_name(name);
+    }
+    else if (name == NULL)
+            return -1;
 
     switch (override)
     {
         default:
         case OVERRIDE_LFUN:
-            if (name->u.global.struct_id != I_GLOBAL_STRUCT_NONE
-             && !(STRUCT_DEF(name->u.global.struct_id).flags & NAME_HIDDEN))
+            if (string_context)
+            {
+                if (name->u.global.struct_id == I_GLOBAL_STRUCT_NONE
+                 && string_context->struct_lookup)
+                {
+                    svalue_t *str = lookup_entity(string_context->struct_lookup, name, T_STRUCT);
+                    if (str)
+                    {
+                        svalue_t ref_str;
+                        int idx;
+                        struct_type_t *st = str->u.strct->type;
+                        lpctype_t *lt = get_struct_type(st); /* Freed by epilog_closure() */
+
+                        update_struct_type(lt, st);
+                        lt->t_struct.def_idx = LAMBDA_STRUCTS_COUNT;
+
+                        assign_svalue_no_free(&ref_str, str); /* Add a reference. */
+                        idx = store_lambda_value(str);
+
+                        name->u.global.struct_id = LAMBDA_STRUCTS_COUNT;
+                        ADD_LAMBDA_STRUCT((lambda_struct_ident_t){
+                            .index = {.kind = LAMBDA_IDENT_VALUE, .value_index = idx},
+                            .type = ref_struct_type(st)});
+                    }
+                }
+
+                if (name->u.global.struct_id == I_GLOBAL_STRUCT_NONE
+                 && string_context->use_prog_for_structs)
+                {
+                    program_t *prog = get_current_object_program();
+                    for (int idx = 0; idx < prog->num_structs; idx++)
+                    {
+                        struct_type_t *st = prog->struct_defs[idx].type;
+                        if (st->name->name == name->name
+                         && !(prog->struct_defs[idx].flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)))
+                        {
+                            lpctype_t *lt = get_struct_type(st);
+
+                            if (lt->t_struct.def_idx < LAMBDA_STRUCTS_COUNT
+                             && LAMBDA_STRUCT(lt->t_struct.def_idx).index.kind == LAMBDA_IDENT_OBJECT
+                             && LAMBDA_STRUCT(lt->t_struct.def_idx).type == st)
+                            {
+                                name->u.global.struct_id = lt->t_struct.def_idx;
+                                free_lpctype(lt);
+                            }
+                            else
+                            {
+                                update_struct_type(lt, st);
+                                lt->t_struct.def_idx = LAMBDA_STRUCTS_COUNT;
+
+                                name->u.global.struct_id = LAMBDA_STRUCTS_COUNT;
+                                ADD_LAMBDA_STRUCT((lambda_struct_ident_t){
+                                    .index = {.kind = LAMBDA_IDENT_OBJECT, .object_index = idx},
+                                    .type = ref_struct_type(st)});
+                                /* lt is freed by epilog_closure(). */
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                if (name->u.global.struct_id == I_GLOBAL_STRUCT_NONE)
+                {
+                    name->u.global.struct_id = LAMBDA_STRUCTS_COUNT;
+                    ADD_LAMBDA_STRUCT((lambda_struct_ident_t){.index = {LAMBDA_IDENT_UNDEF}, .type = NULL});
+                }
+
+                if (LAMBDA_STRUCT(name->u.global.struct_id).index.kind != LAMBDA_IDENT_UNDEF)
+                    return name->u.global.struct_id;
+            }
+            else if (name->u.global.struct_id != I_GLOBAL_STRUCT_NONE
+                  && !(STRUCT_DEF(name->u.global.struct_id).flags & NAME_HIDDEN))
                 return name->u.global.struct_id;
 
             if (override == OVERRIDE_LFUN)
@@ -6365,38 +6678,84 @@ find_struct ( ident_t * name, efun_override_t override )
                     lpctype = get_struct_type(stype);
 
                     id = lpctype->t_struct.def_idx;
-                    if (id != USHRT_MAX && STRUCT_DEF(id).type == stype)
+                    if (id != USHRT_MAX
+                     && (string_context ? LAMBDA_STRUCT(id).type : STRUCT_DEF(id).type) == stype)
                     {
                         free_lpctype(lpctype);
                         SEFUN_STRUCT_DEF(sefun_id) = id;
                         return id;
                     }
 
-                    for (unsigned short i = 0; i < STRUCT_COUNT; i++)
+                    if (string_context)
                     {
-                        if (STRUCT_DEF(i).type == stype)
+                        int idx;
+                        svalue_t str;
+                        struct_t *s;
+
+                        for (unsigned short i = 0; i < LAMBDA_STRUCTS_COUNT; i++)
+                        {
+                            if (LAMBDA_STRUCT(i).type == stype)
+                            {
+                                free_lpctype(lpctype);
+                                SEFUN_STRUCT_DEF(sefun_id) = id;
+                                return id;
+                            }
+                        }
+
+                        /* Add this as a lambda value. */
+                        id = LAMBDA_STRUCTS_COUNT;
+                        if (id == USHRT_MAX)
+                        {
+                            /* Not enough space to do so. */
+                            free_lpctype(lpctype);
+                            return -1;
+                        }
+
+                        s = struct_new(stype);
+                        if (!s)
                         {
                             free_lpctype(lpctype);
-                            SEFUN_STRUCT_DEF(sefun_id) = id;
-                            return id;
+                            return -1;
                         }
-                    }
 
-                    /* Add this as a hidden struct to our program. */
-                    id = STRUCT_COUNT;
-                    if (id == USHRT_MAX)
+                        put_struct(&str, s);
+                        idx = store_lambda_value(&str);
+
+                        ADD_LAMBDA_STRUCT((lambda_struct_ident_t){
+                            .index = {.kind = LAMBDA_IDENT_VALUE, .value_index = idx},
+                            .type = ref_struct_type(stype)});
+                        SEFUN_STRUCT_DEF(sefun_id) = id;
+                        /* lpctype is freed by epiolog_closure(). */
+                    }
+                    else
                     {
-                        /* Not enough space to do so. */
-                        free_lpctype(lpctype);
-                        return -1;
+                        for (unsigned short i = 0; i < STRUCT_COUNT; i++)
+                        {
+                            if (STRUCT_DEF(i).type == stype)
+                            {
+                                free_lpctype(lpctype);
+                                SEFUN_STRUCT_DEF(sefun_id) = id;
+                                return id;
+                            }
+                        }
+
+                        /* Add this as a hidden struct to our program. */
+                        id = STRUCT_COUNT;
+                        if (id == USHRT_MAX)
+                        {
+                            /* Not enough space to do so. */
+                            free_lpctype(lpctype);
+                            return -1;
+                        }
+
+                        sdef.type = ref_struct_type(stype);
+                        sdef.flags = NAME_HIDDEN;
+                        sdef.inh = STRUCT_INH_SEFUN;
+
+                        ADD_STRUCT_DEF(&sdef);
+                        SEFUN_STRUCT_DEF(sefun_id) = id;
                     }
 
-                    sdef.type = ref_struct_type(stype);
-                    sdef.flags = NAME_HIDDEN;
-                    sdef.inh = STRUCT_INH_SEFUN;
-
-                    ADD_STRUCT_DEF(&sdef);
-                    SEFUN_STRUCT_DEF(sefun_id) = id;
                     lpctype->t_struct.def_idx = id;
                     /* Note we keep the reference of lpctype
                      * for epilog() to free it.
@@ -6525,10 +6884,12 @@ finish_struct ( int32 prog_id)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
+create_struct_literal ( int sidx, struct_type_t * stype, int length, struct_init_t * list)
 
 /* The compiler has created code for <length> expressions in order
- * to create a struct literal of struct <pdef>.
+ * to create a struct literal of struct type <stype> with index <sidx>.
+ * If <sidx> is -1, then a template struct needs to be on the stack before
+ * the values.
  * Analyze the <list> of member descriptions and generate the appropriate
  * bytecode.
  *
@@ -6559,8 +6920,8 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
         /* Check the types */
         if (exact_types && length > 0)
         {
-            for (member = 0, pmember = pdef->type->member, p = list
-                ; member < length && member < struct_t_size(pdef->type)
+            for (member = 0, pmember = stype->member, p = list
+                ; member < length && member < struct_t_size(stype)
                 ; member++, pmember++, p = p->next
                 )
             {
@@ -6570,7 +6931,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
                              "in struct '%s'"
                             , get_two_lpctypes(pmember->type, p->type.t_type)
                             , get_txt(pmember->name)
-                            , get_txt(struct_t_name(pdef->type))
+                            , get_txt(struct_t_name(stype))
                             );
                     got_error = MY_TRUE;
                 }
@@ -6582,7 +6943,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
         /* The types check out - create the bytecode */
         ins_f_code(F_S_AGGREGATE);
-        ins_short(pdef - &STRUCT_DEF(0));
+        ins_short(sidx);
         ins_byte(length);
 
         return MY_TRUE;
@@ -6592,12 +6953,12 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
     consumed = 0;
 
-    block = xalloc( struct_t_size(pdef->type) * sizeof(*flags)
+    block = xalloc( struct_t_size(stype) * sizeof(*flags)
                   + length * sizeof(*ix));
     flags = (Bool *)block;
-    ix = (int *)((char *)block + struct_t_size(pdef->type) * sizeof(*flags));
+    ix = (int *)((char *)block + struct_t_size(stype) * sizeof(*flags));
 
-    for (i = 0; i < struct_t_size(pdef->type); i++)
+    for (i = 0; i < struct_t_size(stype); i++)
     {
         flags[i] = MY_FALSE;
     }
@@ -6618,7 +6979,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
             {
                 yyerrorf( "Can't mix named and unnamed initializers "
                           "in struct '%s'"
-                        , get_txt(struct_t_name(pdef->type))
+                        , get_txt(struct_t_name(stype))
                         );
                 got_error = MY_TRUE;
             }
@@ -6627,15 +6988,15 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
         consumed++;
         pmember = NULL; /* avoids a warning */
-        member = struct_find_member(pdef->type, p->name);
+        member = struct_find_member(stype, p->name);
         if (member >= 0)
-            pmember = &pdef->type->member[member];
+            pmember = &stype->member[member];
 
         if (member < 0)
         {
             yyerrorf( "No such member '%s' in struct '%s'"
                     , get_txt(p->name)
-                    , get_txt(struct_t_name(pdef->type))
+                    , get_txt(struct_t_name(stype))
                     );
             got_error = MY_TRUE;
         }
@@ -6644,7 +7005,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
             yyerrorf( "Multiple initializations of member '%s' "
                       "in struct '%s'"
                     , get_txt(p->name)
-                    , get_txt(struct_t_name(pdef->type))
+                    , get_txt(struct_t_name(stype))
                     );
             got_error = MY_TRUE;
         }
@@ -6655,7 +7016,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
                      "in struct '%s'"
                     , get_two_lpctypes(pmember->type, p->type.t_type)
                     , get_txt(p->name)
-                    , get_txt(struct_t_name(pdef->type))
+                    , get_txt(struct_t_name(stype))
                     );
             got_error = MY_TRUE;
         }
@@ -6677,7 +7038,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
     if (consumed < length)
     {
         yyerrorf("Too many elements for struct '%s'"
-                , get_txt(struct_t_name(pdef->type))
+                , get_txt(struct_t_name(stype))
                 );
         xfree(block);
         return MY_FALSE;
@@ -6695,7 +7056,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
     /* Finally, create the code */
     ins_f_code(F_S_M_AGGREGATE);
-    ins_short(pdef - &STRUCT_DEF(0));
+    ins_short(sidx);
     ins_byte(length);
     for (i = length-1; i >= 0; i--)
         ins_byte(ix[i]);
@@ -6711,36 +7072,77 @@ static short
 get_struct_index (lpctype_t* stype)
 
 /* Return the index of struct <stype> in this program's A_STRUCT_DEFS.
- * Return -1 if not found.
+ * Return -2 if not found and should be an error, -1 if not found and
+ * should not be an error.
  */
 
 {
     unsigned short idx = stype->t_struct.def_idx;
     if (idx == USHRT_MAX)
     {
-        struct_def_t sdef;
+        if (string_context)
+        {
+            /* We do this even when we should not use the program for structs.
+             * As this is just an optimization (compile-time lookup instead of
+             * runtime lookup). We cannot do this, if a replace_program() is
+             * in progress.
+             */
+            program_t *prog = get_current_object_program();
 
-        /* Do we know the exact definition from the name? */
-        if (stype->t_struct.def == NULL)
+            if (current_object.type == T_OBJECT
+             && (current_object.u.ob->prog->flags & P_REPLACE_ACTIVE))
+                return -1;
+
+            for (idx = 0; idx < prog->num_structs; idx++)
+            {
+                if ((stype->t_struct.def == NULL)
+                  ? (prog->struct_defs[idx].type->name == stype->t_struct.name)
+                  : (prog->struct_defs[idx].type == stype->t_struct.def))
+                {
+                    if (stype->t_struct.def == NULL)
+                        update_struct_type(stype, prog->struct_defs[idx].type);
+
+                    stype->t_struct.def_idx = LAMBDA_STRUCTS_COUNT;
+                    ADD_LAMBDA_STRUCT((lambda_struct_ident_t){
+                        .index = {.kind = LAMBDA_IDENT_OBJECT, .object_index = idx},
+                        .type = ref_struct_type(stype->t_struct.def)});
+                    ref_lpctype(stype); /* Freed by epilog_closure(). */
+
+                    return idx;
+                }
+            }
+
             return -1;
+        }
+        else
+        {
+            struct_def_t sdef;
 
-        /* Add this as a hidden struct to our program. */
-        idx = STRUCT_COUNT;
-        if (idx == USHRT_MAX)
-            return -1; /* Not enough space to do so. */
+            /* Do we know the exact definition from the name? */
+            if (stype->t_struct.def == NULL)
+                return -2;
 
-        sdef.type = stype->t_struct.def;
-        sdef.flags = NAME_HIDDEN;
-        sdef.inh = STRUCT_INH_USAGE;
+            /* Add this as a hidden struct to our program. */
+            idx = STRUCT_COUNT;
+            if (idx == USHRT_MAX)
+                return -2; /* Not enough space to do so. */
 
-        ADD_STRUCT_DEF(&sdef);
-        ref_lpctype(stype); /* Epilog will free this. */
-        stype->t_struct.def_idx = idx;
-        return idx;
+            sdef.type = stype->t_struct.def;
+            sdef.flags = NAME_HIDDEN;
+            sdef.inh = STRUCT_INH_USAGE;
+
+            ADD_STRUCT_DEF(&sdef);
+            ref_lpctype(stype); /* Epilog will free this. */
+            stype->t_struct.def_idx = idx;
+            return idx;
+        }
     }
 
-    assert(idx < STRUCT_COUNT);
-    assert(STRUCT_DEF(idx).type->name == stype->t_struct.name);
+    if (!string_context)
+    {
+        assert(idx < STRUCT_COUNT);
+        assert(STRUCT_DEF(idx).type->name == stype->t_struct.name);
+    }
 
     return idx;
 } /* get_struct_index() */
@@ -6881,7 +7283,18 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool
             {
                 struct_type_t *pdef = unionmember->t_struct.def;
                 if (pdef == NULL)
-                    break;
+                {
+                    short idx;
+
+                    if (!string_context)
+                        break;
+
+                    idx = get_struct_index(unionmember);
+                    if (idx < 0)
+                        break;
+                    pdef = unionmember->t_struct.def;
+                    assert(pdef != NULL);
+                }
 
                 int midx = -1;
 
@@ -6901,7 +7314,7 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool
                         fstruct = pdef;
                         *struct_index = get_struct_index(unionmember);
                         *member_index = midx;
-                        if (*struct_index == -1)
+                        if (*struct_index == FSM_NO_STRUCT)
                         {
                             yyerrorf("Unknown type in struct dereference: struct %s\n"
                                     , get_txt(fstruct->name->name));
@@ -7156,6 +7569,7 @@ printf("DEBUG:   start: %"PRIuMPINT", depth %d, locals: %d/%d, break: %d/%d\n",
     ict.full_local_var_start = local_variables - &(LOCAL_VARIABLE(0));
     ict.full_context_var_start = context_variables - &(LOCAL_VARIABLE(0));
     ict.full_local_var_size  = mem_block[A_LOCAL_VARIABLES].current_size;
+    ict.lambda_values_start  = LAMBDA_VALUES_COUNT - lambda_values_offset;
 #ifdef DEBUG_INLINES
 printf("DEBUG:   local types: %"PRIuMPINT", context types: %"PRIuMPINT"\n", 
        ict.full_local_var_start, ict.full_context_var_start);
@@ -7179,6 +7593,8 @@ printf("DEBUG:   type ptrs: %p, %p\n",
 
     max_break_stack_need = current_break_stack_need = 0;
     max_number_of_locals = current_number_of_locals = 0;
+    lambda_values_offset = LAMBDA_VALUES_COUNT;
+    lambda_values_table_level++;
 
     /* Add the structure to the memblock */
     ADD_INLINE_CLOSURE(&ict);
@@ -7222,7 +7638,7 @@ printf("DEBUG:   depth %d, locals: %d/%d, break: %d/%d\n",
     length = current_inline->length;
     end = current_inline->end;
 
-    if (!bAbort)
+    if (!bAbort && !string_context)
     {
         backup_start = INLINE_PROGRAM_SIZE;
 #ifdef DEBUG_INLINES
@@ -7266,7 +7682,7 @@ printf("DEBUG:   program size: %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
     /* Move the linenumber data into the backup storage */
     start = current_inline->li_start;
     length = current_inline->li_length;
-    if (!bAbort)
+    if (!bAbort && !string_context)
     {
         backup_start = INLINE_PROGRAM_SIZE;
 #ifdef DEBUG_INLINES
@@ -7317,6 +7733,8 @@ printf("DEBUG:   move li data forward: from %"PRIuMPINT", length %"PRIuMPINT
     current_break_stack_need = current_inline->break_stack_size;
     max_break_stack_need     = current_inline->max_break_stack_size;
     exact_types              = current_inline->exact_types;
+    lambda_values_offset    -= current_inline->lambda_values_start;
+    decrease_lambda_values_table_level();
 
 #ifdef DEBUG_INLINES
 printf("DEBUG:   local types: %"PRIuMPINT", context types: %"PRIuMPINT"\n", 
@@ -7419,31 +7837,36 @@ prepare_inline_closure (lpctype_t *returntype, bool coroutine)
     fulltype_t funtype;
     ident_t * ident;
 
-    /* Create the name of the new inline function.
-     * We have to make sure the name is really unique.
-     */
-    do
+    if (!string_context)
     {
-        char * start;
-
-        sprintf(name, "__inline_%s_%d_#%04x", current_loc.file->name
-                     , current_loc.line, inline_closure_id++);
-
-        /* Convert all non-alnums (but '#') to '_' */
-        for (start = name; *start != '\0'; start++)
+        /* Create the name of the new inline function.
+         * We have to make sure the name is really unique.
+         */
+        do
         {
-            if (!isalnum((unsigned char)(*start)) && '#' != *start)
-                *start = '_';
-        }
-    } while (    find_shared_identifier(name, 0, 0)
-              && inline_closure_id != 0);
-    if (inline_closure_id == 0)
-    {
-        yyerror("Can't generate unique name for inline closure");
-        return MY_FALSE;
-    }
+            char * start;
 
-    ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
+            sprintf(name, "__inline_%s_%d_#%04x", current_loc.file->name
+                         , current_loc.line, inline_closure_id++);
+
+            /* Convert all non-alnums (but '#') to '_' */
+            for (start = name; *start != '\0'; start++)
+            {
+                if (!isalnum((unsigned char)(*start)) && '#' != *start)
+                    *start = '_';
+            }
+        } while (    find_shared_identifier(name, 0, 0)
+                  && inline_closure_id != 0);
+        if (inline_closure_id == 0)
+        {
+            yyerror("Can't generate unique name for inline closure");
+            return MY_FALSE;
+        }
+
+        ident = add_global_name(make_shared_identifier(name, I_TYPE_UNKNOWN, 0));
+    }
+    else
+        ident = NULL;
 
     /* The lfuns implementing the inline closures should not
      * be callable directly (without the CLOSURE svalue), and also not
@@ -7486,7 +7909,9 @@ inline_closure_prototype (int num_args)
 #ifdef DEBUG_INLINES
 printf("DEBUG: inline_closure_prototype(%d)\n", num_args);
 #endif /* DEBUG_INLINES */
-    def_function_prototype(num_args, MY_TRUE);
+    def_function_argument_check(true);
+    if (!string_context)
+        def_function_prototype(num_args, MY_TRUE);
 
 #ifdef DEBUG_INLINES
 printf("DEBUG:   current_inline->depth: %d: %d\n", current_inline->block_depth, block_scope[current_inline->block_depth-1].num_locals);
@@ -7495,6 +7920,9 @@ printf("DEBUG:               arg depth: %d: %d\n", current_inline->block_depth+2
 printf("DEBUG:           current depth: %d: %d\n", block_depth, block_scope[block_depth].num_locals);
 printf("DEBUG:   Function index: %d\n", current_inline->function);
 #endif /* DEBUG_INLINES */
+
+    current_inline->num_args = num_args;
+    current_inline->num_opt_args = 0;
 
     store_line_number_info();
 
@@ -7569,9 +7997,18 @@ printf("DEBUG:               arg depth: %d: %d\n", current_inline->block_depth+2
 printf("DEBUG:           current depth: %d: %d\n", block_depth, block_scope[block_depth-1].num_locals);
 #endif /* DEBUG_INLINES */
 
+    /* Insert any missing returns. */
+    def_function_check_return(current_inline->returntype, statements);
+
     /* Generate the function header and update the ident-table entry.
      */
-    def_function_complete(true, start, statements, true);
+    if (!string_context)
+    {
+        int fnum = current_inline->ident->u.global.function;
+        FUNCTION(fnum)->num_opt_arg = current_inline->num_opt_args;
+
+        def_function_complete(true, start, true);
+    }
 
     current_inline->length = CURRENT_PROGRAM_SIZE - start;
 
@@ -7665,8 +8102,81 @@ printf("DEBUG:     -> F_LOCAL %d\n", lcmap[i]);
 printf("DEBUG:     -> F_CONTEXT_CLOSURE %d %d %d\n", current_inline->function
       , num_explicit_context, context->num_locals - num_explicit_context);
 #endif /* DEBUG_INLINES */
-        ins_f_code(F_CONTEXT_CLOSURE);
-        ins_short(current_inline->function);
+
+        if (string_context)
+        {
+            /* We are compiling a lambda closure. Therefore we cannot insert
+             * the inline closure into a program and need to make that
+             * a lambda closure as well.
+             */
+
+            int num_values, idx;
+            size_t size;
+            void *block;
+            lambda_t *l;
+            svalue_t cl;
+            svalue_t *values;
+
+            num_values = LAMBDA_VALUES_COUNT - lambda_values_offset
+                       + context->num_locals;
+            size = sizeof(lambda_t) + current_inline->length - FUNCTION_HDR_SIZE
+                                    + num_values * sizeof(svalue_t);
+            if ( !(block = xalloc(size)) )
+            {
+                yyerrorf("Out of memory: closure structure (%zu bytes)", size);
+                leave_block_scope(MY_TRUE);  /* Argument scope */
+                leave_block_scope(MY_TRUE);  /* Context scope */
+                finish_inline_closure(MY_TRUE);
+                return;
+            }
+
+            l = (lambda_t*)(block + num_values * sizeof(svalue_t));
+            closure_init_base(&(l->base), current_object);
+
+            memcpy(l->program, PROGRAM_BLOCK + current_inline->start + FUNCTION_HDR_SIZE
+                             , current_inline->length - FUNCTION_HDR_SIZE);
+
+            l->num_values = num_values;
+            l->num_arg = current_inline->num_args;
+            l->num_opt_arg = current_inline->num_opt_args;
+            l->num_locals = max_number_of_locals - l->num_arg + max_break_stack_need;
+            l->num_values = num_values;
+            l->xvarargs = (current_inline->returntype.t_flags & TYPE_MOD_XVARARGS) != 0;
+
+            /* We need to reverse the order of lambda values. */
+            values = ((svalue_t*) block) + num_values;
+            for (int i = lambda_values_offset; i < LAMBDA_VALUES_COUNT; i++)
+            {
+                values--;
+                *values = LAMBDA_VALUE(i);
+            }
+
+            /* Initialize the slots for the context variables. */
+            memset(values - context->num_locals, 0, context->num_locals * sizeof(svalue_t));
+
+            /* References have been adopted. */
+            GET_BLOCK_SIZE(A_LAMBDA_VALUES) = lambda_values_offset * sizeof(A_LAMBDA_VALUES_t);
+            GET_BLOCK_SIZE(A_LAMBDA_VALUES_NEXT) = lambda_values_offset * sizeof(A_LAMBDA_VALUES_NEXT_t);
+
+            /* Store the closure as a lambda value.
+             * We need to go to the outer scope for that.
+             */
+            lambda_values_offset -= current_inline->lambda_values_start;
+            decrease_lambda_values_table_level();
+            cl = (svalue_t){ T_CLOSURE, {.closure_type = CLOSURE_LAMBDA}, {.lambda = l} };
+            idx = store_lambda_value(&cl);
+            lambda_values_offset += current_inline->lambda_values_start;
+            lambda_values_table_level++;
+
+            ins_f_code(F_CONTEXT_LAMBDA);
+            ins_short(idx);
+            ins_uint32(current_inline->length - FUNCTION_HDR_SIZE);
+        }
+        else
+        {
+            ins_f_code(F_CONTEXT_CLOSURE);
+            ins_short(current_inline->function);
+        }
         ins_byte(context->first_local);
         ins_short(num_explicit_context);
         ins_short(context->num_locals - num_explicit_context);
@@ -7780,37 +8290,47 @@ ins_prog_string (string_t *str)
  * Returns the number of bytes written to the bytecode.
  */
 {
-    PREPARE_INSERT(3);
-    int string_number = store_prog_string(str);
-    if ( string_number <= 0xff )
+    if (string_context)
     {
-        add_f_code(F_CSTRING0);
-        add_byte(string_number);
-    }
-    else if ( string_number <= 0x1ff )
-    {
-        add_f_code(F_CSTRING1);
-        add_byte(string_number);
-    }
-    else if ( string_number <= 0x2ff )
-    {
-        add_f_code(F_CSTRING2);
-        add_byte(string_number);
-    }
-    else if ( string_number <= 0x3ff )
-    {
-        add_f_code(F_CSTRING3);
-        add_byte(string_number);
+        svalue_t sv = str->info.unicode == STRING_BYTES ? svalue_bytes(str) : svalue_string(str);
+
+        last_string_is_new = false;
+        return ins_lambda_value(&sv);
     }
     else
     {
-        add_f_code(F_STRING);
-        add_short(string_number);
-        CURRENT_PROGRAM_SIZE += 3;
-        return 3;
+        PREPARE_INSERT(3);
+        int string_number = store_prog_string(str);
+        if ( string_number <= 0xff )
+        {
+            add_f_code(F_CSTRING0);
+            add_byte(string_number);
+        }
+        else if ( string_number <= 0x1ff )
+        {
+            add_f_code(F_CSTRING1);
+            add_byte(string_number);
+        }
+        else if ( string_number <= 0x2ff )
+        {
+            add_f_code(F_CSTRING2);
+            add_byte(string_number);
+        }
+        else if ( string_number <= 0x3ff )
+        {
+            add_f_code(F_CSTRING3);
+            add_byte(string_number);
+        }
+        else
+        {
+            add_f_code(F_STRING);
+            add_short(string_number);
+            CURRENT_PROGRAM_SIZE += 3;
+            return 3;
+        }
+        CURRENT_PROGRAM_SIZE += 2;
+        return 2;
     }
-    CURRENT_PROGRAM_SIZE += 2;
-    return 2;
 } /* ins_prog_string */
 
 /*-------------------------------------------------------------------------*/
@@ -7844,6 +8364,412 @@ delete_prog_string (void)
 } /* delete_prog_string() */
 
 
+/* ======================   STRING COMPILATION   ========================= */
+
+/*-------------------------------------------------------------------------*/
+static void
+decrease_lambda_values_table_level ()
+
+/* Basically decrements lambda_values_table_level by one, but also invalidates
+ * the corresponding table.
+ */
+
+{
+    size_t target_size = sizeof(A_LAMBDA_VALUES_TABLE_t) * lambda_values_table_level*0x100;
+    if (mem_block[A_LAMBDA_VALUES_TABLE].current_size > target_size)
+        mem_block[A_LAMBDA_VALUES_TABLE].current_size = target_size;
+    lambda_values_table_level--;
+} /* decrease_lambda_values_table_level() */
+
+/*-------------------------------------------------------------------------*/
+static int
+store_lambda_value (svalue_t *svp)
+
+/* Add the value <svp> to the lambda values used for building the closure.
+ * The references from <svp> are adopted.
+ */
+
+{
+    int hash = svalue_hash(svp, 8);
+    int *entry;
+    int result;
+
+    assert(hash < 0x100);
+
+    if (lambda_values_table_level*0x100 + hash >= LAMBDA_VALUE_TABLE_SIZE)
+    {
+        int needed_entries = (lambda_values_table_level+1)*0x100 - LAMBDA_VALUE_TABLE_SIZE;
+        size_t blocksize = needed_entries * sizeof(A_LAMBDA_VALUES_TABLE_t);
+        if (!RESERVE_LAMBDA_VALUES_TABLE(needed_entries))
+        {
+            yyerrorf("Out of memory for lambda values hash table (%zu bytes).",
+                     blocksize);
+            free_svalue(svp);
+            return -1;
+        }
+
+        memset(mem_block[A_LAMBDA_VALUES_TABLE].block + mem_block[A_LAMBDA_VALUES_TABLE].current_size, -1, blocksize);
+        mem_block[A_LAMBDA_VALUES_TABLE].current_size += blocksize;
+    }
+
+    entry = &(LAMBDA_VALUE_ENTRY(lambda_values_table_level, hash));
+
+    /* Check for existing values. */
+    for (int idx = *entry; idx >= 0; idx = LAMBDA_VALUE_NEXT(lambda_values_offset + idx))
+    {
+        if (svalue_eq(svp, &LAMBDA_VALUE(lambda_values_offset + idx)))
+        {
+            free_svalue(svp);
+            return idx;
+        }
+    }
+
+    /* Append to the lambda value list. */
+    result = LAMBDA_VALUES_COUNT - lambda_values_offset;
+
+    if (!RESERVE_LAMBDA_VALUES(1) || !RESERVE_LAMBDA_VALUES_NEXT(1))
+    {
+        yyerrorf("Out of memory for new value (%zu bytes).",
+                sizeof(svalue_t) + sizeof(int));
+        free_svalue(svp);
+        return -1;
+    }
+
+    ADD_LAMBDA_VALUE(svp);
+    ADD_LAMBDA_VALUE_NEXT(*entry);
+    *entry = result;
+
+    return result;
+} /* store_lambda_value() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ins_lambda_value (svalue_t *svp)
+
+/* Add the value <svp> to the lambda values used for building the closure
+ * and insert code using the value into the current bytecode.
+ * The references from <svp> are adopted.
+ * Returns the number of bytes written to the bytecode.
+ */
+{
+    PREPARE_INSERT(3);
+    int idx = store_lambda_value(svp);
+
+    if (idx < 0x100)
+    {
+        add_f_code(F_LAMBDA_CCONSTANT);
+        add_byte(idx);
+        CURRENT_PROGRAM_SIZE += 2;
+        return 2;
+    }
+    else
+    {
+        /* epilog_closure() checks whether the index exceeds its range. */
+        add_f_code(F_LAMBDA_CONSTANT);
+        add_short(idx);
+        CURRENT_PROGRAM_SIZE += 3;
+        return 3;
+    }
+
+    /* NOTREACHED */
+    return 0;
+} /* ins_prog_string */
+
+/*-------------------------------------------------------------------------*/
+static svalue_t *
+lookup_entity (svalue_t *dict, ident_t* name, ph_int exp_type)
+
+/* Looks up the identifier <name> in the mapping or closure <dict>.
+ * <dict> maybe NULL, in which case the lookup won't be successful.
+ * The identifier is converted into a symbol for lookup. For mapping
+ * it's a direct key lookup, for closure it's a call with the name
+ * as the only argument.
+ * The resulting value must be of <exp_type> type. If the lookup
+ * is unsuccessful (or returns 0), NULL is returned. If the lookup
+ * yields another type than <exp_type> an error is thrown (and NULL
+ * is returned). Otherwise the resulting value is returned (with
+ * borrowed references).
+ */
+
+{
+    svalue_t sym = svalue_symbol(name->name, 1);
+    svalue_t *result;
+
+    if (!dict)
+        return NULL;
+
+    switch (dict->type)
+    {
+        case T_MAPPING:
+            result = get_map_value(dict->u.map, &sym);
+            break;
+
+        case T_CLOSURE:
+            if (is_current_object_destructed())
+                return NULL;
+
+            push_svalue(&sym);
+            result = secure_call_lambda(dict, 1, false, NULL);
+            break;
+
+        default:
+            return NULL;
+    }
+
+    if (!result || (result->type == T_NUMBER && result->u.number == 0))
+        return NULL;
+
+    if (result->type != exp_type)
+    {
+        yyerrorf("Bad type returned for '%.50s': got '%s', expected '%s'",
+            get_txt(name->name), typename(result->type), typename(exp_type));
+        return NULL;
+    }
+
+    return result;
+} /* lookup_entity() */
+
+/*-------------------------------------------------------------------------*/
+bool
+lookup_function (ident_t *ident, char* super, efun_override_t override)
+
+/* This function checks whether the given indentifier represents a function.
+ * It handles lookup during string compilation.
+ */
+
+{
+    ident = add_global_name(ident);
+
+    if (string_context && !super
+     && ident->type == I_TYPE_GLOBAL
+     && ident->u.global.function == I_GLOBAL_FUNCTION_OTHER
+     && (override == OVERRIDE_NONE || override == OVERRIDE_LFUN))
+    {
+        /* Unless there is an override, we look up this name.
+         * And we store the result.
+         */
+        /* We haven't seen this function, yet. Let's look it up. */
+        if (string_context->fun_lookup)
+        {
+            svalue_t *fun = lookup_entity(string_context->fun_lookup, ident, T_CLOSURE);
+            if (fun)
+            {
+                svalue_t ref_fun;
+                int idx;
+
+                assign_svalue_no_free(&ref_fun, fun); /* Add a reference. */
+                idx = store_lambda_value(fun);
+
+                ident->u.global.function = LAMBDA_FUNCTIONS_COUNT;
+                ADD_LAMBDA_FUNCTION((lambda_ident_t){.kind = LAMBDA_IDENT_VALUE, .value_index = idx});
+            }
+        }
+
+        if (ident->u.global.function == I_GLOBAL_FUNCTION_OTHER
+         && string_context->use_prog_for_functions)
+        {
+            program_t *prog = get_current_object_program();
+            int idx = find_function(ident->name, prog);
+            if (idx >= 0 && !(prog->functions[idx] & (TYPE_MOD_PRIVATE|NAME_HIDDEN)))
+            {
+                ident->u.global.function = LAMBDA_FUNCTIONS_COUNT;
+                ADD_LAMBDA_FUNCTION((lambda_ident_t){.kind = LAMBDA_IDENT_OBJECT, .object_index = idx});
+            }
+        }
+
+        if (ident->u.global.function == I_GLOBAL_FUNCTION_OTHER)
+        {
+            ident->u.global.function = LAMBDA_FUNCTIONS_COUNT;
+            ADD_LAMBDA_FUNCTION((lambda_ident_t){LAMBDA_IDENT_UNDEF});
+        }
+
+        /* The identifier now contains an index, even though it might point
+         * to an undefined entry. We need to be aware of that later on.
+         */
+    }
+
+    if (ident->u.global.function == I_GLOBAL_FUNCTION_OTHER)
+        return false;
+    if (!string_context)
+        return true;
+    return LAMBDA_FUNCTION(ident->u.global.function).kind != LAMBDA_IDENT_UNDEF;
+} /* lookup_function() */
+
+/*-------------------------------------------------------------------------*/
+int
+get_function_index (ident_t *ident)
+
+/* Checks whether the given identifier function is a real lfun to be called.
+ * If so return the function index, otherwise return -1.
+ */
+
+{
+    assert(ident->type == I_TYPE_GLOBAL);
+
+    if (ident->u.global.function == I_GLOBAL_FUNCTION_OTHER)
+        return -1;
+
+    if (!string_context)
+        return ident->u.global.function;
+
+    if (LAMBDA_FUNCTION(ident->u.global.function).kind != LAMBDA_IDENT_OBJECT)
+        return -1;
+
+    return LAMBDA_FUNCTION(ident->u.global.function).object_index;
+} /* get_function_index() */
+
+/*-------------------------------------------------------------------------*/
+int
+get_function_closure (ident_t *ident)
+
+/* Checks whether the given identifier function is a closure to be called.
+ * If so return the lambda value index for the closure, otherwise return -1.
+ */
+
+{
+    assert(ident->type == I_TYPE_GLOBAL);
+
+    if (!string_context
+     || ident->u.global.function == I_GLOBAL_FUNCTION_OTHER
+     || LAMBDA_FUNCTION(ident->u.global.function).kind != LAMBDA_IDENT_VALUE)
+        return -1;
+
+    return LAMBDA_FUNCTION(ident->u.global.function).value_index;
+} /* get_function_closure() */
+
+/*-------------------------------------------------------------------------*/
+bool
+lookup_global_variable (ident_t *ident)
+
+/* This function checks whether the given indentifier represents a global
+ * variable. It handles lookup during string compilation.
+ */
+
+{
+
+    if (string_context)
+    {
+        bool found = false;
+
+        if (ident->type == I_TYPE_GLOBAL
+         && ident->u.global.variable != I_GLOBAL_VARIABLE_OTHER
+         && ident->u.global.variable != I_GLOBAL_VARIABLE_WORLDWIDE)
+        {
+            return LAMBDA_VARIABLE(ident->u.global.variable).kind != LAMBDA_IDENT_UNDEF;
+        }
+
+        ident = add_global_name(ident);
+
+        if (string_context->var_lookup)
+        {
+            svalue_t *var = lookup_entity(string_context->var_lookup, ident, T_LVALUE);
+            if (var)
+            {
+                svalue_t ref_var;
+                int idx;
+
+                assign_svalue_no_free(&ref_var, var); /* Add a reference. */
+                idx = store_lambda_value(var);
+
+                ident->u.global.variable = LAMBDA_VARIABLES_COUNT;
+                ADD_LAMBDA_VARIABLE((lambda_ident_t){.kind = LAMBDA_IDENT_VALUE, .value_index = idx});
+
+                found = true;
+            }
+        }
+
+        if (!found && string_context->use_prog_for_variables)
+        {
+            program_t *prog = get_current_object_program();
+            for (int idx = 0; idx < prog->num_variables; idx++)
+            {
+                if (prog->variables[idx].name == ident->name
+                 && !(prog->variables[idx].type.t_flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)))
+                {
+                    ident->u.global.variable = LAMBDA_VARIABLES_COUNT;
+                    ADD_LAMBDA_VARIABLE((lambda_ident_t){.kind = LAMBDA_IDENT_OBJECT, .object_index = idx});
+
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        if (!found)
+        {
+            ident->u.global.variable = LAMBDA_VARIABLES_COUNT;
+            ADD_LAMBDA_VARIABLE((lambda_ident_t){.kind = LAMBDA_IDENT_UNDEF});
+        }
+
+        return found;
+    }
+    else
+        return ident->type == I_TYPE_GLOBAL
+            && ident->u.global.variable != I_GLOBAL_VARIABLE_OTHER
+            && ident->u.global.variable != I_GLOBAL_VARIABLE_WORLDWIDE;
+} /* lookup_global_variable() */
+
+/*-------------------------------------------------------------------------*/
+int
+get_global_variable_index (ident_t *ident, bool no_virtual)
+
+/* Checks whether the given identifier variable is a real object variable.
+ * If so return the variable index, otherwise return -1.
+ * If <no_virtual> is true, then return -2 if the variable would is virtual.
+ */
+
+{
+    int idx;
+
+    assert(ident->type == I_TYPE_GLOBAL);
+
+    if (ident->u.global.variable == I_GLOBAL_VARIABLE_OTHER
+     || ident->u.global.variable == I_GLOBAL_VARIABLE_WORLDWIDE)
+        return -1;
+
+    if (!string_context)
+    {
+        if (ident->u.global.variable & VIRTUAL_VAR_TAG)
+        {
+            if (no_virtual)
+                return -2;
+            else
+                return ident->u.global.variable - VIRTUAL_VAR_TAG;
+        }
+        return ident->u.global.variable + num_virtual_variables;
+    }
+
+    if (LAMBDA_VARIABLE(ident->u.global.variable).kind != LAMBDA_IDENT_OBJECT)
+        return -1;
+
+    idx = LAMBDA_VARIABLE(ident->u.global.variable).object_index;
+    if (no_virtual
+     && idx < get_current_object_program()->num_virtual_variables)
+        return -2;
+
+    return idx;
+} /* get_global_variable_index() */
+
+/*-------------------------------------------------------------------------*/
+int
+get_global_variable_lvalue (ident_t *ident)
+
+/* Checks whether the given identifier variable is an lvalue reference.
+ * If so return the lambda value index for the lvalue, otherwise return -1.
+ */
+
+{
+    assert(ident->type == I_TYPE_GLOBAL);
+
+    if (!string_context
+     || ident->u.global.variable == I_GLOBAL_VARIABLE_OTHER
+     || ident->u.global.variable == I_GLOBAL_VARIABLE_WORLDWIDE
+     || LAMBDA_FUNCTION(ident->u.global.variable).kind != LAMBDA_IDENT_VALUE)
+        return -1;
+
+    return LAMBDA_VARIABLE(ident->u.global.variable).value_index;
+} /* get_global_variable_lvalue() */
+
 /*=========================================================================*/
 
 #if defined(__MWERKS__) && !defined(WARN_ALL)
@@ -7858,6 +8784,9 @@ delete_prog_string (void)
 
 /*-------------------------------------------------------------------------*/
 
+%token L_START_PROG
+%token L_START_EXPR
+%token L_START_BLOCK
 %token L_ASSIGN
 %token L_ASYNC
 %token L_ARROW
@@ -7892,6 +8821,7 @@ delete_prog_string (void)
 %token L_INC
 %token L_INHERIT
 %token L_INT
+%token L_LAMBDA_CLOSURE_VALUE
 %token L_LAND
 %token L_LE
 %token L_LOR
@@ -8277,7 +9207,7 @@ delete_prog_string (void)
 
 /*-------------------------------------------------------------------------*/
 
-%type <number>       L_NUMBER constant
+%type <number>       L_NUMBER L_LAMBDA_CLOSURE_VALUE constant
 %type <float_number> L_FLOAT
 %type <closure>      L_CLOSURE
 %type <symbol>       L_SYMBOL
@@ -8386,7 +9316,13 @@ delete_prog_string (void)
 
 /*-------------------------------------------------------------------------*/
 
-all: program;
+all:  L_START_PROG program
+    | L_START_BLOCK statements_block
+    | L_START_EXPR comma_expr
+      {
+          free_fulltype($2.type);
+      }
+; /* all */
 
 program:
       program def possible_semi_colon
@@ -8426,7 +9362,7 @@ function_def:
 
       {
           check_identifier($2);
-          def_function_typecheck($1, $2, MY_FALSE);
+          def_function_typecheck($1, add_global_name($2), MY_FALSE);
       }
 
       '(' argument ')'
@@ -8436,6 +9372,7 @@ function_def:
           p_int offset = 0;
           function_t *funp;
 
+          def_function_argument_check(false);
           def_function_prototype($5.num, MY_FALSE);
 
           /* Remember the current size if we need to revert. */
@@ -8610,7 +9547,9 @@ function_def:
                   DEFAULT_VALUES_POS(fnum) = -1;
           }
 
-          def_function_complete($8.has_code, offset, $8.statements, false);
+          if ($8.has_code)
+              def_function_check_return(def_function_returntype, $8.statements);
+          def_function_complete($8.has_code, offset, false);
 
           insert_pending_inline_closures();
           free_fulltype($1);
@@ -8697,6 +9636,8 @@ printf("DEBUG: After inline_opt_type: program size %"PRIuMPINT"\n", CURRENT_PROG
       inline_opt_args
 
       {
+          int num_values;
+
 #ifdef DEBUG_INLINES
 printf("DEBUG: After inline_opt_args: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
@@ -8731,6 +9672,22 @@ printf("DEBUG: After inline_opt_args: program size %"PRIuMPINT"\n", CURRENT_PROG
 
           if ($1 && $5.num > 0)
               yyerror("async inline closure may not have arguments");
+
+          /* For the context we need to go back to the previous context with
+           * regard to lambda values. Save the values for the inline closure.
+           */
+          num_values = LAMBDA_VALUES_COUNT - lambda_values_offset;
+          RESERVE_DEFAULT_LAMBDA_VALUES(num_values);
+          for (int i = lambda_values_offset; i < LAMBDA_VALUES_COUNT; i++)
+              ADD_DEFAULT_LAMBDA_VALUE(&(LAMBDA_VALUE(i)));
+          /* References have been adopted. */
+          GET_BLOCK_SIZE(A_LAMBDA_VALUES) = lambda_values_offset * sizeof(A_LAMBDA_VALUES_t);
+          GET_BLOCK_SIZE(A_LAMBDA_VALUES_NEXT) = lambda_values_offset * sizeof(A_LAMBDA_VALUES_NEXT_t);
+
+          decrease_lambda_values_table_level();
+          lambda_values_offset -= current_inline->lambda_values_start;
+
+          $<number>4 = num_values;
       }
 
       inline_opt_context
@@ -8744,6 +9701,7 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
           block_scope_t *scope = block_scope + current_inline->block_depth;
           inline_closure_t *outer_closure;
           int * outer_max_num_locals;
+          int num_values;
 
           if (scope->num_locals > scope->num_cleared)
           {
@@ -8799,10 +9757,7 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
           if (!$<number>$)
               $5.num_opt = 0;
           else
-          {
-              int fnum = current_inline->ident->u.global.function;
-              FUNCTION(fnum)->num_opt_arg = $5.num_opt;
-          }
+              current_inline->num_opt_args = $5.num_opt;
 
           if ($1)
           {
@@ -8810,6 +9765,25 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
               ins_local_names();
               ins_f_code(F_POP_VALUE);
           }
+
+          /* Activate the a scope for lambda values. And restore any
+           * values from default value initializers.
+           */
+          current_inline->lambda_values_start = LAMBDA_VALUES_COUNT - lambda_values_offset;
+          lambda_values_table_level++;
+          lambda_values_offset = LAMBDA_VALUES_COUNT;
+
+          num_values = $<number>4;
+          for (int i = 0; i < num_values; i++)
+          {
+              int idx = store_lambda_value(&(DEFAULT_LAMBDA_VALUE(DEFAULT_LAMBDA_VALUES_COUNT - num_values + i)));
+
+              /* This should be the same index as before. */
+              assert(idx == i);
+          }
+
+          /* The references have been adopted. */
+          GET_BLOCK_SIZE(A_DEFAULT_LAMBDA_VALUES) -= num_values * sizeof(A_DEFAULT_LAMBDA_VALUES_t);
       }
 
       inline_block
@@ -9615,7 +10589,10 @@ single_basic_non_void_type:
           }
           else
           {
-              $$ = get_struct_type(STRUCT_DEF(num).type);
+              if (string_context)
+                  $$ = get_struct_type(LAMBDA_STRUCT(num).type);
+              else
+                  $$ = get_struct_type(STRUCT_DEF(num).type);
           }
       }
     | L_STRUCT L_MIXED
@@ -11536,7 +12513,13 @@ case_label:
               yyerror("Mixed case label list not allowed");
 
           case_state.no_string_labels = MY_FALSE;
-          store_prog_string(last_string_constant);
+          if (string_context)
+          {
+              svalue_t sv = svalue_string(last_string_constant);
+              store_lambda_value(&sv);
+          }
+          else
+              store_prog_string(last_string_constant);
           $$.key = (p_int)last_string_constant;
           $$.numeric = MY_FALSE;
           last_string_constant = NULL;
@@ -13558,14 +14541,25 @@ expr4:
               else if (ix >= CLOSURE_IDENTIFIER_OFFS)
               {
                   // closure to global variable
-                  // the lexxer only creates closure to non-virtual variables - our luck ;)
-                  int varidx = ix - CLOSURE_IDENTIFIER_OFFS - num_virtual_variables;
-                  variable_t *varp = NV_VARIABLE(varidx);
+                  variable_t *varp;
+
+                  if (string_context)
+                  {
+                      int varidx = ix - CLOSURE_IDENTIFIER_OFFS;
+                      program_t *prog = get_current_object_program();
+                      varp = prog->variables+varidx;
+                  }
+                  else
+                  {
+                      // the lexxer only creates closure to non-virtual variables - our luck ;)
+                      int varidx = ix - CLOSURE_IDENTIFIER_OFFS - num_virtual_variables;
+                      varp = NV_VARIABLE(varidx);
+                      GLOBAL_VARIABLE(varidx).usage = VAR_USAGE_READWRITE;
+                  }
 
                   if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
                       yywarnf("Creating closure to deprecated global variable %s.\n",
                               get_txt(varp->name));
-                  GLOBAL_VARIABLE(varidx).usage = VAR_USAGE_READWRITE;
               }
           }
           else if (ix >= CLOSURE_EFUN_OFFS && ix < CLOSURE_SIMUL_EFUN_OFFS)
@@ -13640,19 +14634,18 @@ expr4:
           $$.name =   NULL;
           $$.needs_use = true;
           quotes = $1.quotes;
-          string_number = store_prog_string($1.name);
-          if (quotes == 1 && string_number < 0x100)
+
+          if (string_context)
           {
-                /* One byte shorter than the other way */
-                ins_f_code(F_CSTRING0);
-                ins_byte(string_number);
-                ins_f_code(F_QUOTE);
+              svalue_t sv = svalue_symbol($1.name, quotes);
+              ins_lambda_value(&sv);
           }
           else
           {
-                ins_f_code(F_SYMBOL);
-                ins_short(string_number);
-                ins_byte(quotes);
+              string_number = store_prog_string($1.name);
+              ins_f_code(F_SYMBOL);
+              ins_short(string_number);
+              ins_byte(quotes);
           }
           $$.type = get_fulltype_flags(lpctype_symbol, TYPE_MOD_LITERAL);
       }
@@ -13675,6 +14668,28 @@ expr4:
           ins_uint16 ( exponent );
 #endif  /* FLOAT_FORMAT_2 */
           $$.type = get_fulltype_flags(lpctype_float, TYPE_MOD_LITERAL);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | L_LAMBDA_CLOSURE_VALUE
+      {
+          assert(string_context != NULL);
+
+          $$.start = CURRENT_PROGRAM_SIZE;
+          $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
+          $$.type = get_fulltype_flags(lpctype_closure, TYPE_MOD_LITERAL);
+
+          if ($1 < 0x100)
+          {
+              ins_f_code(F_LAMBDA_CCONSTANT);
+              ins_byte($1);
+          }
+          else
+          {
+              ins_f_code(F_LAMBDA_CONSTANT);
+              ins_short($1);
+          }
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13822,6 +14837,22 @@ expr4:
               YYACCEPT;
           }
           $<number>$ = num;
+
+          if (string_context && LAMBDA_STRUCT(num).index.kind == LAMBDA_IDENT_VALUE)
+          {
+              // Need to put the lambda value as a struct template on the stack.
+              int idx = LAMBDA_STRUCT(num).index.value_index;
+              if (idx < 0x100)
+              {
+                  ins_f_code(F_LAMBDA_CCONSTANT);
+                  ins_byte(idx);
+              }
+              else
+              {
+                  ins_f_code(F_LAMBDA_CONSTANT);
+                  ins_short(idx);
+              }
+          }
       }
 
       note_start opt_struct_init ')'
@@ -13830,22 +14861,33 @@ expr4:
           /* Generate a literal struct */
 
           int num = $<number>5;
-          struct_def_t *pdef = &(STRUCT_DEF(num));
+          struct_type_t *stype;
+
+          if (string_context)
+          {
+              stype = LAMBDA_STRUCT(num).type;
+              if (LAMBDA_STRUCT(num).index.kind == LAMBDA_IDENT_OBJECT)
+                  num = LAMBDA_STRUCT(num).index.object_index;
+              else
+                  num = -1;
+          }
+          else
+              stype = STRUCT_DEF(num).type;
 
           if ($7.length > STRUCT_MAX_MEMBERS
-           || $7.length > struct_t_size(pdef->type))
+           || $7.length > struct_t_size(stype))
           {
               /* Too many elements - create an empty struct */
               yyerrorf("Too many elements for literal struct '%s'"
-                      , get_txt(struct_t_name(pdef->type)));
+                      , get_txt(struct_t_name(stype)));
               CURRENT_PROGRAM_SIZE = $6;
-              create_struct_literal(pdef, 0, NULL);
+              create_struct_literal(num, stype, 0, NULL);
           }
-          else if (!create_struct_literal(pdef, $7.length, $7.list))
+          else if (!create_struct_literal(num, stype, $7.length, $7.list))
           {
               /* Creation failed - create an empty struct */
               CURRENT_PROGRAM_SIZE = $6;
-              create_struct_literal(pdef, 0, NULL);
+              create_struct_literal(num, stype, 0, NULL);
           }
 
           /* Free the list of member descriptors */
@@ -13859,7 +14901,7 @@ expr4:
               xfree(p);
           }
 
-          $$.type = get_fulltype_flags(get_struct_type(pdef->type), TYPE_MOD_LITERAL);
+          $$.type = get_fulltype_flags(get_struct_type(stype), TYPE_MOD_LITERAL);
           $$.start = $6;
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.name =   NULL;
@@ -13883,7 +14925,7 @@ expr4:
 
           $$.start = current = CURRENT_PROGRAM_SIZE;
 
-          if (!realloc_a_program(3))
+          if (!realloc_a_program(4))
           {
               yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+3);
               YYACCEPT;
@@ -13894,9 +14936,66 @@ expr4:
           {
               /* A global variable. */
               int i = varident->u.global.variable;
-              variable_t *varp;
+              variable_t *varp = NULL;
 
-              if (i & VIRTUAL_VAR_TAG)
+              if (string_context)
+              {
+                  if (LAMBDA_VARIABLE(i).kind == LAMBDA_IDENT_OBJECT)
+                  {
+                      program_t *prog = get_current_object_program();
+
+                      i = LAMBDA_VARIABLE(i).object_index;
+                      varp = prog->variables+i;
+
+                      if (i < prog->num_virtual_variables)
+                          i |= VIRTUAL_VAR_TAG;
+                      else
+                          i -= prog->num_virtual_variables;
+                  }
+                  else
+                  {
+                      /* This is a lvalue stored in a lambda value. */
+                      bytecode_p q;
+                      int idx = LAMBDA_VARIABLE(i).value_index;
+
+                      if (idx < 0x100)
+                      {
+                          $$.lvalue = alloc_lvalue_block(2);
+                          q = LVALUE_BLOCK + $$.lvalue.start;
+
+                          q[0] = F_LAMBDA_CCONSTANT;
+                          q[1] = idx;
+
+                          p[0] = F_LAMBDA_CCONSTANT;
+                          p[1] = idx;
+                          p[2] = F_MAKE_RVALUE;
+
+                          current++;
+                      }
+                      else
+                      {
+                          $$.lvalue = alloc_lvalue_block(3);
+                          q = LVALUE_BLOCK + $$.lvalue.start;
+
+                          q[0] = F_LAMBDA_CONSTANT;
+                          PUT_SHORT(q+1, idx);
+
+                          p[0] = F_LAMBDA_CCONSTANT;
+                          upd_short(current+1, i);
+                          p[3] = F_MAKE_RVALUE;
+                          current += 2;
+                      }
+
+                      $$.type = get_fulltype(lpctype_mixed);
+                      i = -1; /* Finished. */
+                  }
+              }
+
+              if (i < 0)
+              {
+                  /* Already handled above. */
+              }
+              else if (i & VIRTUAL_VAR_TAG)
               {
                   /* Access a virtual variable */
 
@@ -13911,7 +15010,8 @@ expr4:
                   *p++ = F_VIRTUAL_VARIABLE;
                   *p = i;
 
-                  varp = V_VARIABLE(i);
+                  if (!varp)
+                      varp = V_VARIABLE(i);
                   $$.type = ref_fulltype(varp->type);
               }
               else
@@ -13944,11 +15044,12 @@ expr4:
                       *p++ = F_IDENTIFIER;
                       *p = i;
                   }
-                  varp = NV_VARIABLE(i);
+                  if (!varp)
+                      varp = NV_VARIABLE(i);
                   $$.type = ref_fulltype(varp->type);
               }
 
-              if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
+              if (varp && varp->type.t_flags & TYPE_MOD_DEPRECATED)
               {
                   yywarnf("Using deprecated global variable %s.\n",
                           get_txt(varp->name));
@@ -14204,9 +15305,56 @@ name_lvalue:
           {
               /* A global variable. */
               int i = varident->u.global.variable;
-              variable_t *varp;
+              variable_t *varp = NULL;
 
-              if (i & VIRTUAL_VAR_TAG)
+              if (string_context)
+              {
+                  if (LAMBDA_VARIABLE(i).kind == LAMBDA_IDENT_OBJECT)
+                  {
+                      program_t *prog = get_current_object_program();
+
+                      i = LAMBDA_VARIABLE(i).object_index;
+                      varp = prog->variables+i;
+                      if (i < prog->num_virtual_variables)
+                          i |= VIRTUAL_VAR_TAG;
+                      else
+                          i -= prog->num_virtual_variables;
+                  }
+                  else
+                  {
+                      /* This is a lvalue stored in a lambda value. */
+                      bytecode_p q;
+                      int idx = LAMBDA_VARIABLE(i).value_index;
+
+                      if (idx < 0x100)
+                      {
+                          $$.lvalue = alloc_lvalue_block(2);
+                          q = LVALUE_BLOCK + $$.lvalue.start;
+
+                          q[0] = F_LAMBDA_CCONSTANT;
+                          q[1] = idx;
+                      }
+                      else
+                      {
+                          $$.lvalue = alloc_lvalue_block(3);
+                          q = LVALUE_BLOCK + $$.lvalue.start;
+
+                          q[0] = F_LAMBDA_CONSTANT;
+                          PUT_SHORT(q+1, idx);
+                      }
+
+                      $$.vlvalue_inst = 0;
+                      $$.num_arg = 0;
+                      $$.type = lpctype_mixed;
+                      i = -1; /* Finished. */
+                  }
+              }
+
+              if (i < 0)
+              {
+                  /* Already handled. */
+              }
+              else if (i & VIRTUAL_VAR_TAG)
               {
                   bytecode_p q;
 
@@ -14218,7 +15366,8 @@ name_lvalue:
                   $$.vlvalue_inst = F_PUSH_VIRTUAL_VARIABLE_VLVALUE;
                   $$.num_arg = 1;
 
-                  varp = V_VARIABLE(i);
+                  if (!varp)
+                      varp = V_VARIABLE(i);
                   $$.type = ref_lpctype(varp->type.t_type);
               }
               else
@@ -14249,10 +15398,11 @@ name_lvalue:
                       $$.vlvalue_inst = F_PUSH_IDENTIFIER_VLVALUE;
                       $$.num_arg = 1;
                   }
-                  varp = NV_VARIABLE(i);
+                  if (!varp)
+                      varp = NV_VARIABLE(i);
                   $$.type = ref_lpctype(varp->type.t_type);
               }
-              if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
+              if (varp && varp->type.t_flags & TYPE_MOD_DEPRECATED)
                   yywarnf("Using deprecated global variable %s.\n",
                           get_txt(varp->name));
           }
@@ -15765,7 +16915,8 @@ function_call:
            */
 
           ident_t *real_name;
-          int efun_idx;
+          int efun_idx, value_idx;
+          bool has_function;
 
           /* Save the (simple) state */
           $<function_call_head>$.start = CURRENT_PROGRAM_SIZE;
@@ -15811,16 +16962,10 @@ function_call:
           function_call_info[argument_level].unlimited_args = false;
           function_call_info[argument_level].remaining_arg_types = 0;
 
-          if (real_name->type == I_TYPE_UNKNOWN)
-          {
-              /* prevent freeing by exotic name clashes */
-              /* also makes life easier below */
-              init_global_identifier(real_name, /* bProgram: */ true);
-              real_name->next_all = all_globals;
-              all_globals = real_name;
-          }
-          else if ( ($1.super ? ( $<function_call_head>$.efun_override == OVERRIDE_SEFUN )
-                              : ( real_name->u.global.function == I_GLOBAL_FUNCTION_OTHER ))
+          has_function = lookup_function(real_name, $1.super, $<function_call_head>$.efun_override);
+
+          if ( ($1.super ? ( $<function_call_head>$.efun_override == OVERRIDE_SEFUN )
+                         : ( !has_function ))
                 && real_name->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
                 && !pragma_no_simul_efuns)
           {
@@ -15832,21 +16977,13 @@ function_call:
                   /* The simul-efun has to be called by name:
                    * prepare the extra args for the call_other
                    */
-                  PREPARE_INSERT(8)
-                  string_t *p;
-
-                  p = ref_mstring(real_name->name);
-                  add_f_code(F_STRING);
-                  add_short(store_prog_string(
-                    ref_mstring(query_simul_efun_file_name())));
-                  add_f_code(F_STRING);
-                  add_short(store_prog_string(p));
-                  CURRENT_PROGRAM_SIZE += 6;
+                  ins_prog_string(ref_mstring(query_simul_efun_file_name()));
+                  ins_prog_string(ref_mstring(real_name->name));
               }
           }
           else if ( real_name->type == I_TYPE_GLOBAL
                 && ($1.super ? ($<function_call_head>$.efun_override == OVERRIDE_EFUN)
-                             : (defined_function(real_name)) < 0)
+                             : (!has_function))
 %ifdef USE_PYTHON
                 && !is_python_efun(real_name)
 %endif
@@ -15862,6 +16999,25 @@ function_call:
                   function_call_info[argument_level].remaining_arg_types = instrs[efun_idx].max_arg;
               }
           }
+          else if (!$1.super && (value_idx = get_function_closure(real_name)) >= 0)
+          {
+              /* A call to a closure. Need to insert the closure before
+               * the arguments.
+               */
+              PREPARE_INSERT(3);
+              if (value_idx < 0x100)
+              {
+                  add_f_code(F_LAMBDA_CCONSTANT);
+                  add_byte(value_idx);
+                  CURRENT_PROGRAM_SIZE += 2;
+              }
+              else
+              {
+                  add_f_code(F_LAMBDA_CONSTANT);
+                  add_short(value_idx);
+                  CURRENT_PROGRAM_SIZE += 3;
+              }
+          }
       }
 
       '(' arg_expr_list ')'
@@ -15871,9 +17027,9 @@ function_call:
            * proper instructions to call the function.
            */
 %line
-          int         f = 0;             /* Function index */
+          int         f;                 /* Function index */
           int         simul_efun;
-          lpctype_t **arg_types = NULL; /* Argtypes from the program */
+          lpctype_t **arg_types = NULL;  /* Argtypes from the program */
           int         first_arg;         /* Startindex in arg_types[] */
           Bool        ap_needed;         /* TRUE if arg frame is needed */
           Bool        has_ellipsis;      /* TRUE if '...' was used */
@@ -15889,6 +17045,15 @@ function_call:
               /* since num_arg is encoded in just one byte, and 0xff
                * is taken for SIMUL_EFUN_VARARG */
               yyerrorf("Too many arguments to function");
+
+          f = ($1.real->u.global.function == I_GLOBAL_FUNCTION_OTHER) ? -1 : $1.real->u.global.function;
+          if (string_context && !$1.super && f >= 0)
+          {
+              if (LAMBDA_FUNCTION(f).kind == LAMBDA_IDENT_OBJECT)
+                  f = LAMBDA_FUNCTION(f).object_index;
+              else
+                  f = -1;
+          }
 
           do {
               /* The function processing is in a big do...while(0)
@@ -15971,8 +17136,17 @@ function_call:
                       $$.type = get_fulltype(ref_lpctype(funp->type));
               } /* if (simul-efun) */
 
+              else if (!$1.super && get_function_closure($1.real) >= 0)
+              {
+                  /* CLOSURE during string compilation */
+                  PREPARE_INSERT(2)
+                  add_f_code(F_FUNCALL);
+                  CURRENT_PROGRAM_SIZE++;
+                  ap_needed = MY_TRUE;
+              }
+
               else if ($1.super ? ($<function_call_head>2.efun_override == OVERRIDE_NONE)
-                                : (f = defined_function($1.real)) >= 0
+                                : (f >= 0)
                       )
               {
                   /* LFUN or INHERITED LFUN */
@@ -15989,10 +17163,13 @@ function_call:
                       program_t *super_prog;
                       int ix;
 
-                      ix = insert_inherited( $1.super, $1.real->name
-                                           , &super_prog, &inherited_function
-                                           , $4
-                                           );
+                      if (string_context && !string_context->use_prog_for_functions)
+                          ix = INHERITED_NOT_FOUND;
+                      else
+                          ix = insert_inherited( $1.super, $1.real->name
+                                               , &super_prog, &inherited_function
+                                               , $4
+                                               );
 
                       if (ix < 0)
                       {
@@ -16040,10 +17217,27 @@ function_call:
                       ap_needed = MY_TRUE;
                       add_f_code(F_CALL_FUNCTION);
                       add_short(f);
-                      funp = FUNCTION(f);
-                      arg_types = GET_BLOCK(A_ARGUMENT_TYPES);
-                      first_arg = ARGUMENT_INDEX(f);
                       CURRENT_PROGRAM_SIZE += 3;
+
+                      if (string_context)
+                      {
+                          program_t *prog = get_current_object_program();
+
+                          inherited_function.flags = prog->functions[f];
+                          get_function_information(&inherited_function, prog, f);
+                          arg_types = prog->argument_types;
+                          if (arg_types != NULL)
+                              first_arg = prog->type_start[f];
+                          else
+                              first_arg = INDEX_START_NONE;
+                          funp = &inherited_function;
+                      }
+                      else
+                      {
+                          funp = FUNCTION(f);
+                          arg_types = GET_BLOCK(A_ARGUMENT_TYPES);
+                          first_arg = ARGUMENT_INDEX(f);
+                      }
                   }
 
                   /* Result type */
@@ -16319,6 +17513,11 @@ function_call:
                       ? "Unknown efun: %s" : "Unknown simul-efun: %s", get_txt($1.real->name));
                   $$.type = get_fulltype(lpctype_mixed);
               }
+              else if (string_context)
+              {
+                  yyerrorf("Undefined function '%.50s'", get_txt($1.real->name));
+                  $$.type = get_fulltype(lpctype_mixed);
+              }
               else
               {
                   /* There is no such function, but maybe it's defined later,
@@ -16409,7 +17608,7 @@ function_call:
            * however yields a faulty grammar.
            */
           {
-              char *p, *q;
+              bytecode_t *p, *q;
               p_int left;
 
               if (!realloc_a_program(1))
@@ -16421,7 +17620,7 @@ function_call:
               }
 
               /* Move the generated code forward by 1 */
-              p = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE - 1;
+              p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE - 1;
               q = p + 1;
               for (left = CURRENT_PROGRAM_SIZE - $1.start
                   ; left > 0
@@ -16464,7 +17663,7 @@ function_call:
               /* The simul-efun has to be called by name:
                * insert the extra args for the call_other
                */
-              char *p, *q;
+              bytecode_t *p, *q;
               p_int left;
 
               if (!realloc_a_program(6))
@@ -16476,7 +17675,7 @@ function_call:
               }
 
               /* Move the generated code forward by 6 */
-              p = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE - 1;
+              p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE - 1;
               q = p + 6;
               for (left = CURRENT_PROGRAM_SIZE - $1.start - 1
                   ; left > 0
@@ -16486,12 +17685,28 @@ function_call:
               /* p now points to program[$1.start].
                * Store the first two call-other args there.
                */
-              p[1] = F_STRING;
-              upd_short($1.start+2, store_prog_string(
-                        ref_mstring(query_simul_efun_file_name())));
-              p[4] = F_STRING;
-              upd_short($1.start+5, store_prog_string(ref_mstring(
-                  $2.strict_member ? STR_CALL_STRICT : STR_CALL_OTHER)));
+              if (string_context)
+              {
+                  svalue_t sv;
+
+                  p[1] = F_LAMBDA_CONSTANT;
+                  sv = svalue_string(ref_mstring(query_simul_efun_file_name()));
+                  upd_short($1.start+2, store_lambda_value(&sv));
+
+                  p[4] = F_LAMBDA_CONSTANT;
+                  sv = svalue_string(ref_mstring(
+                      $2.strict_member ? STR_CALL_STRICT : STR_CALL_OTHER));
+                  upd_short($1.start+5, store_lambda_value(&sv));
+              }
+              else
+              {
+                  p[1] = F_STRING;
+                  upd_short($1.start+2, store_prog_string(
+                            ref_mstring(query_simul_efun_file_name())));
+                  p[4] = F_STRING;
+                  upd_short($1.start+5, store_prog_string(ref_mstring(
+                      $2.strict_member ? STR_CALL_STRICT : STR_CALL_OTHER)));
+              }
 
               CURRENT_PROGRAM_SIZE += 6;
           }
@@ -16616,10 +17831,12 @@ function_call:
           {
               int call_instr = $2.strict_member ? F_CALL_STRICT : F_CALL_OTHER;
 
-              if ($1.type.t_type->t_class == TCLASS_OBJECT
+              if ($1.type.t_type != NULL
+               && $1.type.t_type->t_class == TCLASS_OBJECT
                && $1.type.t_type->t_object.type == OBJECT_LIGHTWEIGHT
                && $3
-               && num_lwo_calls <= USHRT_MAX)
+               && num_lwo_calls <= USHRT_MAX
+               && !string_context)
               {
                   /* Call to a single lightweight object with a constant function name
                    * and we have space in the call cache, then we use the cached call
@@ -16746,22 +17963,7 @@ function_name:
 
           check_identifier($1);
           if (fun->type == I_TYPE_LOCAL)
-          {
-              fun = find_shared_identifier_mstr(fun->name, I_TYPE_UNKNOWN, 0);
-
-              /* Search the inferior list for this identifier for a global
-               * (function) definition.
-               */
-
-              while (fun && fun->type > I_TYPE_GLOBAL)
-                  fun = fun->inferior;
-
-              if (!fun || fun->type != I_TYPE_GLOBAL)
-              {
-                  yyerrorf("Undefined function '%.50s'\n", get_txt($1->name));
-                  YYACCEPT;
-              }
-          }
+              fun = insert_shared_identifier_mstr(fun->name, I_TYPE_GLOBAL, 0);
 
           $$.super = NULL;
           $$.real  = fun;
@@ -16781,22 +17983,7 @@ function_name:
 
           check_identifier($3);
           if (fun->type == I_TYPE_LOCAL)
-          {
-              fun = find_shared_identifier_mstr(fun->name, I_TYPE_UNKNOWN, 0);
-
-              /* Search the inferior list for this identifier for a global
-               * (function) definition.
-               */
-
-              while (fun && fun->type > I_TYPE_GLOBAL)
-                  fun = fun->inferior;
-
-              if (!fun || fun->type != I_TYPE_GLOBAL)
-              {
-                  yyerrorf("Undefined function '%.50s'\n", get_txt($3->name));
-                  YYACCEPT;
-              }
-          }
+              fun = insert_shared_identifier_mstr(fun->name, I_TYPE_GLOBAL, 0);
 
           /* Attempt to call an efun directly even though there
            * is a nomask simul-efun for it?
@@ -16816,7 +18003,10 @@ function_name:
               svalue_t *res;
 
               push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
-              push_c_string(inter_sp, current_loc.file->name);
+              if (string_context)
+                  push_current_object(inter_sp, "nomask simul_efun");
+              else
+                  push_c_string(inter_sp, current_loc.file->name);
               push_ref_string(inter_sp, fun->name);
               res = apply_master(STR_PRIVILEGE, 3);
               if (!res || res->type != T_NUMBER || res->u.number < 0)
@@ -17515,6 +18705,10 @@ add_type_check (lpctype_t *expected, enum type_check_operation op)
     if (!pragma_rtt_checks || !pragma_save_types)
         return;
 
+    /* TODO: Implement this for string-compiler using type objects. */
+    if (string_context)
+        return;
+
     /* Also we don't check for mixed... */
     if (expected == lpctype_mixed || expected == lpctype_unknown)
         return;
@@ -17698,17 +18892,37 @@ adjust_virtually_inherited ( unsigned short *pFX, inherit_t **pIP)
             fx -= ip2->function_index_offset;
 
             /* Is there an update for this program? */
-            while (ip->inherit_mapped)
+            if (ip->inherit_mapped)
             {
-                fx = GET_BLOCK(A_UPDATE_INDEX_MAP)[fx + ip->function_map_offset];
-                if (fx == USHRT_MAX)
+                unsigned short *update_index_map;
+                inherit_t *inherits;
+
+                if (string_context)
                 {
-                    /* Not defined anymore. */
-                    *pIP = NULL;
-                    return false;
+                    program_t *prog = get_current_object_program();
+
+                    update_index_map = prog->update_index_map;
+                    inherits = prog->inherit;
+                }
+                else
+                {
+                    update_index_map = GET_BLOCK(A_UPDATE_INDEX_MAP);
+                    inherits = GET_BLOCK(A_INHERITS);
                 }
 
-                ip = GET_BLOCK(A_INHERITS) + ip->updated_inherit;
+                do
+                {
+                    fx = update_index_map[fx + ip->function_map_offset];
+                    if (fx == USHRT_MAX)
+                    {
+                        /* Not defined anymore. */
+                        *pIP = NULL;
+                        return false;
+                    }
+
+                    ip = inherits + ip->updated_inherit;
+                }
+                while (ip->inherit_mapped);
             }
 
             *pFX = fx;
@@ -17723,22 +18937,24 @@ adjust_virtually_inherited ( unsigned short *pFX, inherit_t **pIP)
 
 static unsigned short
 lookup_inherited (const char *super_name, string_t *real_name
-                 , inherit_t **pIP, funflag_t *pFlags)
+                 , inherit_t **pIP, unsigned short * pIIdx
+                 , funflag_t *pFlags)
 
 /* Lookup an inherited function <super_name>::<real_name> and return
- * it's function index, setting *pIP to the inherit_t pointer and
- * *pFlags to the function flags.
+ * it's function index, setting *pIP to the inherit_t pointer, *pIIdx
+ * to the inherit index and *pFlags to the function flags.
  * Return USHRT_MAX if not found, *pIP set to NULL, and *pFlags set to 0.
  *
  * <super_name> can be an empty string or the (partial) name of one
  * of the inherits. <real_name> must be shared string.
  */
 {
-    inherit_t *ip;
+    inherit_t *ip, *inherits;
     int num_inherits, super_length;
 
     *pIP = NULL;
     *pFlags = 0;
+    *pIIdx = 0;
 
     if (!real_name)
         return -1;
@@ -17747,7 +18963,18 @@ lookup_inherited (const char *super_name, string_t *real_name
     while (*super_name == '/')
         super_name++;
     super_length = strlen(super_name);
-    num_inherits = INHERIT_COUNT;
+
+    if (string_context)
+    {
+        program_t *prog = get_current_object_program();
+        inherits = prog->inherit;
+        num_inherits = prog->num_inherited;
+    }
+    else
+    {
+        inherits = GET_BLOCK(A_INHERITS);
+        num_inherits = INHERIT_COUNT;
+    }
 
     /* TODO: Is this really necessary?  real_name should be tabled
      * already.
@@ -17778,7 +19005,7 @@ lookup_inherited (const char *super_name, string_t *real_name
      * from the back in order to get the topmost definition; however,
      * with virtual inherits the order gets messed up.
      */
-    for (ip = GET_BLOCK(A_INHERITS); num_inherits > 0 ; ip++, num_inherits--)
+    for (ip = inherits; num_inherits > 0 ; ip++, num_inherits--)
     {
         inherit_t *foundp;
         unsigned short found_ix;
@@ -17824,6 +19051,7 @@ lookup_inherited (const char *super_name, string_t *real_name
         if (adjust_virtually_inherited(&found_ix, &foundp))
         {
             *pIP = foundp;
+            *pIIdx = foundp - inherits;
             *pFlags = foundp->prog->functions[found_ix];
             return found_ix;
         }
@@ -17863,10 +19091,8 @@ find_inherited_function ( const char * super_name
 
     rname = find_tabled_str(real_name, STRING_UTF8);
 
-    ix =  rname ? lookup_inherited(super_name, rname, &ip, flags) : USHRT_MAX;
-    if (ix != USHRT_MAX) /* Also return the inherit index. */
-        *pInherit = ip - GET_BLOCK(A_INHERITS);
-    else
+    ix =  rname ? lookup_inherited(super_name, rname, &ip, pInherit, flags) : USHRT_MAX;
+    if (ix == USHRT_MAX)
         *pInherit = 0;
     return ix;
 } /* find_inherited_function() */
@@ -17907,8 +19133,9 @@ insert_inherited (char *super_name, string_t *real_name
     inherit_t *ip;
     funflag_t flags;
     unsigned short found_ix;
+    unsigned short inh_ix;
 
-    found_ix = lookup_inherited(super_name, real_name, &ip, &flags);
+    found_ix = lookup_inherited(super_name, real_name, &ip, &inh_ix, &flags);
 
     if (ip != NULL)
     {
@@ -17917,7 +19144,7 @@ insert_inherited (char *super_name, string_t *real_name
 
         /* Generate the function call */
         add_f_code(F_CALL_INHERITED);
-        add_short(ip - GET_BLOCK(A_INHERITS));
+        add_short(inh_ix);
         add_short(found_ix);
         CURRENT_PROGRAM_SIZE += 5;
 
@@ -17936,7 +19163,7 @@ insert_inherited (char *super_name, string_t *real_name
     if (strpbrk(super_name, "*?"))
     {
         Bool *was_called;  /* Flags which inh. fun has been called already */
-        inherit_t *ip0;
+        inherit_t *ip0, *inherits;
         int num_inherits;
         int calls = 0;
         int ip_index;
@@ -18005,7 +19232,18 @@ insert_inherited (char *super_name, string_t *real_name
         }
 
         *super_p = NULL;
-        num_inherits = INHERIT_COUNT;
+
+        if (string_context)
+        {
+            program_t *prog = get_current_object_program();
+            inherits = prog->inherit;
+            num_inherits = prog->num_inherited;
+        }
+        else
+        {
+            inherits = GET_BLOCK(A_INHERITS);
+            num_inherits = INHERIT_COUNT;
+        }
 
         was_called = alloca(sizeof(*was_called)*num_inherits);
         for (i = 0; i < num_inherits; i++)
@@ -18014,7 +19252,7 @@ insert_inherited (char *super_name, string_t *real_name
         /* Test every inherit if the name matches and if
          * it does, generate the function call.
          */
-        ip0 = GET_BLOCK(A_INHERITS);
+        ip0 = inherits;
         first_index = num_inherits > 0 ? INHERITED_WILDCARDED_NOT_FOUND
                                        : INHERITED_NOT_FOUND;
         for (; num_inherits > 0; ip0++, num_inherits--)
@@ -18039,7 +19277,7 @@ insert_inherited (char *super_name, string_t *real_name
             if (ip->inherit_duplicate)
             {
                 /* This is a duplicate inherit, let's search for the original. */
-                for (ip = &(INHERIT(0)); ip < ip0; ip++)
+                for (ip = inherits; ip < ip0; ip++)
                     if (ip->prog == ip0->prog)
                         break;
 
@@ -18058,7 +19296,7 @@ insert_inherited (char *super_name, string_t *real_name
 
             /* Found a match */
             flags = ip->prog->functions[i];
-            ip_index = ip - GET_BLOCK(A_INHERITS);
+            ip_index = ip - inherits;
 
             /* The (new) ip might be duplicate inherit, or point to
              * a virtually inherited function we called already.
@@ -20290,6 +21528,7 @@ init_compiler ()
     make_static_type(get_array_type(lpctype_mixed),                 &_lpctype_any_array);
     make_static_type(get_union_type(lpctype_int, lpctype_float),    &_lpctype_int_float);
     make_static_type(get_array_type(lpctype_int),                   &_lpctype_int_array);
+    make_static_type(get_array_type(lpctype_symbol),                &_lpctype_symbol_array);
     make_static_type(get_array_type(lpctype_string),                &_lpctype_string_array);
     make_static_type(get_array_type(lpctype_any_object),            &_lpctype_object_array);
     make_static_type(get_array_type(lpctype_bytes),                 &_lpctype_bytes_array);
@@ -20390,6 +21629,9 @@ prolog (const char * fname, Bool isMasterObj)
     default_structmod = 0;
     current_inline = NULL;
     inline_closure_id = 0;
+    string_context = NULL;
+    lambda_values_table_level = 0;
+    lambda_values_offset = 0;
 
     free_all_local_names();   /* In case of earlier error */
 
@@ -20481,6 +21723,121 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", local_variables, context_variables 
 
 /*-------------------------------------------------------------------------*/
 static void
+epilog_cleanup (void)
+
+/* Basic cleanup of parser structures after parsing.
+ */
+
+{
+#ifdef DEBUG
+    if (num_parse_error == 0 && type_of_arguments.current_size != 0)
+        fatal("Failed to deallocate argument type stack\n");
+#endif
+
+    if (last_string_constant)
+    {
+        free_mstring(last_string_constant);
+        last_string_constant = NULL;
+    }
+
+    free_case_blocks();
+
+    for (size_t i = 0; i < STRUCT_MEMBER_COUNT; i++)
+    {
+        free_struct_member_data(&STRUCT_MEMBER(i));
+    }
+    mem_block[A_STRUCT_MEMBERS].current_size = 0;
+
+    free_all_local_names();
+
+    for (ident_t *g, *q = all_globals; NULL != (g = q); )
+    {
+         q = g->next_all;
+         free_shared_identifier(g);
+    }
+
+    while(last_yalloced)
+    {
+        yfree(last_yalloced);
+        debug_message("%s freeing lost block\n", time_stamp());
+    }
+
+    if (all_efun_shadows)
+    {
+        efun_shadow_t *s, *t;
+
+        for (t = all_efun_shadows; NULL != (s = t); )
+        {
+            s->shadow->u.global.function = I_GLOBAL_FUNCTION_OTHER;
+            s->shadow->u.global.variable = I_GLOBAL_VARIABLE_WORLDWIDE;
+            s->shadow->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+            t = s->next;
+            xfree(s);
+        }
+        all_efun_shadows = NULL;
+    }
+
+    all_globals = NULL;
+
+    remove_unknown_identifier();
+
+} /* epilog_cleanup() */
+
+/*-------------------------------------------------------------------------*/
+static void
+epilog_free_all (void)
+
+/* Free all memory. This function assumes, that all references are
+ * intact and not have been adopted by a compiled program.
+ */
+
+{
+    function_t *functions;
+
+    /* Free all function names and type data. */
+    functions = FUNCTION(0);
+    for (size_t i = 0; i < FUNCTION_COUNT; i++, functions++)
+    {
+        if ( !(functions->flags & NAME_INHERITED) && functions->name )
+        {
+            /* The other references have been adopted. */
+            free_mstring(functions->name);
+        }
+        free_lpctype(functions->type);
+    }
+
+    do_free_sub_strings( STRING_COUNT
+                       , GET_BLOCK(A_STRINGS)
+                       , V_VARIABLE_COUNT
+                       , GET_BLOCK(A_VIRTUAL_VAR)
+                       , INCLUDE_COUNT
+                       , GET_BLOCK(A_INCLUDES)
+                       , STRUCT_COUNT
+                       , GET_BLOCK(A_STRUCT_DEFS)
+                       );
+
+    /* Free the type information */
+    for (size_t i = 0; i < ARGTYPE_COUNT; i++)
+        free_lpctype(ARGUMENT_TYPE(i));
+
+    for (int i = 0; i < DEFAULT_LAMBDA_VALUES_COUNT; i++)
+        free_svalue(&DEFAULT_LAMBDA_VALUE(i));
+
+    for (int i = 0; i < LAMBDA_VALUES_COUNT; i++)
+        free_svalue(&LAMBDA_VALUE(i));
+
+    compiled_prog = NULL;
+
+    for (int i = 0; i < NUMAREAS; i++)
+        xfree(mem_block[i].block);
+
+    local_variables = NULL;
+    context_variables = NULL;
+    return;
+} /* epilog_free_all() */
+
+/*-------------------------------------------------------------------------*/
+static void
 epilog (void)
 
 /* The parser finished - now collect the information and generate
@@ -20495,33 +21852,11 @@ epilog (void)
     mp_int       num_variables;
     mp_int       num_function_headers;
     bytecode_p   p;
-    ident_t     *g, *q;
     function_t  *f;
     function_t  *funname_start1;  /* The name chains (to sort) */
     function_t  *funname_start2;
     mp_int       num_function_names;
     program_t   *prog;
-
-    /* First, clean up */
-#ifdef DEBUG
-    if (num_parse_error == 0 && type_of_arguments.current_size != 0)
-        fatal("Failed to deallocate argument type stack\n");
-#endif
-
-    if (last_string_constant)
-
-    {
-        free_mstring(last_string_constant);
-        last_string_constant = NULL;
-    }
-
-    free_case_blocks();
-
-    for (i = 0; (size_t)i < STRUCT_MEMBER_COUNT; i++)
-    {
-        free_struct_member_data(&STRUCT_MEMBER(i));
-    }
-    mem_block[A_STRUCT_MEMBERS].current_size = 0;
 
     /* If the parse was successful, Make sure that all structs are defined and
      * reactivate old structs where possible.
@@ -20532,6 +21867,9 @@ epilog (void)
     {
         struct_epilog();
     }
+
+    /* These should only be used with string compilations. */
+    assert(LAMBDA_VALUES_COUNT == 0);
 
     /* Append the non-virtual variable block to the virtual ones,
      * and take care of the initializers.
@@ -20575,6 +21913,8 @@ epilog (void)
         mem_block[A_PROGRAM].block[last_initializer_end-0] =
             F_RETURN;
     } /* if (has initializer) */
+
+    epilog_cleanup();
 
     /* Check the string block. We don't have to count the include file names
      * as those won't be accessed from the program code.
@@ -20894,40 +22234,6 @@ epilog (void)
         }
 
     } /* if (parse successful) */
-
-    /* Free unneeded memory */
-    free_all_local_names();
-
-    for (q = all_globals; NULL != (g = q); )
-    {
-         q = g->next_all;
-         free_shared_identifier(g);
-    }
-
-    while(last_yalloced)
-    {
-        yfree(last_yalloced);
-        debug_message("%s freeing lost block\n", time_stamp());
-    }
-
-    if (all_efun_shadows)
-    {
-        efun_shadow_t *s, *t;
-
-        for (t = all_efun_shadows; NULL != (s = t); )
-        {
-            s->shadow->u.global.function = I_GLOBAL_FUNCTION_OTHER;
-            s->shadow->u.global.variable = I_GLOBAL_VARIABLE_WORLDWIDE;
-            s->shadow->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
-            t = s->next;
-            xfree(s);
-        }
-        all_efun_shadows = NULL;
-    }
-
-    all_globals = NULL;
-    
-    remove_unknown_identifier();
 
     /* Remove the concrete struct definition from the lpctype object
      * and free the reference we took.
@@ -21290,49 +22596,116 @@ epilog (void)
     /* If we come here, the program couldn't be created - just
      * free all memory.
      */
+    epilog_free_all();
+
+} /* epilog() */
+
+/*-------------------------------------------------------------------------*/
+static lambda_t *
+epilog_closure (int num_args)
+
+/* The parser finished with an expression or block,
+ * generate a closure for it, if parsing was successful.
+ */
+
+{
+    lambda_t *l = NULL;
+
+    /* Some things should not be possible within an expression or block .*/
+    assert(STRING_COUNT == 0);
+    assert(STRUCT_COUNT == 0);
+    assert(NV_VARIABLE_COUNT == 0);
+    assert(V_VARIABLE_COUNT == 0);
+    assert(FUNCTION_COUNT == 0);
+    assert(INHERIT_COUNT == 0);
+    assert(last_initializer_end < 0);
+    assert(inherit_file == NULL);
+    assert(num_lwo_calls == 0);
+
+    /* Check the string block. We don't have to count the include file names
+     * as those won't be accessed from the program code.
+     */
+    if (LAMBDA_VALUES_COUNT > 0x10000)
+        yyerror("Too many values");
+
+    if (!num_parse_error &&CURRENT_PROGRAM_SIZE > FUNSTART_MASK)
+        yyerror("Program too large");
+
+    /* Now create the closure. */
+    while (1)
     {
-        function_t *functions;
+        size_t size, num_values;
+        svalue_t *values;
+        void *block;
 
-        /* Free all function names and type data. */
-        functions = FUNCTION(0);
-        for (i = num_functions; --i >= 0; functions++)
+        /* On error, don't create anything */
+        if (num_parse_error > 0)
+            break;
+
+        /* Compute the size of the closure.
+         */
+        assert(lambda_values_table_level == 0);
+        assert(lambda_values_offset == 0);
+        num_values = LAMBDA_VALUES_COUNT;
+        size = sizeof(lambda_t) + CURRENT_PROGRAM_SIZE + num_values * sizeof(svalue_t);
+
+        /* Allocate the lambda structure. */
+        if ( !(block = xalloc(size)) )
         {
-            if ( !(functions->flags & NAME_INHERITED) && functions->name )
-            {
-                /* The other references have been adopted. */
-                free_mstring(functions->name);
-            }
-            free_lpctype(functions->type);
+            yyerrorf("Out of memory: closure structure (%zd bytes)", size);
+            break;
         }
 
-        do_free_sub_strings( num_strings
-                           , GET_BLOCK(A_STRINGS)
-                           , num_variables
-                           , GET_BLOCK(A_VIRTUAL_VAR)
-                           , INCLUDE_COUNT
-                           , GET_BLOCK(A_INCLUDES)
-                           , STRUCT_COUNT
-                           , GET_BLOCK(A_STRUCT_DEFS)
-                           );
+        /* Fill the lambda structure. */
+        l = (lambda_t*)(block + num_values * sizeof(svalue_t));
 
-        /* Free the type information */
-        for (i = 0; (size_t)i < ARGTYPE_COUNT; i++)
-            free_lpctype(ARGUMENT_TYPE(i));
+        closure_init_base(&(l->base), current_object);
 
-        compiled_prog = NULL;
+        memcpy(l->program, mem_block[A_PROGRAM].block, CURRENT_PROGRAM_SIZE);
 
-        for (i = 0; i < NUMAREAS; i++)
+        l->num_values = num_values;
+        l->num_arg = num_args;
+        l->num_opt_arg = 0;
+        l->num_locals = max_number_of_locals - num_args + max_break_stack_need;
+        l->num_values = num_values;
+        l->xvarargs = false;
+
+        /* We need to reverse the order of lambda values. */
+        values = (svalue_t*) block;
+        for (int i = LAMBDA_VALUES_COUNT; i > 0; i--)
         {
-            xfree(mem_block[i].block);
+            *values = LAMBDA_VALUE(i-1);
+            values++;
         }
+        /* References have been adopted. */
+        GET_BLOCK_SIZE(A_LAMBDA_VALUES) = 0;
+        GET_BLOCK_SIZE(A_LAMBDA_VALUES_NEXT) = 0;
 
-        local_variables = NULL;
-        context_variables = NULL;
-        return;
+        break;
     }
 
-    /* NOTREACHED */
-} /* epilog() */
+    epilog_cleanup();
+
+    /* Remove the concrete struct definition from the lpctype object
+     * and free the reference we took.
+     */
+    for (int i = 0; i < LAMBDA_STRUCTS_COUNT; i++)
+    {
+        lpctype_t *t;
+
+        if (LAMBDA_STRUCT(i).type == NULL)
+            continue;
+
+        t = LAMBDA_STRUCT(i).type->name->lpctype;
+        clean_struct_type(t);
+        t->t_struct.def_idx = USHRT_MAX;
+        free_lpctype(t);
+    }
+
+    epilog_free_all();
+
+    return l;
+} /* epilog_closure() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -21352,6 +22725,101 @@ compile_file (int fd, const char * fname,  Bool isMasterObj)
     epilog();
     end_new_file();
 } /* compile_file() */
+
+/*-------------------------------------------------------------------------*/
+static lambda_t *
+compile_string (string_t *expr, code_context_t *context, bool block)
+
+/* Compile an LPC expression (block==false) or code block (block==true).
+ * This is compiled into a closure, but using the regular LPC compiler.
+ * So we need to initialize everything to simulate a simple program.
+ */
+
+{
+    lambda_t* l;
+
+    prolog(NULL, false);
+    string_context = context;
+    string_context->error_msg[0] = 0;
+
+    if (block)
+        start_new_block(expr);
+    else
+        start_new_expr(expr);
+    pragma_no_simul_efuns = false;
+
+    block_depth = 1;
+    init_scope(block_depth);
+
+    for (int i = 0; i < context->num_args; i++)
+    {
+        string_t *name = context->arg_names[i].u.str;
+        ident_t *ident, *var;
+
+        /* The caller checks the type of the names to be symbols. */
+        assert(context->arg_names[i].type == T_SYMBOL);
+
+        ident = make_shared_identifier_mstr(context->arg_names[i].u.str, I_TYPE_UNKNOWN, 0);
+        if (ident->type == I_TYPE_LOCAL)
+            yyerrorf("Argument '%.*s' was given twice", (int)mstrsize(name), get_txt(name));
+        else
+        {
+            var = add_local_name(ident, get_fulltype(lpctype_mixed), 1);
+            use_variable(var, VAR_USAGE_READWRITE);
+        }
+    }
+
+    enter_block_scope();
+    exact_types = lpctype_mixed;
+
+    if (context->make_async)
+    {
+        ins_f_code(F_TRANSFORM_TO_COROUTINE);
+        ins_local_names();
+        /* The first call_coroutine() value will be ignored. */
+        ins_f_code(F_POP_VALUE);
+
+        def_function_coroutine = true;
+    }
+    else
+        def_function_coroutine = false;
+
+    yyparse();
+    if (!num_parse_error)
+        ins_f_code(block ? F_RETURN0 : F_RETURN);
+
+    leave_block_scope(false);
+    block_depth = 0;
+    l = epilog_closure(context->num_args);
+    if (block)
+        end_new_block();
+    else
+        end_new_expr();
+
+    return l;
+} /* compile_string() */
+
+/*-------------------------------------------------------------------------*/
+lambda_t *
+compile_expr (string_t *expr, code_context_t *context)
+
+/* Compile an LPC expression into a closure.
+ */
+
+{
+    return compile_string(expr, context, false);
+} /* compile_expr() */
+
+/*-------------------------------------------------------------------------*/
+lambda_t *
+compile_block (string_t *block, code_context_t *context)
+
+/* Compile an LPC code block into a closure.
+ */
+
+{
+    return compile_string(block, context, true);
+} /* compile_block() */
 
 /*-------------------------------------------------------------------------*/
 Bool

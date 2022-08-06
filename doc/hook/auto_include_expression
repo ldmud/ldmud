@@ -1,0 +1,37 @@
+SYNOPSIS
+        #include <sys/driver_hooks.h>
+
+        set_driver_hook(H_AUTO_INCLUDE_EXPRESSION, value)
+
+        <value> being:
+
+          string <text>
+          string <closure>(object current_object, string current_file
+                          , int sys_include)
+
+DESCRIPTION
+        Optional hook specifying a string to be included before the
+        code of a compile_string() call for an LPC expression.
+        Hook setting can be a string or a closure.
+
+        If the setting is a string, it will be automatically included
+        in the compilation for every compile_string() call.
+
+        If the setting is a closure, it is called for the original
+        string and for every file opened by the compiler.
+        <current_object> is the object the string is compiled for.
+        <base_file> will be zero for the string itself and the name
+        of a file included directly or indirectly by the string.
+        For an included file, <sys_include> will be TRUE if it is
+        a <>-type include.
+
+        If the result from the call is a string, it will be included
+        before the actual text.
+
+        In both cases, the string will be included as-is; in
+        particular no terminating '\n' will be added.
+
+HISTORY
+
+SEE ALSO
+        hooks(C), include_dirs(H), auto_include_block(H), compile_string(E)

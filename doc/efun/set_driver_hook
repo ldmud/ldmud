@@ -83,6 +83,12 @@ DESCRIPTION
           Optional hook to specify a string to be included before the
           source of every compiled LPC object.
 
+        H_AUTO_INCLUDE_EXPRESSION
+        H_AUTO_INCLUDE_BLOCK
+          arg: closure, string
+          Optional hook specifying a string to be prepended before
+          the string of a compile_string() call.
+
         H_FILE_ENCODING
           arg: lambda closure, lfun closure, string
           Optonal hook specifying the name of the encoding to be used

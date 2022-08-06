@@ -1,0 +1,68 @@
+SYNOPSIS
+        #include <compile_string.h>
+
+        closure compile_string(symbol* args, string str)
+        closure compile_string(symbol* args, string str, int flags)
+        closure compile_string(symbol* args, string str, int flags
+                              , mapping|closure variables
+                              , mapping|closure functions
+                              , mapping|closure structs)
+
+DESCRIPTION
+        Compiles <str> into a closure. The closure will be bound to the
+        current object. By default the string will be interpreted as an
+        LPC expression. The string may also contain preprocessor directives
+        (which must occur on their own line).
+
+        The argument names are given as the first argument <args>.
+
+        The optional argument <flag> may be a binary-OR of the following
+        option values:
+
+          CS_COMPILE_EXPRESSION
+              The string is interpreted as an expression (eg. "1+1") and
+              therefore must not contain a terminal semicolon. This is
+              the default.
+
+          CS_COMPILE_BLOCK
+              The string is interpreted as a block (code between braces),
+              the surrounding braces can be omitted. To return a value,
+              the code needs a return statement.
+
+          CS_ASYNC
+              The code will be compiled as a coroutine, i.e. the resulting
+              closure will return a coroutine when called.
+
+          CS_USE_OBJECT_VARIABLES
+          CS_USE_OBJECT_FUNCTIONS
+          CS_USE_OBJECT_STRUCTS
+              By default the code may not reference the current object's
+              variables, functions resp. structs. This flag allows that,
+              but successful lookups in <variables>, <functions> resp.
+              <structs> have precedence. Private variables, functions
+              and structs cannot be accessed this way.
+
+        Optionally the functions accepts a mapping or closure for the lookup
+        of variables, functions resp. structs. A mapping is looked up using
+        the name, the closure will be called with the name as its only
+        argument. The name of the variable, function resp. struct will be
+        given as a symbol. The result (mapping value resp. closure return
+        value) should be:
+          - for <functions> a closure,
+          - for <variables> a reference, and
+          - for <structs> a template struct (i.e. a struct whose data are
+            irrelevant, only its type will be used).
+
+        When compiling expressions the result of the H_AUTO_INCLUDE_EXPRESSION
+        driver hook will be prepended, for blocks the H_AUTO_INCLUDE_BLOCK
+        hook will be used.
+
+EXAMPLES
+        funcall(compile_string(({'a,'b}), "a+b"), 1, 2);
+
+HISTORY
+        Introduced in LDMud 3.6.7.
+
+SEE ALSO
+        lambda(E), block(LPC),
+        auto_include_expression(H), auto_include_block(H)

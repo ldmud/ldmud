@@ -33,12 +33,8 @@ clear_coroutine (coroutine_t *cr, bool clear_variables)
     if (cr->prog)
         free_prog(cr->prog, true);
 
-    if (cr->closure)
-    {
-        svalue_t svp = { T_CLOSURE, {.closure_type = CLOSURE_LFUN}, {.lfun_closure = cr->closure } };
-        free_closure(&svp);
-        cr->closure = NULL;
-    }
+    free_svalue(&cr->closure);
+    cr->closure.type = T_INVALID;
 
     if (clear_variables)
     {
@@ -152,8 +148,8 @@ create_coroutine (svalue_t *closure)
 /* Create a new coroutine from the current running function. It is assumed,
  * that the current program counter points to the start of the coroutine
  * (just behind the F_TRANSFORM_TO_COROUTINE opcode.)
- * If the coroutine is created from an inline closure, <closure> will point
- * to it. Returns NULL when out of memory.
+ * If the coroutine is created from an inline or lambda closure,
+ * <closure> will point to it. Returns NULL when out of memory.
  *
  * On success the local variables are removed from the stack.
  */
@@ -168,12 +164,13 @@ create_coroutine (svalue_t *closure)
     result->prog = current_prog;
     if (closure)
     {
-        assert(closure->type == T_CLOSURE && closure->x.closure_type == CLOSURE_LFUN);
-        result->closure = closure->u.lfun_closure;
-        result->closure->base.ref++;
+        assert(closure->type == T_CLOSURE
+            && (closure->x.closure_type == CLOSURE_LFUN
+             || closure->x.closure_type == CLOSURE_LAMBDA));
+        assign_svalue_no_free(&(result->closure), closure);
     }
     else
-        result->closure = NULL;
+        result->closure.type = T_INVALID;
     result->funstart = csp->funstart;
     result->num_variable_names = *(unsigned char*)inter_pc;
     result->pc = inter_pc + 1 + 2*result->num_variable_names;
@@ -205,9 +202,6 @@ suspend_coroutine (coroutine_t *cr, svalue_t *fp)
 {
     int num_values;
     svalue_t *extra, *sp, *values;
-#ifdef DEBUG
-    function_t *header = cr->prog->function_headers + FUNCTION_HEADER_INDEX(cr->funstart);
-#endif
 
     /* We can only suspend a running coroutine. */
     assert(cr->state == CS_RUNNING);
@@ -218,7 +212,11 @@ suspend_coroutine (coroutine_t *cr, svalue_t *fp)
     assert(cr->function_index_offset == function_index_offset);
     assert(cr->variable_index_offset == variable_index_offset);
 #ifdef DEBUG
-    assert(cr->num_variables == header->num_locals + header->num_arg);
+    if (cr->closure.type != T_CLOSURE || cr->closure.x.closure_type == CLOSURE_LFUN)
+    {
+        function_t *header = cr->prog->function_headers + FUNCTION_HEADER_INDEX(cr->funstart);
+        assert(cr->num_variables == header->num_locals + header->num_arg);
+    }
 #else
     assert(cr->num_variables == csp->num_local_variables);
 #endif
@@ -355,10 +353,24 @@ resume_coroutine (coroutine_t *cr)
     variable_index_offset = cr->variable_index_offset;
     current_variables = get_current_object_variables() + variable_index_offset;
 
-    if (cr->closure && cr->closure->context_size > 0)
-        inter_context = cr->closure->context;
-    else
-        inter_context = NULL;
+    switch (cr->closure.type == T_CLOSURE ? cr->closure.x.closure_type : CLOSURE_IDENTIFIER)
+    {
+        case CLOSURE_LFUN:
+            if (cr->closure.u.lfun_closure->context_size > 0)
+                inter_context = cr->closure.u.lfun_closure->context;
+            else
+                inter_context = NULL;
+            break;
+
+        case CLOSURE_LAMBDA:
+        {
+            lambda_t *l = cr->closure.u.lambda;
+            inter_context = ((svalue_t*)(void*)l) - l->num_values;
+        }
+
+        default:
+            inter_context = NULL;
+    }
 
     if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
         extra = cr->variables[cr->num_variables].u.lvalue;
@@ -603,11 +615,7 @@ clear_coroutine_ref (coroutine_t *cr)
         if (cr->prog)
             clear_program_ref(cr->prog, true);
         clear_ref_in_vector(&cr->ob, 1);
-        if (cr->closure && cr->closure->base.ref != 0)
-        {
-            svalue_t svp = { T_CLOSURE, {.closure_type = CLOSURE_LFUN}, {.lfun_closure = cr->closure } };
-            clear_ref_in_vector(&svp, 1);
-        }
+        clear_ref_in_vector(&cr->closure, 1);
         if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
         {
             svalue_t *extra = cr->variables[cr->num_variables].u.lvalue;
@@ -641,16 +649,7 @@ count_coroutine_ref (coroutine_t *cr)
         if (cr->prog)
             mark_program_ref(cr->prog);
         count_ref_in_vector(&cr->ob, 1);
-        if (cr->closure)
-        {
-            if (cr->closure->base.ref == 0)
-            {
-                svalue_t svp = { T_CLOSURE, {.closure_type = CLOSURE_LFUN}, {.lfun_closure = cr->closure } };
-                count_ref_in_vector(&svp, 1);
-            }
-            else
-                cr->closure->base.ref++;
-        }
+        count_ref_in_vector(&cr->closure, 1);
         if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
         {
             svalue_t *extra = cr->variables[cr->num_variables].u.lvalue;

@@ -122,6 +122,8 @@
 #include "i-current_object.h"
 #include "i-svalue_cmp.h"
 
+#include "../mudlib/sys/compile_string.h"
+
 /*-------------------------------------------------------------------------*/
 
 #define MAX_LAMBDA_LEVELS 0x8000;
@@ -1112,6 +1114,8 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
             l2->num_values = l->num_values;
             l2->num_locals = l->num_locals;
             l2->num_arg = l->num_arg;
+            l2->num_opt_arg = l->num_opt_arg;
+            l2->xvarargs = l->xvarargs;
             memcpy(&l->program, &l2->program, (size_t)code_size2);
 
             /* Free the (now empty) memory */
@@ -5602,6 +5606,8 @@ lambda (vector_t *args, svalue_t *block, svalue_t origin)
     l->num_arg = VEC_SIZE(args);
     l->num_locals = current.num_locals + current.max_break_stack - l->num_arg;
     l->num_values = num_values;
+    l->num_opt_arg = 0;
+    l->xvarargs = false;
 
     /* Clean up */
     free_symbols();
@@ -6860,6 +6866,97 @@ f_unbound_lambda (svalue_t *sp)
     sp->u.lambda = l;
     return sp;
 } /* f_unbound_lambda() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+v_compile_string (svalue_t *sp, int num_arg)
+
+/* EFUN compile_string()
+ *
+ *   closure compile_string(symbol* args, string str, int flags,
+ *                         , mapping|closure variables
+ *                         , mapping|closure functions
+ *                         , mapping|closure structs)
+ *
+ * Compile <str> using the LPC compiler into a closure (of type
+ * CLOSURE_LAMBDA).
+ */
+
+{
+    svalue_t *argp = sp - num_arg + 1;
+    code_context_t context;
+    lambda_t *l;
+
+    int flags = (num_arg > 2) ? argp[2].u.number : 0;
+
+    if (argp->type != T_POINTER)
+    {
+        context.num_args = 0;
+        context.arg_names = NULL;
+    }
+    else
+    {
+        context.num_args = VEC_SIZE(argp->u.vec);
+        context.arg_names = argp->u.vec->item;
+
+        for (int i = 0; i < context.num_args; i++)
+            if (context.arg_names[i].type != T_SYMBOL)
+                errorf("Invalid type for argument name: %s, expected symbol.\n", typename(context.arg_names[i].type));
+    }
+
+    if ((flags & (CS_COMPILE_EXPRESSION|CS_COMPILE_BLOCK)) == (CS_COMPILE_EXPRESSION|CS_COMPILE_BLOCK))
+        errorf("CS_COMPILE_EXPRESSION and CS_COMPILE_BLOCK are given.\n");
+
+    if (current_loc.file)
+        errorf("Compiler is busy with '%s'.\n", current_loc.file->name);
+
+    context.prog = get_current_object_program();
+
+    if (num_arg > 3
+     && (argp[3].type == T_MAPPING || argp[3].type == T_CLOSURE))
+        context.var_lookup = argp+3;
+    else
+        context.var_lookup = NULL;
+
+    if (num_arg > 4
+     && (argp[4].type == T_MAPPING || argp[4].type == T_CLOSURE))
+        context.fun_lookup = argp+4;
+    else
+        context.fun_lookup = NULL;
+
+    if (num_arg > 5
+     && (argp[5].type == T_MAPPING || argp[5].type == T_CLOSURE))
+        context.struct_lookup = argp+5;
+    else
+        context.struct_lookup = NULL;
+
+    if (current_object.type == T_OBJECT
+     && (current_object.u.ob->prog->flags & P_REPLACE_ACTIVE)
+     && (flags & (CS_USE_OBJECT_VARIABLES|CS_USE_OBJECT_FUNCTIONS|CS_USE_OBJECT_STRUCTS)))
+        errorf("Can't use current object's variables/functions/struct definitions when replace_program() is scheduled.\n");
+
+    context.use_prog_for_variables = (flags & CS_USE_OBJECT_VARIABLES) != 0;
+    context.use_prog_for_functions = (flags & CS_USE_OBJECT_FUNCTIONS) != 0;
+    context.use_prog_for_structs = (flags & CS_USE_OBJECT_STRUCTS) != 0;
+
+    context.make_async = (flags & CS_ASYNC) != 0;
+
+    if (flags & CS_COMPILE_BLOCK)
+        l = compile_block(argp[1].u.str, &context);
+    else
+        l = compile_expr(argp[1].u.str, &context);
+    if (!l)
+        errorf("%s", context.error_msg[0] ? context.error_msg : "Compilation error.\n");
+
+    sp = pop_n_elems(num_arg, sp);
+
+    sp++;
+    sp->type = T_CLOSURE;
+    sp->x.closure_type = CLOSURE_LAMBDA;
+    sp->u.lambda = l;
+
+    return sp;
+} /* v_compile_string() */
 
 /*=========================================================================*/
 

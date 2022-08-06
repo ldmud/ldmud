@@ -71,7 +71,7 @@ struct coroutine_s
 
     svalue_t ob;                    /* The corresponding object.      */
     program_t *prog;                /* Current program.               */
-    lfun_closure_t *closure;        /* Inline closure.                */
+    svalue_t closure;               /* Closure implementing coroutne. */
     bytecode_p funstart;            /* Start of the function code.    */
     bytecode_p pc;                  /* Program counter.               */
     int function_index_offset;      /* Index of .prog's function block

@@ -67,6 +67,10 @@ struct lambda_s
     mp_int num_values;          /* Number of svalues.           */
     unsigned char num_locals;   /* Number of local variables    */
     unsigned char num_arg;      /* Number of arguments needed.  */
+    unsigned char num_opt_arg;  /* Number of optional arguments *
+                                 * (with default values).       */
+    bool xvarargs: 1;           /* Whether to the last arg is   *
+                                 * a varargs argument.          */
 
     bytecode_t program[];       /* The bytecode of the closure. */
 };
@@ -158,6 +162,7 @@ extern svalue_t *f_lambda(svalue_t *sp);
 extern svalue_t *f_symbol_function(svalue_t *sp);
 extern svalue_t *f_symbol_variable(svalue_t *sp);
 extern svalue_t *f_unbound_lambda(svalue_t *sp);
+extern svalue_t *v_compile_string(svalue_t *sp, int num_arg);
 extern void      align_switch(bytecode_p pc);
 
 /* --- helper functions --- */

@@ -1897,6 +1897,10 @@ name_to_hook(char *name)
         return H_SEND_NOTIFY_FAIL;
     if ( !strcmp(name, "AUTO_INCLUDE") )
         return H_AUTO_INCLUDE;
+    if ( !strcmp(name, "AUTO_INCLUDE_EXPRESSION") )
+        return H_AUTO_INCLUDE_EXPRESSION;
+    if ( !strcmp(name, "AUTO_INCLUDE_BLOCK") )
+        return H_AUTO_INCLUDE_BLOCK;
     if ( !strcmp(name, "FILE_ENCODING") )
         return H_FILE_ENCODING;
     if ( !strcmp(name, "DEFAULT_METHOD") )
@@ -2886,6 +2890,8 @@ lpctypestr (int n)
       case MF_TYPE_MOD_POINTER|BYTES_OR_STRING:
                     p = "&_lpctype_string_or_bytes_array";
                                                   break;
+      case MF_TYPE_MOD_POINTER|SYMBOL:
+                    p = "&_lpctype_symbol_array"; break;
       case MF_TYPE_MOD_POINTER|OBJECT:
                     p = "&_lpctype_object_array"; break;
       case MF_TYPE_MOD_POINTER|LWOBJECT:

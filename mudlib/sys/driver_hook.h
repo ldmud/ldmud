@@ -34,7 +34,9 @@
 #define H_CREATE_LWOBJECT           27
 #define H_CREATE_LWOBJECT_COPY      28
 #define H_CREATE_LWOBJECT_RESTORE   29
+#define H_AUTO_INCLUDE_EXPRESSION   30
+#define H_AUTO_INCLUDE_BLOCK        31
 
-#define NUM_DRIVER_HOOKS            30  /* Number of hooks */
+#define NUM_DRIVER_HOOKS            32  /* Number of hooks */
 
 #endif /* LPC_DRIVER_HOOK_ */

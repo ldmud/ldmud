@@ -9306,6 +9306,7 @@ setup_new_frame2 (bytecode_p funstart, svalue_t *sp
                    */
     int num_arg;  /* Number of formal args */
     int num_vars; /* Number of local variables */
+    int num_opt_arg;  /* Number of optional formal arguments */
     bool has_varargs; /* Function has an varargs parameter. */
 
     /* Setup the frame pointer */
@@ -9324,15 +9325,14 @@ setup_new_frame2 (bytecode_p funstart, svalue_t *sp
             l = current_lambda.u.lambda;
 
         num_arg = l->num_arg;
+        num_opt_arg = l->num_opt_arg;
         num_vars = l->num_locals;
-        has_varargs = false;
+        has_varargs = l->xvarargs;
 
         inter_pc = funstart;
     }
     else
     {
-        int num_opt_arg; /* Number of optional formal arguments */
-
         function_t *header = current_prog->function_headers + FUNCTION_HEADER_INDEX(funstart);
         num_arg = header->num_arg;
         num_opt_arg = header->num_opt_arg;
@@ -9340,24 +9340,25 @@ setup_new_frame2 (bytecode_p funstart, svalue_t *sp
         has_varargs = (header->flags & TYPE_MOD_XVARARGS) != 0;
 
         inter_pc = funstart;
-        if (num_opt_arg)
-        {
-            /* Modify inter_pc, depending on how many
-             * arguments are missing. */
-            int missing = num_arg - csp->num_local_variables;
+    }
 
-            if (has_varargs)
-                missing--;
-            if (missing < 0)
-                missing = 0;
-            else if (missing > num_opt_arg)
-                missing = num_opt_arg;
+    if (num_opt_arg)
+    {
+        /* Modify inter_pc, depending on how many
+         * arguments are missing. */
+        int missing = num_arg - csp->num_local_variables;
 
-            /* Skip the initial jump table. */
-            inter_pc += num_opt_arg * sizeof(unsigned short);
-            if (missing < num_opt_arg)
-                inter_pc += get_short(funstart + sizeof(unsigned short) * (num_opt_arg - missing - 1));
-        }
+        if (has_varargs)
+            missing--;
+        if (missing < 0)
+            missing = 0;
+        else if (missing > num_opt_arg)
+            missing = num_opt_arg;
+
+        /* Skip the initial jump table. */
+        inter_pc += num_opt_arg * sizeof(unsigned short);
+        if (missing < num_opt_arg)
+            inter_pc += get_short(funstart + sizeof(unsigned short) * (num_opt_arg - missing - 1));
     }
 
     if (has_varargs)
@@ -10870,6 +10871,90 @@ again:
                 }
             }
         }
+        break;
+    }
+
+    CASE(F_CONTEXT_LAMBDA); /* --- context_lambda <lix> <lsize> <vix> <num_ex> <num_im> --- */
+    {
+        /* Create a copy of a lambda closure and put context values into it.
+         * The lambda to be copied is the value at index <lix> of the current
+         * lambda closure. It's code size is <lsize>. The context consists of
+         * <num_ex> explicit values (to be taken from the local variables
+         * at <vix>) and <num_in> implicit values on the stack.
+         */
+
+        uint16_t lambda_index = load_uint16(&pc);
+        uint32_t code_size = load_uint32(&pc);
+        svalue_t * explicit_context = fp + load_uint8(&pc);
+        uint16_t explicit_context_size = load_uint16(&pc);
+        uint16_t implicit_context_size = load_uint16(&pc);
+
+        lambda_t *orig, *l;
+        void *block;
+        svalue_t *values, *orig_svp, *orig_values;
+        size_t lambda_size, value_size;
+
+        /* Get the original lambda from the current lambda. */
+        orig_svp = (svalue_t *)((void *)(csp->funstart) - LAMBDA_VALUE_OFFSET) - lambda_index;
+        assert(orig_svp->type == T_CLOSURE);
+        assert(orig_svp->x.closure_type == CLOSURE_LAMBDA);
+        orig = orig_svp->u.lambda;
+
+        /* Create the new lambda closure. */
+        lambda_size = sizeof(lambda_t) + code_size;
+        value_size = orig->num_values * sizeof(svalue_t);
+
+        if ( !(block = xalloc(lambda_size + value_size)) )
+        {
+            ERRORF(("Out of memory: closure structure (%zd bytes)", lambda_size + value_size));
+            break;
+        }
+
+        /* Copy header and code. */
+        l =  (lambda_t*)(block + value_size);
+        memcpy(l, orig, lambda_size);
+        l->base.prog_ob = ref_valid_object(orig->base.prog_ob, "context_lambda");
+        assign_object_svalue_no_free(&l->base.ob, orig->base.ob, "context_lambda");
+
+        /* Copy context values. */
+        assert(implicit_context_size + explicit_context_size <= l->num_values);
+
+        values = (svalue_t*) block;
+
+        /* Now copy the context values */
+        if (explicit_context_size != 0)
+        {
+            for (uint16_t i = 0; i < explicit_context_size; i++)
+            {
+                transfer_svalue_no_free(values++, explicit_context+i);
+
+                /* Set it to T_INVALID, as it is still a variable of
+                 * the function frame and will be freed on return.
+                 */
+                explicit_context[i].type = T_INVALID;
+            }
+        }
+
+        if (implicit_context_size != 0)
+        {
+            svalue_t * arg = sp - implicit_context_size + 1;
+
+            for (uint16_t i = 0; i < implicit_context_size; i++)
+                transfer_svalue_no_free(values++, arg+i);
+
+            sp -= implicit_context_size;
+        }
+
+        /* Copy the remaining values from the lambda closure. */
+        orig_values = (svalue_t*)(((void*)orig) - ((void*)l) + ((void*)values));
+        while (values != (void*)l)
+            assign_svalue_no_free(values++, orig_values++);
+
+        sp++;
+        sp->type = T_CLOSURE;
+        sp->x.closure_type = CLOSURE_LAMBDA;
+        sp->u.lambda = l;
+
         break;
     }
 
@@ -21309,6 +21394,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, bool external, svalue_t *bind_ob)
 
             current_variables = get_current_object_variables();
             current_strings = current_prog->strings;
+            inter_context = ((svalue_t*)(void*)lambda) - lambda->num_values;
             if (external)
                 eval_instruction(inter_pc, sp);
             else
@@ -23575,11 +23661,7 @@ count_extra_ref_in_vector (svalue_t *svp, size_t num)
                     count_extra_ref_in_prog(cr->prog);
                 }
                 count_extra_ref_in_vector(&cr->ob, 1);
-                if (cr->closure && register_pointer(ptable, cr->closure) != NULL)
-                {
-                    count_extra_ref_in_base_closure(&(cr->closure->base), CLOSURE_LFUN);
-                    count_extra_ref_in_lfun_closure(cr->closure);
-                }
+                count_extra_ref_in_vector(&cr->closure, 1);
                 if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
                 {
                     count_extra_ref_in_vector(cr->variables, cr->num_variables);

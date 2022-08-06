@@ -23,6 +23,7 @@ typedef struct case_state_s       case_state_t;       /* switch.h */
 typedef struct cleanup_s          cleanup_t;          /* gcollect.c */
 typedef struct closure_base_s     closure_base_t;     /* closure.h */
 typedef struct coroutine_s        coroutine_t;        /* coroutine.h */
+typedef enum efun_override_e      efun_override_t;    /* lex.h */
 typedef struct error_handler_s    error_handler_t;    /* interpret.h */
 typedef struct fulltype_s         fulltype_t;         /* types.h */
 typedef struct function_s         function_t;         /* exec.h */
