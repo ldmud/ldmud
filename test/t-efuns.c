@@ -20,6 +20,11 @@ struct test_struct
     int* arg;
 };
 
+struct derived_struct (test_struct)
+{
+    string* values;
+};
+
 mapping json_testdata = ([ "test 1": 42, "test 2": 42.0,
                           "test 3": "hello world\n",
                           "test 4": ({1,2,3,4,5,42.0,"teststring"}),
@@ -717,6 +722,8 @@ mixed *tests = ({
     ({ "to_struct anonymous from array", 0, (: mixed s = to_struct(({10, 20})); return sizeof(s) == 2 && s.(0) == 10 && s.(1) == 20; :) }),
     ({ "to_struct templated from array 1", 0, (: deep_eq(to_struct(({({10, 20})}), (<test_struct>)), (<test_struct> ({10,20}))) :) }),
     ({ "to_struct templated from array 2", 0, (: deep_eq(to_struct(({({10, 20}), ({30, 40})}), (<test_struct>)), (<test_struct> ({10,20}))) :) }),
+    ({ "to_struct derived from base struct", 0, (: mixed b = (<test_struct> ({10,20})); return deep_eq(to_struct(b, (<derived_struct>)), (<derived_struct> ({10,20}), 0)); :) }),
+    ({ "to_struct base from derived struct", 0, (: mixed d = (<derived_struct> ({10,20}), ({"A","B"})); return deep_eq(to_struct(d, (<test_struct>)), (<test_struct> ({10,20}))); :) }),
 
     ({ "get_type_info with temporary anonymous struct 1", 0, (: deep_eq(get_type_info(to_struct((["A": 10]))), ({ T_STRUCT, "anonymous" })) :) }),
     ({ "get_type_info with temporary anonymous struct 2", 0, (: !strstr(get_type_info(to_struct((["A": 10])), 2), "anonymous ") :) }),

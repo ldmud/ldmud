@@ -6828,7 +6828,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                 int rc;
                 p_int size = 0;
                 struct_type_t *oldbase, *newbase;
-                
+
                 struct_t *oldstruct = argp->u.strct;
                 struct_t *newstruct = argp[1].u.strct;
                 svalue_t *memberp; // pointer to the first member of the new struct
@@ -6843,7 +6843,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                 // check if template is a base of the old struct or the old struct is
                 // a base of the template.
                 rc = struct_baseof(newstruct->type, oldstruct->type);
-                
+
                 // special case, same structs.
                 if (rc == 2)
                 {
@@ -6887,6 +6887,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                     // the base. That is OK, the extra svalues just remain 0. On the other hand,
                     // if the old struct has more members, we just ignore them.
 
+                    free_struct(oldstruct);
                     put_struct(argp, newstruct);
                     break;
                 }
@@ -6918,6 +6919,7 @@ v_to_struct (svalue_t *sp, int num_arg)
                         assign_rvalue_no_free(memberp, oldstruct->member + idx);
                     }
 
+                    free_struct(oldstruct);
                     put_struct(argp, newstruct);
                     break;
                 }
@@ -6943,7 +6945,7 @@ v_to_struct (svalue_t *sp, int num_arg)
 
     /* sp is now argp */
     return sp;
-} /* f_to_struct() */
+} /* v_to_struct() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
