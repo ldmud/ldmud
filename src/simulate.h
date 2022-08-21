@@ -124,16 +124,21 @@ struct error_recovery_info
  * information about the function to call and the arguments to pass.
  */
 
-struct callback_s {
-    union {               /* The function to call: by name or the closure */
-        struct {
-            string_t *name;  /* the tabled function name */
-            svalue_t  ob;    /* reference to the object to call */
+struct callback_s
+{
+    union
+    {
+        /* The function to call: by name or the closure */
+        struct
+        {
+            string_t *name;     /* the tabled function name */
+            svalue_t  ob;       /* reference to the object to call */
         } named;
-        svalue_t lambda;     /* the closure to call */
+        svalue_t closure;       /* the closure to call */
     } function;
-    Bool is_lambda;         /* Closure or named function? */
-    int         num_arg;    /* Number of arguments */
+    bool is_closure;            /* Closure or named function? */
+
+    int         num_arg;        /* Number of arguments */
     svalue_t    arg;
       /* Arguments to pass:
        *   - T_INVALID if no arguments

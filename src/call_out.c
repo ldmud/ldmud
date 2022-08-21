@@ -492,8 +492,8 @@ find_call_out (svalue_t ob, svalue_t *fun, Bool do_free_call)
             for (copp = &call_list; NULL != (cop = *copp); copp = &cop->next)
             {
                 delay += cop->delta;
-                if (cop->fun.is_lambda
-                 && closure_eq(&(cop->fun.function.lambda), fun)
+                if (cop->fun.is_closure
+                 && closure_eq(&(cop->fun.function.closure), fun)
                    )
                 {
                     goto found;
@@ -536,7 +536,7 @@ found:
     for (copp = &call_list; NULL != (cop = *copp); copp = &cop->next)
     {
         delay += cop->delta;
-        if (!cop->fun.is_lambda
+        if (!cop->fun.is_closure
          && object_svalue_eq(cop->fun.function.named.ob, ob)
          && cop->fun.function.named.name == fun_name)
         {
@@ -761,13 +761,13 @@ get_all_call_outs (void)
 
         vv = allocate_array(3 + cop->fun.num_arg);
 
-        if (cop->fun.is_lambda)
+        if (cop->fun.is_closure)
         {
-            if (cop->fun.function.lambda.x.closure_type == CLOSURE_LFUN)
-                assign_object_svalue_no_free(vv->item, cop->fun.function.lambda.u.lfun_closure->fun_ob, "get_all_call_outs");
+            if (cop->fun.function.closure.x.closure_type == CLOSURE_LFUN)
+                assign_object_svalue_no_free(vv->item, cop->fun.function.closure.u.lfun_closure->fun_ob, "get_all_call_outs");
             else
                 assign_object_svalue_no_free(vv->item, ob, "get_all_call_outs");
-            assign_svalue_no_free(&vv->item[1], &cop->fun.function.lambda);
+            assign_svalue_no_free(&vv->item[1], &cop->fun.function.closure);
         }
         else
         {

@@ -7604,7 +7604,7 @@ v_find_input_to (svalue_t *sp, int num_arg)
             switch (arg[1].type)
             {
             case T_STRING:
-                if (!it->fun.is_lambda
+                if (!it->fun.is_closure
                  && mstreq(it->fun.function.named.name, arg[1].u.str))
                     found = MY_TRUE;
                 break;
@@ -7613,7 +7613,7 @@ v_find_input_to (svalue_t *sp, int num_arg)
                 if (num_arg > 2)
                 {
                     if (object_svalue_eq(callback_object(&(it->fun)), arg[1])
-                     && !it->fun.is_lambda
+                     && !it->fun.is_closure
                      && it->fun.function.named.name == arg[2].u.str
                        )
                         found = MY_TRUE;
@@ -7626,8 +7626,8 @@ v_find_input_to (svalue_t *sp, int num_arg)
                 break;
 
             case T_CLOSURE:
-                if (it->fun.is_lambda
-                 && closure_eq(&(it->fun.function.lambda), arg+1))
+                if (it->fun.is_closure
+                 && closure_eq(&(it->fun.function.closure), arg+1))
                     found = MY_TRUE;
                 break;
 
@@ -7758,7 +7758,7 @@ v_remove_input_to (svalue_t *sp, int num_arg)
             switch (arg[1].type)
             {
             case T_STRING:
-                if (!it->fun.is_lambda
+                if (!it->fun.is_closure
                  && mstreq(it->fun.function.named.name, arg[1].u.str))
                     found = MY_TRUE;
                 break;
@@ -7767,7 +7767,7 @@ v_remove_input_to (svalue_t *sp, int num_arg)
                 if (num_arg > 2)
                 {
                     if (object_svalue_eq(callback_object(&(it->fun)), arg[1])
-                     && !it->fun.is_lambda
+                     && !it->fun.is_closure
                      && it->fun.function.named.name == arg[2].u.str
                        )
                         found = MY_TRUE;
@@ -7780,8 +7780,8 @@ v_remove_input_to (svalue_t *sp, int num_arg)
                 break;
 
             case T_CLOSURE:
-                if (it->fun.is_lambda
-                 && closure_eq(&(it->fun.function.lambda), arg+1))
+                if (it->fun.is_closure
+                 && closure_eq(&(it->fun.function.closure), arg+1))
                     found = MY_TRUE;
                 break;
 
@@ -7907,13 +7907,13 @@ f_input_to_info (svalue_t *sp)
 
             vv = allocate_array(2 + it->fun.num_arg);
 
-            if (it->fun.is_lambda)
+            if (it->fun.is_closure)
             {
-                if (it->fun.function.lambda.x.closure_type == CLOSURE_LFUN)
-                    assign_object_svalue_no_free(vv->item, it->fun.function.lambda.u.lfun_closure->fun_ob, "input_to_info");
+                if (it->fun.function.closure.x.closure_type == CLOSURE_LFUN)
+                    assign_object_svalue_no_free(vv->item, it->fun.function.closure.u.lfun_closure->fun_ob, "input_to_info");
                 else
                     assign_object_svalue_no_free(vv->item, ob, "input_to_info");
-                assign_svalue_no_free(&vv->item[1], &it->fun.function.lambda);
+                assign_svalue_no_free(&vv->item[1], &it->fun.function.closure);
             }
             else
             {

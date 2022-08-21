@@ -3397,23 +3397,23 @@ make_unique (vector_t *arr, callback_t *cb, svalue_t *skipnum)
              * change the object the callback is bound to to call the
              * discriminator function in it.
              */
-            if (!cb->is_lambda)
+            if (!cb->is_closure)
                 callback_change_object(cb, item->u.ob);
             else
                 push_ref_object(inter_sp, item->u.ob, "unique_array");
 
-            v = apply_callback(cb, cb->is_lambda ? 1 : 0);
+            v = apply_callback(cb, cb->is_closure ? 1 : 0);
             if (v && !sameval(v, skipnum))
                 ant = put_in(pool, &head, v, item);
         }
         else if (item->type == T_LWOBJECT)
         {
-            if (!cb->is_lambda)
+            if (!cb->is_closure)
                 callback_change_lwobject(cb, item->u.lwob);
             else
                 push_ref_lwobject(inter_sp, item->u.lwob);
 
-            v = apply_callback(cb, cb->is_lambda ? 1 : 0);
+            v = apply_callback(cb, cb->is_closure ? 1 : 0);
             if (v && !sameval(v, skipnum))
                 ant = put_in(pool, &head, v, item);
         }

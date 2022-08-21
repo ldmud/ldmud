@@ -3849,7 +3849,7 @@ init_empty_callback (callback_t *cb)
 
 {
     cb->num_arg = 0;
-    cb->is_lambda = MY_FALSE;
+    cb->is_closure = MY_FALSE;
     cb->function.named.ob = const0;
     cb->function.named.name = NULL;
 } /* init_empty_callback() */
@@ -3899,12 +3899,12 @@ free_callback (callback_t *cb)
  */
 
 {
-    if (cb->is_lambda && cb->function.lambda.type != T_INVALID)
+    if (cb->is_closure && cb->function.closure.type != T_INVALID)
     {
-        free_svalue(&(cb->function.lambda));
-        cb->function.lambda.type = T_INVALID;
+        free_svalue(&(cb->function.closure));
+        cb->function.closure.type = T_INVALID;
     }
-    else if (!(cb->is_lambda))
+    else if (!(cb->is_closure))
     {
         free_svalue(&(cb->function.named.ob));
         if (cb->function.named.name)
@@ -3989,7 +3989,7 @@ setup_function_callback_base ( callback_t *cb, svalue_t ob, string_t * fun
 {
     int error_index;
 
-    cb->is_lambda = MY_FALSE;
+    cb->is_closure = MY_FALSE;
     cb->function.named.name = make_tabled_from(fun); /* for faster apply()s */
     assign_object_svalue_no_free(&(cb->function.named.ob), ob, "callback");
 
@@ -4037,15 +4037,15 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
 {
     int error_index = -1;
 
-    cb->is_lambda = MY_TRUE;
-    transfer_svalue_no_free(&(cb->function.lambda), cl);
+    cb->is_closure = MY_TRUE;
+    transfer_svalue_no_free(&(cb->function.closure), cl);
 
-    if (cb->function.lambda.x.closure_type == CLOSURE_UNBOUND_LAMBDA)
+    if (cb->function.closure.x.closure_type == CLOSURE_UNBOUND_LAMBDA)
     {
         /* Uncalleable closure  */
         error_index = 0;
-        free_svalue(&(cb->function.lambda));
-        cb->function.lambda.type = T_INVALID;
+        free_svalue(&(cb->function.closure));
+        cb->function.closure.type = T_INVALID;
 
         for (int i = 0; i < nargs; i++)
             free_svalue(args+i);
@@ -4055,8 +4055,8 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
         error_index = setup_callback_args(cb, nargs, args);
         if (error_index >= 0)
         {
-            free_svalue(&(cb->function.lambda));
-            cb->function.lambda.type = T_INVALID;
+            free_svalue(&(cb->function.closure));
+            cb->function.closure.type = T_INVALID;
             error_index++;
         }
     }
@@ -4212,7 +4212,7 @@ callback_change_object (callback_t *cb, object_t *obj)
 
 {
     svalue_t old;
-    if (cb->is_lambda)
+    if (cb->is_closure)
     {
         fatal("callback_change_object(): Must not be called with a closure callback.");
         /* NOTREACHED */
@@ -4233,7 +4233,7 @@ callback_change_lwobject (callback_t *cb, lwobject_t *lwobj)
  */
 
 {
-    if (cb->is_lambda)
+    if (cb->is_closure)
     {
         fatal("callback_change_lwobject(): Must not be called with a closure callback.");
         /* NOTREACHED */
@@ -4259,8 +4259,8 @@ callback_object (callback_t *cb)
 {
     svalue_t ob;
 
-    if (cb->is_lambda)
-        ob = get_bound_object(cb->function.lambda);
+    if (cb->is_closure)
+        ob = get_bound_object(cb->function.closure);
     else
         ob = cb->function.named.ob;
 
@@ -4294,8 +4294,8 @@ callback_function (callback_t *cb)
 {
     static svalue_t fun;
 
-    if (cb->is_lambda)
-        assign_svalue_no_free(&fun, &(cb->function.lambda));
+    if (cb->is_closure)
+        assign_svalue_no_free(&fun, &(cb->function.closure));
     else
         put_ref_string(&fun, cb->function.named.name);
 
@@ -4386,11 +4386,11 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
     if (toplevel)
         current_object = ob; /* Need something valid here */
 
-    if (cb->is_lambda)
+    if (cb->is_closure)
     {
         if (toplevel
-         && cb->function.lambda.x.closure_type < CLOSURE_SIMUL_EFUN
-         && cb->function.lambda.x.closure_type >= CLOSURE_OPERATOR)
+         && cb->function.closure.x.closure_type < CLOSURE_SIMUL_EFUN
+         && cb->function.closure.x.closure_type >= CLOSURE_OPERATOR)
         {
             /* efun, operator or sefun closure called from the backend:
              * we need the program for a proper traceback. We made sure
@@ -4399,7 +4399,7 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
             current_prog = (ob.type == T_OBJECT) ? ob.u.ob->prog : ob.u.lwob->prog;
         }
 
-        call_lambda(&(cb->function.lambda), num_arg + nargs);
+        call_lambda(&(cb->function.closure), num_arg + nargs);
         transfer_svalue(&apply_return_value, inter_sp);
         inter_sp--;
 
@@ -4436,10 +4436,10 @@ count_callback_extra_refs (callback_t *cb)
 /* Count all the refs in the callback to verify the normal refcounting. */
 
 {
-    if (!cb->is_lambda)
+    if (!cb->is_closure)
         count_extra_ref_in_vector(&cb->function.named.ob, 1);
     else
-        count_extra_ref_in_vector(&cb->function.lambda, 1);
+        count_extra_ref_in_vector(&cb->function.closure, 1);
     if (cb->num_arg == 1)
         count_extra_ref_in_vector(&(cb->arg), 1);
     else if (cb->num_arg > 1)
@@ -4467,8 +4467,8 @@ clear_ref_in_callback (callback_t *cb)
         clear_memory_reference(cb->arg.u.lvalue);
     }
 
-    if (cb->is_lambda)
-        clear_ref_in_vector(&(cb->function.lambda), 1);
+    if (cb->is_closure)
+        clear_ref_in_vector(&(cb->function.closure), 1);
     else
     {
 #ifdef DEBUG
@@ -4500,8 +4500,8 @@ count_ref_in_callback (callback_t *cb)
     if (!valid_callback_object(cb))
         fatal("GC run on callback with stale object.\n");
 #endif
-    if (cb->is_lambda)
-        count_ref_in_vector(&(cb->function.lambda), 1);
+    if (cb->is_closure)
+        count_ref_in_vector(&(cb->function.closure), 1);
     else
     {
         count_ref_in_vector(&(cb->function.named.ob), 1);
