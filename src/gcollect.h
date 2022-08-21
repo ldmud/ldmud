@@ -19,7 +19,7 @@ extern gc_status_t gc_status;
 extern int gcollect_outfd;
 extern int default_gcollect_outfd;
 extern object_t *gc_obj_list_destructed;
-extern lambda_t *stale_misc_closures;
+extern closure_base_t *stale_misc_closures;
 extern mapping_t *stale_mappings;
 
 

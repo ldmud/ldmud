@@ -764,7 +764,7 @@ get_all_call_outs (void)
         if (cop->fun.is_lambda)
         {
             if (cop->fun.function.lambda.x.closure_type == CLOSURE_LFUN)
-                assign_object_svalue_no_free(vv->item, cop->fun.function.lambda.u.lambda->function.lfun.ob, "get_all_call_outs");
+                assign_object_svalue_no_free(vv->item, cop->fun.function.lambda.u.lfun_closure->fun_ob, "get_all_call_outs");
             else
                 assign_object_svalue_no_free(vv->item, ob, "get_all_call_outs");
             assign_svalue_no_free(&vv->item[1], &cop->fun.function.lambda);

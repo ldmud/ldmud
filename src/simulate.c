@@ -5178,11 +5178,11 @@ f_set_driver_hook (svalue_t *sp)
          */
         if ((hook_type_map[n] & TF_CLOSURE) == 0
          && sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA
-         && sp->u.lambda->ref == 1)
+         && sp->u.lambda->base.ref == 1)
         {
             driver_hook[n] = *sp;
             driver_hook[n].x.closure_type = CLOSURE_LAMBDA;
-            put_ref_object(&(driver_hook[n].u.lambda->ob), master_ob, "hook closure");
+            put_ref_object(&(driver_hook[n].u.lambda->base.ob), master_ob, "hook closure");
             break;
         }
         /* FALLTHROUGH */

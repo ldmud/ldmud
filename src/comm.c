@@ -7910,7 +7910,7 @@ f_input_to_info (svalue_t *sp)
             if (it->fun.is_lambda)
             {
                 if (it->fun.function.lambda.x.closure_type == CLOSURE_LFUN)
-                    assign_object_svalue_no_free(vv->item, it->fun.function.lambda.u.lambda->function.lfun.ob, "input_to_info");
+                    assign_object_svalue_no_free(vv->item, it->fun.function.lambda.u.lfun_closure->fun_ob, "input_to_info");
                 else
                     assign_object_svalue_no_free(vv->item, ob, "input_to_info");
                 assign_svalue_no_free(&vv->item[1], &it->fun.function.lambda);

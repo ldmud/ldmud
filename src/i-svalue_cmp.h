@@ -17,6 +17,37 @@
 
 /*-------------------------------------------------------------------------*/
 static INLINE int
+ptr_cmp (void *left, void *right)
+
+/* Helper function for comparing pointers.
+ * Returns:
+ *   -1 if <left> is smaller than <right>
+ *    0 if both are equal
+ *    1 if <left> is greater than <right>
+ */
+
+{
+    return (left < right) ? -1 : (left == right) ? 0 : 1;
+} /* ptr_cmp() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE int
+int_cmp (p_int left, p_int right)
+
+/* Helper function for comparing integers without fear of overflow
+ * or sign problems.
+ * Returns:
+ *   -1 if <left> is smaller than <right>
+ *    0 if both are equal
+ *    1 if <left> is greater than <right>
+ */
+
+{
+    return (left < right) ? -1 : (left == right) ? 0 : 1;
+} /* int_cmp() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE int
 svalue_cmp (svalue_t *left, svalue_t *right)
 
 /* Order function for sorts.
@@ -52,9 +83,8 @@ svalue_cmp (svalue_t *left, svalue_t *right)
         return mstr_order(left->u.str, right->u.str);
     }
 
-    /* Avoid a numeric overflow by first comparing the values halfed. */
-    if ( 0 != (d = (left->u.number >> 1) - (right->u.number >> 1)) ) return d;
-    if ( 0 != (d = left->u.number - right->u.number) ) return d;
+    if ( 0 != (d = int_cmp(left->u.number, right->u.number)) )
+        return d;
 
     switch (left->type)
     {
@@ -64,7 +94,8 @@ svalue_cmp (svalue_t *left, svalue_t *right)
     case T_SYMBOL:
     case T_QUOTED_ARRAY:
     case T_LVALUE:
-        if ( 0 != (d = left->x.generic - right->x.generic) ) return d;
+        if ( 0 != (d = int_cmp(left->x.generic, right->x.generic)) )
+            return d;
         break;
     }
     return 0;

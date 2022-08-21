@@ -711,9 +711,9 @@ mhash (svalue_t * svp)
         }
         else if (CLOSURE_MALLOCED(svp->x.closure_type))
         {
-            i = (svp->u.lambda->ob.type == T_OBJECT
-               ? (p_int)svp->u.lambda->ob.u.ob
-               : (p_int)svp->u.lambda->ob.u.lwob) ^ *SVALUE_FULLTYPE(svp);
+            i = (svp->u.lambda->base.ob.type == T_OBJECT
+               ? (p_int)svp->u.lambda->base.ob.u.ob
+               : (p_int)svp->u.lambda->base.ob.u.lwob) ^ *SVALUE_FULLTYPE(svp);
         }
         else /* Efun, Simul-Efun, Operator closure */
         {
@@ -2714,20 +2714,20 @@ handle_destructed_key (svalue_t *key)
          * into a single lambda closure bound to the destructed
          * object. This way the GC will treat it correctly.
          */
-        lambda_t *l = key->u.lambda;
+        bound_lambda_t *l = key->u.bound_lambda;
 
         key->x.closure_type = CLOSURE_LAMBDA;
-        key->u.lambda = l->function.lambda;
-        if (!l->ref)
+        key->u.lambda = l->lambda;
+        if (!l->base.ref)
         {
             /* This would have been the first reference to the
              * lambda closure: add it to the stale list and mark
              * it as 'stale'.
              */
-            l->function.lambda->ob = l->ob;
-            l->ref = -1;
-            l->ob.u.lambda = stale_misc_closures;
-            stale_misc_closures = l;
+            l->lambda->base.ob = l->base.ob;
+            l->base.ref = -1;
+            l->base.ob.u.closure = stale_misc_closures;
+            stale_misc_closures = &(l->base);
         }
         else
         {
@@ -2743,7 +2743,7 @@ handle_destructed_key (svalue_t *key)
             if (gc_obj_list_destructed)
                 fatal("gc_obj_list_destructed is NULL\n");
 #endif
-            l->function.lambda->ob.u.ob = gc_obj_list_destructed;
+            l->lambda->base.ob.u.ob = gc_obj_list_destructed;
         }
     }
     count_ref_in_vector(key, 1);

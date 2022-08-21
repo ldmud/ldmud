@@ -1524,7 +1524,6 @@ _destructed_object_ref (svalue_t *svp)
 
         case T_CLOSURE:
         {
-            lambda_t *l;
             int type;
 
             if (!CLOSURE_MALLOCED(type = svp->x.closure_type))
@@ -1535,20 +1534,18 @@ _destructed_object_ref (svalue_t *svp)
                     return (svp->u.ob->flags & O_DESTRUCTED) ? MY_TRUE : MY_FALSE;
             }
 
-            /* Lambda closure */
+            /* Allocated closure */
 
-            l = svp->u.lambda;
-
-            if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
+            if (type == CLOSURE_UNBOUND_LAMBDA)
                 return MY_FALSE;
 
             if (type == CLOSURE_LFUN
-             && l->function.lfun.ob.type == T_OBJECT
-             && (l->function.lfun.ob.u.ob->flags & O_DESTRUCTED))
+             && svp->u.lfun_closure->fun_ob.type == T_OBJECT
+             && (svp->u.lfun_closure->fun_ob.u.ob->flags & O_DESTRUCTED))
                 return MY_TRUE;
 
-            if (l->ob.type == T_OBJECT
-             && (l->ob.u.ob->flags & O_DESTRUCTED))
+            if (svp->u.closure->ob.type == T_OBJECT
+             && (svp->u.closure->ob.u.ob->flags & O_DESTRUCTED))
                 return MY_TRUE;
 
             return MY_FALSE;
@@ -1582,7 +1579,6 @@ inl_object_ref (svalue_t *svp, object_t *obj)
 
         case T_CLOSURE:
         {
-            lambda_t *l;
             int type;
 
             if (!CLOSURE_MALLOCED(type = svp->x.closure_type))
@@ -1593,20 +1589,18 @@ inl_object_ref (svalue_t *svp, object_t *obj)
                     return svp->u.ob == obj;
             }
 
-            /* Lambda closure */
+            /* Allocated closure */
 
-            l = svp->u.lambda;
-
-            if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
+            if (type == CLOSURE_UNBOUND_LAMBDA)
                 return MY_FALSE;
 
             if (type == CLOSURE_LFUN
-             && l->function.lfun.ob.type == T_OBJECT
-             && l->function.lfun.ob.u.ob == obj)
+             && svp->u.lfun_closure->fun_ob.type == T_OBJECT
+             && svp->u.lfun_closure->fun_ob.u.ob == obj)
                 return MY_TRUE;
 
-            if (l->ob.type == T_OBJECT
-             && l->ob.u.ob == obj)
+            if (svp->u.closure->ob.type == T_OBJECT
+             && svp->u.closure->ob.u.ob == obj)
                 return MY_TRUE;
 
             return MY_FALSE;
@@ -1699,7 +1693,12 @@ internal_assign_svalue_no_free (svalue_t *to, svalue_t *from)
         break;
 
     case T_CLOSURE:
-        addref_closure(to, "ass to var");
+        if (CLOSURE_MALLOCED(to->x.closure_type))
+            to->u.closure->ref++;
+        else if (to->x.closure_type < CLOSURE_LWO)
+            ref_lwobject(to->u.lwob);
+        else
+            ref_object(to->u.ob, "ass to var");
         break;
 
     case T_COROUTINE:
@@ -8746,12 +8745,14 @@ do_trace_call (bytecode_p funstart, Bool is_lambda)
         /* Trace the function itself */
         if (is_lambda)
         {
-            lambda_t *l = current_lambda.u.lambda;
+            lambda_t *l;
             if (current_lambda.x.closure_type == CLOSURE_BOUND_LAMBDA)
-                l = l->function.lambda;
+                l = current_lambda.u.bound_lambda->lambda;
+            else
+                l = current_lambda.u.lambda;
 
             do_trace("Call direct ", "lambda-closure", " ");
-            num_args = l->function.code.num_arg;
+            num_args = l->num_arg;
         }
         else
         {
@@ -9316,12 +9317,14 @@ setup_new_frame2 (bytecode_p funstart, svalue_t *sp
     /* (Re)move excessive arguments.  */
     if (is_lambda)
     {
-        lambda_t *l = current_lambda.u.lambda;
+        lambda_t *l;
         if (current_lambda.x.closure_type == CLOSURE_BOUND_LAMBDA)
-            l = l->function.lambda;
+            l = current_lambda.u.bound_lambda->lambda;
+        else
+            l = current_lambda.u.lambda;
 
-        num_arg = l->function.code.num_arg;
-        num_vars = l->function.code.num_locals;
+        num_arg = l->num_arg;
+        num_vars = l->num_locals;
         has_varargs = false;
 
         inter_pc = funstart;
@@ -10791,7 +10794,7 @@ again:
             if (explicit_context_size != 0)
             {
                 unsigned short i;
-                svalue_t * context = sp->u.lambda->context;
+                svalue_t * context = sp->u.lfun_closure->context;
 
                 for (i = 0; i < explicit_context_size; i++)
                 {
@@ -10808,7 +10811,7 @@ again:
             {
                 unsigned short i;
                 svalue_t * arg = sp - implicit_context_size;
-                svalue_t * context = sp->u.lambda->context + explicit_context_size;
+                svalue_t * context = sp->u.lfun_closure->context + explicit_context_size;
 
                 for (i = 0; i < implicit_context_size; i++)
                     transfer_svalue_no_free(context+i, arg+i);
@@ -21029,7 +21032,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, bool external, svalue_t *bind_ob)
    */
 
     svalue_t *sp;
-    lambda_t *l = lsvp->u.lambda;
+    lambda_t *lambda = NULL; /* The lambda to execute if any. */
 
     sp = inter_sp;
 
@@ -21045,469 +21048,472 @@ int_call_lambda (svalue_t *lsvp, int num_arg, bool external, svalue_t *bind_ob)
 
     switch(lsvp->x.closure_type)
     {
-
-    case CLOSURE_LFUN:  /* --- lfun closure --- */
-      {
-        Bool      extra_frame;
-
-        if (l->ob.type == T_OBJECT)
+        case CLOSURE_LFUN:  /* --- lfun closure --- */
         {
-            /* Can't call from a destructed object */
-            if (l->ob.u.ob->flags & O_DESTRUCTED)
+            lfun_closure_t *l = lsvp->u.lfun_closure;
+            bool extra_frame;
+
+            if (l->base.ob.type == T_OBJECT)
             {
-                /* inter_sp == sp */
-                CLEAN_CSP
-                pop_n_elems(num_arg);
-                push_number(sp, 0);
-                inter_sp = sp;
-                return;
+                /* Can't call from a destructed object */
+                if (l->base.ob.u.ob->flags & O_DESTRUCTED)
+                {
+                    /* inter_sp == sp */
+                    CLEAN_CSP
+                    pop_n_elems(num_arg);
+                    push_number(sp, 0);
+                    inter_sp = sp;
+                    return;
+                }
+
+                /* Reference the bound and the originating object */
+                l->base.ob.u.ob->time_of_ref = current_time;
             }
 
-            /* Reference the bound and the originating object */
-            l->ob.u.ob->time_of_ref = current_time;
-        }
-
-        if (l->function.lfun.ob.type == T_OBJECT)
-        {
-            l->function.lfun.ob.u.ob->time_of_ref = current_time;
-            l->function.lfun.ob.u.ob->flags &= ~O_RESET_STATE;
-
-            /* Can't call a function in a destructed object */
-            if (l->function.lfun.ob.u.ob->flags & O_DESTRUCTED)
+            if (l->fun_ob.type == T_OBJECT)
             {
-                /* inter_sp == sp */
-                CLEAN_CSP
-                pop_n_elems(num_arg);
-                push_number(sp, 0);
-                inter_sp = sp;
-                return;
-            }
-        }
+                l->fun_ob.u.ob->time_of_ref = current_time;
+                l->fun_ob.u.ob->flags &= ~O_RESET_STATE;
 
-        /* Make the objects resident */
-        if ( (   current_object.type == T_OBJECT
-              && current_object.u.ob->flags & O_SWAPPED
-              && load_ob_from_swap(current_object.u.ob) < 0)
-         ||  (   l->function.lfun.ob.type == T_OBJECT
-              && l->function.lfun.ob.u.ob->flags & O_SWAPPED
-              && load_ob_from_swap(l->function.lfun.ob.u.ob) < 0)
-           )
-        {
-            /* inter_sp == sp */
-            CLEAN_CSP
-            errorf("Out of memory\n");
-            /* NOTREACHED */
-            return;
-        }
-
-        current_object = l->ob;
-
-        /* If the object creating the closure wasn't the one in which
-         * it will be executed, we need to record the fact in a second
-         * 'dummy' control frame. If we didn't, major security holes
-         * open up.
-         */
-
-        if (!object_svalue_eq(l->ob, l->function.lfun.ob))
-        {
-            extra_frame = MY_TRUE;
-            csp->extern_call = MY_TRUE;
-            csp->funstart = NULL;
-            push_control_stack(sp, 0, inter_fp, inter_context);
-            csp->ob = current_object;
-            csp->prev_ob = previous_ob;
-            csp->num_local_variables = num_arg;
-            previous_ob = current_object;
-            external = MY_TRUE;
-        }
-        else
-            extra_frame = MY_FALSE;
-
-        /* Finish the setup of the control frame.
-         * This is a real inter-object call.
-         */
-        csp->extern_call = external;
-        current_object = l->function.lfun.ob;
-        current_prog = get_current_object_program();
-
-#ifdef DEBUG
-        if (l->function.lfun.index >= current_prog->num_functions)
-            fatal("Calling non-existing lfun closure #%hu in program '%s' "
-                  "with %hu functions.\n"
-                 , l->function.lfun.index
-                 , get_txt(current_prog->name)
-                 , current_prog->num_functions
-                );
-#endif
-
-        /* inter_sp == sp */
-        setup_new_frame(l->function.lfun.index, l->function.lfun.inhProg);
-          
-        // check arguments
-        check_function_args(current_prog->function_headers[FUNCTION_HEADER_INDEX(csp->funstart)].offset.fx, current_prog, csp->funstart);
-        if (l->function.lfun.context_size > 0)
-            inter_context = l->context;
-        if (external)
-            eval_instruction(inter_pc, inter_sp);
-
-        /* If l->ob selfdestructs during the call, l might have been
-         * deallocated at this point!
-         */
-
-        /* If necessary, remove the second control frame */
-        if (extra_frame)
-        {
-            current_object = csp->ob;
-            previous_ob = csp->prev_ob;
-            pop_control_stack();
-        }
-
-        /* The result is on the stack (inter_sp) */
-        return;
-      }
-
-    case CLOSURE_IDENTIFIER:  /* --- variable closure --- */
-      {
-        short i; /* the signed variant of lambda_t->function.index */
-        svalue_t *vars;
-
-        CLEAN_CSP  /* no call will be done */
-
-        /* Ignore any arguments passed to a variable closure. */
-        pop_n_elems(num_arg);
-
-        if (l->ob.type == T_OBJECT)
-        {
-            /* Don't use variables in a destructed object */
-            if (l->ob.u.ob->flags & O_DESTRUCTED)
-            {
-                push_number(sp, 0);
-                inter_sp = sp;
-                return;
+                /* Can't call a function in a destructed object */
+                if (l->fun_ob.u.ob->flags & O_DESTRUCTED)
+                {
+                    /* inter_sp == sp */
+                    CLEAN_CSP
+                    pop_n_elems(num_arg);
+                    push_number(sp, 0);
+                    inter_sp = sp;
+                    return;
+                }
             }
 
-            /* Make the object resident */
-            if (   (l->ob.u.ob->flags & O_SWAPPED)
-                 && load_ob_from_swap(l->ob.u.ob) < 0
+            /* Make the objects resident */
+            if ( (   current_object.type == T_OBJECT
+                  && current_object.u.ob->flags & O_SWAPPED
+                  && load_ob_from_swap(current_object.u.ob) < 0)
+             ||  (   l->fun_ob.type == T_OBJECT
+                  && l->fun_ob.u.ob->flags & O_SWAPPED
+                  && load_ob_from_swap(l->fun_ob.u.ob) < 0)
                )
             {
-                errorf("Out of memory.\n");
+                /* inter_sp == sp */
+                CLEAN_CSP
+                errorf("Out of memory\n");
                 /* NOTREACHED */
                 return;
             }
-        }
 
-        /* Do we have the variable? */
-        if ( (i = (short)l->function.var_index) < 0)
-        {
-            errorf("Variable not inherited\n");
-            /* NOTREACHED */
+            current_object = l->base.ob;
+
+            /* If the object creating the closure wasn't the one in which
+             * it will be executed, we need to record the fact in a second
+             * 'dummy' control frame. If we didn't, major security holes
+             * open up.
+             */
+
+            if (!object_svalue_eq(l->base.ob, l->fun_ob))
+            {
+                extra_frame = MY_TRUE;
+                csp->extern_call = MY_TRUE;
+                csp->funstart = NULL;
+                push_control_stack(sp, 0, inter_fp, inter_context);
+                csp->ob = current_object;
+                csp->prev_ob = previous_ob;
+                csp->num_local_variables = num_arg;
+                previous_ob = current_object;
+                external = MY_TRUE;
+            }
+            else
+                extra_frame = MY_FALSE;
+
+            /* Finish the setup of the control frame.
+             * This is a real inter-object call.
+             */
+            csp->extern_call = external;
+            current_object = l->fun_ob;
+            current_prog = get_current_object_program();
+
+#ifdef DEBUG
+            if (l->fun_index >= current_prog->num_functions)
+                fatal("Calling non-existing lfun closure #%hu in program '%s' "
+                      "with %hu functions.\n"
+                     , l->fun_index
+                     , get_txt(current_prog->name)
+                     , current_prog->num_functions
+                    );
+#endif
+
+            /* inter_sp == sp */
+            setup_new_frame(l->fun_index, l->inhProg);
+
+            /* Check arguments. */
+            check_function_args(current_prog->function_headers[FUNCTION_HEADER_INDEX(csp->funstart)].offset.fx, current_prog, csp->funstart);
+            if (l->context_size > 0)
+                inter_context = l->context;
+            if (external)
+                eval_instruction(inter_pc, inter_sp);
+
+            /* If l->base.ob selfdestructs during the call, l might have been
+             * deallocated at this point!
+             */
+
+            /* If necessary, remove the second control frame */
+            if (extra_frame)
+            {
+                current_object = csp->ob;
+                previous_ob = csp->prev_ob;
+                pop_control_stack();
+            }
+
+            /* The result is on the stack (inter_sp) */
             return;
         }
 
-        if (l->ob.type == T_OBJECT)
+        case CLOSURE_IDENTIFIER:  /* --- variable closure --- */
         {
-            l->ob.u.ob->time_of_ref = current_time;
-            vars = l->ob.u.ob->variables;
-#ifdef DEBUG
-            if (!vars)
-                fatal("%s Fatal: call_lambda on variable for object %p '%s' "
-                      "w/o variables, index %d\n"
-                     , time_stamp(), l->ob.u.ob, get_txt(l->ob.u.ob->name), i);
-#endif
-        }
-        else
-        {
-            vars = l->ob.u.lwob->variables;
-#ifdef DEBUG
-            if (!vars)
-                fatal("%s Fatal: call_lambda on variable for lightweight object %p '/%s' "
-                      "w/o variables, index %d\n"
-                     , time_stamp(), l->ob.u.lwob, get_txt(l->ob.u.lwob->prog->name), i);
-#endif
-        }
+            identifier_closure_t *cl = lsvp->u.identifier_closure;
+            svalue_t *vars;
 
-        assign_svalue_no_free(++sp, vars+i);
-        inter_sp = sp;
-        return;
-      }
+            CLEAN_CSP  /* no call will be done */
 
-    case CLOSURE_BOUND_LAMBDA:  /* --- bound lambda closure --- */
-      {
-        lambda_t *l2;
+            /* Ignore any arguments passed to a variable closure. */
+            pop_n_elems(num_arg);
 
-        /* Deref the closure and then treat the resulting unbound
-         * lambda like a normal lambda
-         */
-        l2 = l->function.lambda;
-        l2->ob = l->ob;
-        l = l2;
-      }
-      /* FALLTHROUGH */
-
-    case CLOSURE_UNBOUND_LAMBDA:
-      if (lsvp->x.closure_type == CLOSURE_UNBOUND_LAMBDA)
-      {
-          if (!bind_ob)
-              break;
-
-          /* Internal call of an unbound closure.
-           * Bind it on the fly.
-           */
-          l->ob = *bind_ob;
-      }
-      /* FALLTHROUGH */
-
-    case CLOSURE_LAMBDA:
-      {
-        bytecode_p funstart;
-
-        if (l->ob.type == T_OBJECT)
-        {
-            /* Can't call from a destructed object */
-            if (l->ob.u.ob->flags & O_DESTRUCTED)
+            if (cl->base.ob.type == T_OBJECT)
             {
-                /* inter_sp == sp */
-                CLEAN_CSP
-                pop_n_elems(num_arg);
-                push_number(sp, 0);
-                inter_sp = sp;
-                return;
-            }
-
-            /* Make the object resident */
-            if (l->ob.u.ob->flags & O_SWAPPED
-             && load_ob_from_swap(l->ob.u.ob) < 0)
-            {
-                /* inter_sp == sp */
-                CLEAN_CSP
-                errorf("Out of memory\n");
-                /* NOTREACHED */
-                return;
-            }
-
-            /* Reference the object */
-            l->ob.u.ob->time_of_ref = current_time;
-            l->ob.u.ob->flags &= ~O_RESET_STATE;
-        }
-
-        current_object = l->ob;
-
-        /* Finish the setup */
-
-        current_prog = get_current_object_program();
-        current_lambda = *lsvp; addref_closure(lsvp, "call_lambda()");
-        variable_index_offset = 0;
-        function_index_offset = 0;
-        funstart = l->function.code.program;
-        csp->funstart = funstart;
-        csp->extern_call = external;
-        sp = setup_new_frame2(funstart, sp, MY_TRUE);
-
-        current_variables = get_current_object_variables();
-        current_strings = current_prog->strings;
-        if (external)
-            eval_instruction(inter_pc, sp);
-        else
-            inter_sp = sp;
-
-        /* The result is on the stack (inter_sp). */
-        return;
-      }
-
-    default: /* --- efun-, simul efun-, operator closure */
-      {
-        int i = lsvp->x.closure_type;  /* the closure type */
-
-        if (i < CLOSURE_LWO)
-        {
-            i -= CLOSURE_LWO;
-            set_current_lwobject(lsvp->u.lwob);
-        }
-        else
-        {
-            object_t *ob = lsvp->u.ob;
-
-            /* Can't call from a destructed object */
-            if (ob->flags & O_DESTRUCTED)
-            {
-                /* inter_sp == sp */
-                CLEAN_CSP
-                pop_n_elems(num_arg);
-                push_number(sp, 0);
-                inter_sp = sp;
-                return;
-            }
-
-            /* Make the object resident */
-            if (ob->flags & O_SWAPPED
-             && load_ob_from_swap(ob) < 0)
-            {
-                /* inter_sp == sp */
-                CLEAN_CSP
-                errorf("Out of memory\n");
-                /* NOTREACHED */
-                return;
-            }
-
-            /* Reference the object */
-            ob->time_of_ref = current_time;
-
-            set_current_object(ob);
-        }
-
-        if (i < CLOSURE_SIMUL_EFUN)
-        {
-            /* It's an operator or efun */
-
-            if (i == CLOSURE_EFUN + F_UNDEF)
-            {
-                /* The closure was discovered to be bound to a destructed
-                 * object and thus disabled.
-                 * This situation should no longer happen - in all situations
-                 * the closure should be zeroed out.
-                 */
-                CLEAN_CSP
-                pop_n_elems(num_arg);
-                push_number(sp, 0);
-                inter_sp = sp;
-                return;
-            }
-
-#ifdef USE_PYTHON
-            if (i >= CLOSURE_PYTHON_EFUN && i < CLOSURE_EFUN)
-            {
-                inter_pc = csp->funstart = PYTHON_EFUN_FUNSTART;
-                csp->instruction = i - CLOSURE_PYTHON_EFUN;
-                csp->num_local_variables = 0;
-
-                call_python_efun(i - CLOSURE_PYTHON_EFUN, num_arg);
-                CLEAN_CSP
-                return;
-            }
-#endif
-
-            i -= CLOSURE_EFUN;
-              /* Efuns have now a positive value, operators a negative one.
-               */
-
-            if (i >= 0
-             || instrs[i -= CLOSURE_OPERATOR-CLOSURE_EFUN].min_arg)
-            {
-                /* To call an operator or efun, we have to construct
-                 * a small piece of program with this instruction.
-                 */
-                bytecode_t code[9];    /* the code fragment */
-                bytecode_p p;          /* the code pointer */
-
-                int min, max, def;
-
-                min = instrs[i].min_arg;
-                max = instrs[i].max_arg;
-                p = code;
-
-                /* Fix up the number of arguments passed */
-                if (num_arg < min)
+                /* Don't use variables in a destructed object */
+                if (cl->base.ob.u.ob->flags & O_DESTRUCTED)
                 {
-                    /* Add some arguments */
-
-                    int f;
-
-                    if (num_arg == min-1
-                     && 0 != (def = instrs[i].Default) && def != -1)
-                    {
-                        /* We lack one argument for which a default
-                         * is provided.
-                         */
-                        if (instrs[def].prefix)
-                            *p++ = instrs[def].prefix;
-                        *p++ = instrs[def].opcode;
-                        max--;
-                        min--;
-                    }
-                    else
-                    {
-                        /* Maybe there is a fitting replacement efun */
-                        f = proxy_efun(i, num_arg);
-                        if (f >= 0)
-                            /* Yup, use that one */
-                            i = f;
-                        else
-                        {
-                            /* Nope. */
-                            csp->extern_call = MY_TRUE;
-                            inter_pc = csp->funstart = EFUN_FUNSTART;
-                            csp->instruction = i;
-                            errorf("Too few arguments to %s\n", instrs[i].name);
-                        }
-                    }
-                }
-                else if (num_arg > 0xff || (num_arg > max && max != -1))
-                {
-                    csp->extern_call = MY_TRUE;
-                    inter_pc = csp->funstart = EFUN_FUNSTART;
-                    csp->instruction = i;
-                    errorf("Too many arguments to %s\n", instrs[i].name);
+                    push_number(sp, 0);
+                    inter_sp = sp;
+                    return;
                 }
 
-                /* Store the instruction code */
-                if (instrs[i].prefix)
-                    *p++ = instrs[i].prefix;
-                *p++ = instrs[i].opcode;
-
-                /* And finally the return instruction */
-                if ( instrs[i].ret_type == lpctype_void )
-                    *p++ = F_RETURN0;
-                else
-                    *p++ = F_RETURN;
-
-                csp->instruction = i;
-                csp->funstart = EFUN_FUNSTART;
-                csp->num_local_variables = 0;
-                inter_fp = sp - num_arg + 1;
-                inter_context = NULL;
-                tracedepth++; /* Counteract the F_RETURN */
-                eval_instruction(code, sp);
-                /* The result is on the stack (inter_sp) */
-                return;
-            }
-            else
-            {
-                /* It is an operator or syntactic marker: fall through
-                 * to uncallable closure type.
-                 */
-                break;
-            }
-        }
-        else
-        {
-            /* simul_efun */
-            object_t *ob;
-
-            /* Mark the call as sefun closure */
-            inter_pc = csp->funstart = SIMUL_EFUN_FUNSTART;
-
-            /* Get the simul_efun object */
-            if ( !(ob = simul_efun_object) )
-            {
-                /* inter_sp == sp */
-                if (!assert_simul_efun_object()
-                 || !(ob = simul_efun_object)
+                /* Make the object resident */
+                if (   (cl->base.ob.u.ob->flags & O_SWAPPED)
+                     && load_ob_from_swap(cl->base.ob.u.ob) < 0
                    )
                 {
-                    csp->extern_call = MY_TRUE;
-                    errorf("Couldn't load simul_efun object\n");
+                    errorf("Out of memory.\n");
                     /* NOTREACHED */
                     return;
                 }
             }
-            call_simul_efun(i - CLOSURE_SIMUL_EFUN, ob, num_arg);
-            CLEAN_CSP
-        }
-        /* The result is on the stack (inter_sp) */
-        return;
-      }
 
+            /* Do we have the variable? */
+            if ( cl->var_index == VANISHED_VARCLOSURE_INDEX)
+            {
+                errorf("Variable not inherited\n");
+                /* NOTREACHED */
+                return;
+            }
+
+            if (cl->base.ob.type == T_OBJECT)
+            {
+                cl->base.ob.u.ob->time_of_ref = current_time;
+                vars = cl->base.ob.u.ob->variables;
+#ifdef DEBUG
+                if (!vars)
+                    fatal("%s Fatal: call_lambda on variable for object %p '%s' "
+                          "w/o variables, index %d\n"
+                         , time_stamp(), cl->base.ob.u.ob
+                         , get_txt(cl->base.ob.u.ob->name), cl->var_index);
+#endif
+            }
+            else
+            {
+                vars = cl->base.ob.u.lwob->variables;
+#ifdef DEBUG
+                if (!vars)
+                    fatal("%s Fatal: call_lambda on variable for lightweight object %p '/%s' "
+                          "w/o variables, index %d\n"
+                         , time_stamp(), cl->base.ob.u.lwob
+                         , get_txt(cl->base.ob.u.lwob->prog->name), cl->var_index);
+#endif
+            }
+
+            assign_svalue_no_free(++sp, vars+cl->var_index);
+            inter_sp = sp;
+            return;
+        }
+
+        case CLOSURE_BOUND_LAMBDA:  /* --- bound lambda closure --- */
+        {
+            /* Deref the closure and then treat the resulting unbound
+             * lambda like a normal lambda
+             */
+            lambda = lsvp->u.bound_lambda->lambda;
+            lambda->base.ob = lsvp->u.bound_lambda->base.ob;
+
+            /* FALLTHROUGH */
+        }
+
+        case CLOSURE_UNBOUND_LAMBDA:
+            if (lsvp->x.closure_type == CLOSURE_UNBOUND_LAMBDA)
+            {
+                if (!bind_ob)
+                    break;
+
+                /* Internal call of an unbound closure.
+                 * Bind it on the fly.
+                 */
+                lambda = lsvp->u.lambda;
+                lambda->base.ob = *bind_ob;
+            }
+            /* FALLTHROUGH */
+
+        case CLOSURE_LAMBDA:
+        {
+            bytecode_p funstart;
+
+            if (lsvp->x.closure_type == CLOSURE_LAMBDA)
+                lambda = lsvp->u.lambda;
+
+            if (lambda->base.ob.type == T_OBJECT)
+            {
+                /* Can't call from a destructed object */
+                if (lambda->base.ob.u.ob->flags & O_DESTRUCTED)
+                {
+                    /* inter_sp == sp */
+                    CLEAN_CSP
+                    pop_n_elems(num_arg);
+                    push_number(sp, 0);
+                    inter_sp = sp;
+                    return;
+                }
+
+                /* Make the object resident */
+                if (lambda->base.ob.u.ob->flags & O_SWAPPED
+                 && load_ob_from_swap(lambda->base.ob.u.ob) < 0)
+                {
+                    /* inter_sp == sp */
+                    CLEAN_CSP
+                    errorf("Out of memory\n");
+                    /* NOTREACHED */
+                    return;
+                }
+
+                /* Reference the object */
+                lambda->base.ob.u.ob->time_of_ref = current_time;
+                lambda->base.ob.u.ob->flags &= ~O_RESET_STATE;
+            }
+
+            current_object = lambda->base.ob;
+
+            /* Finish the setup */
+
+            current_prog = get_current_object_program();
+            internal_assign_svalue_no_free(&current_lambda, lsvp);
+            variable_index_offset = 0;
+            function_index_offset = 0;
+            funstart = lambda->program;
+            csp->funstart = funstart;
+            csp->extern_call = external;
+            sp = setup_new_frame2(funstart, sp, MY_TRUE);
+
+            current_variables = get_current_object_variables();
+            current_strings = current_prog->strings;
+            if (external)
+                eval_instruction(inter_pc, sp);
+            else
+                inter_sp = sp;
+
+            /* The result is on the stack (inter_sp). */
+            return;
+        }
+
+        default: /* --- efun-, simul efun-, operator closure */
+        {
+            int i = lsvp->x.closure_type;  /* the closure type */
+
+            if (i < CLOSURE_LWO)
+            {
+                i -= CLOSURE_LWO;
+                set_current_lwobject(lsvp->u.lwob);
+            }
+            else
+            {
+                object_t *ob = lsvp->u.ob;
+
+                /* Can't call from a destructed object */
+                if (ob->flags & O_DESTRUCTED)
+                {
+                    /* inter_sp == sp */
+                    CLEAN_CSP
+                    pop_n_elems(num_arg);
+                    push_number(sp, 0);
+                    inter_sp = sp;
+                    return;
+                }
+
+                /* Make the object resident */
+                if (ob->flags & O_SWAPPED
+                 && load_ob_from_swap(ob) < 0)
+                {
+                    /* inter_sp == sp */
+                    CLEAN_CSP
+                    errorf("Out of memory\n");
+                    /* NOTREACHED */
+                    return;
+                }
+
+                /* Reference the object */
+                ob->time_of_ref = current_time;
+
+                set_current_object(ob);
+            }
+
+            if (i < CLOSURE_SIMUL_EFUN)
+            {
+                /* It's an operator or efun */
+
+                if (i == CLOSURE_EFUN + F_UNDEF)
+                {
+                    /* The closure was discovered to be bound to a destructed
+                     * object and thus disabled.
+                     * This situation should no longer happen - in all situations
+                     * the closure should be zeroed out.
+                     */
+                    CLEAN_CSP
+                    pop_n_elems(num_arg);
+                    push_number(sp, 0);
+                    inter_sp = sp;
+                    return;
+                }
+
+#ifdef USE_PYTHON
+                if (i >= CLOSURE_PYTHON_EFUN && i < CLOSURE_EFUN)
+                {
+                    inter_pc = csp->funstart = PYTHON_EFUN_FUNSTART;
+                    csp->instruction = i - CLOSURE_PYTHON_EFUN;
+                    csp->num_local_variables = 0;
+
+                    call_python_efun(i - CLOSURE_PYTHON_EFUN, num_arg);
+                    CLEAN_CSP
+                    return;
+                }
+#endif
+
+                i -= CLOSURE_EFUN;
+                  /* Efuns have now a positive value, operators a negative one.
+                   */
+
+                if (i >= 0
+                 || instrs[i -= CLOSURE_OPERATOR-CLOSURE_EFUN].min_arg)
+                {
+                    /* To call an operator or efun, we have to construct
+                     * a small piece of program with this instruction.
+                     */
+                    bytecode_t code[9];    /* the code fragment */
+                    bytecode_p p;          /* the code pointer */
+
+                    int min, max, def;
+
+                    min = instrs[i].min_arg;
+                    max = instrs[i].max_arg;
+                    p = code;
+
+                    /* Fix up the number of arguments passed */
+                    if (num_arg < min)
+                    {
+                        /* Add some arguments */
+
+                        int f;
+
+                        if (num_arg == min-1
+                         && 0 != (def = instrs[i].Default) && def != -1)
+                        {
+                            /* We lack one argument for which a default
+                             * is provided.
+                             */
+                            if (instrs[def].prefix)
+                                *p++ = instrs[def].prefix;
+                            *p++ = instrs[def].opcode;
+                            max--;
+                            min--;
+                        }
+                        else
+                        {
+                            /* Maybe there is a fitting replacement efun */
+                            f = proxy_efun(i, num_arg);
+                            if (f >= 0)
+                                /* Yup, use that one */
+                                i = f;
+                            else
+                            {
+                                /* Nope. */
+                                csp->extern_call = MY_TRUE;
+                                inter_pc = csp->funstart = EFUN_FUNSTART;
+                                csp->instruction = i;
+                                errorf("Too few arguments to %s\n", instrs[i].name);
+                            }
+                        }
+                    }
+                    else if (num_arg > 0xff || (num_arg > max && max != -1))
+                    {
+                        csp->extern_call = MY_TRUE;
+                        inter_pc = csp->funstart = EFUN_FUNSTART;
+                        csp->instruction = i;
+                        errorf("Too many arguments to %s\n", instrs[i].name);
+                    }
+
+                    /* Store the instruction code */
+                    if (instrs[i].prefix)
+                        *p++ = instrs[i].prefix;
+                    *p++ = instrs[i].opcode;
+
+                    /* And finally the return instruction */
+                    if ( instrs[i].ret_type == lpctype_void )
+                        *p++ = F_RETURN0;
+                    else
+                        *p++ = F_RETURN;
+
+                    csp->instruction = i;
+                    csp->funstart = EFUN_FUNSTART;
+                    csp->num_local_variables = 0;
+                    inter_fp = sp - num_arg + 1;
+                    inter_context = NULL;
+                    tracedepth++; /* Counteract the F_RETURN */
+                    eval_instruction(code, sp);
+                    /* The result is on the stack (inter_sp) */
+                    return;
+                }
+                else
+                {
+                    /* It is an operator or syntactic marker: fall through
+                     * to uncallable closure type.
+                     */
+                    break;
+                }
+            }
+            else
+            {
+                /* simul_efun */
+                object_t *ob;
+
+                /* Mark the call as sefun closure */
+                inter_pc = csp->funstart = SIMUL_EFUN_FUNSTART;
+
+                /* Get the simul_efun object */
+                if ( !(ob = simul_efun_object) )
+                {
+                    /* inter_sp == sp */
+                    if (!assert_simul_efun_object()
+                     || !(ob = simul_efun_object)
+                       )
+                    {
+                        csp->extern_call = MY_TRUE;
+                        errorf("Couldn't load simul_efun object\n");
+                        /* NOTREACHED */
+                        return;
+                    }
+                }
+                call_simul_efun(i - CLOSURE_SIMUL_EFUN, ob, num_arg);
+                CLEAN_CSP
+            }
+            /* The result is on the stack (inter_sp) */
+            return;
+        }
     }
 
     CLEAN_CSP
@@ -22129,10 +22135,9 @@ get_line_number_if_any (string_t **name)
             memsafe(*name = new_mstring(name_buffer, STRING_ASCII), strlen(name_buffer)
                    , "lambda name");
             /* Find the beginning of the lambda structure.*/
-            l = (lambda_t *)( (PTRTYPE)(csp->funstart)
-                             - offsetof(lambda_t, function.code.program));
+            l = (lambda_t *)( (PTRTYPE)(csp->funstart) - offsetof(lambda_t, program));
 
-            location = closure_location(l);
+            location = closure_location(&(l->base));
 
             tmp = mstr_add(*name, location);
             if (tmp)
@@ -23452,57 +23457,50 @@ count_extra_ref_in_object (object_t *ob)
 
 /*-------------------------------------------------------------------------*/
 static void
-count_extra_ref_in_closure (lambda_t *l, ph_int type)
+count_extra_ref_in_base_closure (closure_base_t *cl, ph_int type)
 
 /* Count the extra refs in the closure <l> of type <type>.
  */
 
 {
-    if (CLOSURE_HAS_CODE(type))
-    {
-        /* We need to count the extra_refs in the constant values. */
-
-        mp_int num_values;
-        svalue_t *svp;
-
-        svp = (svalue_t *)l;
-        num_values = l->function.code.num_values;
-
-        svp -= num_values;
-        count_extra_ref_in_vector(svp, (size_t)num_values);
-    }
-    else
-    {
-        /* Count the referenced closures and objects */
-        if (type == CLOSURE_BOUND_LAMBDA)
-        {
-            lambda_t *l2 = l->function.lambda;
-
-            if (NULL != register_pointer(ptable, l2) )
-                count_extra_ref_in_closure(l2, CLOSURE_UNBOUND_LAMBDA);
-        }
-        else if (type == CLOSURE_LFUN)
-        {
-            count_extra_ref_in_vector(&(l->function.lfun.ob), 1);
-            if (l->function.lfun.inhProg)
-            {
-                l->function.lfun.inhProg->extra_ref++;
-                count_extra_ref_in_prog(l->function.lfun.inhProg);
-            }
-            count_extra_ref_in_vector(l->context, l->function.lfun.context_size);
-        }
-    }
-
     if (type != CLOSURE_UNBOUND_LAMBDA)
+        count_extra_ref_in_vector(&(cl->ob), 1);
+
+    if (cl->prog_ob)
+        count_extra_ref_in_object(cl->prog_ob);
+} /* count_extra_ref_in_base_closure() */
+
+/*-------------------------------------------------------------------------*/
+static void
+count_extra_ref_in_lfun_closure (lfun_closure_t *l)
+
+/* Count the extra refs in the closure <l> of type <type>.
+ */
+
+{
+    /* Count the referenced closures and objects */
+    count_extra_ref_in_vector(&(l->fun_ob), 1);
+    if (l->inhProg)
     {
-        count_extra_ref_in_vector(&(l->ob), 1);
+        l->inhProg->extra_ref++;
+        count_extra_ref_in_prog(l->inhProg);
     }
-    
-    if (l->prog_ob)
-    {
-        count_extra_ref_in_object(l->prog_ob);
-    }
-} /* count_extra_ref_in_closure() */
+
+    count_extra_ref_in_vector(l->context, l->context_size);
+
+} /* count_extra_ref_in_lfun_closure() */
+
+/*-------------------------------------------------------------------------*/
+static void
+count_extra_ref_in_lambda_closure (lambda_t *l)
+
+/* Count the extra refs in the closure <l> of type <type>.
+ */
+
+{
+    /* We need to count the extra_refs in the constant values. */
+    count_extra_ref_in_vector(((svalue_t *)l) - l->num_values, (size_t)l->num_values);
+} /* count_extra_ref_in_lambda_closure() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -23521,16 +23519,32 @@ count_extra_ref_in_vector (svalue_t *svp, size_t num)
     {
         switch(p->type)
         {
-
         case T_CLOSURE:
             if (CLOSURE_MALLOCED(p->x.closure_type))
             {
-                lambda_t *l;
-
-                l = p->u.lambda;
-                if ( NULL == register_pointer(ptable, l) )
+                if (NULL == register_pointer(ptable, p->u.closure))
                     continue;
-                count_extra_ref_in_closure(l, p->x.closure_type);
+                count_extra_ref_in_base_closure(p->u.closure, p->x.closure_type);
+
+                switch (p->x.closure_type)
+                {
+                    case CLOSURE_LFUN:
+                        count_extra_ref_in_lfun_closure(p->u.lfun_closure);
+                        break;
+
+                    case CLOSURE_BOUND_LAMBDA:
+                        count_extra_ref_in_base_closure(&(p->u.bound_lambda->lambda->base), CLOSURE_UNBOUND_LAMBDA);
+                        count_extra_ref_in_lambda_closure(p->u.bound_lambda->lambda);
+                        break;
+
+                    case CLOSURE_LAMBDA:
+                    case CLOSURE_UNBOUND_LAMBDA:
+                        count_extra_ref_in_lambda_closure(p->u.lambda);
+                        break;
+
+                    default:
+                        break;
+                }
             }
             else if (p->x.closure_type < CLOSURE_LWO)
             {
@@ -23564,7 +23578,10 @@ count_extra_ref_in_vector (svalue_t *svp, size_t num)
                 }
                 count_extra_ref_in_vector(&cr->ob, 1);
                 if (cr->closure && register_pointer(ptable, cr->closure) != NULL)
-                    count_extra_ref_in_closure(cr->closure, CLOSURE_LFUN);
+                {
+                    count_extra_ref_in_base_closure(&(cr->closure->base), CLOSURE_LFUN);
+                    count_extra_ref_in_lfun_closure(cr->closure);
+                }
                 if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
                 {
                     count_extra_ref_in_vector(cr->variables, cr->num_variables);

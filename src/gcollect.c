@@ -162,7 +162,7 @@ object_t *gc_obj_list_destructed;
    * add their share of information.
    */
 
-lambda_t *stale_misc_closures;
+closure_base_t *stale_misc_closures;
   /* List of non-lambda closures bound to a destructed object.
    * The now irrelevant .ob pointer is used to link the list elements.
    * Scope is global so that the GC support functions in mapping.c can
@@ -338,7 +338,6 @@ cleanup_closure (svalue_t *csvp, cleanup_t * context)
 
 {
     ph_int    type = csvp->x.closure_type;
-    lambda_t *l    = csvp->u.lambda;
 
     /* If this closure is bound to or defined in a destructed object, zero it
      * out.
@@ -351,30 +350,25 @@ cleanup_closure (svalue_t *csvp, cleanup_t * context)
     }
 
     if (!CLOSURE_MALLOCED(type)
-     || register_pointer(context->ptable, l) == NULL
+     || register_pointer(context->ptable, csvp->u.closure) == NULL
        )
         return;
 
     /* If the creating program has been destructed, zero out the reference.
      */
-    if (CLOSURE_MALLOCED(type)
-     && l->prog_ob
-     && (l->prog_ob->flags & O_DESTRUCTED))
+    if (csvp->u.closure->prog_ob &&
+        (csvp->u.closure->prog_ob->flags & O_DESTRUCTED))
     {
-        free_object(l->prog_ob, "cleanup_closure");
-        l->prog_ob = NULL;
-        l->prog_pc = 0;
+        free_object(csvp->u.closure->prog_ob, "cleanup_closure");
+        csvp->u.closure->prog_ob = NULL;
+        csvp->u.closure->prog_pc = 0;
     }
 
     if (CLOSURE_HAS_CODE(type))
     {
-        mp_int num_values;
-        svalue_t *svp;
+        lambda_t *l = csvp->u.lambda;
 
-        svp = (svalue_t *)l;
-        num_values = l->function.code.num_values;
-        svp -= num_values;
-        cleanup_vector(svp, (size_t)num_values, context);
+        cleanup_vector(((svalue_t *)l) - l->num_values, (size_t)l->num_values, context);
     }
     else if (type == CLOSURE_BOUND_LAMBDA)
     {
@@ -382,15 +376,14 @@ cleanup_closure (svalue_t *csvp, cleanup_t * context)
 
         dummy.type = T_CLOSURE;
         dummy.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
-        dummy.u.lambda = l->function.lambda;
+        dummy.u.lambda = csvp->u.bound_lambda->lambda;
 
         cleanup_closure(&dummy, context);
     }
-
-    if (type == CLOSURE_LFUN && l->function.lfun.context_size != 0)
+    else if (type == CLOSURE_LFUN && csvp->u.lfun_closure->context_size != 0)
     {
-        unsigned short size = l->function.lfun.context_size;
-        cleanup_vector(l->context, size, context);
+        lfun_closure_t *l = csvp->u.lfun_closure;
+        cleanup_vector(l->context, l->context_size, context);
     }
 } /* cleanup_closure() */
 
@@ -660,8 +653,8 @@ cleanup_structures (cleanup_t * context)
                 {
                     lambda_t * l = driver_hook[i].u.lambda;
 
-                    free_svalue(&(l->ob));
-                    put_ref_object(&(l->ob), master_ob, "cleanup_structures");
+                    free_svalue(&(l->base.ob));
+                    put_ref_object(&(l->base.ob), master_ob, "cleanup_structures");
                 }
             }
             else
@@ -1007,12 +1000,12 @@ unsigned long gc_mark_ref(void * p, const char * file, int line)
 /* Forward declarations */
 
 static void clear_map_ref_filter (svalue_t *, svalue_t *, void *);
-static void clear_ref_in_closure (lambda_t *l, ph_int type);
-static void gc_count_ref_in_closure (svalue_t *csvp);
+static void clear_ref_in_malloced_closure (svalue_t *csvp);
+static void gc_count_ref_in_malloced_closure (svalue_t *csvp);
 static void gc_MARK_MSTRING_REF (string_t * str);
 
-#define count_ref_in_closure(p) \
-  GC_REF_DUMP(svalue_t*, p, "Count ref in closure", gc_count_ref_in_closure)
+#define count_ref_in_malloced_closure(p) \
+  GC_REF_DUMP(svalue_t*, p, "Count ref in closure", gc_count_ref_in_malloced_closure)
 
 #define MARK_MSTRING_REF(str) \
   GC_REF_DUMP(string_t*, str, "Mark string", gc_MARK_MSTRING_REF)
@@ -1505,13 +1498,12 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
         case T_CLOSURE:
             if (CLOSURE_MALLOCED(p->x.closure_type))
             {
-                lambda_t *l;
+                closure_base_t *l = p->u.closure;
 
-                l = p->u.lambda;
                 if (l->ref)
                 {
                     l->ref = 0;
-                    clear_ref_in_closure(l, p->x.closure_type);
+                    clear_ref_in_malloced_closure(p);
                 }
             }
             else if (p->x.closure_type < CLOSURE_LWO)
@@ -1695,9 +1687,9 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
         case T_CLOSURE:
             if (CLOSURE_MALLOCED(p->x.closure_type))
             {
-                if (p->u.lambda->ref++ <= 0)
+                if (p->u.closure->ref++ <= 0)
                 {
-                    count_ref_in_closure(p);
+                    count_ref_in_malloced_closure(p);
                 }
             }
             else if (p->x.closure_type < CLOSURE_LWO)
@@ -1902,7 +1894,7 @@ gc_note_action_ref (action_t *p)
 
 /*-------------------------------------------------------------------------*/
 static void
-gc_count_ref_in_closure (svalue_t *csvp)
+gc_count_ref_in_malloced_closure (svalue_t *csvp)
 
 /* Count the reference to closure <csvp> and all referenced data.
  * Closures using a destructed object are stored in the stale_ lists
@@ -1910,19 +1902,19 @@ gc_count_ref_in_closure (svalue_t *csvp)
  */
 
 {
-    lambda_t *l = csvp->u.lambda;
+    closure_base_t *cl = csvp->u.closure;
     ph_int type = csvp->x.closure_type;
 
-    if (!l->ref)
+    if (!cl->ref)
     {
         /* This closure was bound to a destructed object, and has been
          * encountered before.
          */
-        l->ref--; /* Undo ref increment that was done by the caller */
+        cl->ref--; /* Undo ref increment that was done by the caller */
         if (type == CLOSURE_BOUND_LAMBDA)
         {
             csvp->x.closure_type = CLOSURE_UNBOUND_LAMBDA;
-            (csvp->u.lambda = l->function.lambda)->ref++;
+            (csvp->u.lambda = csvp->u.bound_lambda->lambda)->base.ref++;
         }
         else
         {
@@ -1937,29 +1929,29 @@ gc_count_ref_in_closure (svalue_t *csvp)
 
     if (type != CLOSURE_UNBOUND_LAMBDA)
     {
-        if ((l->ob.type == T_OBJECT && (l->ob.u.ob->flags & O_DESTRUCTED))
+        if ((cl->ob.type == T_OBJECT && (cl->ob.u.ob->flags & O_DESTRUCTED))
          || (   type == CLOSURE_LFUN
-             && l->function.lfun.ob.type == T_OBJECT
-             && l->function.lfun.ob.u.ob->flags & O_DESTRUCTED))
+             && csvp->u.lfun_closure->fun_ob.type == T_OBJECT
+             && csvp->u.lfun_closure->fun_ob.u.ob->flags & O_DESTRUCTED))
         {
-            object_t *ob = (l->ob.type == T_OBJECT && (l->ob.u.ob->flags & O_DESTRUCTED)) ? l->ob.u.ob : NULL;
+            object_t *ob = (cl->ob.type == T_OBJECT && (cl->ob.u.ob->flags & O_DESTRUCTED)) ? cl->ob.u.ob : NULL;
 
-            l->ref = -1;
+            cl->ref = -1;
             if (type == CLOSURE_LAMBDA)
             {
-                l->ob.u.lambda = stale_lambda_closures;
-                stale_lambda_closures = l;
+                cl->ob.u.lambda = stale_lambda_closures;
+                stale_lambda_closures = csvp->u.lambda;
             }
             else
             {
-                l->ob.u.lambda = stale_misc_closures;
-                stale_misc_closures = l;
+                cl->ob.u.closure = stale_misc_closures;
+                stale_misc_closures = cl;
                 if (type == CLOSURE_LFUN)
                 {
-                    if (l->function.lfun.ob.type == T_OBJECT
-                     && l->function.lfun.ob.u.ob->flags & O_DESTRUCTED)
+                    if (csvp->u.lfun_closure->fun_ob.type == T_OBJECT
+                     && csvp->u.lfun_closure->fun_ob.u.ob->flags & O_DESTRUCTED)
                     {
-                        reference_destructed_object(l->function.lfun.ob.u.ob);
+                        reference_destructed_object(csvp->u.lfun_closure->fun_ob.u.ob);
                     }
                 }
             }
@@ -1972,7 +1964,7 @@ gc_count_ref_in_closure (svalue_t *csvp)
             if (type == CLOSURE_BOUND_LAMBDA)
             {
                 csvp->x.closure_type = CLOSURE_UNBOUND_LAMBDA;
-                csvp->u.lambda = l->function.lambda;
+                csvp->u.lambda = csvp->u.bound_lambda->lambda;
             }
             else
             {
@@ -1982,31 +1974,31 @@ gc_count_ref_in_closure (svalue_t *csvp)
         else
         {
              /* Object exists: count reference */
-            count_ref_in_vector(&(l->ob), 1);
+            count_ref_in_vector(&(cl->ob), 1);
 
             if (type == CLOSURE_LFUN)
             {
-                count_ref_in_vector(&(l->function.lfun.ob), 1);
-                if(l->function.lfun.inhProg)
-                    mark_program_ref(l->function.lfun.inhProg);
+                count_ref_in_vector(&(csvp->u.lfun_closure->fun_ob), 1);
+                if(csvp->u.lfun_closure->inhProg)
+                    mark_program_ref(csvp->u.lfun_closure->inhProg);
             }
         }
     }
 
     /* Count the references in the code of the closure */
 
-    if (l->prog_ob)
+    if (cl->prog_ob)
     {
-        if (l->prog_ob->flags & O_DESTRUCTED)
+        if (cl->prog_ob->flags & O_DESTRUCTED)
         {
-            reference_destructed_object(l->prog_ob);
-            l->prog_ob = NULL;
-            l->prog_pc = 0;
+            reference_destructed_object(cl->prog_ob);
+            cl->prog_ob = NULL;
+            cl->prog_pc = 0;
         }
         else
         {
              /* Object exists: count reference */
-            l->prog_ob->ref++;
+            cl->prog_ob->ref++;
         }
     }
 
@@ -2015,87 +2007,99 @@ gc_count_ref_in_closure (svalue_t *csvp)
         mp_int num_values;
         svalue_t *svp;
 
-        svp = (svalue_t *)l;
-        num_values = l->function.code.num_values;
+        svp = (svalue_t *)cl;
+        num_values = csvp->u.lambda->num_values;
         svp -= num_values;
         note_ref(svp);
         count_ref_in_vector(svp, (size_t)num_values);
     }
     else
     {
-        note_ref(l);
+        note_ref(cl);
         if (type == CLOSURE_BOUND_LAMBDA)
         {
-            lambda_t *l2 = l->function.lambda;
+            lambda_t *l = csvp->u.bound_lambda->lambda;
 
-            if (!l2->ref++) {
+            if (!l->base.ref++)
+            {
                 svalue_t sv;
 
                 sv.type = T_CLOSURE;
                 sv.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
-                sv.u.lambda = l2;
-                count_ref_in_closure(&sv);
+                sv.u.lambda = l;
+                count_ref_in_malloced_closure(&sv);
             }
         }
-        if (type == CLOSURE_LFUN && l->function.lfun.context_size != 0)
+        else if (type == CLOSURE_LFUN && csvp->u.lfun_closure->context_size != 0)
         {
-            unsigned short size = l->function.lfun.context_size;
-            l->function.lfun.context_size = 0; /* Prevent recursion */
+            lfun_closure_t *l = csvp->u.lfun_closure;
+            unsigned short size = l->context_size;
+
+            l->context_size = 0; /* Prevent recursion */
             count_ref_in_vector(l->context, size);
-            l->function.lfun.context_size = size;
+            l->context_size = size;
         }
     }
-} /* count_ref_in_closure() */
+} /* count_ref_in_malloced_closure() */
 
 /*-------------------------------------------------------------------------*/
 static void
-clear_ref_in_closure (lambda_t *l, ph_int type)
+clear_ref_in_malloced_closure (svalue_t *csvp)
 
-/* Clear the references in closure <l> which is of type <type>.
+/* Clear the references in closure <csvp>.
  */
 
 {
-    if (l->prog_ob)
-        clear_object_ref(l->prog_ob);
+    closure_base_t *cl = csvp->u.closure;
+    ph_int type = csvp->x.closure_type;
+
+    if (cl->prog_ob)
+        clear_object_ref(cl->prog_ob);
 
     if (CLOSURE_HAS_CODE(type))
     {
         mp_int num_values;
         svalue_t *svp;
 
-        svp = (svalue_t *)l;
-        num_values = l->function.code.num_values;
+        svp = (svalue_t *)cl;
+        num_values = csvp->u.lambda->num_values;
         svp -= num_values;
         clear_ref_in_vector(svp, (size_t)num_values);
     }
     else if (type == CLOSURE_BOUND_LAMBDA)
     {
-        lambda_t *l2 = l->function.lambda;
+        lambda_t *l = csvp->u.bound_lambda->lambda;
 
-        if (l2->ref) {
-            l2->ref = 0;
-            clear_ref_in_closure(l2, CLOSURE_UNBOUND_LAMBDA);
+        if (l->base.ref)
+        {
+            svalue_t sv = { T_CLOSURE, {.closure_type = CLOSURE_UNBOUND_LAMBDA}, {.lambda = l } };
+
+            l->base.ref = 0;
+
+            clear_ref_in_malloced_closure(&sv);
         }
     }
 
     if (type != CLOSURE_UNBOUND_LAMBDA)
-        clear_ref_in_vector(&(l->ob), 1);
+        clear_ref_in_vector(&(cl->ob), 1);
 
     if (type == CLOSURE_LFUN)
     {
-        clear_ref_in_vector(&(l->function.lfun.ob), 1);
-        if (l->function.lfun.inhProg)
-            clear_program_ref(l->function.lfun.inhProg, MY_TRUE);
-    }
+        lfun_closure_t *l = csvp->u.lfun_closure;
 
-    if (type == CLOSURE_LFUN && l->function.lfun.context_size != 0)
-    {
-        unsigned short size = l->function.lfun.context_size;
-        l->function.lfun.context_size = 0; /* Prevent recursion */
-        clear_ref_in_vector(l->context, size);
-        l->function.lfun.context_size = size;
+        clear_ref_in_vector(&(l->fun_ob), 1);
+        if (l->inhProg)
+            clear_program_ref(l->inhProg, MY_TRUE);
+
+        if (l->context_size != 0)
+        {
+            unsigned short size = l->context_size;
+            l->context_size = 0; /* Prevent recursion */
+            clear_ref_in_vector(l->context, size);
+            l->context_size = size;
+        }
     }
-} /* clear_ref_in_closure() */
+} /* clear_ref_in_malloced_closure() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -2149,7 +2153,6 @@ garbage_collection(void)
 
 {
     object_t *ob, *next_ob;
-    lambda_t *l, *next_l;
     int i;
     long dobj_count;
 
@@ -2634,23 +2637,23 @@ garbage_collection(void)
         dobj_count++;
     }
 
-    for (l = stale_lambda_closures; l; )
+    for (lambda_t *l = stale_lambda_closures; l; )
     {
         svalue_t sv;
 
-        next_l = l->ob.u.lambda;
-        l->ref = 1;
+        l->base.ref = 1;
         sv.type = T_CLOSURE;
         sv.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
         sv.u.lambda = l;
-        l = l->ob.u.lambda;
+        l = l->base.ob.u.lambda;
         free_closure(&sv);
     }
 
-    for (l = stale_misc_closures; l; l = next_l)
+    for (closure_base_t *cl = stale_misc_closures; cl; )
     {
-        next_l = l->ob.u.lambda;
-        xfree((char *)l);
+        closure_base_t *next = cl->ob.u.closure;
+        xfree(cl);
+        cl = next;
     }
 
     clean_stale_mappings();
@@ -2941,9 +2944,9 @@ show_cl_literal (int d, void *block, int depth UNUSED)
 #ifdef __MWERKS__
 #    pragma unused(depth)
 #endif
-    lambda_t *l;
+    closure_base_t *l;
 
-    if (is_freed(block, sizeof(lambda_t)))
+    if (is_freed(block, sizeof(closure_base_t)))
     {
         WRITES(d, "Closure literal in freed block 0x");
         write_x(d, (p_uint)((void *)block - xalloc_overhead()));
@@ -2951,7 +2954,7 @@ show_cl_literal (int d, void *block, int depth UNUSED)
         return;
     }
 
-    l = (lambda_t *)block;
+    l = (closure_base_t *)block;
 
     WRITES(d, "Closure literal: Object ");
 
@@ -2985,8 +2988,6 @@ show_cl_literal (int d, void *block, int depth UNUSED)
             break;
     }
 
-    WRITES(d, ", index ");
-    writed(d, l->function.var_index);
     WRITES(d, ", ref ");
     writed(d, l->ref);
     WRITES(d, "\n");
@@ -3098,7 +3099,7 @@ show_array(int d, void *block, int depth)
         case T_CLOSURE:
             if (svp->x.closure_type == CLOSURE_LFUN
              || svp->x.closure_type == CLOSURE_IDENTIFIER)
-               show_cl_literal(d, (char *)svp->u.lambda, depth);
+               show_cl_literal(d, (char *)svp->u.closure, depth);
             else
             {
                 WRITES(d, "Closure type ");
@@ -3239,8 +3240,9 @@ show_struct(int d, void *block, int depth)
             break;
 
         case T_CLOSURE:
-            if (svp->x.closure_type == CLOSURE_IDENTIFIER)
-               show_cl_literal(d, (char *)svp->u.lambda, depth);
+            if (svp->x.closure_type == CLOSURE_LFUN
+             || svp->x.closure_type == CLOSURE_IDENTIFIER)
+               show_cl_literal(d, (char *)svp->u.closure, depth);
             else
             {
                 WRITES(d, "Closure type ");
@@ -3345,8 +3347,12 @@ setup_print_block_dispatcher (void)
     free_svalue(inter_sp--);
 
     set_current_object(master_ob);
+    current_prog = master_ob->prog;
     closure_literal(&tmp_closure, 0, 0, 0);
-    store_print_block_dispatch_info(tmp_closure.u.lambda, show_cl_literal);
+    store_print_block_dispatch_info(tmp_closure.u.closure, show_cl_literal);
+    free_svalue(&tmp_closure);
+    closure_literal(&tmp_closure, CLOSURE_IDENTIFIER_OFFS, 0, 0);
+    store_print_block_dispatch_info(tmp_closure.u.closure, show_cl_literal);
     free_svalue(&tmp_closure);
 }
 #endif /* MALLOC_TRACE */

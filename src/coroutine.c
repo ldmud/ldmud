@@ -35,7 +35,7 @@ clear_coroutine (coroutine_t *cr, bool clear_variables)
 
     if (cr->closure)
     {
-        svalue_t svp = { T_CLOSURE, {.closure_type = CLOSURE_LFUN}, {.lambda = cr->closure } };
+        svalue_t svp = { T_CLOSURE, {.closure_type = CLOSURE_LFUN}, {.lfun_closure = cr->closure } };
         free_closure(&svp);
         cr->closure = NULL;
     }
@@ -169,8 +169,8 @@ create_coroutine (svalue_t *closure)
     if (closure)
     {
         assert(closure->type == T_CLOSURE && closure->x.closure_type == CLOSURE_LFUN);
-        result->closure = closure->u.lambda;
-        result->closure->ref++;
+        result->closure = closure->u.lfun_closure;
+        result->closure->base.ref++;
     }
     else
         result->closure = NULL;
@@ -355,7 +355,7 @@ resume_coroutine (coroutine_t *cr)
     variable_index_offset = cr->variable_index_offset;
     current_variables = get_current_object_variables() + variable_index_offset;
 
-    if (cr->closure && cr->closure->function.lfun.context_size > 0)
+    if (cr->closure && cr->closure->context_size > 0)
         inter_context = cr->closure->context;
     else
         inter_context = NULL;
@@ -603,9 +603,9 @@ clear_coroutine_ref (coroutine_t *cr)
         if (cr->prog)
             clear_program_ref(cr->prog, true);
         clear_ref_in_vector(&cr->ob, 1);
-        if (cr->closure && cr->closure->ref != 0)
+        if (cr->closure && cr->closure->base.ref != 0)
         {
-            svalue_t svp = { T_CLOSURE, {.closure_type = CLOSURE_LFUN}, {.lambda = cr->closure } };
+            svalue_t svp = { T_CLOSURE, {.closure_type = CLOSURE_LFUN}, {.lfun_closure = cr->closure } };
             clear_ref_in_vector(&svp, 1);
         }
         if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
@@ -643,13 +643,13 @@ count_coroutine_ref (coroutine_t *cr)
         count_ref_in_vector(&cr->ob, 1);
         if (cr->closure)
         {
-            if (cr->closure->ref == 0)
+            if (cr->closure->base.ref == 0)
             {
-                svalue_t svp = { T_CLOSURE, {.closure_type = CLOSURE_LFUN}, {.lambda = cr->closure } };
+                svalue_t svp = { T_CLOSURE, {.closure_type = CLOSURE_LFUN}, {.lfun_closure = cr->closure } };
                 count_ref_in_vector(&svp, 1);
             }
             else
-                cr->closure->ref++;
+                cr->closure->base.ref++;
         }
         if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
         {

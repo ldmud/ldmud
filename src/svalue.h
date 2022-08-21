@@ -51,8 +51,21 @@ union u {
     mapping_t *map;
       /* T_MAPPING: pointer to the mapping structure.
        */
+    closure_base_t *closure;
+      /* T_CLOSURE when CLOSURE_MALLOCED: Base closure structure.
+       * This is a common structure for all allocated closure types.
+       */
     lambda_t *lambda;
-      /* T_CLOSURE: allocated closures: the closure structure.
+      /* T_CLOSURE/CLOSURE_(UNBOUND_)LAMBDA: the lambda structure.
+       */
+    bound_lambda_t *bound_lambda;
+      /* T_CLOSURE/CLOSURE_BOUND_LAMBDA: bound lambda structure.
+       */
+    lfun_closure_t *lfun_closure;
+      /* T_CLOSURE/CLOSURE_LFUN: lfun/inline closure structure.
+       */
+    identifier_closure_t *identifier_closure;
+      /* T_CLOSURE/CLOSURE_IDENTIFIER: identifier closure structure.
        */
     coroutine_t *coroutine;
       /* T_COROUTINE: pointer to the coroutine structure.
@@ -251,13 +264,13 @@ struct svalue_s
   /* The secondary information (.x.closure_type) defines the type
    * of closure and the data structure used in the .u union.
    *
-   * Positive numbers have an allocated data structure in .u.lambda:
+   * Positive numbers have an allocated data structure:
    *
-   *    CLOSURE_LFUN           uses .u.lambda->function.lfun
-   *    CLOSURE_IDENTIFIER     uses .u.lambda->function.var_index
-   *    CLOSURE_BOUND_LAMBDA   uses .u.lambda->function.lambda
-   *    CLOSURE_LAMBDA         uses .u.lambda->function.code
-   *    CLOSURE_UNBOUND_LAMBDA uses .u.lambda->function.code
+   *    CLOSURE_LFUN           uses .u.lfun_closure
+   *    CLOSURE_IDENTIFIER     uses .u.identifier_closure
+   *    CLOSURE_BOUND_LAMBDA   uses .u.bound_lambda
+   *    CLOSURE_LAMBDA         uses .u.lambda
+   *    CLOSURE_UNBOUND_LAMBDA uses .u.lambda
    *
    * Negative numbers consist of an index and the corresponding
    * object in .u.ob or .u.lwob. The index (operator, efun or
@@ -293,10 +306,8 @@ struct svalue_s
 #define CLOSURE_EFUN_OFFS       (CLOSURE_EFUN & 0xffff)
 #define CLOSURE_SIMUL_EFUN_OFFS (CLOSURE_SIMUL_EFUN & 0xffff)
 
-  /* The other closure types are created from actual objects and lambdas,
-   * the detailed information is stored in the u.lambda field.
-   * The first types are 'just' references to existing lfuns and variables,
-   * the others actually point to code.
+  /* The other closure types use an allocated and ref-counted structure
+   * with further information.
    */
 
 #define CLOSURE_LFUN            0  /* lfun in an object */
@@ -502,20 +513,6 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
 #endif // FLOAT_FORMAT_2
 
 /* --- svalue helper functions and macros --- */
-
-#define addref_closure(sp, from) \
-  MACRO( svalue_t * p = sp; \
-         if (CLOSURE_MALLOCED(p->x.closure_type)) \
-             p->u.lambda->ref++; \
-         else if (p->x.closure_type < CLOSURE_LWO) \
-            ref_lwobject(p->u.lwob); \
-         else \
-             (void)ref_object(p->u.ob, from); \
-  )
-  /* void addref_closure(sp, from): Add one ref to the closure svalue <sp>
-   *   in the function <from>.
-   */
-
 
 /* svalue_t svalue_<type>(value): Creates a svalue_t value of <type>.
  *

@@ -344,9 +344,9 @@ object_svalue_cmp (svalue_t a, svalue_t b)
     switch (a.type)
     {
         case T_OBJECT:
-            return (int)(a.u.ob - b.u.ob);
+            return a.u.ob < b.u.ob ? -1 : (a.u.ob == b.u.ob) ? 0 : 1;
         case T_LWOBJECT:
-            return (int)(a.u.lwob - b.u.lwob);
+            return a.u.lwob < b.u.lwob ? -1 : (a.u.lwob == b.u.lwob) ? 0 : 1;
         case T_NUMBER:
             return 0;
         default:

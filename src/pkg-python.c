@@ -6560,8 +6560,8 @@ ldmud_closure_init (ldmud_closure_t *self, PyObject *args, PyObject *kwds)
             return -1;
         }
 
-        /* The lambda was bound to the wrong object */
-        assign_object_svalue(&(self->lpc_closure.u.lambda->ob), sv_bound_ob, "ldmud_closure_init");
+        /* The closure was bound to the wrong object */
+        assign_object_svalue(&(self->lpc_closure.u.lfun_closure->base.ob), sv_bound_ob, "ldmud_closure_init");
 
         return 0;
     }
@@ -6587,9 +6587,9 @@ ldmud_closure_hash (ldmud_closure_t *val)
         return _Py_HashPointer(val->lpc_closure.u.lambda) ^ closure_type;
     /* Lfun or identifier closures. */
     if (CLOSURE_MALLOCED(closure_type))
-        return (val->lpc_closure.u.lambda->ob.type == T_OBJECT
-                ? _Py_HashPointer(val->lpc_closure.u.lambda->ob.u.ob)
-                : _Py_HashPointer(val->lpc_closure.u.lambda->ob.u.lwob)) ^ closure_type;
+        return (val->lpc_closure.u.closure->ob.type == T_OBJECT
+                ? _Py_HashPointer(val->lpc_closure.u.closure->ob.u.ob)
+                : _Py_HashPointer(val->lpc_closure.u.closure->ob.u.lwob)) ^ closure_type;
     /* Efun, simul-efun or operator closure. */
     return closure_type;
 } /* ldmud_closure_hash() */

@@ -837,7 +837,7 @@ reset_object (object_t *ob, int arg, int num_arg)
         }
 
         if (driver_hook[arg].x.closure_type != CLOSURE_UNBOUND_LAMBDA
-         || driver_hook[arg].u.lambda->function.code.num_arg)
+         || driver_hook[arg].u.lambda->num_arg)
         {
             /* closure accepts arguments, so give it the target object
              * and if necessary bind to the current object.
@@ -3918,13 +3918,13 @@ move_object (void)
 
     if (NULL != ( l = driver_hook[H_MOVE_OBJECT1].u.lambda) )
     {
-        free_svalue(&(l->ob));
-        put_ref_object(&(l->ob), inter_sp[-1].u.ob, "move_object");
+        free_svalue(&(l->base.ob));
+        put_ref_object(&(l->base.ob), inter_sp[-1].u.ob, "move_object");
         call_lambda(&driver_hook[H_MOVE_OBJECT1], 2);
     }
     else if (NULL != ( l = driver_hook[H_MOVE_OBJECT0].u.lambda) )
     {
-        assign_current_object(&(l->ob), "move_object");
+        assign_current_object(&(l->base.ob), "move_object");
         call_lambda(&driver_hook[H_MOVE_OBJECT0], 2);
     }
     else
@@ -6170,24 +6170,24 @@ save_closure (svalue_t *cl, Bool writable)
     {
     case CLOSURE_LFUN:
       {
-        if (recall_pointer(cl->u.lambda))
+        if (recall_pointer(cl->u.lfun_closure))
             break;
 
-        if (is_current_object(cl->u.lambda->function.lfun.ob)
-         && is_current_object(cl->u.lambda->ob)
+        if (is_current_object(cl->u.lfun_closure->fun_ob)
+         && is_current_object(cl->u.lfun_closure->base.ob)
            )
         {
-            lambda_t       *l;
+            lfun_closure_t *l;
             program_t      *prog, *obprog;
             program_t      *inhProg = 0;
             int             ix;
             char           *source, c;
             svalue_t        ob;
 
-            l = cl->u.lambda;
-            ob = l->function.lfun.ob;
-            ix = l->function.lfun.index;
-            inhProg = l->function.lfun.inhProg;
+            l = cl->u.lfun_closure;
+            ob = l->fun_ob;
+            ix = l->fun_index;
+            inhProg = l->inhProg;
 
             if (ob.type == T_OBJECT)
                 obprog = ob.u.ob->prog;
@@ -6211,7 +6211,7 @@ save_closure (svalue_t *cl, Bool writable)
             {
                 L_PUTC_PROLOG
                 L_PUTC('#');
-                if (l->function.lfun.context_size)
+                if (l->context_size)
                 {
                     L_PUTC('c');
                 }
@@ -6229,18 +6229,18 @@ save_closure (svalue_t *cl, Bool writable)
             if (inhProg)
             {
                 prog = obprog;
-                ix = l->function.lfun.index;
-                
+                ix = l->fun_index;
+
                 while(prog != inhProg)
                 {
                     inherit_t *inheritp;
                     string_t  *progName;
-                    
+
                     inheritp = search_function_inherit(prog, ix);
                     ix -= inheritp->function_index_offset;
                     prog = inheritp->prog;
                     progName = del_dotc(prog->name);
-                    
+
                     {
                         L_PUTC_PROLOG
                         source = get_txt(progName);
@@ -6258,7 +6258,7 @@ save_closure (svalue_t *cl, Bool writable)
                 }
             }
 
-            if (l->function.lfun.context_size)
+            if (l->context_size)
             {
                 int i;
                 svalue_t * val;
@@ -6276,7 +6276,7 @@ save_closure (svalue_t *cl, Bool writable)
                 {
                     svalue_t num;
 
-                    put_number(&num, l->function.lfun.context_size);
+                    put_number(&num, l->context_size);
                     save_svalue(&num, ':', MY_FALSE);
                 }
 
@@ -6288,7 +6288,7 @@ save_closure (svalue_t *cl, Bool writable)
                     L_PUTC_EPILOG
                 }
 
-                for (i = l->function.lfun.context_size
+                for (i = l->context_size
                     , val = l->context
                     ; --i >= 0; )
                 {
@@ -6314,36 +6314,36 @@ save_closure (svalue_t *cl, Bool writable)
 
     case CLOSURE_IDENTIFIER:
       {
-        lambda_t *l;
+        identifier_closure_t *ic;
         program_t *prog = NULL;;
         char * source, c;
 
-        if (recall_pointer(cl->u.lambda))
+        ic = cl->u.identifier_closure;
+        if (recall_pointer(ic))
             break;
 
-        l = cl->u.lambda;
-        if (l->function.var_index == VANISHED_VARCLOSURE_INDEX)
+        if (ic->var_index == VANISHED_VARCLOSURE_INDEX)
         {
             rc = MY_FALSE;
             break;
         }
 
-        switch (l->ob.type)
+        switch (ic->base.ob.type)
         {
             case T_OBJECT:
-                if (l->ob.u.ob->flags & O_DESTRUCTED
-                 || l->ob.u.ob != get_current_object()
+                if (ic->base.ob.u.ob->flags & O_DESTRUCTED
+                 || ic->base.ob.u.ob != get_current_object()
                    )
                    break;
 
-                prog = l->ob.u.ob->prog;
+                prog = ic->base.ob.u.ob->prog;
                 break;
 
             case T_LWOBJECT:
-                if (l->ob.u.lwob != get_current_lwobject())
+                if (ic->base.ob.u.lwob != get_current_lwobject())
                     break;
 
-                prog = l->ob.u.lwob->prog;
+                prog = ic->base.ob.u.lwob->prog;
                 break;
 
             default:
@@ -6356,7 +6356,7 @@ save_closure (svalue_t *cl, Bool writable)
             break;
         }
 
-        source = get_txt(prog->variables[l->function.var_index].name);
+        source = get_txt(prog->variables[ic->var_index].name);
 
         {
             L_PUTC_PROLOG
@@ -7147,7 +7147,7 @@ register_closure (svalue_t *cl)
     {
     case CLOSURE_LFUN:
     case CLOSURE_IDENTIFIER:
-        if (NULL == register_pointer(ptable, cl->u.lambda))
+        if (NULL == register_pointer(ptable, cl->u.closure))
             return;
         break;
 
@@ -7157,19 +7157,17 @@ register_closure (svalue_t *cl)
     }
 
     if (type == CLOSURE_LFUN
-     && is_current_object(cl->u.lambda->function.lfun.ob)
-     && is_current_object(cl->u.lambda->ob)
-     && cl->u.lambda->function.lfun.context_size
+     && is_current_object(cl->u.lfun_closure->fun_ob)
+     && is_current_object(cl->u.lfun_closure->base.ob)
+     && cl->u.lfun_closure->context_size
        )
     {
-        lambda_t  *l;
+        lfun_closure_t *l;
         svalue_t *val;
         long i;
 
-        l = cl->u.lambda;
-        for (i = l->function.lfun.context_size
-            , val = l->context
-            ; --i >= 0; )
+        l = cl->u.lfun_closure;
+        for (i = l->context_size, val = l->context; --i >= 0; )
         {
             register_svalue(val++);
         }
@@ -9274,7 +9272,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
             {
                 svalue_t context = const0;
                 int j;
-                lambda_t * l = svp->u.lambda;
+                lfun_closure_t * l = svp->u.lfun_closure;
 
                 /* Parse the context information */
                 if (!restore_svalue(&context, str, delimiter)
@@ -9282,7 +9280,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
                  || VEC_SIZE(context.u.vec) != context_size
                    )
                 {
-                    l->function.lfun.context_size = 0;
+                    l->context_size = 0;
                     free_svalue(svp);
                     free_svalue(&context);
                     *svp = const0;

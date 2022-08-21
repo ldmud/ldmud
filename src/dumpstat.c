@@ -287,30 +287,33 @@ svalue_size (svalue_t *v, mp_int * pTotal)
         if (!CLOSURE_REFERENCES_CODE(v->x.closure_type))
         {
             if (v->x.closure_type == CLOSURE_LFUN)
-                composite = SIZEOF_LAMBDA(v->u.lambda->function.lfun.context_size);
+                composite = SIZEOF_LFUN_CLOSURE(v->u.lfun_closure->context_size);
             else /* CLOSURE_IDENTIFIER */
-                composite = sizeof *v->u.lambda;
+                composite = sizeof *v->u.identifier_closure;
 
             composite += sizeof(char *);
             *pTotal = composite;
-            return composite / v->u.lambda->ref;
+            return composite / v->u.closure->ref;
         }
         /* CLOSURE_LAMBDA */
         composite = overhead = 0;
-        l = v->u.lambda;
         if (v->x.closure_type == CLOSURE_BOUND_LAMBDA)
         {
-            total = sizeof *l - sizeof l->function + sizeof l->function.lambda;
+            bound_lambda_t *bl = v->u.bound_lambda;
+
+            total = sizeof *bl;
             *pTotal += total;
-            composite += total / l->ref;
-            l = l->function.lambda;
+            composite += total / bl->base.ref;
+            l = bl->lambda;
         }
-        num_values = l->function.code.num_values;
+        else
+            l = v->u.lambda;
+        num_values = l->num_values;
         svp = (svalue_t *)l - num_values;
         if (NULL == register_pointer(ptable, svp)) return 0;
         overhead = sizeof(svalue_t) * num_values + sizeof (char *);
         {
-            bytecode_p p = l->function.code.program;
+            bytecode_p p = l->program;
             do {
                 switch(GET_CODE(p++)) {
                   case F_RETURN:
@@ -332,8 +335,8 @@ svalue_size (svalue_t *v, mp_int * pTotal)
         }
 
         *pTotal += overhead;
-        if (l->ref)
-            return (overhead + composite) / l->ref;
+        if (l->base.ref)
+            return (overhead + composite) / l->base.ref;
         else
             return 0;
     }

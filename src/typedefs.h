@@ -12,6 +12,7 @@
 #include "driver.h"
 
 typedef struct action_s           action_t;           /* sent.h */
+typedef struct bound_lambda_s     bound_lambda_t;     /* closure.h */
 // NOTE: mk_bytecode_gen.sh assumes that sizeof(bytecode_t) == 1
 typedef unsigned char             bytecode_t;         /* bytecode.h */
 typedef bytecode_t              * bytecode_p;         /* bytecode.h */
@@ -20,17 +21,20 @@ typedef struct callback_s         callback_t;         /* simulate.h */
 typedef struct case_list_entry_s  case_list_entry_t;  /* switch.h */
 typedef struct case_state_s       case_state_t;       /* switch.h */
 typedef struct cleanup_s          cleanup_t;          /* gcollect.c */
+typedef struct closure_base_s     closure_base_t;     /* closure.h */
 typedef struct coroutine_s        coroutine_t;        /* coroutine.h */
 typedef struct error_handler_s    error_handler_t;    /* interpret.h */
 typedef struct fulltype_s         fulltype_t;         /* types.h */
 typedef struct function_s         function_t;         /* exec.h */
 typedef struct ident_s            ident_t;            /* lex.h */
+typedef struct identifier_closure_s identifier_closure_t; /* closure.h */
 typedef struct include_s          include_t;          /* exec.h */
 typedef struct inherit_s          inherit_t;          /* exec.h */
 typedef struct interactive_s      interactive_t;      /* comm.h */
 typedef struct input_s            input_t;            /* comm.h */
 typedef struct instr_s            instr_t;            /* exec.h */
 typedef struct lambda_s           lambda_t;           /* closure.h */
+typedef struct lfun_closure_s     lfun_closure_t;     /* closure.h */
 typedef struct linenumbers_s      linenumbers_t;      /* exec.h */
 typedef struct lpctype_s          lpctype_t;          /* types.h */
 typedef struct lwobject_s         lwobject_t;         /* lwobject.h */

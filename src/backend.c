@@ -602,10 +602,10 @@ cleanup_stuff (void)
             lambda_t *l;
 
             l = driver_hook[i].u.lambda;
-            if (l->ob.type != T_OBJECT || l->ob.u.ob != master_ob)
+            if (l->base.ob.type != T_OBJECT || l->base.ob.u.ob != master_ob)
             {
-                free_svalue(&(l->ob));
-                put_ref_object(&(l->ob), master_ob, "backend");
+                free_svalue(&(l->base.ob));
+                put_ref_object(&(l->base.ob), master_ob, "backend");
             }
         }
     }

@@ -6198,9 +6198,9 @@ f_to_int (svalue_t *sp)
 
     case T_CLOSURE:
         if (sp->x.closure_type == CLOSURE_IDENTIFIER)
-            n = sp->u.lambda->function.var_index;
+            n = sp->u.identifier_closure->var_index;
         else if (sp->x.closure_type == CLOSURE_LFUN)
-            n = sp->u.lambda->function.lfun.index;
+            n = sp->u.lfun_closure->fun_index;
         else
             errorf("Bad arg 1 to to_int(): not a lfun or variable closure.\n");
         free_closure(sp);
@@ -6990,8 +6990,8 @@ f_to_object (svalue_t *sp)
                 errorf("Bad arg 1 to to_object(): unbound lambda.\n");
                 /* NOTREACHED */
             }
-            if (sp->u.lambda->ob.type == T_OBJECT)
-                o = sp->u.lambda->ob.u.ob;
+            if (sp->u.closure->ob.type == T_OBJECT)
+                o = sp->u.closure->ob.u.ob;
             else
                 o = NULL;
         }
@@ -8026,10 +8026,10 @@ v_get_type_info (svalue_t *sp, int num_arg)
             case CLOSURE_IDENTIFIER:
             case CLOSURE_BOUND_LAMBDA:
             case CLOSURE_LAMBDA:
-                ob = sp->u.lambda->ob;
+                ob = sp->u.closure->ob;
                 break;
             case CLOSURE_LFUN:
-                ob = sp->u.lambda->function.lfun.ob;
+                ob = sp->u.lfun_closure->fun_ob;
                 break;
             case CLOSURE_UNBOUND_LAMBDA:
                 ob = const0;
@@ -8051,7 +8051,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
                 string_t  *function_name;
                 Bool       is_inherited;
 
-                closure_lookup_lfun_prog(sp->u.lambda, &prog, &function_name, &is_inherited);
+                closure_lookup_lfun_prog(sp->u.lfun_closure, &prog, &function_name, &is_inherited);
 
                 memsafe(progname = mstring_cvt_progname(prog->name MTRACE_ARG)
                        , mstrsize(prog->name)
@@ -8076,7 +8076,7 @@ v_get_type_info (svalue_t *sp, int num_arg)
                 program_t *prog;
                 Bool       is_inherited;
 
-                closure_lookup_lfun_prog(sp->u.lambda, &prog, &function_name, &is_inherited);
+                closure_lookup_lfun_prog(sp->u.lfun_closure, &prog, &function_name, &is_inherited);
             }
 
             free_svalue(sp);

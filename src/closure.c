@@ -57,66 +57,14 @@
  * lambda closure:         type = CLOSURE_LAMBDA (5)
  *   Lambda closure bound to an object at compilation time.
  *   u.lambda points to the lambda structure with the compiled function.
+ *   This structure is embedded in the middle of a larger memory block:
+ *   it is prepended by an array of the svalues used as constants in
+ *   the function, and followed by the actual function code.
  *
  * unbound lambda closure: type = CLOSURE_UNBOUND_LAMBDA (6)
  *   Unbound lambda closure, which is not bound to any object at
  *   compile time.
  *   u.lambda points to the lambda structure with the compiled function.
- *
- *
- * The additional information for closure are stored in structures
- * of type lambda_s, which are refcounted. For lambda closures the lambda
- * structure is in fact embedded in the middle of a larger memory block:
- * it is prepended by an array of the svalues used as constants in
- * the function, and followed by the actual function code.
- *
- *   struct lambda_s
- *   {
- *       svalue_t values[] (lambda closures only)
- *           For lambda closures, the constant values used by the function
- *           which are indexed from the end ((svalue_t*)lambda_t).
- *       p_int ref;
- *       object_t *ob;
- *           Object the closure is bound to (for bound UNBOUND_LAMBDAs just
- *           during the execution of the lambda).
- *       union --- Closure information ---
- *       {
- *           unsigned short var_index;
- *               _IDENTIFIER: index in the variable table
- *               The special value VANISHED_VARCLOSURE_INDEX (-1) is
- *               used to mark vanished variables.
- *
- *           struct -- CLOSURE_LFUN
- *           {
- *               object_t *ob;
- *                   Originating object
- *               unsigned short  index
- *                   Index in the objects function table
- *           } lfun;
- *
- *           struct
- *           {
- *               mp_int num_values;         -- Number of svalues.
- *               unsigned char num_locals;  -- Number of local variables
- *               unsigned char num_arg;     -- Number of arguments needed
- *               bytecode_t program[1];
- *           } code;
- *               LAMBDA and UNBOUND_LAMBDA closures: the function code.
- *               'num_values' is the number of constants store before
- *               the lambda structure.
- *
- *           lambda_t *lambda;
- *               BOUND_LAMBDA: pointer to the UNBOUND_LAMBDA structure.
- *
- *       } function;
- *
- *       svalue_t context[.lfun.context_size];
- *          lfun-closure context variables, if any.
- *          Putting this array into the function.lfun somehow causes memory
- *          corruption because some lambda structures won't be allocated large
- *          enough.
- *   }
- *
  *
  * If a lambda() is compiled while replace_program() is scheduled, the
  * construction information is stored in the protector and the lambda
@@ -246,7 +194,7 @@ typedef struct work_area_s work_area_t;
  * is kept in replace_ob_s.lambda_rpp to hold the necessary information
  * to adjust the closures after the program has been replaced.
  *
- * The list is created by calls to lambda_ref_replace_program() and evaluated
+ * The list is created by calls to closure_ref_replace_program() and evaluated
  * in lambda_replace_program_adjust().
  */
 
@@ -364,7 +312,7 @@ static int compile_sefun_call(ph_int type, struct range_iterator *args_it, enum 
 #ifdef USE_PYTHON
 static int compile_python_efun_call(ph_int type, struct range_iterator *args_it, enum compile_value_input_flags opt_flags);
 #endif
-static int compile_lambda_call(ph_int type, svalue_t* closure, struct range_iterator *args_it, enum compile_value_input_flags opt_flags);
+static int compile_closure_call(ph_int type, svalue_t* closure, struct range_iterator *args_it, enum compile_value_input_flags opt_flags);
 static Bool is_lvalue (svalue_t *argp, int flags);
 static void compile_lvalue(svalue_t *, int);
 static lambda_t * lambda (vector_t *args, svalue_t *block, svalue_t origin);
@@ -456,75 +404,67 @@ closure_eq (svalue_t * left, svalue_t * right)
  */
 
 {
-    int i;
+    if (left->x.closure_type != right->x.closure_type)
+        return false;
 
-    /* Operator, Efun and Simul efun closures don't have a .u.lambda
-     * part.
-     */
-    i = left->x.generic == right->x.generic;
-
-    if (i
-     && (   left->x.closure_type >= 0
-         || right->x.closure_type >= 0)
-       )
-        i = left->u.lambda  == right->u.lambda;
-
-    /* Lfun- and identifier closure can be equal even if
-     * their pointers differ.
-     */
-    if (!i
-     && left->x.closure_type == right->x.closure_type
-     && (   left->x.closure_type == CLOSURE_LFUN
-         || left->x.closure_type == CLOSURE_IDENTIFIER
-        )
-     && object_svalue_eq(left->u.lambda->ob, right->u.lambda->ob)
-       )
+    switch (left->x.closure_type)
     {
-        if (left->x.closure_type == CLOSURE_LFUN)
+        case CLOSURE_LFUN:
         {
-            i =    object_svalue_eq(left->u.lambda->function.lfun.ob,
-                                    right->u.lambda->function.lfun.ob)
-                && (   left->u.lambda->function.lfun.index
-                    == right->u.lambda->function.lfun.index)
-                && (   left->u.lambda->function.lfun.inhProg
-                    == right->u.lambda->function.lfun.inhProg)
-                && (    left->u.lambda->function.lfun.context_size
-                     == right->u.lambda->function.lfun.context_size)
-                ;
+            unsigned int context_size;
+            bool result = true;
 
-            if (i)
+            if (!object_svalue_eq(left->u.lfun_closure->base.ob, right->u.lfun_closure->base.ob)
+             || !object_svalue_eq(left->u.lfun_closure->fun_ob, right->u.lfun_closure->fun_ob)
+             || left->u.lfun_closure->fun_index != right->u.lfun_closure->fun_index
+             || left->u.lfun_closure->inhProg != right->u.lfun_closure->inhProg
+             || left->u.lfun_closure->context_size != right->u.lfun_closure->context_size)
+                return false;
+
+            /* Compare the context variables.
+             *
+             * There might be a difference is in the context svalues.
+             * To prevent recursion, hide them while comparing them.
+             */
+            context_size = left->u.lfun_closure->context_size;
+            left->u.lfun_closure->context_size = 0;
+            right->u.lfun_closure->context_size = 0;
+
+            for (unsigned int ix = 0; ix < context_size; ix++)
             {
-                unsigned int context_size, ix;
-
-                /* There might be a difference is in the context svalues.
-                 * To prevent recursion, hide them while comparing them.
-                 */
-
-                context_size = left->u.lambda->function.lfun.context_size;
-                left->u.lambda->function.lfun.context_size = 0;
-                right->u.lambda->function.lfun.context_size = 0;
-
-                for (ix = 0; i && ix < context_size; ix++)
+                if (svalue_eq(left->u.lfun_closure->context+ix, right->u.lfun_closure->context+ix))
                 {
-                    i = svalue_eq( &(left->u.lambda->context[ix])
-                                 , &(right->u.lambda->context[ix])
-                                 );
+                    result = false;
+                    break;
                 }
-
-                /* Restore the context size.
-                 */
-                left->u.lambda->function.lfun.context_size = context_size;
-                right->u.lambda->function.lfun.context_size = context_size;
             }
-        }
-        else /* CLOSURE_IDENTIFIER */
-        {
-            i =    left->u.lambda->function.var_index
-                == right->u.lambda->function.var_index;
-        }
-    }
 
-    return (Bool)i;
+            /* Restore the context size.
+             */
+            left->u.lfun_closure->context_size = context_size;
+            right->u.lfun_closure->context_size = context_size;
+            return result;
+        }
+
+        case CLOSURE_IDENTIFIER:
+            return object_svalue_eq(left->u.identifier_closure->base.ob, right->u.identifier_closure->base.ob)
+                && left->u.identifier_closure->var_index == right->u.identifier_closure->var_index;
+
+        case CLOSURE_BOUND_LAMBDA:
+            return left->u.bound_lambda == right->u.bound_lambda;
+
+        case CLOSURE_LAMBDA:
+        case CLOSURE_UNBOUND_LAMBDA:
+            return left->u.lambda == right->u.lambda;
+
+        default:
+            if (left->x.closure_type < CLOSURE_LWO)
+                return left->u.lwob == right->u.lwob;
+            else
+                return left->u.ob == right->u.ob;
+    }
+    /* NOTREACHED */
+
 } /* closure_eq() */
 
 /*-------------------------------------------------------------------------*/
@@ -539,103 +479,86 @@ closure_cmp (svalue_t * left, svalue_t * right)
  */
 
 {
-    if (closure_eq(left, right)) return 0;
-
     /* First comparison criterium is the closure_type */
     if (left->x.closure_type != right->x.closure_type)
-    {
-        return (left->x.closure_type < right->x.closure_type) ? -1 : 1;
-    }
+        return int_cmp(left->x.closure_type, right->x.closure_type);
 
-    /* The types are identical and determine the next comparison.
-     * For lfun/identifier closure, we compare the actual closure data,
-     * for other closures a comparison of the lambda pointer is sufficient.
-     */
-    if (left->x.closure_type == CLOSURE_IDENTIFIER
-     || left->x.closure_type == CLOSURE_LFUN
-       )
+    switch (left->x.closure_type)
     {
-        int d = object_svalue_cmp(left->u.lambda->ob, right->u.lambda->ob);
-        if (d)
-            return d;
-
-        if (left->x.closure_type == CLOSURE_LFUN)
+        case CLOSURE_LFUN:
         {
-            unsigned context_size, i;
+            int d;
+            unsigned int context_size;
 
-            d = object_svalue_cmp(left->u.lambda->function.lfun.ob,
-                                  right->u.lambda->function.lfun.ob);
-            if (d)
+            if ((d = object_svalue_cmp(left->u.lfun_closure->base.ob, right->u.lfun_closure->base.ob)) != 0
+             || (d = object_svalue_cmp(left->u.lfun_closure->fun_ob, right->u.lfun_closure->fun_ob)) != 0
+             || (d = int_cmp(left->u.lfun_closure->fun_index, right->u.lfun_closure->fun_index)) != 0
+             || (d = ptr_cmp(left->u.lfun_closure->inhProg, right->u.lfun_closure->inhProg)) != 0
+             || (d = int_cmp(left->u.lfun_closure->context_size, right->u.lfun_closure->context_size)) != 0)
                 return d;
 
-            if (   left->u.lambda->function.lfun.index
-                != right->u.lambda->function.lfun.index
-               )
-                return (  left->u.lambda->function.lfun.index
-                        < right->u.lambda->function.lfun.index)
-                       ? -1 : 1;
-
-            if (   left->u.lambda->function.lfun.inhProg
-                != right->u.lambda->function.lfun.inhProg
-               )
-                return (  left->u.lambda->function.lfun.inhProg
-                        < right->u.lambda->function.lfun.inhProg)
-                       ? -1 : 1;
-
-            /* The difference is in the context svalues.
+            /* The difference might be in the context svalues.
              * To prevent recursion, hide them while comparing them.
              */
-            if (   left->u.lambda->function.lfun.context_size
-                != right->u.lambda->function.lfun.context_size
-               )
-                return (  left->u.lambda->function.lfun.context_size
-                        < right->u.lambda->function.lfun.context_size)
-                       ? -1 : 1;
+            context_size = left->u.lfun_closure->context_size;
+            left->u.lfun_closure->context_size = 0;
+            right->u.lfun_closure->context_size = 0;
 
-            context_size = left->u.lambda->function.lfun.context_size;
-            left->u.lambda->function.lfun.context_size = 0;
-            right->u.lambda->function.lfun.context_size = 0;
-
-            for (i = 0, d = 0; d == 0 && i < context_size; i++)
+            for (unsigned int ix = 0; ix < context_size; ix++)
             {
-                d = svalue_cmp( &(left->u.lambda->context[i])
-                              , &(right->u.lambda->context[i])
-                              );
+                d = svalue_cmp(left->u.lfun_closure->context+ix, right->u.lfun_closure->context+ix);
+                if (d != 0)
+                    break;
             }
 
             /* Restore the context size, the return the comparison
              * result in d.
              */
-            left->u.lambda->function.lfun.context_size = context_size;
-            right->u.lambda->function.lfun.context_size = context_size;
+            left->u.lfun_closure->context_size = context_size;
+            right->u.lfun_closure->context_size = context_size;
 
             return d;
         }
-        else /* CLOSURE_IDENTIFIER */
-        {
-            /* This is the only field left, so it is guaranteed to differ */
-            return (  left->u.lambda->function.var_index
-                    < right->u.lambda->function.var_index)
-                   ? -1 : 1;
-        }
-    }
 
-    /* Normal closure: compare the lambda pointers */
-    return (left->u.lambda < right->u.lambda) ? -1 : 1;
+        case CLOSURE_IDENTIFIER:
+        {
+            int d = object_svalue_cmp(left->u.identifier_closure->base.ob, right->u.identifier_closure->base.ob);
+            if (d)
+                return d;
+            else
+                return int_cmp(left->u.identifier_closure->var_index, right->u.identifier_closure->var_index);
+        }
+
+        case CLOSURE_BOUND_LAMBDA:
+            return ptr_cmp(left->u.bound_lambda, right->u.bound_lambda);
+
+        case CLOSURE_LAMBDA:
+        case CLOSURE_UNBOUND_LAMBDA:
+            return ptr_cmp(left->u.lambda, right->u.lambda);
+
+        default:
+            if (left->x.closure_type < CLOSURE_LWO)
+                return ptr_cmp(left->u.lwob, right->u.lwob);
+            else
+                return ptr_cmp(left->u.ob, right->u.ob);
+    }
+    /* NOTREACHED */
+
 } /* closure_cmp() */
 
 /*-------------------------------------------------------------------------*/
 Bool
-lambda_ref_replace_program( object_t * curobj, lambda_t *l, int type
-                          , p_int size, vector_t *args, svalue_t *block)
+closure_ref_replace_program( object_t * curobj, svalue_t *cl
+                           , p_int size, vector_t *args, svalue_t *block)
 
-/* The lambda <l> of type <type> is about to be bound to the object <curobj>
+/* The closure <cl> is about to be bound to the object <curobj>
  * which might be scheduled for program replacement.
  * If that is the case, a(nother) protector is added to replace_ob_s.lambda_rpp
  * and the function returns TRUE. Otherwise the function just returns FALSE.
  *
- * If <size> is not zero, it is the size of <args>, a vector with parameter
- * descriptions for a lambda(), and <block> holds the body of the lambda().
+ * If <size> is not zero, it is the size of the resulting lambda bytecode.
+ * Also then <args> holds a vector with parameter descriptions for a lambda(),
+ * and <block> holds the body of the lambda().
  * If <size> is zero, both <args> and <block> are undetermined.
  */
 
@@ -653,10 +576,8 @@ lambda_ref_replace_program( object_t * curobj, lambda_t *l, int type
 
             struct lambda_replace_program_protector *lrpp;
 
-            l->ref++;
             lrpp = xalloc(sizeof *lrpp);
-            lrpp->l.u.lambda = l;
-            lrpp->l.x.closure_type = (short)type;
+            assign_svalue_no_free(&lrpp->l, cl);
             lrpp->next = r_ob->lambda_rpp;
             r_ob->lambda_rpp = lrpp;
             if (size)
@@ -672,7 +593,7 @@ lambda_ref_replace_program( object_t * curobj, lambda_t *l, int type
 
     /* No replacement found: return false */
     return MY_FALSE;
-} /* lambda_ref_replace_program() */
+} /* closure_ref_replace_program() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -980,7 +901,7 @@ replace_program_lfun_closure_adjust (replace_ob_t *r_ob)
 
             if (lrpp->l.x.closure_type == CLOSURE_LFUN)
             {
-                lambda_t *l = lrpp->l.u.lambda;
+                lfun_closure_t *l = lrpp->l.u.lfun_closure;
 
                 /* Adjust the index of the lfun
                  * If the lfun closure is a reference to an inherited
@@ -988,46 +909,46 @@ replace_program_lfun_closure_adjust (replace_ob_t *r_ob)
                  * changes.
                  */
 
-                int newidx = replace_program_function_adjust(r_ob, l->function.lfun.index);
+                int newidx = replace_program_function_adjust(r_ob, l->fun_index);
                 if (newidx < 0)
                 {
                     /* If the function vanished, replace it with a default */
                     assert_master_ob_loaded();
-                    free_svalue(&(l->function.lfun.ob));
-                    if(l->function.lfun.inhProg)
-                        free_prog(l->function.lfun.inhProg, MY_TRUE);
+                    free_svalue(&(l->fun_ob));
+                    if(l->inhProg)
+                        free_prog(l->inhProg, MY_TRUE);
 
-                    put_ref_object(&(l->function.lfun.ob), master_ob, "replace_program_lambda_adjust");
+                    put_ref_object(&(l->fun_ob), master_ob, "replace_program_lambda_adjust");
                     newidx = find_function( STR_DANGLING_LFUN, master_ob->prog);
-                    l->function.lfun.index = (unsigned short)(newidx < 0 ? 0 : newidx);
-                    l->function.lfun.inhProg = NULL;
+                    l->fun_index = (unsigned short)(newidx < 0 ? 0 : newidx);
+                    l->inhProg = NULL;
                 }
                 else
                 {
-                    l->function.lfun.index = newidx;
+                    l->fun_index = newidx;
                 }
 
                 /* For inherited lfuns we might have to adjust the program. */
-                if (l->function.lfun.inhProg == r_ob->new_prog)
+                if (l->inhProg == r_ob->new_prog)
                 {
                     /* Easy case: The new program is the same one the closure
                      * is pointing to. Just concert the closure into a
                      * straight lfun closure.
                      */
-                     free_prog(l->function.lfun.inhProg, MY_TRUE);
-                     l->function.lfun.inhProg = NULL;
+                     free_prog(l->inhProg, MY_TRUE);
+                     l->inhProg = NULL;
                 }
-                else if (l->function.lfun.inhProg)
+                else if (l->inhProg)
                 {
                     program_t *prog = r_ob->new_prog;
-                    int fx = l->function.lfun.index;
+                    int fx = l->fun_index;
 
                     /* Checkt hat inhProg is still in the inherit chain.
                      * If not, convert the closure into a straight
                      * lfun closure.
                      */
 
-                    while(prog != l->function.lfun.inhProg)
+                    while(prog != l->inhProg)
                     {
                         inherit_t *inheritp = prog->inherit;
                         int inhcount = prog->num_inherited;
@@ -1042,8 +963,8 @@ replace_program_lfun_closure_adjust (replace_ob_t *r_ob)
                         if (inhcount < 0)
                         {
                             /* Didn't find it. */
-                            free_prog(l->function.lfun.inhProg, MY_TRUE);
-                            l->function.lfun.inhProg = NULL;
+                            free_prog(l->inhProg, MY_TRUE);
+                            l->inhProg = NULL;
                             break;
                         }
 
@@ -1054,17 +975,17 @@ replace_program_lfun_closure_adjust (replace_ob_t *r_ob)
             }
             else /* CLOSURE_IDENTIFIER */
             {
-                lambda_t *l = lrpp->l.u.lambda;
-                int newidx = replace_program_variable_adjust(r_ob, l->function.var_index);
+                identifier_closure_t *cl = lrpp->l.u.identifier_closure;
+                int newidx = replace_program_variable_adjust(r_ob, cl->var_index);
                 if (newidx < 0)
                 {
-                    l->function.var_index = VANISHED_VARCLOSURE_INDEX;
+                    cl->var_index = VANISHED_VARCLOSURE_INDEX;
                     /* TODO: This value should be properly publicized and
                      * TODO:: tested.
                      */
                 }
                 else
-                    l->function.var_index = newidx;
+                    cl->var_index = newidx;
             }
         } /* if (!CLOSURE_HAS_CODE()) */
     } while ( NULL != (lrpp = lrpp->next) );
@@ -1116,7 +1037,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
         lrpp = current_lrpp;
 
         /* Replace the function with "undef" */
-        lrpp->l.u.lambda->function.code.program[0] = F_UNDEF;
+        lrpp->l.u.lambda->program[0] = F_UNDEF;
 
         /* Free the protector and all held values */
         free_array(lrpp->args);
@@ -1152,13 +1073,13 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
 
             /* Remember the original lambda, and also recompile it */
             l = lrpp->l.u.lambda;
-            l2 = lambda(lrpp->args, &lrpp->block, l->ob);
+            l2 = lambda(lrpp->args, &lrpp->block, l->base.ob);
 
             svp = (svalue_t *)l;
-            num_values = l->function.code.num_values;
+            num_values = l->num_values;
 
             svp2 = (svalue_t *)l2;
-            num_values2 = l2->function.code.num_values;
+            num_values2 = l2->num_values;
 
             code_size2 = current.code_max - current.code_left;
 
@@ -1188,12 +1109,15 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
              */
             while (--num_values >= 0)
                 transfer_svalue(--svp, --svp2);
-            memcpy(&l->function.code, &l2->function.code, sizeof(l->function.code) - 1 + (size_t)code_size2);
+            l2->num_values = l->num_values;
+            l2->num_locals = l->num_locals;
+            l2->num_arg = l->num_arg;
+            memcpy(&l->program, &l2->program, (size_t)code_size2);
 
             /* Free the (now empty) memory */
-            free_svalue(&(l2->ob));
-            if  (l2->prog_ob)
-                free_object(l2->prog_ob, "replace_program_lambda_adjust");
+            free_svalue(&(l2->base.ob));
+            if  (l2->base.prog_ob)
+                free_object(l2->base.prog_ob, "replace_program_lambda_adjust");
             xfree(svp2);
             free_array(lrpp->args);
             free_svalue(&lrpp->block);
@@ -1213,60 +1137,27 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
 
 /*-------------------------------------------------------------------------*/
 void
-closure_init_lambda (lambda_t * l, svalue_t obj)
+closure_init_base (closure_base_t * cl, svalue_t obj)
 
-/* Initialize the freshly created lambda <l> to be bound to object <obj>
+/* Initialize the freshly created closure <cl> to be bound to object <obj>
  * (if given), and set the other generic fields (.ref, .prog_ob, .prog_pc).
  */
 
 {
-    l->ref = 1;
+    cl->ref = 1;
     if (current_prog)
     {
-        l->prog_ob = ref_valid_object(current_prog->blueprint, "lambda creator");
-        l->prog_pc = inter_pc - current_prog->program;
+        cl->prog_ob = ref_valid_object(current_prog->blueprint, "closure creator");
+        cl->prog_pc = inter_pc - current_prog->program;
     }
     else
     {
-        l->prog_ob = NULL;
-        l->prog_pc = 0;
+        cl->prog_ob = NULL;
+        cl->prog_pc = 0;
     }
 
-    assign_object_svalue_no_free(&(l->ob), obj, "lambda object");
-} /* closure_init_lambda() */
-
-/*-------------------------------------------------------------------------*/
-lambda_t *
-closure_new_lambda ( svalue_t obj,  unsigned short context_size
-                   , Bool raise_error)
-/* Create a basic lambda closure structure, suitable to hold <context_size>
- * context values, and bound to <obj>. The structure has the generic
- * fields (.ref, .ob, .prog_ob, .prog_pc) initialized.
- *
- * The function may raise an error on out of memory if <raise_error> is TRUE,
- * or just return NULL.
- */
-
-{
-    lambda_t *l;
-
-    /* Allocate a new lambda structure */
-    l = xalloc(SIZEOF_LAMBDA(context_size));
-    if (!l)
-    {
-        if (raise_error)
-        {
-            outofmem(SIZEOF_LAMBDA(context_size)
-                    , "closure literal");
-            /* NOTREACHED */
-        }
-    	return NULL;
-    }
-
-    closure_init_lambda(l, obj);
-
-    return l;
-} /* closure_new_lambda() */
+    assign_object_svalue_no_free(&(cl->ob), obj, "closure object");
+} /* closure_init_base() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1283,15 +1174,26 @@ closure_identifier (svalue_t *dest, svalue_t obj, int ix, Bool raise_error)
  */
 
 {
-    lambda_t *l;
+    identifier_closure_t *cl;
 
-    /* Allocate an initialise a new lambda structure */
-    l = closure_new_lambda(obj, 0, raise_error);
-    if (!l)
+    /* Allocate an initialise a new closure structure */
+    cl = xalloc(sizeof(identifier_closure_t));
+    if (!cl)
     {
-        put_number(dest, 0);
+        if (raise_error)
+            outofmem(sizeof(identifier_closure_t), "identifier closure");
+        else
+            put_number(dest, 0);
         return;
     }
+
+    closure_init_base(&(cl->base), obj);
+    cl->var_index = (unsigned short)ix;
+
+    /* Fill in the result svalue */
+    dest->type = T_CLOSURE;
+    dest->x.closure_type = CLOSURE_IDENTIFIER;
+    dest->u.identifier_closure = cl;
 
     /* If the object's program will be replaced, store the closure
      * in lambda protector, otherwise mark the object as referenced by
@@ -1299,19 +1201,12 @@ closure_identifier (svalue_t *dest, svalue_t obj, int ix, Bool raise_error)
      */
     if (obj.type == T_OBJECT
      && (!(obj.u.ob->prog->flags & P_REPLACE_ACTIVE)
-      || !lambda_ref_replace_program(obj.u.ob, l, CLOSURE_IDENTIFIER, 0, NULL, NULL)
+      || !closure_ref_replace_program(obj.u.ob, dest, 0, NULL, NULL)
        ))
     {
         obj.u.ob->flags |= O_LAMBDA_REFERENCED;
     }
 
-    dest->x.closure_type = CLOSURE_IDENTIFIER;
-    l->function.var_index = (unsigned short)ix;
-
-    /* Fill in the rest of the lambda and of the result svalue */
-
-    dest->type = T_CLOSURE;
-    dest->u.lambda = l;
 } /* closure_identifier() */
 
 /*-------------------------------------------------------------------------*/
@@ -1335,36 +1230,26 @@ closure_lfun ( svalue_t *dest, svalue_t obj, program_t *prog, int ix
  */
 
 {
-    lambda_t *l;
+    lfun_closure_t *l;
 
-    /* Allocate and initialise a new lambda structure */
-    l = closure_new_lambda(obj, num, raise_error);
+    /* Allocate and initialise a new closure structure */
+    l = xalloc(sizeof(lfun_closure_t) + num * sizeof(svalue_t));
     if (!l)
     {
-        put_number(dest, 0);
+        if (raise_error)
+            outofmem(sizeof(lfun_closure_t) + num * sizeof(svalue_t), "lfun closure");
+        else
+            put_number(dest, 0);
         return;
     }
 
-    /* If the object's program will be replaced, store the closure
-     * in lambda protector, otherwise mark the object as referenced by
-     * a closure.
-     */
-    if (obj.type == T_OBJECT
-     && (!(obj.u.ob->prog->flags & P_REPLACE_ACTIVE)
-      || !lambda_ref_replace_program(obj.u.ob, l, CLOSURE_LFUN, 0, NULL, NULL)
-       ))
-    {
-        obj.u.ob->flags |= O_LAMBDA_REFERENCED;
-    }
-
-    dest->x.closure_type = CLOSURE_LFUN;
-
-    assign_object_svalue_no_free(&(l->function.lfun.ob), obj, "closure");
-    l->function.lfun.index = (unsigned short)ix;
-    l->function.lfun.inhProg = prog;
+    closure_init_base(&(l->base), obj);
+    assign_object_svalue_no_free(&(l->fun_ob), obj, "closure");
+    l->fun_index = (unsigned short)ix;
+    l->inhProg = prog;
     if (prog)
         reference_prog(prog, "closure_lfun");
-    l->function.lfun.context_size = num;
+    l->context_size = num;
 
     /* Init the context variables */
     while (num > 0)
@@ -1373,10 +1258,23 @@ closure_lfun ( svalue_t *dest, svalue_t obj, program_t *prog, int ix
         put_number(&(l->context[num]), 0);
     }
 
-    /* Fill in the rest of the lambda and of the result svalue */
-
+    /* Fill in the result svalue */
     dest->type = T_CLOSURE;
-    dest->u.lambda = l;
+    dest->x.closure_type = CLOSURE_LFUN;
+    dest->u.lfun_closure = l;
+
+    /* If the object's program will be replaced, store the closure
+     * in lambda protector, otherwise mark the object as referenced by
+     * a closure.
+     */
+    if (obj.type == T_OBJECT
+     && (!(obj.u.ob->prog->flags & P_REPLACE_ACTIVE)
+      || !closure_ref_replace_program(obj.u.ob, dest, 0, NULL, NULL)
+       ))
+    {
+        obj.u.ob->flags |= O_LAMBDA_REFERENCED;
+    }
+
 } /* closure_lfun() */
 
 /*-------------------------------------------------------------------------*/
@@ -4245,7 +4143,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
         case CLOSURE_BOUND_LAMBDA:
         case CLOSURE_LAMBDA:
         case CLOSURE_LFUN:
-            result_flags = compile_lambda_call(type, rfun, &it, opt_flags);
+            result_flags = compile_closure_call(type, rfun, &it, opt_flags);
             break;
 
         case CLOSURE_IDENTIFIER:
@@ -4261,16 +4159,15 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
              * recognize the CLOSURE_IDENTIFIER and act accordingly.
              */
 
-            lambda_t *l;
+            identifier_closure_t *cl = rfun->u.identifier_closure;
 
-            l = rfun->u.lambda;
             if (it.size != 1)
                 lambda_error("Argument to variable\n");
 
-            if (!object_svalue_eq(l->ob, current.lambda_origin))
+            if (!object_svalue_eq(cl->base.ob, current.lambda_origin))
             {
-            	/* We need the FUNCALL */
-            	
+                /* We need the FUNCALL */
+
                 if (current.code_left < 1)
                     realloc_code();
                 current.code_left -= 1;
@@ -4286,15 +4183,15 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
             }
             else
             {
-            	/* We can use the IDENTIFIER */
-            	
+                /* We can use the IDENTIFIER */
+
                 if (current.code_left < 2)
                     realloc_code();
                 current.code_left -= 2;
-                if ((short)l->function.var_index < 0)
+                if ((short)cl->var_index < 0)
                     lambda_error("Variable not inherited\n");
                 STORE_CODE(current.codep, F_IDENTIFIER);
-                STORE_CODE(current.codep, (bytecode_t)l->function.var_index);
+                STORE_CODE(current.codep, (bytecode_t)cl->var_index);
             }
             break;
           } /* CLOSURE_IDENTIFIER */
@@ -4789,7 +4686,7 @@ compile_sefun_call (ph_int type, struct range_iterator *args_it, enum compile_va
 
 /*-------------------------------------------------------------------------*/
 static int
-compile_lambda_call (ph_int type, svalue_t* closure, struct range_iterator *args_it, enum compile_value_input_flags opt_flags)
+compile_closure_call (ph_int type, svalue_t* closure, struct range_iterator *args_it, enum compile_value_input_flags opt_flags)
 {
     /* This is compiled as
      *   alien-lfun:             local lfun:
@@ -4807,12 +4704,10 @@ compile_lambda_call (ph_int type, svalue_t* closure, struct range_iterator *args
      * closures are compiled similar to alien lfuns using
      * F_CALL_CLOSURE.
      */
+    closure_base_t *cl = closure->u.closure;
 
-    lambda_t *l;
-
-    l = closure->u.lambda;
-    if ((type != CLOSURE_UNBOUND_LAMBDA && !object_svalue_eq(l->ob, current.lambda_origin))
-     || (type == CLOSURE_LFUN && !object_svalue_eq(l->ob, l->function.lfun.ob))
+    if ((type != CLOSURE_UNBOUND_LAMBDA && !object_svalue_eq(cl->ob, current.lambda_origin))
+     || (type == CLOSURE_LFUN && !object_svalue_eq(cl->ob, closure->u.lfun_closure->fun_ob))
        )
     {
         /* Compile it like an alien lfun */
@@ -4839,8 +4734,8 @@ compile_lambda_call (ph_int type, svalue_t* closure, struct range_iterator *args
         }
     }
     else if (type != CLOSURE_LFUN
-     || l->function.lfun.inhProg
-     || l->function.lfun.context_size
+     || closure->u.lfun_closure->inhProg
+     || closure->u.lfun_closure->context_size
        )
     {
         /* Compile it using F_CALL_CLOSURE. */
@@ -4882,7 +4777,7 @@ compile_lambda_call (ph_int type, svalue_t* closure, struct range_iterator *args
             realloc_code();
 
         STORE_CODE(current.codep, F_CALL_FUNCTION);
-        STORE_SHORT(current.codep, l->function.lfun.index);
+        STORE_SHORT(current.codep, closure->u.lfun_closure->fun_index);
         STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
 
         current.code_left -= 4;
@@ -4898,7 +4793,7 @@ compile_lambda_call (ph_int type, svalue_t* closure, struct range_iterator *args
     }
 
     return 0;
-} /* compile_lambda_call */
+} /* compile_closure_call */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -5471,7 +5366,7 @@ compile_lvalue (svalue_t *argp, int flags)
             case CLOSURE_LFUN:
                 if (flags & ALLOW_FUNCTION_CALL)
                 {
-                    compile_lambda_call(type, cl, &it, LEAVE_LVALUE);
+                    compile_closure_call(type, cl, &it, LEAVE_LVALUE);
                     return;
                 }
                 break;
@@ -5563,18 +5458,17 @@ compile_lvalue (svalue_t *argp, int flags)
                 {
                     case CLOSURE_IDENTIFIER:
                     {
-                        lambda_t *l;
+                        identifier_closure_t *cl = item->u.identifier_closure;
 
-                        l = item->u.lambda;
-                        if (!object_svalue_eq(l->ob, current.lambda_origin))
+                        if (!object_svalue_eq(cl->base.ob, current.lambda_origin))
                             break;
                         if (current.code_left < 4)
                             realloc_code();
                         current.code_left -= 2;
-                        if ((short)l->function.var_index < 0)
+                        if ((short)cl->var_index < 0)
                             lambda_error("Variable not inherited\n");
                         STORE_CODE(current.codep, (flags & MAKE_VAR_LVALUE) ? F_PUSH_IDENTIFIER_VLVALUE : F_PUSH_IDENTIFIER_LVALUE);
-                        STORE_CODE(current.codep, (bytecode_t)(l->function.var_index));
+                        STORE_CODE(current.codep, (bytecode_t)(cl->var_index));
 
                         if (flags & PROTECT_LVALUE)
                         {
@@ -5696,18 +5590,18 @@ lambda (vector_t *args, svalue_t *block, svalue_t origin)
     code_size = current.code_max - current.code_left;
 
     /* Allocate the memory for values, lambda_t and code */
-    l0 = xalloc(values_size + SIZEOF_LAMBDA(0) - sizeof(l->function) + sizeof(l->function.code) - 1 + code_size);
+    l0 = xalloc(values_size + sizeof(lambda_t) + code_size);
 
     /* Copy the data */
     memcpy(l0, current.valuep, (size_t)values_size);
     l0 += values_size;
     l = (lambda_t *)l0;
-    closure_init_lambda(l, origin);
+    closure_init_base(&(l->base), origin);
 
-    memcpy(l->function.code.program, current.code, (size_t)code_size);
-    l->function.code.num_arg = VEC_SIZE(args);
-    l->function.code.num_locals = current.num_locals + current.max_break_stack - l->function.code.num_arg;
-    l->function.code.num_values = num_values;
+    memcpy(l->program, current.code, (size_t)code_size);
+    l->num_arg = VEC_SIZE(args);
+    l->num_locals = current.num_locals + current.max_break_stack - l->num_arg;
+    l->num_values = num_values;
 
     /* Clean up */
     free_symbols();
@@ -5717,12 +5611,20 @@ lambda (vector_t *args, svalue_t *block, svalue_t origin)
     /* If the lambda is to be bound to an object, check if the object's program
      * is scheduled for replacement. If not, mark the object as referenced.
      */
-    if (origin.type == T_OBJECT
-     && (   !(origin.u.ob->prog->flags & P_REPLACE_ACTIVE)
-         || !lambda_ref_replace_program(origin.u.ob, l, CLOSURE_LAMBDA, code_size, args, block)
-    ) )
+    if (origin.type == T_OBJECT)
     {
-        origin.u.ob->flags |= O_LAMBDA_REFERENCED;
+        if (!(origin.u.ob->prog->flags & P_REPLACE_ACTIVE))
+            origin.u.ob->flags |= O_LAMBDA_REFERENCED;
+        else
+        {
+            svalue_t cl;
+            cl.type = T_CLOSURE;
+            cl.x.closure_type = CLOSURE_LAMBDA;
+            cl.u.lambda = l;
+
+            if (!closure_ref_replace_program(origin.u.ob, &cl, code_size, args, block))
+                origin.u.ob->flags |= O_LAMBDA_REFERENCED;
+        }
     }
 
     /* Return the lambda */
@@ -5737,10 +5639,9 @@ free_closure (svalue_t *svp)
  */
 
 {
-    lambda_t *l;
-    int type;
+    int type = svp->x.closure_type;
 
-    if (!CLOSURE_MALLOCED(type = svp->x.closure_type))
+    if (!CLOSURE_MALLOCED(type))
     {
         /* Simple closure */
         if (type < CLOSURE_LWO)
@@ -5749,86 +5650,83 @@ free_closure (svalue_t *svp)
             free_object(svp->u.ob, "free_closure");
         return;
     }
-
-    /* Lambda closure */
-
-    l = svp->u.lambda;
-    if (--l->ref)
-        return;
-
-    if (l->prog_ob)
-        free_object(l->prog_ob, "free_closure: lambda creator");
-
-    if (CLOSURE_HAS_CODE(type))
+    else
     {
-    	/* Free all the values for this lambda, then the memory */
-    	
-        mp_int num_values;
-
-        if (type != CLOSURE_UNBOUND_LAMBDA)
-            free_svalue(&(l->ob));
-
-        svp = (svalue_t *)l;
-        num_values = l->function.code.num_values;
-
-        while (--num_values >= 0)
-            free_svalue(--svp);
-        xfree(svp);
-        return;
-    }
-
-    free_svalue(&(l->ob));
-    if (type == CLOSURE_BOUND_LAMBDA)
-    {
-    	/* BOUND_LAMBDAs are indirections to UNBOUND_LAMBDA structures.
-    	 * Free the BOUND_LAMBDA and then deref/free the referenced
-    	 * UNBOUND_LAMBDA.
-    	 */
-    	
-        mp_int num_values;
-        lambda_t *l2;
-
-        l2 = l->function.lambda;
-        xfree(l);
-
-        if (--l2->ref)
+        closure_base_t *cl = svp->u.closure;
+        if (--cl->ref)
             return;
 
-        if (l2->prog_ob)
-            free_object(l2->prog_ob, "free_closure: unbound lambda creator");
+        if (type != CLOSURE_UNBOUND_LAMBDA)
+            free_svalue(&(cl->ob));
 
-        svp = (svalue_t *)l2;
-        num_values = l2->function.code.num_values;
-
-        while (--num_values >= 0)
-            free_svalue(--svp);
-        xfree(svp);
-        return;
+        if (cl->prog_ob)
+            free_object(cl->prog_ob, "free_closure: closure creator");
     }
 
-    if (type == CLOSURE_LFUN)
+    /* When we are here, we need to deallocate the closure. */
+    switch (type)
     {
-        free_svalue(&(l->function.lfun.ob));
-        if(l->function.lfun.inhProg)
-            free_prog(l->function.lfun.inhProg, MY_TRUE);
-    }
-
-    if (type == CLOSURE_LFUN)
-    {
-        unsigned short num = l->function.lfun.context_size;
-
-        l->function.lfun.context_size = 0; /* ...just in case... */
-        while (num > 0)
+        case CLOSURE_LFUN:
         {
-            num--;
-            free_svalue(&(l->context[num]));
-        }
-    }
+            lfun_closure_t *l = svp->u.lfun_closure;
 
-    /* else CLOSURE_LFUN || CLOSURE_IDENTIFIER:
-     * no further references held.
-     */
-    xfree(l);
+            free_svalue(&(l->fun_ob));
+            if(l->inhProg)
+                free_prog(l->inhProg, MY_TRUE);
+
+            for (unsigned short idx = l->context_size; idx-- > 0;)
+                free_svalue(&(l->context[idx]));
+
+            xfree(l);
+            return;
+        }
+
+        case CLOSURE_IDENTIFIER:
+        {
+            identifier_closure_t *cl = svp->u.identifier_closure;
+
+            xfree(cl);
+            return;
+        }
+
+        case CLOSURE_BOUND_LAMBDA:
+        {
+            /* BOUND_LAMBDAs are indirections to UNBOUND_LAMBDA structures.
+             * Free the BOUND_LAMBDA and then deref/free the referenced
+             * UNBOUND_LAMBDA.
+             */
+            bound_lambda_t *l = svp->u.bound_lambda;
+            svalue_t lv;
+
+            lv.type = T_CLOSURE;
+            lv.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
+            lv.u.lambda = l->lambda;
+
+            xfree(l);
+            free_closure(&lv);
+
+            return;
+        }
+
+        case CLOSURE_LAMBDA:
+        case CLOSURE_UNBOUND_LAMBDA:
+        {
+            /* Free all the values for this lambda, then the memory */
+            lambda_t *l = svp->u.lambda;
+            svalue_t *lv = (svalue_t*)l;
+            mp_int num_values = l->num_values;
+
+            while (--num_values >= 0)
+                free_svalue(--lv);
+
+            /* The block starts with the last lambda value. */
+            xfree(lv);
+            return;
+        }
+
+        default:
+            fatal("(free_closure) Invalid closure type %d!\n", type);
+    }
 } /* free_closure() */
 
 /*-------------------------------------------------------------------------*/
@@ -5852,7 +5750,7 @@ is_undef_closure (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-closure_lookup_lfun_prog ( lambda_t * l
+closure_lookup_lfun_prog ( lfun_closure_t * l
                          , program_t ** pProg
                          , string_t ** pName
                          , Bool * pIsInherited
@@ -5877,13 +5775,13 @@ closure_lookup_lfun_prog ( lambda_t * l
 
     is_inherited = MY_FALSE;
 
-    ix = l->function.lfun.index;
+    ix = l->fun_index;
 
-    switch (l->function.lfun.ob.type)
+    switch (l->fun_ob.type)
     {
         case T_OBJECT:
         {
-            object_t *ob = l->function.lfun.ob.u.ob;
+            object_t *ob = l->fun_ob.u.ob;
 
             /* Get the program resident */
             if (O_PROG_SWAPPED(ob))
@@ -5900,7 +5798,7 @@ closure_lookup_lfun_prog ( lambda_t * l
         }
 
         case T_LWOBJECT:
-            prog = l->function.lfun.ob.u.lwob->prog;
+            prog = l->fun_ob.u.lwob->prog;
             obname = prog->name;
             break;
 
@@ -5909,9 +5807,9 @@ closure_lookup_lfun_prog ( lambda_t * l
             fatal("(closure_lookup_lfun_prog) Invalid closure.\n");
     }
 
-    if (l->function.lfun.inhProg)
+    if (l->inhProg)
     {
-        while (prog != l->function.lfun.inhProg)
+        while (prog != l->inhProg)
         {
             inherit_t *inheritp;
 
@@ -5920,9 +5818,9 @@ closure_lookup_lfun_prog ( lambda_t * l
                 errorf("(closure_lookup_lfun_prog): Couldn't find "
                        "program '%s' in object '%s' with function index %ld. "
                        "Found program '%s' instead.\n"
-                     , get_txt(l->function.lfun.inhProg->name)
+                     , get_txt(l->inhProg->name)
                      , get_txt(obname)
-                     , (long) l->function.lfun.index
+                     , (long) l->fun_index
                      , get_txt(prog->name)
                      );
 #endif
@@ -6036,37 +5934,38 @@ closure_efun_to_string (int type)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-closure_location (lambda_t *l)
+closure_location (closure_base_t *cl)
 
-/* Return the location the lambda structure <l> was created as
+/* Return the location the closure structure <cl> was created as
  * the string 'from <filename> line <number>".
  */
 
 {
     string_t * rc = NULL;
 
-    if (l && l->prog_ob && !(l->prog_ob->flags & O_DESTRUCTED))
+    if (cl && cl->prog_ob && !(cl->prog_ob->flags & O_DESTRUCTED))
     {
 
-        if (l->prog_ob->flags & O_SWAPPED)
+        if (cl->prog_ob->flags & O_SWAPPED)
         {
-            if (load_ob_from_swap(l->prog_ob) < 0)
+            if (load_ob_from_swap(cl->prog_ob) < 0)
                 errorf("Out of memory\n");
         }
 
-        do {
+        do
+        {
             int          lineno;
             char buf[20];
             string_t   * name = NULL;
 
-            program_t  * prog    = l->prog_ob->prog;
-            bytecode_p   prog_pc = prog->program + l->prog_pc;
+            program_t  * prog    = cl->prog_ob->prog;
+            bytecode_p   prog_pc = prog->program + cl->prog_pc;
 
             if (prog_pc <= prog->program || prog_pc >= PROGRAM_END(*prog))
                 break;
 
-            lineno = get_line_number( l->prog_ob->prog->program + l->prog_pc
-                                    , l->prog_ob->prog
+            lineno = get_line_number( cl->prog_ob->prog->program + cl->prog_pc
+                                    , cl->prog_ob->prog
                                     , &name
                                     );
 
@@ -6096,7 +5995,7 @@ closure_to_string (svalue_t * sp, Bool compact)
 {
     char buf[1024];
     string_t *rc;
-    lambda_t *l;
+    closure_base_t *cl;
     size_t len;
 
     rc = NULL;
@@ -6112,256 +6011,260 @@ closure_to_string (svalue_t * sp, Bool compact)
         return NULL;
     }
 
-    l = NULL;
+    cl = NULL;
       /* Will be set to valid pointer if the closure has a lambda_t structure.
        */
 
     switch(sp->x.closure_type)
     {
-
-    case CLOSURE_IDENTIFIER: /* Variable Closure */
-      {
-        l = sp->u.lambda;
-        switch (l->ob.type)
+        case CLOSURE_IDENTIFIER: /* Variable Closure */
         {
-            case T_OBJECT:
-            {
-                object_t *ob = l->ob.u.ob;
+            identifier_closure_t *ic = sp->u.identifier_closure;
+            cl = &(ic->base);
 
-                if (ob->flags & O_DESTRUCTED)
+            switch (cl->ob.type)
+            {
+                case T_OBJECT:
                 {
+                    object_t *ob = cl->ob.u.ob;
+
+                    if (ob->flags & O_DESTRUCTED)
+                    {
+                        strcat(buf, compact ? "<dest lvar>"
+                                            : "<local variable in destructed object>");
+                        break;
+                    }
+
+                    if (ic->var_index == VANISHED_VARCLOSURE_INDEX)
+                    {
+                        strcat(buf, compact ? "<repl lvar>"
+                                            : "<local variable from replaced program>");
+                        break;
+                    }
+
+                    /* We need the program resident */
+                    if (O_PROG_SWAPPED(ob))
+                    {
+                        ob->time_of_ref = current_time;
+                        if (load_ob_from_swap(ob) < 0)
+                            errorf("Out of memory.\n");
+                    }
+
+                    sprintf(buf, "#'%s->%s"
+                               , get_txt(ob->name)
+                               , get_txt(ob->prog->variables[ic->var_index].name)
+                          );
+                    break;
+                }
+
+                case T_LWOBJECT:
+                    sprintf(buf, "#'/%s->%s"
+                               , get_txt(cl->ob.u.lwob->prog->name)
+                               , get_txt(cl->ob.u.lwob->prog->variables[ic->var_index].name)
+                          );
+                break;
+
+                case T_NUMBER:
+                default:
                     strcat(buf, compact ? "<dest lvar>"
                                         : "<local variable in destructed object>");
                     break;
-                }
+            }
+            break;
+        }
 
-                if (l->function.var_index == VANISHED_VARCLOSURE_INDEX)
+        case CLOSURE_LFUN: /* Lfun closure */
+        {
+            lfun_closure_t *l = sp->u.lfun_closure;
+            program_t      *prog;
+            string_t       *function_name;
+            bool            is_inherited;
+
+            cl = &(l->base);
+
+            /* For alien lfun closures, prepend the object the closure
+             * is bound to.
+             */
+            if (!object_svalue_eq(cl->ob, l->fun_ob))
+            {
+                svalue_t ob = l->fun_ob;
+
+                switch (ob.type)
                 {
-                    strcat(buf, compact ? "<repl lvar>"
-                                        : "<local variable from replaced program>");
-                    break;
-                }
+                    case T_OBJECT:
+                        if (ob.u.ob->flags & O_DESTRUCTED)
+                        {
+                            strcat(buf, compact ? "[<dest obj>]" : "[<destructed object>]");
+                        }
+                        else
+                        {
+                            strcat(buf, "[");
+                            strcat(buf, get_txt(ob.u.ob->name));
+                            strcat(buf, "]");
+                        }
+                        break;
 
-                /* We need the program resident */
-                if (O_PROG_SWAPPED(ob))
-                {
-                    ob->time_of_ref = current_time;
-                    if (load_ob_from_swap(ob) < 0)
-                        errorf("Out of memory.\n");
-                }
+                    case T_LWOBJECT:
+                        strcat(buf, "[/");
+                        strcat(buf, get_txt(ob.u.lwob->prog->name));
+                        strcat(buf, "]");
+                        break;
 
-                sprintf(buf, "#'%s->%s"
-                           , get_txt(ob->name)
-                           , get_txt(ob->prog->variables[l->function.var_index].name)
-                      );
-                break;
+                    case T_NUMBER:
+                    default:
+                        strcat(buf, compact ? "[<dest obj>]" : "[<destructed object>]");
+                        break;
+                }
             }
 
-            case T_LWOBJECT:
-                sprintf(buf, "#'/%s->%s"
-                           , get_txt(l->ob.u.lwob->prog->name)
-                           , get_txt(l->ob.u.lwob->prog->variables[l->function.var_index].name)
-                      );
-                break;
+            closure_lookup_lfun_prog(l, &prog, &function_name, &is_inherited);
 
-            case T_NUMBER:
-            default:
-                strcat(buf, compact ? "<dest lvar>"
-                                    : "<local variable in destructed object>");
-                break;
-        }
-        break;
-      }
-
-    case CLOSURE_LFUN: /* Lfun closure */
-      {
-        program_t *prog;
-        string_t  *function_name;
-        Bool       is_inherited;
-
-        l = sp->u.lambda;
-
-        /* For alien lfun closures, prepend the object the closure
-         * is bound to.
-         */
-        if (!object_svalue_eq(l->ob, l->function.lfun.ob))
-        {
-            svalue_t ob = l->function.lfun.ob;
-
-            switch (ob.type)
+            switch (l->fun_ob.type)
             {
                 case T_OBJECT:
-                    if (ob.u.ob->flags & O_DESTRUCTED)
-                    {
-                        strcat(buf, compact ? "[<dest obj>]" : "[<destructed object>]");
-                    }
+                {
+                    object_t *ob = l->fun_ob.u.ob;
+                    if (ob->flags & O_DESTRUCTED)
+                        strcat(buf, compact ? "<dest lfun>"
+                                            : "<local function in destructed object>");
                     else
-                    {
-                        strcat(buf, "[");
-                        strcat(buf, get_txt(ob.u.ob->name));
-                        strcat(buf, "]");
-                    }
+                        strcat(buf, get_txt(ob->name));
                     break;
+                }
 
                 case T_LWOBJECT:
-                    strcat(buf, "[/");
-                    strcat(buf, get_txt(ob.u.lwob->prog->name));
-                    strcat(buf, "]");
+                    strcat(buf, "/");
+                    strcat(buf, get_txt(l->fun_ob.u.lwob->prog->name));
                     break;
 
                 case T_NUMBER:
                 default:
-                    strcat(buf, compact ? "[<dest obj>]" : "[<destructed object>]");
-                    break;
-            }
-        }
-
-        closure_lookup_lfun_prog(l, &prog, &function_name, &is_inherited);
-
-        switch (l->function.lfun.ob.type)
-        {
-            case T_OBJECT:
-            {
-                object_t *ob = l->function.lfun.ob.u.ob;
-                if (ob->flags & O_DESTRUCTED)
                     strcat(buf, compact ? "<dest lfun>"
                                         : "<local function in destructed object>");
-                else
-                    strcat(buf, get_txt(ob->name));
-                break;
+                    break;
             }
 
-            case T_LWOBJECT:
-                strcat(buf, "/");
-                strcat(buf, get_txt(l->function.lfun.ob.u.lwob->prog->name));
-                break;
-
-            case T_NUMBER:
-            default:
-                strcat(buf, compact ? "<dest lfun>"
-                                    : "<local function in destructed object>");
-                break;
-        }
-
-        if (is_inherited)
-        {
-            strcat(buf, "(");
-            strcat(buf, get_txt(prog->name));
-            buf[strlen(buf)-2] = '\0'; /* Remove the '.c' after the program name */
-            strcat(buf, ")");
-        }
-        strcat(buf, "->");
-        strcat(buf, get_txt(function_name));
-        strcat(buf, "()");
-        break;
-      }
-
-    case CLOSURE_UNBOUND_LAMBDA: /* Unbound-Lambda Closure */
-      {
-        l = sp->u.lambda;
-
-        sprintf(buf, compact ? "<free %p>" : "<free lambda %p>", l);
-        break;
-      }
-
-    case CLOSURE_LAMBDA:         /* Lambda Closure */
-    case CLOSURE_BOUND_LAMBDA:   /* Bound-Lambda Closure */
-      {
-        l = sp->u.lambda;
-
-        if (sp->x.closure_type == CLOSURE_BOUND_LAMBDA)
-            sprintf(buf, compact ? "<bound %p:" : "<bound lambda %p:", l);
-        else
-            sprintf(buf, compact ? "<%p:" : "<lambda %p:", l);
-
-        switch (l->ob.type)
-        {
-            case T_OBJECT:
-                if (l->ob.u.ob->flags & O_DESTRUCTED)
-                    strcat(buf, "{dest}");
-                strcat(buf, "/");
-                strcat(buf, get_txt(l->ob.u.ob->name));
-                strcat(buf, ">");
-                break;
-
-            case T_LWOBJECT:
-                strcat(buf, "/");
-                strcat(buf, get_txt(l->ob.u.lwob->prog->name));
-                strcat(buf, ">");
-                break;
-
-            case T_NUMBER:
-            default:
-                strcat(buf, "{null}>");
-                break;
-        }
-        break;
-      }
-
-    default:
-      {
-        int type = sp->x.closure_type;
-
-        if (type >= 0)
-            errorf("Bad arg 1 to to_string(): closure type %d.\n"
-                 , sp->x.closure_type);
-        else
-        {
-            if (type < CLOSURE_LWO)
-                type -= CLOSURE_LWO;
-
-            switch(type & -0x0800)
+            if (is_inherited)
             {
-#ifdef USE_PYTHON
-            case CLOSURE_PYTHON_EFUN:
-                strcat(buf, closure_python_efun_to_string(type));
-                break;
-#endif
-            case CLOSURE_OPERATOR:
-              {
-                const char *str = closure_operator_to_string(type);
+                strcat(buf, "(");
+                strcat(buf, get_txt(prog->name));
+                buf[strlen(buf)-2] = '\0'; /* Remove the '.c' after the program name */
+                strcat(buf, ")");
+            }
+            strcat(buf, "->");
+            strcat(buf, get_txt(function_name));
+            strcat(buf, "()");
+            break;
+        }
 
-                if (str)
-                {
-                    strcat(buf, str);
+        case CLOSURE_UNBOUND_LAMBDA: /* Unbound-Lambda Closure */
+        {
+            lambda_t *l = sp->u.lambda;
+            cl = &(l->base);
+
+            sprintf(buf, compact ? "<free %p>" : "<free lambda %p>", l);
+            break;
+        }
+
+        case CLOSURE_LAMBDA:         /* Lambda Closure */
+        case CLOSURE_BOUND_LAMBDA:   /* Bound-Lambda Closure */
+        {
+            lambda_t *l = sp->u.lambda;
+            cl = &(l->base);
+
+            if (sp->x.closure_type == CLOSURE_BOUND_LAMBDA)
+                sprintf(buf, compact ? "<bound %p:" : "<bound lambda %p:", l);
+            else
+                sprintf(buf, compact ? "<%p:" : "<lambda %p:", l);
+
+            switch (cl->ob.type)
+            {
+                case T_OBJECT:
+                    if (cl->ob.u.ob->flags & O_DESTRUCTED)
+                        strcat(buf, "{dest}");
+                    strcat(buf, "/");
+                    strcat(buf, get_txt(cl->ob.u.ob->name));
+                    strcat(buf, ">");
                     break;
-                }
 
-                type += CLOSURE_EFUN - CLOSURE_OPERATOR;
-              }
-            /* default action for operators: FALLTHROUGH */
-
-            case CLOSURE_EFUN:
-              {
-                const char *str = closure_efun_to_string(type);
-
-                if (str)
-                {
-                    strcat(buf, str);
+                case T_LWOBJECT:
+                    strcat(buf, "/");
+                    strcat(buf, get_txt(cl->ob.u.lwob->prog->name));
+                    strcat(buf, ">");
                     break;
-                }
-              }
-              /* Shouldn't happen: FALLTHROUGH */
 
-            case CLOSURE_SIMUL_EFUN:
-                strcat(buf, "sefun::");
-                strcat(buf, get_txt(simul_efun_table[type - CLOSURE_SIMUL_EFUN].function.name));
-                break;
+                case T_NUMBER:
+                default:
+                    strcat(buf, "{null}>");
+                    break;
             }
             break;
-        } /* if (type) */
-      } /* case default */
+        }
+
+        default:
+        {
+            int type = sp->x.closure_type;
+
+            if (type >= 0)
+                errorf("Bad arg 1 to to_string(): closure type %d.\n"
+                     , sp->x.closure_type);
+            else
+            {
+                if (type < CLOSURE_LWO)
+                    type -= CLOSURE_LWO;
+
+                switch(type & -0x0800)
+                {
+#ifdef USE_PYTHON
+                    case CLOSURE_PYTHON_EFUN:
+                        strcat(buf, closure_python_efun_to_string(type));
+                        break;
+#endif
+                    case CLOSURE_OPERATOR:
+                    {
+                        const char *str = closure_operator_to_string(type);
+
+                        if (str)
+                        {
+                            strcat(buf, str);
+                            break;
+                        }
+
+                        type += CLOSURE_EFUN - CLOSURE_OPERATOR;
+                    }
+                    /* default action for operators: FALLTHROUGH */
+
+                    case CLOSURE_EFUN:
+                    {
+                        const char *str = closure_efun_to_string(type);
+
+                        if (str)
+                        {
+                            strcat(buf, str);
+                            break;
+                        }
+                    }
+                    /* Shouldn't happen: FALLTHROUGH */
+
+                    case CLOSURE_SIMUL_EFUN:
+                        strcat(buf, "sefun::");
+                        strcat(buf, get_txt(simul_efun_table[type - CLOSURE_SIMUL_EFUN].function.name));
+                        break;
+                }
+                break;
+            } /* if (type) */
+        } /* case default */
     } /* switch(closure_type) */
 
     len = strlen(buf);
-    memsafe(rc = new_n_unicode_mstring(buf, len), len, "converted lambda");
+    memsafe(rc = new_n_unicode_mstring(buf, len), len, "converted closure");
 
-    /* If it's a closure with a lambda structure, we can determine
+    /* If it's a closure with an allocated structure, we can determine
      * where it was created.
      */
-    if (l && l->prog_ob && !(l->prog_ob->flags & O_DESTRUCTED))
+    if (cl && cl->prog_ob && !(cl->prog_ob->flags & O_DESTRUCTED))
     {
-        string_t * rc2 = closure_location(l);
+        string_t * rc2 = closure_location(cl);
         string_t * rc3;
 
         /* Final step: append the created string rc2 to the original
@@ -6426,94 +6329,111 @@ v_bind_lambda (svalue_t *sp, int num_arg)
 
     switch(sp->x.closure_type)
     {
-    case CLOSURE_LAMBDA:
-    case CLOSURE_IDENTIFIER:
-        /* Unbindable closures. Free the ob reference and
-         * throw an error (unless <ob> has been omitted)
-         */
-        free_svalue(&ob);
-        if (num_arg == 1)
-            break;
-        errorf("Bad arg 1 to bind_lambda(): unbindable closure\n");
-        /* NOTREACHED */
-        return sp;
-        break;
-
-    case CLOSURE_LFUN:
-        /* Rebind an lfun to the given object */
-        free_svalue(&(sp->u.lambda->ob));
-        sp->u.lambda->ob = ob;
-        break;
-
-    default:
-        /* efun, simul_efun, operator closures: rebind it */
-        if (sp->x.closure_type < CLOSURE_LWO)
-        {
-            free_lwobject(sp->u.lwob);
-            sp->x.closure_type -= CLOSURE_LWO;
-        }
-        else
-        {
-            free_object(sp->u.ob, "bind_lambda");
-        }
-        if (ob.type == T_LWOBJECT)
-        {
-            sp->u.lwob = ob.u.lwob;
-            sp->x.closure_type += CLOSURE_LWO;
-        }
-        else
-            sp->u.ob = ob.u.ob;
-        break;
-
-    case CLOSURE_BOUND_LAMBDA:
-      {
-        /* Rebind an already bound lambda closure */
-
-        lambda_t *l;
-
-        if ( (l = sp->u.lambda)->ref == 1)
-        {
-            /* We are the only user of the lambda: simply rebind it.
+        case CLOSURE_LAMBDA:
+        case CLOSURE_IDENTIFIER:
+            /* Unbindable closures. Free the ob reference and
+             * throw an error (unless <ob> has been omitted)
              */
-            free_svalue(&(l->ob));
-            l->ob = ob;
+            free_svalue(&ob);
+            if (num_arg == 1)
+                break;
+
+            errorf("Bad arg 1 to bind_lambda(): unbindable closure\n");
+            /* NOTREACHED */
+            return sp;
+
+        case CLOSURE_LFUN:
+            /* Rebind an lfun to the given object */
+            free_svalue(&(sp->u.lfun_closure->base.ob));
+            sp->u.lfun_closure->base.ob = ob;
             break;
-        }
-        else
+
+        case CLOSURE_BOUND_LAMBDA:
         {
-            /* We share the closure with others: create our own
-             * copy, bind it and put it onto the stack in place of
-             * the original one.
-             */
-            lambda_t *l2;
+            /* Rebind an already bound lambda closure */
 
-            l->ref--;
-            l2 = closure_new_lambda(ob, 0, /* raise_error: */ MY_TRUE);
-            l2->function.lambda = l->function.lambda;
-            l->function.lambda->ref++;
-            free_svalue(&ob); /* We adopted the reference */
-            sp->u.lambda = l2;
+            bound_lambda_t *l = sp->u.bound_lambda;
+
+            if (l->base.ref == 1)
+            {
+                /* We are the only user of the lambda: simply rebind it.
+                 */
+                free_svalue(&(l->base.ob));
+                l->base.ob = ob;
+                break;
+            }
+            else
+            {
+                /* We share the closure with others: create our own
+                 * copy, bind it and put it onto the stack in place of
+                 * the original one.
+                 */
+                bound_lambda_t *l2;
+
+                l2 = xalloc(sizeof(bound_lambda_t));
+                if (!l2)
+                    outofmem(sizeof(bound_lambda_t), "bind_lambda");
+
+                closure_init_base(&(l2->base), ob);
+                free_svalue(&ob); /* We created a new reference. */
+
+                l2->lambda = l->lambda;
+                l->lambda->base.ref++;
+                l->base.ref--;
+
+                sp->u.bound_lambda = l2;
+                break;
+            }
+        }
+
+        case CLOSURE_UNBOUND_LAMBDA:
+        {
+            /* Whee, an unbound lambda: create the bound-lambda structure
+             * and put it onto the stack in place of the unbound one.
+             */
+            bound_lambda_t *l;
+
+            l = xalloc(sizeof(bound_lambda_t));
+            if (!l)
+                outofmem(sizeof(bound_lambda_t), "bind_lambda");
+
+            closure_init_base(&(l->base), ob);
+            free_svalue(&ob); /* We created a new reference. */
+
+            l->lambda = sp->u.lambda;
+              /* The ref to the unbound closure is just transferred from
+               * sp to l->function.lambda.
+               */
+            sp->x.closure_type = CLOSURE_BOUND_LAMBDA;
+            sp->u.bound_lambda = l;
             break;
         }
-      }
 
-    case CLOSURE_UNBOUND_LAMBDA:
-      {
-        /* Whee, an unbound lambda: create the bound-lambda structure
-         * and put it onto the stack in place of the unbound one.
-         */
+        default:
+            if (sp->x.closure_type >= 0)
+                errorf("Bad arg 1 to bind_lambda(): closure type %d.\n"
+                     , sp->x.closure_type);
 
-        lambda_t *l;
-        l = closure_new_lambda(ob, 0, /* raise_error: */ MY_TRUE);
-        free_svalue(&ob); /* We adopted the reference */
-        l->function.lambda = sp->u.lambda;
-          /* The ref to the unbound closure is just transferred from
-           * sp to l->function.lambda.
-           */
-        sp->x.closure_type = CLOSURE_BOUND_LAMBDA;
-        sp->u.lambda = l;
-        break;
-      }
+            /* efun, simul_efun, operator closures: rebind it */
+            if (sp->x.closure_type < CLOSURE_LWO)
+            {
+                free_lwobject(sp->u.lwob);
+                sp->x.closure_type -= CLOSURE_LWO;
+            }
+            else
+            {
+                free_object(sp->u.ob, "bind_lambda");
+            }
+
+            if (ob.type == T_LWOBJECT)
+            {
+                sp->u.lwob = ob.u.lwob;
+                sp->x.closure_type += CLOSURE_LWO;
+            }
+            else
+                sp->u.ob = ob.u.ob;
+            break;
+
     }
 
     return sp;
@@ -6704,11 +6624,11 @@ f_symbol_function (svalue_t *sp)
         if (sp->type != T_CLOSURE)
         {
             inter_sp = sp - 1;
-            outofmem(SIZEOF_LAMBDA(0), "symbol_function");
+            outofmem(SIZEOF_LFUN_CLOSURE(0), "symbol_function");
         }
 
-        /* The lambda was bound to the wrong object */
-        assign_current_object(&(sp->u.lambda->ob), "symbol_function");
+        /* The closure was bound to the wrong object */
+        assign_current_object(&(sp->u.lfun_closure->base.ob), "symbol_function");
 
         free_svalue(&target); /* We adopted the reference */
 
@@ -6879,7 +6799,7 @@ f_symbol_variable (svalue_t *sp)
     if (sp->type != T_CLOSURE)
     {
         inter_sp = sp - 1;
-        outofmem(SIZEOF_LAMBDA(0), "variable symbol");
+        outofmem(sizeof(identifier_closure_t), "variable symbol");
     }
 
     return sp;
@@ -6929,7 +6849,7 @@ f_unbound_lambda (svalue_t *sp)
     /* Compile the lambda */
     inter_sp = sp;
     l = lambda(args, sp, const0);
-    l->ob = const0;
+    l->base.ob = const0;
 
     /* Clean up the stack and push the result */
 
