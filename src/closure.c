@@ -432,7 +432,7 @@ closure_eq (svalue_t * left, svalue_t * right)
 
             for (unsigned int ix = 0; ix < context_size; ix++)
             {
-                if (svalue_eq(left->u.lfun_closure->context+ix, right->u.lfun_closure->context+ix))
+                if (!svalue_eq(left->u.lfun_closure->context+ix, right->u.lfun_closure->context+ix))
                 {
                     result = false;
                     break;

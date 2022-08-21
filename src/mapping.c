@@ -867,7 +867,7 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
 
         for (mc = hm->chains[idx]; mc != NULL; mc = mc->next)
         {
-            if (!svalue_eq(&(mc->data[0]), map_index))
+            if (svalue_eq(&(mc->data[0]), map_index))
             {
                 /* Found it */
                 *ppChain = mc;

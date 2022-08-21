@@ -13598,7 +13598,7 @@ again:
 
                 for (svalue_t *entry = container->u.vec->item + start; count != 0; entry++, count--)
                 {
-                    if (rvalue_eq(item, entry) == 0)
+                    if (rvalue_eq(item, entry))
                     {
                         result = 1;
                         break;

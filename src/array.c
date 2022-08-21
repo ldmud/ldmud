@@ -1252,7 +1252,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
             /* Even more special case: both vectors have just one elem */
             if (len2 == 1)
             {
-                if (!rvalue_eq(vec1->item, vec2->item))
+                if (rvalue_eq(vec1->item, vec2->item))
                 {
                     flags[0] = flags[1] = MY_TRUE;
                 }
@@ -1281,7 +1281,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
          */
         for ( ; rlen != 0; rlen--, rover++, rflag++)
         {
-            if (!rvalue_eq(rover, elem))
+            if (rvalue_eq(rover, elem))
                 *rflag = *eflag = MY_TRUE;
         }
 
@@ -1332,7 +1332,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
                     index1++;
                     len1--;
                     if (len1 != 0)
-                        d = rvalue_eq(test_val, vec1->item + *index1);
+                        d = rvalue_eq(test_val, vec1->item + *index1) ? 0 : -1;
                 }
                 while (len1 != 0 && d == 0);
 
@@ -1341,7 +1341,7 @@ match_arrays (vector_t *vec1, vector_t *vec2)
                     index2++;
                     len2--;
                     if (len2 != 0)
-                        d = rvalue_eq(test_val, vec2->item + *index2);
+                        d = rvalue_eq(test_val, vec2->item + *index2) ? 0 : -1;
                 }
                 while (len2 != 0 && d == 0);
 

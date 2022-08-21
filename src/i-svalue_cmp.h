@@ -211,33 +211,28 @@ rvalue_cmp (svalue_t *left, svalue_t *right)
 } /* rvalue_cmp() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE int
+static INLINE bool
 svalue_eq (svalue_t *left, svalue_t *right)
 
-/* Compare *left and *right, return 0 if equal, and -1 if not
- * (this is to keep in line with the svalue_cmp() return values).
+/* Compare <left> and <right>, return true if equal, and false if not.
  *
  * See also svalue_cmp() for the general version.
  */
 
 {
     if (left->type != right->type)
-        return -1;
+        return false;
 
     if (left->type == T_STRING || left->type == T_BYTES)
-    {
-        return mstreq(left->u.str, right->u.str) ? 0 : -1;
-    }
+        return mstreq(left->u.str, right->u.str);
 
     if (left->type == T_CLOSURE)
-    {
-        return closure_eq(left, right) ? 0 : -1;
-    }
+        return closure_eq(left, right);
 
     /* All other types have to be equal by address, visible in u.number */
     /* TODO: This comparison is not valid according to ISO C */
     if (left->u.number != right->u.number)
-        return -1;
+        return false;
 
     switch (left->type)
     {
@@ -247,17 +242,17 @@ svalue_eq (svalue_t *left, svalue_t *right)
     case T_SYMBOL:
     case T_QUOTED_ARRAY:
     case T_LVALUE:
-        return left->x.generic != right->x.generic ? -1 : 0;
+        return left->x.generic == right->x.generic;
     default:
-        return 0;
+        return true;
     }
 
     /* NOTREACHED */
-    return 0;
+    return true;
 } /* svalue_eq() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE int
+static INLINE bool
 rvalue_eq (svalue_t *left, svalue_t *right)
 
 /* Compare both values.
@@ -281,7 +276,7 @@ rvalue_eq (svalue_t *left, svalue_t *right)
         assert(right->type == T_LVALUE);
 
         if (left->x.lvalue_type != right->x.lvalue_type)
-            return -1;
+            return false;
 
         switch (left->x.lvalue_type)
         {
@@ -289,25 +284,25 @@ rvalue_eq (svalue_t *left, svalue_t *right)
             {
                 struct protected_range_lvalue *lr = left->u.protected_range_lvalue, *rr = right->u.protected_range_lvalue;
                 if (lr->vec.type != rr->vec.type)
-                    return -1;
+                    return false;
 
                 if (lr->vec.type != T_POINTER)
                 {
                     /* String ranges */
                     if ((lr->index2 - lr->index1) != (rr->index2 - rr->index1))
-                        return -1;
+                        return false;
 
-                    return (memcmp(get_txt(lr->vec.u.str) + lr->index1, get_txt(rr->vec.u.str) + rr->index1, lr->index2 - lr->index1) == 0) ? 0 : -1;
+                    return memcmp(get_txt(lr->vec.u.str) + lr->index1, get_txt(rr->vec.u.str) + rr->index1, lr->index2 - lr->index1) == 0;
                 }
                 else
                 {
                     /* Array ranges */
-                    return (lr == rr) ? 0 : -1;
+                    return lr == rr;
                 }
             }
 
             case LVALUE_PROTECTED_MAP_RANGE:
-                return (left->u.protected_map_range_lvalue == right->u.protected_map_range_lvalue) ? 0 : -1;
+                return left->u.protected_map_range_lvalue == right->u.protected_map_range_lvalue;
 
             default:
                 fatal("Illegal lvalue type %d\n", left->x.lvalue_type);
@@ -325,17 +320,17 @@ rvalue_eq (svalue_t *left, svalue_t *right)
                 size_t len;
 
                 if (r->vec.type == T_POINTER || sv->type == T_POINTER || r->vec.type != sv->type)
-                    return -1;
+                    return false;
 
                 len = mstrsize(sv->u.str);
                 if (len != r->index2 - r->index1)
-                    return -1;
+                    return false;
 
-                return (memcmp(get_txt(sv->u.str), get_txt(r->vec.u.str) + r->index1, len) == 0) ? 0 : -1;
+                return memcmp(get_txt(sv->u.str), get_txt(r->vec.u.str) + r->index1, len) == 0;
             }
 
             case LVALUE_PROTECTED_MAP_RANGE:
-                return -1;
+                return false;
 
             default:
                 fatal("Illegal lvalue type %d\n", ((left_rv == NULL) ? left : right)->x.lvalue_type);
