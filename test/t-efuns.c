@@ -940,6 +940,13 @@ mixed *tests = ({
         (: deep_eq(json_parse(json_serialize(json_testdata)), json_testdata) 
          :) }),
 #endif // __JSON__
+
+#ifdef __MYSQL__
+    ({ "db_conv_string without db connection", 0,
+        (: db_conv_string("ldmud") == "ldmud" :) // This shouldn't crash.
+    }),
+#endif // __MYSQL__
+
 #ifdef __TLS__
 }) + (tls_available() ? ({
     ({ "configure_driver DHE 1 (testdata)", 0,
