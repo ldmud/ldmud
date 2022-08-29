@@ -27,7 +27,7 @@ static void check_gc(int nr, closure callback)
     {
 	string *text = explode(s, "\n");
 	
-	msg("%s\n", s);
+	msg(s);
 	if(!sizeof(regexp(text, "freeing.*block|tabled string.*was left unreferenced")))
 	{
 	    msg("Success: No lost block.\n");

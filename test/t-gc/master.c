@@ -4,6 +4,10 @@
  * and then load the 'after-*.c' files. In the later run_test()
  * is called and should return a non-zero value for success.
  * Also the garbage_collection should not find any lost blocks.
+ *
+ * Then we start the garbage-*.c files, who test the garbage
+ * collection by actually creating garbage. Here the GC just
+ * shouldn't crash.
  */
 
 #include "/inc/base.inc"
@@ -34,7 +38,25 @@ void run_after(int errors)
 	}
     }
 
-    shutdown(errors && 1);
+    foreach(string file: get_dir("/garbage-*.c"))
+    {
+        msg("Loading %s...\n", file[0..<3]);
+        catch(load_object(file[0..<3])->run_test();nolog);
+    }
+
+    if (errors)
+        shutdown(1);
+    else
+    {
+         garbage_collection(__MASTER_OBJECT__ ".gc.log");
+         call_out(function void()
+         {
+            rm(__MASTER_OBJECT__ ".gc.log");
+            shutdown(0);
+         }, __ALARM_TIME__);
+
+        start_gc(function void(int result) { shutdown(0); });
+    }
 }
 
 void run_test()

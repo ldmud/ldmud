@@ -2826,6 +2826,14 @@ show_object (int d, void *block, int depth)
 {
     object_t *ob;
 
+    if (is_freed(block, sizeof(object_t)))
+    {
+        WRITES(d, "Object in freed block 0x");
+        write_x(d, (p_uint)((void *)block - xalloc_overhead()));
+        WRITES(d, "\n");
+        return;
+    }
+
     ob = (object_t *)block;
     if (depth) {
         object_t *o;
@@ -2833,7 +2841,7 @@ show_object (int d, void *block, int depth)
         for (o = obj_list; o && o != ob; o = o->next_all) NOOP;
         if (!o || o->flags & O_DESTRUCTED) {
             WRITES(d, "Destructed object in block 0x");
-            write_x(d, (p_uint)((unsigned *)block - xalloc_overhead()));
+            write_x(d, (p_uint)((void *)block - xalloc_overhead()));
             WRITES(d, "\n");
             return;
         }
@@ -2851,6 +2859,24 @@ show_object (int d, void *block, int depth)
 
 /*-------------------------------------------------------------------------*/
 static void
+show_prog_name (int d, program_t *prog)
+
+/* Print the name of the program <prog> on filedescriptor <d>.
+ */
+
+{
+    if (!is_freed(prog, sizeof(program_t)) && prog->name)
+        show_mstring(d, prog->name, 0);
+    else
+    {
+        WRITES(d, "(freed program at 0x");
+        write_x(d, (p_uint)((void *)prog - xalloc_overhead()));
+        WRITES(d, ")");
+    }
+} /* show_prog_name() */
+
+/*-------------------------------------------------------------------------*/
+static void
 show_lwobject (int d, void *block, int depth)
 
 /* Print the data about lightweight object <block> on filedescriptor <d>.
@@ -2859,9 +2885,17 @@ show_lwobject (int d, void *block, int depth)
 {
     lwobject_t *lwob;
 
+    if (is_freed(block, sizeof(lwobject_t)))
+    {
+        WRITES(d, "Lightweight object in freed block 0x");
+        write_x(d, (p_uint)((void *)block - xalloc_overhead()));
+        WRITES(d, "\n");
+        return;
+    }
+
     lwob = (lwobject_t *)block;
     WRITES(d, "Lightweight object from ");
-    show_mstring(d, lwob->prog->name, 0);
+    show_prog_name(d, lwob->prog);
     WRITES(d, ", uid: ");
     show_string(d, lwob->user->name ? get_txt(lwob->user->name) : "0", 0);
     WRITES(d, "\n");
@@ -2877,15 +2911,23 @@ show_coroutine (int d, void *block, int depth)
 {
     coroutine_t *cr;
 
+    if (is_freed(block, sizeof(coroutine_t)))
+    {
+        WRITES(d, "Coroutine in freed block 0x");
+        write_x(d, (p_uint)((void *)block - xalloc_overhead()));
+        WRITES(d, "\n");
+        return;
+    }
+
     cr = (coroutine_t *)block;
-    if (cr->prog)
+    if (!cr->prog)
+        WRITES(d, "Finished coroutine\n");
+    else
     {
         WRITES(d, "Coroutine from ");
-        show_mstring(d, cr->prog->name, 0);
+        show_prog_name(d, cr->prog);
         WRITES(d, "\n");
     }
-    else
-        WRITES(d, "Finished coroutine\n");
 } /* show_coroutine() */
 
 /*-------------------------------------------------------------------------*/
@@ -2900,6 +2942,14 @@ show_cl_literal (int d, void *block, int depth UNUSED)
 #    pragma unused(depth)
 #endif
     lambda_t *l;
+
+    if (is_freed(block, sizeof(lambda_t)))
+    {
+        WRITES(d, "Closure literal in freed block 0x");
+        write_x(d, (p_uint)((void *)block - xalloc_overhead()));
+        WRITES(d, "\n");
+        return;
+    }
 
     l = (lambda_t *)block;
 
@@ -2922,8 +2972,8 @@ show_cl_literal (int d, void *block, int depth UNUSED)
         case T_LWOBJECT:
         {
             lwobject_t *lwob = l->ob.u.lwob;
-            if (lwob->prog && lwob->prog->name)
-                show_mstring(d, lwob->prog->name, 0);
+            if (!is_freed(lwob, sizeof(lwobject_t)))
+                show_prog_name(d, lwob->prog);
             else
                 WRITES(d, "(no name)");
             break;
@@ -2988,7 +3038,7 @@ show_array(int d, void *block, int depth)
               sizeof(vector_t) + sizeof(svalue_t) * a_size )
         {
             WRITES(d, "Array in freed block 0x");
-            write_x(d, (p_uint)((unsigned *)block - xalloc_overhead()));
+            write_x(d, (p_uint)((void *)block - xalloc_overhead()));
             WRITES(d, "\n");
             return;
         }
@@ -3036,7 +3086,7 @@ show_array(int d, void *block, int depth)
             if (is_freed(svp->u.str, 1) )
             {
                 WRITES(d, "String in freed block 0x");
-                write_x(d, (p_uint)((unsigned *)block - xalloc_overhead()));
+                write_x(d, (p_uint)((void *)block - xalloc_overhead()));
                 WRITES(d, "\n");
                 break;
             }
@@ -3111,7 +3161,7 @@ show_struct(int d, void *block, int depth)
         wiz_list_t *wl;
 
         wl = NULL;
-        freed = is_freed(block, sizeof(vector_t) );
+        freed = is_freed(block, sizeof(struct_t) );
         if (!freed)
         {
             user = a->user;
@@ -3124,7 +3174,7 @@ show_struct(int d, void *block, int depth)
               sizeof(struct_t) + sizeof(svalue_t) * (a_size - 1) )
         {
             WRITES(d, "struct in freed block 0x");
-            write_x(d, (p_uint)((unsigned *)block - xalloc_overhead()));
+            write_x(d, (p_uint)((void *)block - xalloc_overhead()));
             WRITES(d, "\n");
             return;
         }
@@ -3171,7 +3221,7 @@ show_struct(int d, void *block, int depth)
             if (is_freed(svp->u.str, 1) )
             {
                 WRITES(d, "String in freed block 0x");
-                write_x(d, (p_uint)((unsigned *)block - xalloc_overhead()));
+                write_x(d, (p_uint)((void *)block - xalloc_overhead()));
                 WRITES(d, "\n");
                 break;
             }
