@@ -9922,7 +9922,7 @@ f_driver_info (svalue_t *sp)
             memsafe(v = allocate_array(numports), sizeof(*v), "result array");
 
             for (i = 0; i < numports; i++)
-                put_number(v->item + i, port_numbers[i]);
+                put_number(v->item + i, port_numbers[i].port);
             put_array(&result, v);
             break;
         }

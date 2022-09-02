@@ -26,7 +26,10 @@ DESCRIPTION
 
         <portnumber> the number of the port the driver shall use to accept
         connections. The maximum number of ports is determined by MAXNUMPORTS
-        in the source file config.h.
+        in the source file config.h. Optionally an address can be given with
+        the portnumber (eg. '127.0.0.1:port' when IPv6 is disabled, or
+        '[::1]:port' when IPv6 is enabled) to use a specific address to bind
+        the port to.
 
         The options modify the behaviour of the gamedriver. Some of them are
         only available if a certain compile-time option was enabled (typically

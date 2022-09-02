@@ -404,6 +404,15 @@ char * domain_name = NULL;
   /* This computer's domain name, as needed by lex.c::get_domainname().
    */
 
+#define STRINGIFY(s) #s
+#define TO_STRING(s) STRINGIFY(s)
+struct listen_port_s port_numbers[MAXNUMPORTS] = { { LISTEN_PORT_ANY, TO_STRING(PORTNO), PORTNO } };
+  /* The login port numbers.
+   * Negative numbers are not ports, but the numbers of inherited
+   * socket file descriptors.
+   */
+int numports = 0;  /* Number of specified ports */
+
 static int min_nfds = 0;
   /* The number of fds used by the driver's sockets (udp, erq, login).
    * It is the number of the highest fd plus one.
@@ -931,6 +940,92 @@ set_socket_own (SOCKET_T new_socket)
 } /* set_socket_own() */
 
 /*-------------------------------------------------------------------------*/
+bool
+add_listen_port (const char *port)
+
+{
+    if (numports < MAXNUMPORTS)
+    {
+        const char* colon = strrchr(port, ':');
+        if (colon == NULL)
+        {
+            int p = atoi(port);
+            if (p <= 0)
+                return false;
+            port_numbers[numports++] = (struct listen_port_s){ LISTEN_PORT_ANY, port, p };
+            return true;
+        }
+        else
+        {
+            char* addr;
+            int length;
+            int p = atoi(colon+1);
+
+            if (p <= 0)
+                return false;
+
+            addr = strdup(port);
+            if (!addr)
+                return false;
+
+            length = colon - port;
+            addr[length] = 0;
+
+            port_numbers[numports] = (struct listen_port_s){ LISTEN_PORT_ADDR, port, p };
+
+#ifndef USE_IPV6
+            if (!inet_pton(AF_INET, addr, &(port_numbers[numports].addr)))
+            {
+                free(addr);
+                return false;
+            }
+            numports++;
+#else
+            if (length == 0)
+            {
+                port_numbers[numports].addr = in6addr_any;
+            }
+            else if (addr[0] == '[' && addr[length-1] == ']')
+            {
+                addr[length-1] = 0;
+                if (!inet_pton(AF_INET6, addr+1, &(port_numbers[numports].addr)))
+                {
+                    free(addr);
+                    return false;
+                }
+            }
+            else
+            {
+                free(addr);
+                return false;
+            }
+
+            numports++;
+            free(addr);
+            return true;
+#endif
+        }
+    }
+
+    return false;
+} /* add_listen_port() */
+
+/*-------------------------------------------------------------------------*/
+bool
+add_inherited_port (const char *port)
+
+{
+    int p = atoi(port);
+    if (p && numports < MAXNUMPORTS)
+    {
+        port_numbers[numports++] = (struct listen_port_s){ LISTEN_PORT_INHERITED, port, p };
+        return true;
+    }
+    else
+        return false;
+} /* add_inherited_port() */
+
+/*-------------------------------------------------------------------------*/
 void
 initialize_host_name (const char *hname)
 
@@ -1241,11 +1336,18 @@ prepare_ipc(void)
 
         memcpy(&host_ip_addr, &host_ip_addr_template, sizeof(host_ip_addr));
 
-        if (port_numbers[i] > 0)
+        if (port_numbers[i].type != LISTEN_PORT_INHERITED)
         {
             /* Real port number */
 
-            host_ip_addr.sin_port = htons((u_short)port_numbers[i]);
+            host_ip_addr.sin_port = htons((u_short)port_numbers[i].port);
+            if (port_numbers[i].type == LISTEN_PORT_ADDR)
+#ifndef USE_IPV6
+                host_ip_addr.sin_addr.s_addr = port_numbers[i].addr;
+#else
+                host_ip_addr.sin_addr = port_numbers[i].addr;
+#endif
+
             sos[i] = socket(host_ip_addr.sin_family, SOCK_STREAM, 0);
             if ((int)sos[i] == -1) {
                 perror("socket");
@@ -1259,10 +1361,10 @@ prepare_ipc(void)
             }
             if (bind(sos[i], (struct sockaddr *)&host_ip_addr, sizeof host_ip_addr) == -1) {
                 if (errno == EADDRINUSE) {
-                    fprintf(stderr, "%s Port %d already bound!\n"
-                                  , time_stamp(), port_numbers[i]);
-                    debug_message("%s Port %d already bound!\n"
-                                 , time_stamp(), port_numbers[i]);
+                    fprintf(stderr, "%s Port %s already bound!\n"
+                                  , time_stamp(), port_numbers[i].str);
+                    debug_message("%s Port %s already bound!\n"
+                                 , time_stamp(), port_numbers[i].str);
                     exit(errno);
                 } else {
                     perror("bind");
@@ -1274,10 +1376,18 @@ prepare_ipc(void)
 
             /* Existing socket */
 
-            sos[i] = -port_numbers[i];
+            sos[i] = port_numbers[i].port;
             tmp = sizeof(host_ip_addr);
             if (!getsockname(sos[i], (struct sockaddr *)&host_ip_addr, &tmp))
-                port_numbers[i] = ntohs(host_ip_addr.sin_port);
+            {
+                port_numbers[i].type = LISTEN_PORT_ADDR;
+                port_numbers[i].port = ntohs(host_ip_addr.sin_port);
+#ifndef USE_IPV6
+                port_numbers[i].addr = host_ip_addr.sin_addr.s_addr;
+#else
+                port_numbers[i].addr = host_ip_addr.sin_addr;
+#endif
+            }
         }
 
         /* Initialise the socket */
@@ -2620,7 +2730,7 @@ get_message (char *buff, size_t *bufflength)
                                               , &length);
                     if ((int)new_socket != -1)
                         new_player( NULL, new_socket, &addr, (size_t)length
-                                  , port_numbers[i]);
+                                  , port_numbers[i].port);
                     else if ((int)new_socket == -1
                       && errno != EWOULDBLOCK && errno != EINTR
                       && errno != EAGAIN && errno != EPROTO )
@@ -2634,13 +2744,13 @@ get_message (char *buff, size_t *bufflength)
                         int errorno = errno;
                         fprintf( stderr
                                , "%s comm: Can't accept on socket %d "
-                                 "(port %d): %s\n"
-                               , time_stamp(), sos[i], port_numbers[i]
+                                 "(port %s): %s\n"
+                               , time_stamp(), sos[i], port_numbers[i].str
                                , strerror(errorno)
                                );
                         debug_message("%s comm: Can't accept on socket %d "
-                                      "(port %d): %s\n"
-                                     , time_stamp(), sos[i], port_numbers[i]
+                                      "(port %s): %s\n"
+                                     , time_stamp(), sos[i], port_numbers[i].str
                                      , strerror(errorno)
                                      );
                         /* TODO: Was: perror(); abort(); */
@@ -5676,8 +5786,8 @@ start_erq_demon (const char *suffix, size_t suffixlen)
 
     /* Close inherited sockets first. */
     for (i = 0; i < numports; i++)
-        if (port_numbers[i] < 0)
-            set_close_on_exec(-port_numbers[i]);
+        if (port_numbers[i].type == LISTEN_PORT_INHERITED)
+            set_close_on_exec(port_numbers[i].port);
 
     if ((pid = fork()) == 0)
     {

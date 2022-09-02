@@ -129,6 +129,24 @@ enum input_type_e {
 
 typedef enum input_type_e input_type_t;
 
+/* --- struct listen_port_s: Port designation.
+ *
+ * A port to listen is either an IPv4/v6 port or an inherited socket.
+ * An IP port can optionally be limited to an address.
+ */
+struct listen_port_s
+{
+    enum { LISTEN_PORT_ANY, LISTEN_PORT_ADDR, LISTEN_PORT_INHERITED } type;
+    const char* str;
+    int port;
+#ifndef USE_IPV6
+    in_addr_t addr;
+#else
+    struct in6_addr addr;
+#endif
+};
+
+
 /* --- struct input_s: Stack of input handlers.
  *
  * input_s represents all pending input handlers, which
@@ -380,6 +398,8 @@ struct interactive_s {
 extern interactive_t *all_players[MAX_PLAYERS];
 extern int num_player;
 extern char *domain_name;
+extern struct listen_port_s port_numbers[];
+extern int numports;
 
 extern p_int write_buffer_max_size;
 
@@ -395,6 +415,8 @@ extern statcounter_t inet_volume_in;
 
 extern void initialize_host_name (const char *hname);
 extern void initialize_host_ip_number(const char *, const char *);
+extern bool add_listen_port(const char *port);
+extern bool add_inherited_port(const char *port);
 extern void  prepare_ipc(void);
 extern void  ipc_remove(void);
 extern Bool comm_socket_write (char *msg, size_t size, interactive_t *ip, uint32 flags);
