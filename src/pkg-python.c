@@ -1043,6 +1043,9 @@ ldmud_program_check_available (ldmud_program_t* self)
                     return false;
                 }
             }
+            /* Update the program entry. */
+            self->lpc_program = self->lpc_object.u.ob->prog;
+
             return true;
 
         case T_LWOBJECT:

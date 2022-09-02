@@ -118,6 +118,30 @@ class TestObject(unittest.TestCase):
         ob = ldmud.Object.__new__(ldmud.Object)
         self.assertEqual(ldmud.efuns.copy(ob), 0)
 
+    def testSwappedObject(self):
+        swap = getattr(ldmud.efuns, 'swap', None)
+        if swap:
+            ob = ldmud.Object("/testob")
+            swap(ob)
+
+            fun = ob.functions.testfun
+            swap(ob)
+            self.assertEqual(fun.file_name, "/testob.c")
+            swap(ob)
+            self.assertEqual(fun.arguments[1].type, ldmud.Array)
+            swap(ob)
+            self.assertEqual(fun(10, "A", "B", "C"), 3)
+
+            swap(ob)
+            var = ob.variables.testvar
+            swap(ob)
+            self.assertEqual(var.name, "testvar")
+            swap(ob)
+            var.value = 100
+            swap(ob)
+            self.assertEqual(var.value, 100)
+            var.value = 42
+
 class TestLWObject(unittest.TestCase):
     def testInitLoaded(self):
         blueprint = ldmud.Object("/testob")
@@ -579,6 +603,16 @@ class TestClosure(unittest.TestCase):
             s()
         self.assertFalse(s)
         self.assertEqual(ldmud.efuns.copy(s), 0)
+
+    def testSwappedObjectLfun(self):
+        swap = getattr(ldmud.efuns, 'swap', None)
+        if swap:
+            ob = ldmud.Object("/testob")
+            swap(ob)
+            c = ldmud.Closure(ob, "testfun", ob)
+            swap(ob)
+            self.assertEqual(c(10, "A", "B", "C"), 3)
+            ldmud.efuns.destruct(ob)
 
 class TestCoroutine(unittest.TestCase):
     def setUp(self):
