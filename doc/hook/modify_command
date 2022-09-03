@@ -11,8 +11,7 @@ SYNOPSIS
 
 DESCRIPTION
         Optional hook to modify commands (both entered or given by a
-        call to command()) before the parser sees them (this includes
-        special commands like 'status').
+        call to command()) before the parser sees them.
 
         Hook setting can be any closure, the name of the function to
         call in the object, or a mapping.
