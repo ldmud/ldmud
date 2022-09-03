@@ -70,8 +70,7 @@ DESCRIPTION
 
         H_MODIFY_COMMAND
           Optional hook to modify commands (both entered or given by a
-          call to command()) before the parser sees them (this includes
-          special commands like 'status').
+          call to command()) before the parser sees them.
 
 
         H_MODIFY_COMMAND_FNAME
