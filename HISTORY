@@ -4,6 +4,12 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+10-Sep-2022 (LDMud Team) -- 3.5.6
+    - Fixed Crashes:
+       + Fixed several crashes in lambda().
+       + Fixed a crash when compiling wildcard calls.
+       + Fixed a crash when calling MySQL functions.
+
 08-Jan-2022 (LDMud Team) -- 3.5.5
     - Fixed Crashes:
        + Fixed crash when having more than 255 lambda values.
