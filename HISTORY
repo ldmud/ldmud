@@ -4,6 +4,59 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+10-Sep-2022 (LDMud Team) -- 3.6.6
+    - Fixed Crashes:
+       + Fixed a crash in configure_interactive() and input_to()
+         checking privileges without an actual living object.
+       + Fixed several crashes in lambda().
+       + Fixed a crash when compiling wildcard calls.
+       + Fixed a crash in Python code with a missing current object.
+       + Fixed a crash in Python code when handling a swapped-out object.
+       + Fixed a crash when calling nonexistent functions on LWOs.
+       + Fixed a crash when swapping LWOs.
+       + Fixed a crash when aborting a coroutine due to an error.
+       + Fixed a crash during the garbage collection.
+       + Fixed a crash when calling MySQL functions.
+
+    - Language:
+       + Introduced 'struct mixed' as type declaration for any struct.
+       + Introduced range indexing for wide mappings
+         (i.e. m[key, index1..index2])
+       + Implemented inheritance modifier and default declaration for
+         struct visibility.
+       + Simul-efun structs are now available in every program.
+       + Added new privileged pragma no_simul_efuns to deactivate the
+         access to simul-efuns.
+       + Fixed object and lwobject type being treated as equal.
+
+    - Runtime:
+       + Implemented runtime type checks for struct initialization.
+       + Several fixes and changes for lightweight objects:
+          + Introduced driver hooks for object creation.
+          + Variables of a new object will be initialized prior to
+            their values being copied or restored.
+          + nosave variables will not be saved anymore.
+          + Fixed a failure when restoring.
+       + Fixed several reference counting issues and other memory leaks.
+
+    - Changed Efuns:
+       + ed() shows Unicode characters now.
+       + unique_array() does not warn about missing functions anymore.
+       + symbol_function() now supports simul-efun closures with high indices.
+       + regexp() can now handle nul bytes in the regular expression.
+       + driver_info() got some more statistics about simul-efuns, lightweight
+         objects and coroutines.
+
+    - Networking:
+       + Added code for TLS and MCCP to the telnet example.
+
+    - Master:
+       + H_CREATE_* hooks can now be arbitrary closures.
+
+    - Other:
+       + Implemented encoding suffixes //IGNORE and //REPLACE for
+         error handling during reading.
+
 09-Jan-2022 (LDMud Team) -- 3.6.5
     - Fixed Crashes:
        + Fixed a crash in implode() with bytes.
