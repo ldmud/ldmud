@@ -86,23 +86,29 @@ _free_coroutine (coroutine_t *cr)
     clear_coroutine(cr, cr->state != CS_FINISHED);
 
     /* Free the whole list. */
-    for (coroutine_t *next = cr->awaitee; next; next = next->awaitee)
+    for (coroutine_t *next = cr->awaitee; next;)
     {
+        coroutine_t *awaitee = next->awaitee;
+
         clear_coroutine(next, next->state != CS_FINISHED);
 
         num_coroutines--;
         total_coroutine_size -= sizeof(coroutine_t) + sizeof(svalue_t) * (next->num_variables + CR_RESERVED_EXTRA_VALUES);
 
         xfree(next);
+        next = awaitee;
     }
-    for (coroutine_t *prev = cr->awaiter; prev; prev = prev->awaiter)
+    for (coroutine_t *prev = cr->awaiter; prev;)
     {
+        coroutine_t *awaiter = prev->awaiter;
+
         clear_coroutine(prev, prev->state != CS_FINISHED);
 
         num_coroutines--;
         total_coroutine_size -= sizeof(coroutine_t) + sizeof(svalue_t) * (prev->num_variables + CR_RESERVED_EXTRA_VALUES);
 
         xfree(prev);
+        prev = awaiter;
     }
 
     num_coroutines--;
