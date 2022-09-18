@@ -18167,12 +18167,13 @@ again:
                                 assign_protected_lvalue_no_free(dest++, item + i);
                         }
 
+                        start = 0;
+                        count = r->index2 - r->index1;
+
                         free_svalue(sp);
                         put_array(sp, vec);
                         arg = sp;
 
-                        start = 0;
-                        count = r->index2 - r->index1;
                         break;
                     }
 
