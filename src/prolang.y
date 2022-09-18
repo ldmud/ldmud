@@ -9051,8 +9051,6 @@ opt_base_struct:
       {
           /* Look up the struct id for the given identifier */
 
-          int num = -1;
-
           check_identifier($2);
 
           if ($2->type == I_TYPE_UNKNOWN)
@@ -9062,13 +9060,9 @@ opt_base_struct:
           }
           else
           {
-              ident_t *p = $2;
+              int num = find_struct($2, OVERRIDE_NONE);
 
-              /* Find the global struct identifier */
-              while (p != NULL && p->type != I_TYPE_GLOBAL)
-                  p = p->inferior;
-
-              if (p == NULL || (num = p->u.global.struct_id) == I_GLOBAL_STRUCT_NONE)
+              if (num < 0)
               {
                   yyerrorf("Unknown base struct '%s'", get_txt($2->name));
               }
