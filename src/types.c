@@ -155,7 +155,7 @@ clean_struct_type (lpctype_t *t)
  */
 
 {
-    if(!t || t->t_class != TCLASS_STRUCT)
+    if(!t || t->t_class != TCLASS_STRUCT || t->t_static)
         return;
 
     t->t_struct.def = NULL;
@@ -1263,7 +1263,8 @@ clear_lpctype_ref (lpctype_t *t)
     case TCLASS_STRUCT:
         if (t->t_struct.name)
             clear_struct_name_ref(t->t_struct.name);
-        t->t_struct.def = NULL;
+        if (!t->t_static)
+            t->t_struct.def = NULL;
         break;
 
     case TCLASS_OBJECT:

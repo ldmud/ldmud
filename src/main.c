@@ -69,6 +69,7 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#include "stdstructs.h"
 #include "svalue.h"
 #include "swap.h"
 #include "wiz_list.h"
@@ -569,6 +570,7 @@ main (int argc, char **argv)
            * to throw errors.
            */
         init_compiler();
+        init_std_structs();
 
 #ifdef USE_PYTHON
         pkg_python_init(argv[0]);

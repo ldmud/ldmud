@@ -19,6 +19,9 @@
  *   make_func strings
  *     creates stdstrings.[ch], reads machine.h, config.h and string_spec.
  *
+ *   make_func structs
+ *     creates stdstructs.[ch], reads machine.h, config.h and struct_spec.
+ *
  * The calls are described in detail below.
  *---------------------------------------------------------------------------
  * make_func instrs
@@ -218,6 +221,24 @@
  *       STR_<id>: the pointer to the shared string
  *       SHX_<id>: the index of the shared string in the table of
  *                 all predefined strings.
+ *---------------------------------------------------------------------------
+ * make_func structs
+ * -----------------
+ *
+ * make_func reads from the file struct_spec the definition of structs which
+ * shall be globally available. It creates the source files stdstructs.[ch]
+ * with the implementation.
+ *
+ * struct_spec is parsed as a list of struct declarations:
+ *
+ *    'struct' name
+ *    {
+ *        type member_name;
+ *    };
+ *
+ *    <name> is the name this struct will have in LPC. In driver sources
+ *    the definition get's the name 'struct_' + name. The corresponding
+ *    LPC type object is named 'lpctype_struct_' + name.
  *
  * And that's it.
  *---------------------------------------------------------------------------
@@ -265,6 +286,10 @@
    * shared strings.
    */
 
+#define STRUCT_SPEC  "struct_spec"
+  /* The input file with the definition of all global structs.
+   */
+
 #define CONFIG       "config.h"
   /* The configuration file.
    */
@@ -298,6 +323,11 @@
    * string implementation files to generate.
    */
 
+#define STDSTRUCTS   "stdstructs"
+  /* The basename (without extension) of the standard global
+   * struct implementation files to generate.
+   */
+
 /*-------------------------------------------------------------------------*/
 
 #define MAKE_FUNC_MAXLINE    4096
@@ -311,6 +341,14 @@
 
 #define MAX_ARGTYPES  1000
   /* Size of the arg_types[] array.
+   */
+
+#define MAX_STRUCTS    256
+  /* Maximum number of structs.
+   */
+
+#define MAX_STRUCT_MEMBERS 256
+  /* Maximum number of members per struct.
    */
 
 #define MF_TYPE_MOD_POINTER         0x10000
@@ -338,6 +376,15 @@
   /* Handy macro to statically determine the number of elements in
    * an array.
    */
+
+/*-------------------------------------------------------------------------*/
+
+typedef struct
+{
+    int token;                  /* The type token.           */
+    int flags;                  /* MF_TYPE_MOD_* flags.      */
+    char* struct_name;          /* If id == STRUCT the name. */
+} lpc_type_t;
 
 /*-------------------------------------------------------------------------*/
 
@@ -426,7 +473,7 @@ struct instrdata_s {
    *   .buf is the actual string text.
    */
 
-static int arg_types[MAX_ARGTYPES];
+static lpc_type_t arg_types[MAX_ARGTYPES];
   /* All distinct function argument signatures encountered so far.
    * One signature is simply a list of all argument types, identified
    * by the starting index of the first argument's type.
@@ -504,7 +551,7 @@ static int current_code_class;
    * shall be assigned to.
    */
 
-static int curr_arg_types[MAX_LOCAL];
+static lpc_type_t curr_arg_types[MAX_LOCAL];
   /* The function argument signature of the current function.
    * The signature is a list of all argument types, which themselves
    * are lists of typecodes, each argument's list terminated by 0.
@@ -560,6 +607,40 @@ static const char* current_default_visibility_flags = NULL;
 
 /*-------------------------------------------------------------------------*/
 
+/* Variables used when parsing the lines of STRUCT_SPEC */
+
+static char* struct_names[MAX_STRUCTS];
+    /* Just the names of defined structs.
+     */
+
+static char* struct_defs[MAX_STRUCTS];
+    /* The full definition for a struct.
+     */
+
+static char* struct_enums[MAX_STRUCTS];
+    /* Enum definition for a struct.
+     */
+
+static lpc_type_t struct_member_types[MAX_STRUCT_MEMBERS];
+    /* Member type for the current parsed struct.
+     */
+
+static char* struct_member_names[MAX_STRUCT_MEMBERS];
+    /* Member name for the current parsed struct.
+     */
+
+static int current_struct;
+    /* Index of currently parsed struct.
+     * (And at the end the number of parsed structs.)
+     */
+
+static int current_struct_member;
+    /* Index of currently parsed member.
+     * (And at the end the number of parsed members.)
+     */
+
+/*-------------------------------------------------------------------------*/
+
 /* Forward declarations */
 
 static void yyerror(const char *) NORETURN;
@@ -567,9 +648,9 @@ static int yylex(void);
 int yyparse(void);
 int ungetc(int c, FILE *f);
 static INLINE const char *type_str(int);
-static long type2flag (int n);
+static long type2flag (lpc_type_t t);
 static const char *etype(long);
-static const char *lpctypestr(int);
+static const char *lpctypestr(lpc_type_t t);
 #ifndef toupper
 int toupper(int);
 #endif
@@ -608,6 +689,31 @@ fatal (const char *str)
 }
 
 /*-------------------------------------------------------------------------*/
+static void
+make_upper_case (char *str)
+
+/* Change all letters in str to upper case.
+ */
+
+{
+    for (int i = 0; str[i] != 0; i++)
+        str[i] = (char)toupper(str[i]);
+}
+
+/*-------------------------------------------------------------------------*/
+static void
+make_upper_case_buf (char *buf, const char *src, size_t len)
+
+/* Change all letters in str to upper case.
+ */
+
+{
+    strncpy(buf, src, len-1);
+    buf[len-1] = 0;
+    make_upper_case(buf);
+}
+
+/*-------------------------------------------------------------------------*/
 static char *
 make_f_name (char *str)
 
@@ -616,17 +722,11 @@ make_f_name (char *str)
 
 {
     char f_name[500];
-    size_t i, len;
 
     if (strlen(str) + 1 + 2 > sizeof f_name)
         fatal("A local buffer was too small!(1)\n");
     sprintf(f_name, "F_%s", str);
-    len = strlen(f_name);
-    for (i = 0; i < len; i++)
-    {
-        if (islower((unsigned char)f_name[i]))
-            f_name[i] = (char)toupper(f_name[i]);
-    }
+    make_upper_case(f_name);
     return mystrdup(f_name);
 }
 
@@ -718,6 +818,19 @@ check_for_duplicate_string (const char *key, const char *buf)
 }
 
 /*-------------------------------------------------------------------------*/
+static bool
+lpc_type_equal (lpc_type_t t1, lpc_type_t t2)
+
+/* Return true, if both types are equal */
+
+{
+    return t1.token == t2.token
+        && t1.flags == t2.flags
+        && !strcmp(t1.struct_name ? t1.struct_name : "<NULL>"
+                 , t2.struct_name ? t2.struct_name : "<NULL>");
+} /* lpc_type_equal() */
+
+/*-------------------------------------------------------------------------*/
 static int
 move_to_arg_types ()
 
@@ -732,7 +845,7 @@ move_to_arg_types ()
         int j;
         for (j = 0; j+i < last_current_type && j < curr_arg_type_size; j++)
         {
-            if (curr_arg_types[j] != arg_types[i+j])
+            if (!lpc_type_equal(curr_arg_types[j], arg_types[i+j]))
                 break;
         }
         if (j == curr_arg_type_size)
@@ -771,7 +884,7 @@ move_to_arg_types ()
 
     struct
     {
-        int type;               /* The type token number.        */
+        lpc_type_t type;        /* The type token number.        */
         bool void_allowed;      /* Whether void is also allowed. */
     } returntype;
 
@@ -780,14 +893,16 @@ move_to_arg_types ()
         const char *name;
         const char *flags;
     } visibility;
+
+    lpc_type_t type;
 }
 
-%token PARSE_FUNC_SPEC PARSE_APPLIED_SPEC PARSE_STRING_SPEC
+%token PARSE_FUNC_SPEC PARSE_APPLIED_SPEC PARSE_STRING_SPEC PARSE_STRUCT_SPEC
 
 %token NAME ID
 
 %token VOID INT STRING BYTES BYTES_OR_STRING OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
-%token MIXED UNKNOWN NUL STRUCT LWOBJECT OBJECT_OR_LWOBJECT COROUTINE
+%token MIXED UNKNOWN NUL STRUCT LWOBJECT OBJECT_OR_LWOBJECT COROUTINE MAPPING_OR_CLOSURE
 %token INT_OR_STRING STRING_OR_STRING_ARRAY CATCH_MSG_ARG
 
 %token DEFAULT NO_LIGHTWEIGHT
@@ -805,7 +920,7 @@ move_to_arg_types ()
 
 %type <number> VOID MIXED UNKNOWN NUL STRUCT
 %type <number> INT STRING BYTES OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY LWOBJECT COROUTINE
-%type <number> basic arg_type
+%type <number> basic basic_utype
   /* Value is the basic type value
    */
 
@@ -813,8 +928,8 @@ move_to_arg_types ()
   /* Value is the appropriate bitflag or 0.
    */
 
-%type <number> type basic_utype utype
-  /* Value is the complete type, incl. *-  and &-modifier bitflags
+%type <type> type utype arg_type applied_argtype struct_member_type
+  /* The complete type.
    */
 
 %type <number> arg_list
@@ -848,10 +963,6 @@ move_to_arg_types ()
 
 %type <returntype> applied_rettype
 
-%type <number> applied_argtype
-  /* Value is the type token.
-   */
-
 %type <number> applied_args
   /* True, when additional arguments can follow.
    */
@@ -861,6 +972,7 @@ move_to_arg_types ()
 all: PARSE_FUNC_SPEC    func_spec
    | PARSE_APPLIED_SPEC applied_spec
    | PARSE_STRING_SPEC  string_spec
+   | PARSE_STRUCT_SPEC  struct_spec
 ;
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -943,6 +1055,7 @@ func: utype ID optional_ID '(' arg_list optional_default ')' optional_no_lightwe
         int  code_class;
         int i;
         int max_arg, arg_index, lpc_index;
+        bool return_ref;
 
         if (num_buff >= MAX_FUNC)
             yyerror("Too many codes and efuns in total!\n");
@@ -957,7 +1070,7 @@ func: utype ID optional_ID '(' arg_list optional_default ')' optional_no_lightwe
             /* Add an additional NULL entry to mark
              * the end of the argument list.
              */
-            curr_arg_types[curr_arg_type_size++] = 0;
+            curr_arg_types[curr_arg_type_size++] = (lpc_type_t){0, 0, NULL};
             if (curr_arg_type_size == NELEMS(curr_arg_types))
                 yyerror("Too many arguments");
             curr_lpc_type_size++;
@@ -1060,6 +1173,9 @@ func: utype ID optional_ID '(' arg_list optional_default ')' optional_no_lightwe
         }
 
         lpc_index = i;
+        return_ref = $1.flags & MF_TYPE_MOD_REFERENCE;
+        if (return_ref)
+            $1.flags &= ~MF_TYPE_MOD_REFERENCE;
 
         /* Store the data */
 
@@ -1072,9 +1188,9 @@ func: utype ID optional_ID '(' arg_list optional_default ')' optional_no_lightwe
             sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, %s, %s, %d, %d, %s, %s, \"%s\""
                         , f_prefix, f_name, tag
                         , unlimit_max ? -1 : max_arg, min_arg
-                        , $6, lpctypestr($1 & ~MF_TYPE_MOD_REFERENCE)
+                        , $6, lpctypestr($1)
                         , arg_index, lpc_index
-                        , ($1 & MF_TYPE_MOD_REFERENCE) ? "true" : "false"
+                        , return_ref ? "true" : "false"
                         , $8 ? "true" : "false"
                         , $2
                    );
@@ -1084,9 +1200,9 @@ func: utype ID optional_ID '(' arg_list optional_default ')' optional_no_lightwe
         {
             sprintf(buff, "{ 0, 0, %d, %d, %s, %s, %d, %d, %s, %s, \"%s\""
                         , unlimit_max ? -1 : max_arg, min_arg
-                        , $6, lpctypestr($1 & ~MF_TYPE_MOD_REFERENCE)
+                        , $6, lpctypestr($1)
                         , arg_index, lpc_index
-                        , ($1 & MF_TYPE_MOD_REFERENCE) ? "true" : "false"
+                        , return_ref ? "true" : "false"
                         , $8 ? "true" : "false"
                         , $2
                    );
@@ -1118,7 +1234,9 @@ func: utype ID optional_ID '(' arg_list optional_default ')' optional_no_lightwe
 
 /* --- Types and Argument lists --- */
 
-type: basic opt_star opt_ref { $$ = $1 | $2 | $3; };
+type: basic opt_star opt_ref { $$ = (lpc_type_t){$1, $2 | $3, NULL}; }
+    | STRUCT ID              { $$ = (lpc_type_t){$1, 0, mystrdup($2)}; }
+    ;
 
 basic: VOID | INT | STRING | BYTES | MAPPING | FLOAT | MIXED | OBJECT | CLOSURE |
         UNKNOWN | SYMBOL | QUOTED_ARRAY | STRUCT | LWOBJECT | COROUTINE | NUL ;
@@ -1140,13 +1258,15 @@ basic_utype: basic
            | BYTES  '|' STRING    { $$ = BYTES_OR_STRING; };
            | OBJECT '|' LWOBJECT  { $$ = OBJECT_OR_LWOBJECT; }
            | LWOBJECT '|' OBJECT  { $$ = OBJECT_OR_LWOBJECT; }
+           | MAPPING '|' CLOSURE  { $$ = MAPPING_OR_CLOSURE; }
+           | CLOSURE '|' MAPPING  { $$ = MAPPING_OR_CLOSURE; }
 
-utype: basic_utype opt_star opt_ref  { $$ = $1 | $2 | $3; };
+utype: basic_utype opt_star opt_ref  { $$ = (lpc_type_t){$1, $2 | $3, NULL}; };
 
 typel2: typel
     {
         $$ = $1;
-        curr_arg_types[curr_arg_type_size++] = 0;
+        curr_arg_types[curr_arg_type_size++] = (lpc_type_t){0, 0, NULL};
         if (curr_arg_type_size == NELEMS(curr_arg_types))
             yyerror("Too many arguments");
         curr_lpc_type_size++;
@@ -1157,10 +1277,13 @@ typel2: typel
 
 arg_type: type
     {
-        if ($1 != VOID)
+        if ($1.token != VOID)
         {
-            if ($1 != NUL)
-                curr_arg_types[curr_arg_type_size++] = $1;
+            if ($1.token != NUL)
+            {
+                curr_arg_types[curr_arg_type_size] = $1;
+                curr_arg_type_size++;
+            }
             if (curr_arg_type_size == NELEMS(curr_arg_types))
                 yyerror("Too many arguments");
             curr_lpc_types[curr_lpc_type_size] |= type2flag($1);
@@ -1168,8 +1291,8 @@ arg_type: type
         $$ = $1;
     } ;
 
-typel: arg_type              { $$ = (min_arg == -1 && $1 == VOID); }
-     | typel '|' arg_type    { $$ = (min_arg == -1 && ($1 || $3 == VOID));}
+typel: arg_type              { $$ = (min_arg == -1 && $1.token == VOID); }
+     | typel '|' arg_type    { $$ = (min_arg == -1 && ($1 || $3.token == VOID));}
      | arg_type '.' '.' '.'  { $$ = min_arg == -1 ; unlimit_max = MY_TRUE; } ;
      | opt_ref '.' '.' '.'
         {
@@ -1182,18 +1305,18 @@ typel: arg_type              { $$ = (min_arg == -1 && $1 == VOID); }
                     yyerror("Too many arguments");
                 else
                 {
-                    curr_arg_types[curr_arg_type_size++] = MIXED;
-                    curr_arg_types[curr_arg_type_size++] = MIXED | MF_TYPE_MOD_REFERENCE;
+                    curr_arg_types[curr_arg_type_size++] = (lpc_type_t){ MIXED, 0, NULL};
+                    curr_arg_types[curr_arg_type_size++] = (lpc_type_t){ MIXED, MF_TYPE_MOD_REFERENCE, NULL};
                 }
             }
             else
             {
-                curr_arg_types[curr_arg_type_size++] = MIXED | $1;
+                curr_arg_types[curr_arg_type_size++] =  (lpc_type_t){ MIXED, $1, NULL};
                 if (curr_arg_type_size == NELEMS(curr_arg_types))
                     yyerror("Too many arguments");
             }
 
-            curr_lpc_types[curr_lpc_type_size] |= type2flag(MIXED);
+            curr_lpc_types[curr_lpc_type_size] |= type2flag((lpc_type_t){ MIXED, 0, NULL});
         }
      ;
 
@@ -1259,12 +1382,12 @@ opt_varargs:
     ;
 
 applied_rettype:
-      basic                     { $$.void_allowed = false; $$.type = $1;}
-    | basic '*'                 { $$.void_allowed = false; $$.type = $1 | MF_TYPE_MOD_POINTER; }
-    | STRING '|' STRING '*'     { $$.void_allowed = false; $$.type = STRING_OR_STRING_ARRAY; }
-    | STRING '|' INT            { $$.void_allowed = false; $$.type = INT_OR_STRING; }
-    | INT    '|' STRING         { $$.void_allowed = false; $$.type = INT_OR_STRING; }
-    | VOID   '|' basic          { $$.void_allowed = true;  $$.type = $3;}
+      basic                     { $$.void_allowed = false; $$.type = (lpc_type_t){$1, 0, NULL};}
+    | basic '*'                 { $$.void_allowed = false; $$.type = (lpc_type_t){$1, MF_TYPE_MOD_POINTER, NULL}; }
+    | STRING '|' STRING '*'     { $$.void_allowed = false; $$.type = (lpc_type_t){STRING_OR_STRING_ARRAY, 0, NULL}; }
+    | STRING '|' INT            { $$.void_allowed = false; $$.type = (lpc_type_t){INT_OR_STRING, 0, NULL}; }
+    | INT    '|' STRING         { $$.void_allowed = false; $$.type = (lpc_type_t){INT_OR_STRING, 0, NULL}; }
+    | VOID   '|' basic          { $$.void_allowed = true;  $$.type = (lpc_type_t){$3, 0, NULL};}
     ;
 
 applied_args:
@@ -1290,14 +1413,14 @@ applied_arg:
     ;
 
 applied_argtype:
-      basic                     { $$ = $1; }
-    | basic '*'                 { $$ = $1 | MF_TYPE_MOD_POINTER; }
-    | OBJECT   '|' LWOBJECT     { $$ = OBJECT_OR_LWOBJECT; }
-    | LWOBJECT '|' OBJECT       { $$ = OBJECT_OR_LWOBJECT; }
-    | INT      '|' STRING       { $$ = INT_OR_STRING; }
-    | STRING   '|' INT          { $$ = INT_OR_STRING; }
+      basic                     { $$ = (lpc_type_t){$1, 0, NULL}; }
+    | basic '*'                 { $$ = (lpc_type_t){$1, MF_TYPE_MOD_POINTER, NULL}; }
+    | OBJECT   '|' LWOBJECT     { $$ = (lpc_type_t){OBJECT_OR_LWOBJECT, 0, NULL}; }
+    | LWOBJECT '|' OBJECT       { $$ = (lpc_type_t){OBJECT_OR_LWOBJECT, 0, NULL}; }
+    | INT      '|' STRING       { $$ = (lpc_type_t){INT_OR_STRING, 0, NULL}; }
+    | STRING   '|' INT          { $$ = (lpc_type_t){INT_OR_STRING, 0, NULL}; }
     | STRUCT '|' MAPPING '|' OBJECT '|' LWOBJECT '|' MIXED '*'
-                                { $$ = CATCH_MSG_ARG; }
+                                { $$ = (lpc_type_t){CATCH_MSG_ARG, 0, NULL}; }
     ;
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -1331,6 +1454,70 @@ stringdef: ID NAME
         num_buff++;
     }
 ; /* stringdef */
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+
+struct_spec: struct_defs ;
+
+struct_defs: /* empty */
+    | struct_defs struct_def
+    ;
+
+struct_def: STRUCT ID '{' struct_members '}' ';'
+    {
+        char buf[2048];
+        char uname[512];
+        int pos;
+
+        make_upper_case_buf(uname, $2, sizeof(uname));
+        pos = snprintf(buf, sizeof(buf),
+            "    STRUCT_%s = create_std_struct_type(STRUCT_IDX_%s,\n"
+            "        &_lpctype_struct_%s, \"%s\",\n"
+            "        (lpctype_t*[]){ "
+            , uname, uname, $2, $2);
+
+        for (int i = 0; i < current_struct_member; i++)
+            pos += snprintf(buf + pos, sizeof(buf) - pos, "%s, ", lpctypestr(struct_member_types[i]));
+        pos += snprintf(buf + pos, sizeof(buf) - pos, "NULL },\n        (const char*[]){ ");
+        for (int i = 0; i < current_struct_member; i++)
+            pos += snprintf(buf + pos, sizeof(buf) - pos, "\"%s\", ", struct_member_names[i]);
+        pos += snprintf(buf + pos, sizeof(buf) - pos, "NULL });\n");
+
+        struct_names[current_struct] = mystrdup($2);
+        struct_defs[current_struct]  = mystrdup(buf);
+
+        pos = snprintf(buf, sizeof(buf), "enum struct_%s_enum\n{\n", $2);
+        for (int i = 0; i < current_struct_member; i++)
+        {
+            char umember[512];
+            make_upper_case_buf(umember, struct_member_names[i], sizeof(umember));
+            pos += snprintf(buf + pos, sizeof(buf) - pos, "    STRUCT_%s_%s,\n", uname, umember);
+        }
+        pos += snprintf(buf + pos, sizeof(buf) - pos, "};\n");
+
+        struct_enums[current_struct]  = mystrdup(buf);
+        current_struct++;
+
+        for (int i = 0; i < current_struct_member; i++)
+            free(struct_member_names[i]);
+        current_struct_member = 0;
+    }
+    ;
+
+struct_members:
+      struct_member
+    | struct_members struct_member
+    ;
+
+struct_member: struct_member_type ID ';'
+    {
+        struct_member_names[current_struct_member] = mystrdup($2);
+        struct_member_types[current_struct_member] = $1;
+        current_struct_member++;
+    }
+    ;
+
+struct_member_type: basic_utype opt_star { $$ = (lpc_type_t){$1, $2, NULL}; };
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -2000,7 +2187,7 @@ handle_map (char *str, int size, int (* name_to_index)(char *) )
         /* Evaluate the current pair */
         if ( !strcmp(str, "default") )
         {
-            strncpy(deflt, val, sizeof(deflt));
+            strncpy(deflt, val, sizeof(deflt)-1);
             deflt[sizeof deflt - 1] = '\0';
         }
         else
@@ -2437,6 +2624,18 @@ ident (char c)
             return VARARGS;
     }
 
+    if ( parsetype == PARSE_STRUCT_SPEC )
+    {
+        for (i=0; i < NELEMS(types); i++)
+        {
+            if (strcmp(buff, types[i].name) == 0)
+            {
+                yylval.number = types[i].num;
+                return types[i].num;
+            }
+        }
+    }
+
     yylval.string = mystrdup(buff);
     return ID;
 } /* ident() */
@@ -2798,22 +2997,20 @@ etype (long n)
 
 /*-------------------------------------------------------------------------*/
 static long
-type2flag (int n)
+type2flag (lpc_type_t t)
 
-/* Convert type <n> into the bitfield value needed to create the LPC
+/* Convert type <t> into the bitfield value needed to create the LPC
  * argument types.
  */
 
 {
-    if (n & MF_TYPE_MOD_REFERENCE)
+    if (t.flags & MF_TYPE_MOD_REFERENCE)
         return LPC_T_LVALUE;
 
-    if (n & (MF_TYPE_MOD_POINTER|MF_TYPE_MOD_POINTER_POINTER))
+    if (t.flags & (MF_TYPE_MOD_POINTER|MF_TYPE_MOD_POINTER_POINTER))
         return LPC_T_POINTER;
 
-    n &= ~(MF_TYPE_MOD_REFERENCE|MF_TYPE_MOD_LVALUE|MF_TYPE_MOD_POINTER|MF_TYPE_MOD_POINTER);
-
-    switch(n) {
+    switch(t.token) {
       case VOID:    return 0;            break;
       case STRING:  return LPC_T_STRING; break;
       case BYTES:   return LPC_T_BYTES; break;
@@ -2837,16 +3034,17 @@ type2flag (int n)
 
 /*-------------------------------------------------------------------------*/
 static const char *
-lpctypestr (int n)
+lpctypestr (lpc_type_t t)
 
-/* Express type <n> in the compiler type symbols of exec.h.
+/* Express type <t> in the compiler type symbols of exec.h.
  * Return a pointer to a constant string.
  */
 
 {
     const char *p = NULL;
 
-    switch(n) {
+    switch(t.token | t.flags)
+    {
       case VOID:    p = "&_lpctype_void";         break;
       case STRING:  p = "&_lpctype_string";       break;
       case BYTES:   p = "&_lpctype_bytes";        break;
@@ -2856,7 +3054,16 @@ lpctypestr (int n)
       case OBJECT:  p = "&_lpctype_any_object";   break;
       case LWOBJECT:p = "&_lpctype_any_lwobject"; break;
       case MAPPING: p = "&_lpctype_mapping";      break;
-      case STRUCT:  p = "&_lpctype_any_struct";   break;
+      case STRUCT:
+                if (t.struct_name == NULL)
+                    p = "&_lpctype_any_struct";
+                else
+                {
+                    char buf[100];
+                    snprintf(buf, sizeof(buf), "&_lpctype_struct_%s", t.struct_name);
+                    p = mystrdup(buf);
+                }
+                break;
       case FLOAT:   p = "&_lpctype_float";        break;
       case CLOSURE: p = "&_lpctype_closure";      break;
       case COROUTINE: p="&_lpctype_coroutine";    break;
@@ -2868,6 +3075,9 @@ lpctypestr (int n)
                     p = "&_lpctype_quoted_array"; break;
       case OBJECT_OR_LWOBJECT:
                     p = "&_lpctype_any_object_or_lwobject";
+                                                  break;
+      case MAPPING_OR_CLOSURE:
+                    p = "&_lpctype_mapping_or_closure";
                                                   break;
       case INT_OR_STRING:
                     p = "&_lpctype_int_or_string";
@@ -2912,19 +3122,22 @@ lpctypestr (int n)
 
 /*-------------------------------------------------------------------------*/
 static const char *
-fulltypestr (int n)
+fulltypestr (lpc_type_t t)
 
-/* Express type <n> in the compiler type symbols of exec.h.
+/* Express type <t> in the compiler type symbols of exec.h.
  * Return a pointer to a constant string.
  */
 
 {
     static char buff[100];        /* 100 is such a comfortable size :-) */
 
+    int flags = t.flags;
+    t.flags &= ~(MF_TYPE_MOD_REFERENCE|MF_TYPE_MOD_LVALUE);
+
     if (snprintf(buff, sizeof(buff), "{ %s, %s }",
-        lpctypestr(n & ~(MF_TYPE_MOD_REFERENCE|MF_TYPE_MOD_LVALUE)),
-        (n & MF_TYPE_MOD_LVALUE) ? "TYPE_MOD_LVALUE" :
-        (n & MF_TYPE_MOD_REFERENCE) ? "TYPE_MOD_REFERENCE" : "0") >= sizeof(buff))
+        lpctypestr(t),
+        (flags & MF_TYPE_MOD_LVALUE) ? "TYPE_MOD_LVALUE" :
+        (flags & MF_TYPE_MOD_REFERENCE) ? "TYPE_MOD_REFERENCE" : "0") >= sizeof(buff))
             fatal("Local buffer overwritten in fulltypestr()");
 
     return buff;
@@ -3268,6 +3481,33 @@ read_string_spec (void)
 
 /*-------------------------------------------------------------------------*/
 static void
+read_struct_spec (void)
+
+/* Read the file STRUCT_SPEC.
+ */
+
+{
+    fpr = fopen(STRUCT_SPEC, "rt");
+    if (fpr == NULL)
+    {
+        perror(STRUCT_SPEC);
+        exit(1);
+    }
+
+    got_error = 0;
+    current_line = 1;
+    current_file = STRUCT_SPEC;
+    parsetype = PARSE_STRUCT_SPEC;
+    parsetype_sent = MY_FALSE;
+    current_struct = 0;
+    current_struct_member = 0;
+    yyparse();
+    fclose(fpr);
+
+} /* read_struct_spec() */
+
+/*-------------------------------------------------------------------------*/
+static void
 create_efun_defs (void)
 
 /* Create the file EFUN_DEFS
@@ -3295,9 +3535,10 @@ create_efun_defs (void)
 " * It is meant to be included in lex.c\n"
 " */\n"
 "\n"
-"#include \"exec.h\"    /* struct instr_s == instr_t */\n"
-"#include \"types.h\"   /* lpctype_* definitions     */\n"
-"#include \"prolang.h\" /* Some aggregate types      */\n"
+"#include \"exec.h\"       /* struct instr_s == instr_t */\n"
+"#include \"stdstructs.h\" /* lpctype_* definitions     */\n"
+"#include \"types.h\"      /* lpctype_* definitions     */\n"
+"#include \"prolang.h\"    /* Some aggregate types      */\n"
 "\n"
            );
 
@@ -3369,7 +3610,7 @@ create_efun_defs (void)
     fprintf(fpw, "fulltype_t efun_arg_types[] = {\n    /*   0 */ ");
     for (i = 0; i < last_current_type; i++)
     {
-        if (arg_types[i] == 0)
+        if (arg_types[i].token == 0)
         {
             fprintf(fpw, "{ NULL, 0 },\n");
 
@@ -3979,6 +4220,154 @@ create_stdstrings (void)
 } /* create_stdstrings() */
 
 /*-------------------------------------------------------------------------*/
+static void
+create_stdstructs (void)
+
+/* Create the files STDSTRUCTS.[ch].
+ */
+
+{
+    /* Create stdstructs.h */
+
+    fpw = fopen(STDSTRUCTS ".h", "wt");
+    if (fpw == NULL)
+    {
+       perror(STDSTRUCTS ".h");
+       exit(1);
+    }
+
+    fprintf(fpw,
+"#ifndef STDSTRUCTS_H__\n"
+"#define STDSTRUCTS_H__ 1\n"
+"\n"
+"/* DO NOT EDIT!\n"
+" *\n"
+" * This file is created automatically by make_func from\n"
+" * the specifications in " STRUCT_SPEC ".\n"
+" */\n"
+"\n"
+"#include \"structs.h\"\n"
+"\n"
+"/* --- Global LPC structs definitions. --- */\n"
+"\n"
+"enum std_struct_index\n"
+"{\n");
+
+    for (int i = 0; i < current_struct; i++)
+    {
+        char buf[512];
+        snprintf(buf, sizeof(buf), "STRUCT_IDX_%s", struct_names[i]);
+        make_upper_case(buf);
+        fprintf(fpw, "    %s,\n", buf);
+    }
+
+    fprintf(fpw,
+"\n"
+"    STD_STRUCT_COUNT,\n"
+"    STD_STRUCT_OFFSET = USHRT_MAX - STD_STRUCT_COUNT /* Offset in bytecodes. */\n"
+"};\n"
+"\n"
+"extern struct_type_t *std_struct[STD_STRUCT_COUNT];\n"
+"\n");
+
+    for (int i = 0; i < current_struct; i++)
+    {
+        char buf[512];
+        make_upper_case_buf(buf, struct_names[i], sizeof(buf));
+        fprintf(fpw, "#define STRUCT_%-24s std_struct[STRUCT_IDX_%s]\n", buf, buf);
+    }
+
+    fprintf(fpw,
+"\n"
+"/* --- Member indices --- */\n"
+"\n");
+
+    for (int i = 0; i < current_struct; i++)
+        fprintf(fpw, "%s\n", struct_enums[i]);
+
+    fprintf(fpw,
+"/* --- Corresponding LPC types. --- */\n"
+"\n");
+
+    for (int i = 0; i < current_struct; i++)
+        fprintf(fpw, "extern lpctype_t _lpctype_struct_%s;\n", struct_names[i]);
+    fprintf(fpw, "\n");
+    for (int i = 0; i < current_struct; i++)
+        fprintf(fpw, "extern lpctype_t *lpctype_struct_%s;\n", struct_names[i]);
+
+    fprintf(fpw,
+"\n"
+"/* --- Prototypes. --- */\n"
+"\n"
+"extern void init_std_structs();\n"
+"\n"
+"#endif /* STDSTRUCTS_H__ */\n");
+    fclose(fpw);
+
+    /* Create stdstructs.c */
+
+    fpw = fopen(STDSTRUCTS ".c", "wt");
+    if (fpw == NULL)
+    {
+       perror(STDSTRUCTS ".c");
+       exit(1);
+    }
+
+    fprintf(fpw,
+"/* DO NOT EDIT!\n"
+" *\n"
+" * This file is created automatically by make_func from\n"
+" * the specifications in " STRUCT_SPEC ".\n"
+" *\n"
+" * It's purpose is to define global struct definitions.\n"
+" */\n"
+"\n"
+"#include \"driver.h\"\n"
+"#include \"prolang.h\"\n"
+"#include \"" STDSTRUCTS ".h\"\n"
+"\n"
+"/*-------------------------------------------------------------------------*/\n"
+"\n"
+"struct_type_t *std_struct[STD_STRUCT_COUNT];\n"
+"  /* All global struct definitions.\n"
+"   */\n"
+"\n");
+
+    for (int i = 0; i < current_struct; i++)
+        fprintf(fpw, "lpctype_t _lpctype_struct_%s;\n", struct_names[i]);
+    fprintf(fpw,
+"  /* Static type definitions of global structs.\n"
+"   */\n"
+"\n");
+    for (int i = 0; i < current_struct; i++)
+        fprintf(fpw, "lpctype_t *lpctype_struct_%-23s = &_lpctype_struct_%s;\n", struct_names[i], struct_names[i]);
+
+    fprintf(fpw,
+"  /* Pointer to type definitions of global structs.\n"
+"   */\n"
+"\n"
+"/*-------------------------------------------------------------------------*/\n"
+"void\n"
+"init_std_structs ()\n"
+"\n"
+"/* Create global struct definitions.\n"
+" */\n"
+"\n"
+"{\n");
+
+    for (int i = 0; i < current_struct; i++)
+        fprintf(fpw, "%s\n", struct_defs[i]);
+
+    fprintf(fpw,
+"} /* init_std_structs() */\n"
+"\n"
+"/*-------------------------------------------------------------------------*/\n");
+
+    fclose(fpw);
+
+} /* create_stdstructs() */
+
+/*-------------------------------------------------------------------------*/
 int
 main (int argc, char ** argv)
 
@@ -3986,7 +4375,7 @@ main (int argc, char ** argv)
  */
 
 {
-    enum { NONE = 0, MakeInstrs, MakeApplied, MakeLang, MakeStrings } action = NONE;
+    enum { NONE = 0, MakeInstrs, MakeApplied, MakeLang, MakeStrings, MakeStructs } action = NONE;
 
     /* --- Check what we have to do --- */
     if (argc == 2)
@@ -3995,6 +4384,7 @@ main (int argc, char ** argv)
         else if (!strcasecmp(argv[1], "applied")) action = MakeApplied;
         else if (!strcasecmp(argv[1], "lang")) action = MakeLang;
         else if (!strcasecmp(argv[1], "strings")) action = MakeStrings;
+        else if (!strcasecmp(argv[1], "structs")) action = MakeStructs;
     }
 
     if (action == NONE)
@@ -4013,6 +4403,9 @@ main (int argc, char ** argv)
 "\n"
 "  make_func strings\n"
 "    creates " STDSTRINGS ".[ch], reads " CONFIG " and " STRING_SPEC ".\n"
+"\n"
+"  make_func stricts\n"
+"    creates " STDSTRUCTS ".[ch], reads " CONFIG " and " STRUCT_SPEC ".\n"
              , stderr);
         return 1; /* TODO: There are constants for this */
     }
@@ -4028,6 +4421,9 @@ main (int argc, char ** argv)
 
     if (action == MakeStrings)
         read_string_spec();
+
+    if (action == MakeStructs)
+        read_struct_spec();
 
     if (got_error)
         return 1;
@@ -4046,6 +4442,9 @@ main (int argc, char ** argv)
 
     if (action == MakeStrings)
         create_stdstrings();
+
+    if (action == MakeStructs)
+        create_stdstructs();
 
     /* --- That's it --- */
 

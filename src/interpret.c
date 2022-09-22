@@ -229,6 +229,7 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#include "stdstructs.h"
 #include "strfuns.h"
 #include "structs.h"
 #include "svalue.h"
@@ -5174,7 +5175,7 @@ check_struct_op (svalue_t * sp, bytecode_p pc, bool * ignore_error)
  */
 
 {
-    short s_index;
+    unsigned short s_index;
     svalue_t * svp, * isvp;
 
     if (ignore_error)
@@ -5188,7 +5189,8 @@ check_struct_op (svalue_t * sp, bytecode_p pc, bool * ignore_error)
                , typename((isvp ? isvp : sp)->type)
               ));
     if (isvp->u.number >= 0
-     && isvp->u.number >= current_prog->num_structs)
+     && isvp->u.number >= current_prog->num_structs
+     && (isvp->u.number < STD_STRUCT_OFFSET || isvp->u.number >= USHRT_MAX))
     {
         ERRORF(("Too big struct index: %"PRIdPINT", max %hu\n"
                , isvp->u.number, current_prog->num_structs
@@ -5196,7 +5198,7 @@ check_struct_op (svalue_t * sp, bytecode_p pc, bool * ignore_error)
     }
 
     /* Get the struct type index */
-    s_index = (short)isvp->u.number;
+    s_index = (unsigned short)isvp->u.number;
 
     /* Get the struct value itself */
     svp = get_rvalue(sp-2, NULL);
@@ -5209,9 +5211,11 @@ check_struct_op (svalue_t * sp, bytecode_p pc, bool * ignore_error)
     }
 
     /* Check if the struct on the stack is of the correct type */
-    if (s_index >= 0)
+    if (s_index != USHRT_MAX)
     {
-        struct_type_t * pExpected = current_prog->struct_defs[s_index].type;
+        struct_type_t * pExpected = (s_index >= STD_STRUCT_OFFSET)
+                                  ? get_std_struct_type(s_index - STD_STRUCT_OFFSET)
+                                  : current_prog->struct_defs[s_index].type;
         struct_type_t * pType = svp->u.strct->type;
 
         if (struct_baseof(pExpected, pType))
@@ -17849,7 +17853,7 @@ again:
          */
         struct_t * st;
         struct_type_t *pType;
-        short idx;
+        unsigned short idx;
         int num_values;
         Bool has_template;
         svalue_t * svp;
@@ -17858,7 +17862,7 @@ again:
         num_values = load_uint8(&pc);
         has_template = MY_FALSE;
 
-        if (idx < 0 && instruction == F_S_AGGREGATE)
+        if (idx == USHRT_MAX && instruction == F_S_AGGREGATE)
         {
             if ((sp - num_values)->type != T_STRUCT)
             {
@@ -17881,6 +17885,10 @@ again:
                 /* NOTREACHED */
             }
             has_template = MY_TRUE;
+        }
+        else if (idx >= STD_STRUCT_OFFSET)
+        {
+            pType = get_std_struct_type(idx - STD_STRUCT_OFFSET);
         }
         else
         {

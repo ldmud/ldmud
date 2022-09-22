@@ -2365,6 +2365,7 @@ garbage_collection(void)
     clear_comm_refs();
     clear_rxcache_refs();
     clear_tabled_struct_refs();
+    clear_std_struct_refs();
     clear_object_type_table_refs();
 #ifdef USE_PGSQL
     pg_clear_refs();
@@ -2585,6 +2586,7 @@ garbage_collection(void)
     count_comm_refs();
     count_interpreter_refs();
     count_heart_beat_refs();
+    count_std_struct_refs();
     count_rxcache_refs();
 #ifdef USE_PGSQL
     pg_count_refs();

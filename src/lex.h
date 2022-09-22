@@ -187,6 +187,10 @@ struct ident_s
               /* struct index in the simul-efun's program's struct table.
                * == I_GLOBAL_SEFUN_STRUCT_NONE: not a simul-efun struct.
                */
+            unsigned short std_struct_id;
+              /* Standard struct id. (Starting with 0.)
+               * == I_GLOBAL_STD_STRUCT_NONE: not a standard struct.
+               */
 #ifdef USE_PYTHON
             unsigned short python_efun;
               /* python-efun: Index into python_efun_table, negative else
@@ -232,6 +236,7 @@ struct ident_s
 #define I_GLOBAL_SEFUN_BY_NAME          (USHRT_MAX - 2) /* Has no entry in the table. */
 #define I_GLOBAL_STRUCT_NONE            (USHRT_MAX)
 #define I_GLOBAL_SEFUN_STRUCT_NONE      (USHRT_MAX)
+#define I_GLOBAL_STD_STRUCT_NONE        (USHRT_MAX)
 #ifdef USE_PYTHON
 #  define I_GLOBAL_PYTHON_EFUN_OTHER    (USHRT_MAX)
 #endif

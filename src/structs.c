@@ -174,12 +174,15 @@
 #include "exec.h"
 #include "gcollect.h"
 #include "interpret.h"
+#include "lex.h"
 #include "main.h"
 #include "mapping.h"
 #include "mstrings.h"
 #include "object.h"
+#include "prolang.h"
 #include "simulate.h"
 #include "stdstrings.h"
+#include "stdstructs.h"
 #include "wiz_list.h"
 #include "xalloc.h"
 
@@ -1147,6 +1150,83 @@ struct_t_unique_name (struct_type_t *pSType)
     return pSType->unique_name;
 } /* struct_t_unique_name() */
 
+/*-------------------------------------------------------------------------*/
+void
+test_efun_arg_struct_type (const char* efun_name, int pos, struct_t *pStruct, struct_type_t *pSType)
+
+/* Check that the given struct <pStruct> is a valid struct of type <pSType>.
+ * Verifies that the struct has the type as its base and every member
+ * has a correct type. This is primary for efuns, as this will not take
+ * related structs (same name, other definition) into account.
+ * Any deviation will be thrown as an error.
+ */
+
+{
+    if (!struct_baseof(pSType, pStruct->type))
+        errorf("Bad arg %d to %s(): got 'struct %s', expected 'struct %s'.\n"
+             , pos, efun_name
+             , get_txt(pStruct->type->name->name), get_txt(pSType->name->name));
+
+    for (int i = 0; i < pSType->num_members; i++)
+        if (!check_rtt_compatibility(pSType->member[i].type, pStruct->member+i))
+        {
+            char buf[512];
+            lpctype_t *realtype = get_rtt_type(pSType->member[i].type, pStruct->member+i);
+            get_lpctype_name_buf(realtype, buf, sizeof(buf));
+            free_lpctype(realtype);
+
+            errorf("Bad type for struct member '%s' in arg %d to %s(): got '%s', expected '%s'.\n"
+                 , get_txt(pSType->member[i].name)
+                 , pos, efun_name
+                 , buf, get_lpctype_name(pSType->member[i].type));
+        }
+} /* test_struct_type() */
+
+/*-------------------------------------------------------------------------*/
+struct_type_t*
+create_std_struct_type (int std_struct_idx, lpctype_t *lpctype, const char* name, lpctype_t *member_types[], const char *member_names[])
+
+/* Create a global struct definition and register it with the compiler.
+ * Create the corresponding lpctype as a static type.
+ */
+
+{
+    struct_type_t *result;
+    ident_t *ident;
+    int num_member = 0;
+
+    while (member_names[num_member] != NULL)
+        num_member++;
+
+    result = struct_new_type(new_tabled(name, STRING_ASCII) , ref_mstring(STR_GLOBAL), 0, NULL, num_member, NULL);
+    for (int i=0; i < num_member; i++)
+    {
+        result->member[i].name = new_tabled(member_names[i], STRING_ASCII);
+        result->member[i].type = ref_lpctype(member_types[i]);
+    }
+
+    make_static_type(get_struct_type(result), lpctype);
+    lpctype->t_struct.def_idx = STD_STRUCT_OFFSET + std_struct_idx;
+
+    ident = make_shared_identifier_mstr(struct_t_name(result), I_TYPE_GLOBAL, 0);
+    if (ident->type == I_TYPE_UNKNOWN)
+        init_global_identifier(ident, /* bProgram: */ false);
+    ident->u.global.std_struct_id = std_struct_idx;
+
+    return result;
+} /* create_std_struct_type() */
+
+/*-------------------------------------------------------------------------*/
+struct_type_t*
+get_std_struct_type (int std_struct_idx)
+
+/* Return the struct type for the given index.
+ */
+
+{
+    return std_struct[std_struct_idx];
+} /* get_std_struct_type() */
+
 /*=========================================================================*/
 /*                           GC SUPPORT                                    */
 
@@ -1198,8 +1278,11 @@ clear_struct_name_ref (struct_name_t * pSName)
         pSName->ref = 0;
         pSName->name->info.ref = 0;
         pSName->prog_name->info.ref = 0;
-        pSName->lpctype = NULL;
-        pSName->current = NULL;
+        if (!pSName->lpctype || !pSName->lpctype->t_static)
+        {
+            pSName->lpctype = NULL;
+            pSName->current = NULL;
+        }
     }
 
 } /* clear_struct_name_ref() */
@@ -1321,6 +1404,30 @@ clear_tabled_struct_refs (void)
         }
     }
 } /* clear_tabled_struct_refs() */
+
+/*-------------------------------------------------------------------------*/
+void
+clear_std_struct_refs ()
+
+/* Clear all references of global struct definitions.
+ */
+
+{
+    for (int i = 0; i < STD_STRUCT_COUNT; i++)
+        clear_struct_type_ref(std_struct[i]);
+} /* clear_std_struct_refs() */
+
+/*-------------------------------------------------------------------------*/
+void
+count_std_struct_refs ()
+
+/* Count all references of global struct definitions.
+ */
+
+{
+    for (int i = 0; i < STD_STRUCT_COUNT; i++)
+        count_struct_type_ref(std_struct[i]);
+} /* count_std_struct_refs() */
 
 /*-------------------------------------------------------------------------*/
 void

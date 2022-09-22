@@ -2096,6 +2096,7 @@ init_global_identifier (ident_t * ident, bool bProgram)
     ident->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
     ident->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
     ident->u.global.sefun_struct_id = I_GLOBAL_SEFUN_STRUCT_NONE;
+    ident->u.global.std_struct_id = I_GLOBAL_STD_STRUCT_NONE;
 #ifdef USE_PYTHON
     ident->u.global.python_efun = I_GLOBAL_PYTHON_EFUN_OTHER;
 #endif

@@ -112,6 +112,7 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#include "stdstructs.h"
 #include "structs.h"
 #include "svalue.h"
 #include "swap.h"
@@ -121,8 +122,6 @@
 
 #include "i-current_object.h"
 #include "i-svalue_cmp.h"
-
-#include "../mudlib/sys/compile_string.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -6873,10 +6872,8 @@ v_compile_string (svalue_t *sp, int num_arg)
 
 /* EFUN compile_string()
  *
- *   closure compile_string(symbol* args, string str, int flags,
- *                         , mapping|closure variables
- *                         , mapping|closure functions
- *                         , mapping|closure structs)
+ *   closure compile_string(symbol* args, string str
+ *                         , struct compile_string_options opts)
  *
  * Compile <str> using the LPC compiler into a closure (of type
  * CLOSURE_LAMBDA).
@@ -6886,8 +6883,16 @@ v_compile_string (svalue_t *sp, int num_arg)
     svalue_t *argp = sp - num_arg + 1;
     code_context_t context;
     lambda_t *l;
+    struct_t *opts = NULL;
 
-    int flags = (num_arg > 2) ? argp[2].u.number : 0;
+    /* We need to check the struct type of the options,
+     * the interpreter will only check that it is a struct.
+     */
+    if (num_arg > 2)
+    {
+        opts = argp[2].u.strct;
+        test_efun_arg_struct_type("compile_string", 3, opts, STRUCT_COMPILE_STRING_OPTIONS);
+    }
 
     if (argp->type != T_POINTER)
     {
@@ -6904,44 +6909,48 @@ v_compile_string (svalue_t *sp, int num_arg)
                 errorf("Invalid type for argument name: %s, expected symbol.\n", typename(context.arg_names[i].type));
     }
 
-    if ((flags & (CS_COMPILE_EXPRESSION|CS_COMPILE_BLOCK)) == (CS_COMPILE_EXPRESSION|CS_COMPILE_BLOCK))
-        errorf("CS_COMPILE_EXPRESSION and CS_COMPILE_BLOCK are given.\n");
+    if (opts != NULL
+     && opts->member[STRUCT_COMPILE_STRING_OPTIONS_COMPILE_EXPRESSION].u.number != 0
+     && opts->member[STRUCT_COMPILE_STRING_OPTIONS_COMPILE_BLOCK].u.number != 0)
+        errorf("Options compile_expression and compile_block are set.\n");
 
     if (current_loc.file)
         errorf("Compiler is busy with '%s'.\n", current_loc.file->name);
 
     context.prog = get_current_object_program();
 
-    if (num_arg > 3
-     && (argp[3].type == T_MAPPING || argp[3].type == T_CLOSURE))
-        context.var_lookup = argp+3;
-    else
-        context.var_lookup = NULL;
-
-    if (num_arg > 4
-     && (argp[4].type == T_MAPPING || argp[4].type == T_CLOSURE))
-        context.fun_lookup = argp+4;
+    if (opts != NULL
+     && (opts->member[STRUCT_COMPILE_STRING_OPTIONS_FUNCTIONS].type == T_MAPPING
+      || opts->member[STRUCT_COMPILE_STRING_OPTIONS_FUNCTIONS].type == T_CLOSURE))
+        context.fun_lookup = &opts->member[STRUCT_COMPILE_STRING_OPTIONS_FUNCTIONS];
     else
         context.fun_lookup = NULL;
 
-    if (num_arg > 5
-     && (argp[5].type == T_MAPPING || argp[5].type == T_CLOSURE))
-        context.struct_lookup = argp+5;
+    if (opts != NULL
+     && (opts->member[STRUCT_COMPILE_STRING_OPTIONS_VARIABLES].type == T_MAPPING
+      || opts->member[STRUCT_COMPILE_STRING_OPTIONS_VARIABLES].type == T_CLOSURE))
+        context.var_lookup = &opts->member[STRUCT_COMPILE_STRING_OPTIONS_VARIABLES];
+    else
+        context.var_lookup = NULL;
+
+    if (opts != NULL
+     && (opts->member[STRUCT_COMPILE_STRING_OPTIONS_STRUCTS].type == T_MAPPING
+      || opts->member[STRUCT_COMPILE_STRING_OPTIONS_STRUCTS].type == T_CLOSURE))
+        context.struct_lookup = &opts->member[STRUCT_COMPILE_STRING_OPTIONS_STRUCTS];
     else
         context.struct_lookup = NULL;
 
+    context.use_prog_for_functions = opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_USE_OBJECT_FUNCTIONS].u.number != 0;
+    context.use_prog_for_variables = opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_USE_OBJECT_VARIABLES].u.number != 0;
+    context.use_prog_for_structs = opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_USE_OBJECT_STRUCTS].u.number != 0;
+    context.make_async = opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_AS_ASYNC].u.number != 0;
+
     if (current_object.type == T_OBJECT
      && (current_object.u.ob->prog->flags & P_REPLACE_ACTIVE)
-     && (flags & (CS_USE_OBJECT_VARIABLES|CS_USE_OBJECT_FUNCTIONS|CS_USE_OBJECT_STRUCTS)))
+     && (context.use_prog_for_functions || context.use_prog_for_variables || context.use_prog_for_structs))
         errorf("Can't use current object's variables/functions/struct definitions when replace_program() is scheduled.\n");
 
-    context.use_prog_for_variables = (flags & CS_USE_OBJECT_VARIABLES) != 0;
-    context.use_prog_for_functions = (flags & CS_USE_OBJECT_FUNCTIONS) != 0;
-    context.use_prog_for_structs = (flags & CS_USE_OBJECT_STRUCTS) != 0;
-
-    context.make_async = (flags & CS_ASYNC) != 0;
-
-    if (flags & CS_COMPILE_BLOCK)
+    if (opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_COMPILE_BLOCK].u.number != 0)
         l = compile_block(argp[1].u.str, &context);
     else
         l = compile_expr(argp[1].u.str, &context);

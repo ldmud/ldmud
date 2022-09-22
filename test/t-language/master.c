@@ -10,7 +10,6 @@
 #define OWN_RUNTIME_WARNING
 #include "/inc/base.inc"
 #include "/inc/gc.inc"
-#include "/sys/compile_string.h"
 
 int got_warning, got_rt_warning;
 
@@ -103,7 +102,12 @@ void run_test()
                 set_this_object(ob);
                 return compile_string(0,
                     implode(regexp(explode(code,"\n"), "#include \"/sys"),"\n")+"\n"+fun[1],
-                    CS_COMPILE_BLOCK|CS_USE_OBJECT_VARIABLES|CS_USE_OBJECT_FUNCTIONS|CS_USE_OBJECT_STRUCTS);
+                    (<compile_string_options>
+                        compile_block: 1,
+                        use_object_functions: 1,
+                        use_object_variables: 1,
+                        use_object_structs: 1
+                    ));
             }));
 
             if (err)

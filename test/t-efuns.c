@@ -8,7 +8,6 @@
 #include "/inc/deep_eq.inc"
 // String compiler header boundary
 #include "/sys/tls.h"
-#include "/sys/compile_string.h"
 #include "/sys/configuration.h"
 #include "/sys/driver_hook.h"
 #include "/sys/functionlist.h"
@@ -30,6 +29,8 @@ struct derived_struct (test_struct)
 {
     string* values;
 };
+
+struct cs_opts (compile_string_options) {};
 
 mapping json_testdata = ([ "test 1": 42, "test 2": 42.0,
                           "test 3": "hello world\n",
@@ -400,13 +401,25 @@ mixed *tests =
             return funcall(compile_string(({'a}), "#pragma rtt_checks\n({int})a"), 11) == 11;
        :)
     }),
+    ({ "compile_string (illegal options)", TF_ERROR,
+       (:
+            struct mixed opts = (<test_struct>);
+            compile_string(0, "1+1", opts);
+       :)
+    }),
+    ({ "compile_string (empty options)", 0,
+       (:
+            return funcall(compile_string(0, "1+1", (<compile_string_options>)))==2;
+       :)
+    }),
     ({ "compile_string (function from mapping)", 0,
        (:
-            return funcall(compile_string(0, "fun1() + fun2(\"z\")", 0, 0,
-                        ([
-                            'fun1: function string() { return "ABC"; },
-                            'fun2: #'capitalize
-                        ]))) == "ABCZ";
+            return funcall(compile_string(0, "fun1() + fun2(\"z\")", (<cs_opts>
+                functions:
+                    ([
+                        'fun1: function string() { return "ABC"; },
+                        'fun2: #'capitalize
+                    ])))) == "ABCZ";
        :)
     }),
     ({ "compile_string (function from function)", 0,
@@ -436,12 +449,14 @@ mixed *tests =
     }),
     ({ "compile_string (function from object)", 0,
        (:
-            return funcall(compile_string(0, "f(41)", CS_USE_OBJECT_FUNCTIONS)) == 42;
+            return funcall(compile_string(0, "f(41)", (<cs_opts> use_object_functions: 1))) == 42;
        :)
     }),
     ({ "compile_string (function from object and mapping)", 0,
        (:
-            return funcall(compile_string(0, "f(41)", CS_USE_OBJECT_FUNCTIONS, 0, (['f: (: $1+2 :)]))) == 43;
+            return funcall(compile_string(0, "f(41)", (<cs_opts>
+                use_object_functions: 1,
+                functions: (['f: (: $1+2 :)])))) == 43;
        :)
     }),
     ({ "compile_string (function not from object)", TF_ERROR,
@@ -451,20 +466,23 @@ mixed *tests =
     }),
     ({ "compile_string (closure from mapping)", 0,
        (:
-            return funcall(compile_string(0, "#'fun2", 0, 0,
-                        ([
-                            'fun2: #'capitalize
-                        ]))) == #'capitalize;
+            return funcall(compile_string(0, "#'fun2", (<cs_opts>
+                functions:
+                    ([
+                        'fun2: #'capitalize
+                    ])))) == #'capitalize;
        :)
     }),
     ({ "compile_string (closure from object)", 0,
        (:
-            return funcall(compile_string(0, "#'f", CS_USE_OBJECT_FUNCTIONS)) == #'f;
+            return funcall(compile_string(0, "#'f", (<cs_opts> use_object_functions: 1))) == #'f;
        :)
     }),
     ({ "compile_string (closure from object and mapping)", 0,
        (:
-            return funcall(compile_string(0, "#'f", CS_USE_OBJECT_FUNCTIONS, 0, (['f: #'max]))) == #'max;
+            return funcall(compile_string(0, "#'f", (<cs_opts>
+                use_object_functions: 1,
+                functions: (['f: #'max])))) == #'max;
        :)
     }),
     ({ "compile_string (closure not from object)", TF_ERROR,
@@ -475,11 +493,12 @@ mixed *tests =
     ({ "compile_string (variable from mapping)", 0,
        (:
             string v1 = "ABC", v2;
-            return funcall(compile_string(0, "var1 + (var2 = \"X\")", 0,
-                        ([
-                            'var1: &v1,
-                            'var2: &v2,
-                        ]))) == "ABCX" && v2 == "X";
+            return funcall(compile_string(0, "var1 + (var2 = \"X\")", (<cs_opts>
+                variables:
+                    ([
+                        'var1: &v1,
+                        'var2: &v2,
+                    ])))) == "ABCX" && v2 == "X";
        :)
     }),
     ({ "compile_string (variable from function)", 0,
@@ -510,7 +529,8 @@ mixed *tests =
     ({ "compile_string (variable from object)", 0,
        (:
             global_var = "ABC";
-            return funcall(compile_string(0, "global_var + (global_var = \"X\")", CS_USE_OBJECT_VARIABLES)) == "ABCX"
+            return funcall(compile_string(0, "global_var + (global_var = \"X\")", (<cs_opts>
+                            use_object_variables: 1))) == "ABCX"
                 && global_var == "X";
        :)
     }),
@@ -518,7 +538,9 @@ mixed *tests =
        (:
             string local_var = "ABC";
             global_var = "-";
-            return funcall(compile_string(0, "global_var + (global_var = \"X\")", CS_USE_OBJECT_VARIABLES, (['global_var: &local_var]))) == "ABCX"
+            return funcall(compile_string(0, "global_var + (global_var = \"X\")", (<cs_opts>
+                            use_object_variables: 1,
+                            variables: (['global_var: &local_var])))) == "ABCX"
                 && local_var == "X";
        :)
     }),
@@ -530,19 +552,21 @@ mixed *tests =
     ({ "compile_string (identifier closure from mapping)", TF_ERROR,
        (:
             string v;
-            compile_string(0, "#'var", 0, (['var: &v]));
+            compile_string(0, "#'var", (<cs_opts> variables: (['var: &v])));
             return 0;
        :)
     }),
     ({ "compile_string (identifier closure from object)", 0,
        (:
-            return funcall(compile_string(0, "#'global_var", CS_USE_OBJECT_VARIABLES)) == #'global_var;
+            return funcall(compile_string(0, "#'global_var", (<cs_opts> use_object_variables: 1))) == #'global_var;
        :)
     }),
     ({ "compile_string (identifier closure from object and mapping)", TF_ERROR,
        (:
             string v;
-            funcall(compile_string(0, "#'global_var", CS_USE_OBJECT_VARIABLES, (['global_var: &v])));
+            funcall(compile_string(0, "#'global_var", (<cs_opts>
+                use_object_variables: 1,
+                variables: (['global_var: &v]))));
        :)
     }),
     ({ "compile_string (identifier closure not from object)", TF_ERROR,
@@ -552,10 +576,11 @@ mixed *tests =
     }),
     ({ "compile_string (struct from mapping)", 0,
        (:
-            return deep_eq(funcall(compile_string(0, "(<my_struct> ({10}))", 0, 0, 0,
-                        ([
-                            'my_struct: (<test_struct> ({-1})),
-                        ]))), (<test_struct> ({10})));
+            return deep_eq(funcall(compile_string(0, "(<my_struct> ({10}))", (<cs_opts>
+                structs:
+                    ([
+                        'my_struct: (<test_struct> ({-1})),
+                    ])))), (<test_struct> ({10})));
        :)
     }),
     ({ "compile_string (struct from function)", 0,
@@ -579,13 +604,15 @@ mixed *tests =
     }),
     ({ "compile_string (struct from object)", 0,
        (:
-            return deep_eq(funcall(compile_string(0, "(<test_struct> ({10}))", CS_USE_OBJECT_STRUCTS)),
+            return deep_eq(funcall(compile_string(0, "(<test_struct> ({10}))", (<cs_opts> use_object_structs: 1))),
                            (<test_struct> ({10})));
        :)
     }),
     ({ "compile_string (struct from object and mapping)", 0,
        (:
-            return deep_eq(funcall(compile_string(0, "(<test_struct> ({10}), ({\"X\"}))", CS_USE_OBJECT_STRUCTS, 0, 0, (['test_struct: (<derived_struct>)]))),
+            return deep_eq(funcall(compile_string(0, "(<test_struct> ({10}), ({\"X\"}))", (<cs_opts>
+                                    use_object_structs: 1,
+                                    structs: (['test_struct: (<derived_struct>)])))),
                            (<derived_struct> ({10}), ({"X"})));
        :)
     }),
@@ -596,7 +623,7 @@ mixed *tests =
     }),
     ({ "compile_string (struct member lookup)", 0,
        (:
-            return funcall(compile_string(0, "get_struct().values[1]", CS_USE_OBJECT_FUNCTIONS))=="B";
+            return funcall(compile_string(0, "get_struct().values[1]", (<cs_opts> use_object_functions: 1)))=="B";
        :)
     }),
     ({ "compile_string (these tests)", 0,
@@ -604,36 +631,45 @@ mixed *tests =
             string file = read_file(__FILE__, 0, 0, "UTF-8");
             string header = explode(file, "// String compiler header boundary\n")[1];
             string code = explode(file, "// String compiler test boundary\n")[1];
-            return pointerp(funcall(compile_string(0, "#define TF_ERROR 1\n#define TF_DONTCHECKERROR 2\n" + header + code, CS_USE_OBJECT_FUNCTIONS|CS_USE_OBJECT_VARIABLES|CS_USE_OBJECT_STRUCTS)));
+            return pointerp(funcall(compile_string(0, "#define TF_ERROR 1\n#define TF_DONTCHECKERROR 2\n" + header + code, (<cs_opts>
+                use_object_functions: 1,
+                use_object_variables: 1,
+                use_object_structs: 1))));
        :)
     }),
     ({ "compile_string (simple block)", 0,
        (:
-            return funcall(compile_string(0, "return 42;", CS_COMPILE_BLOCK))==42;
+            return funcall(compile_string(0, "return 42;", (<cs_opts> compile_block: 1)))==42;
        :)
     }),
     ({ "compile_string (simple variable declarations)", 0,
        (:
-            return funcall(compile_string(({'a}), "int i = 10; return a+i;", CS_COMPILE_BLOCK), 32)==42;
+            return funcall(compile_string(({'a}), "int i = 10; return a+i;", (<cs_opts> compile_block: 1)), 32)==42;
        :)
     }),
     ({ "compile_string (struct (from object) variable declarations)", 0,
        (:
-            return funcall(compile_string(0, "struct test_struct x = (<test_struct> ({11})); return x.arg[0];", CS_COMPILE_BLOCK|CS_USE_OBJECT_STRUCTS))==11;
+            return funcall(compile_string(0, "struct test_struct x = (<test_struct> ({11})); return x.arg[0];", (<cs_opts>
+                compile_block: 1,
+                use_object_structs: 1)))==11;
        :)
     }),
     ({ "compile_string (struct (from mapping) variable declarations)", 0,
        (:
-            return funcall(compile_string(0, "struct my_struct x = (<my_struct> ({12})); return x.arg[0];", CS_COMPILE_BLOCK, 0, 0,
-                        ([
-                            'my_struct: (<test_struct> ({-1})),
-                        ])))==12;
+            return funcall(compile_string(0, "struct my_struct x = (<my_struct> ({12})); return x.arg[0];", (<cs_opts>
+                compile_block: 1,
+                structs:
+                    ([
+                        'my_struct: (<test_struct> ({-1})),
+                    ]))))==12;
        :)
     }),
     ({ "compile_string (range coroutine)", 0,
        (:
             coroutine cr = funcall(compile_string(({'start,'stop}),
-                "for (int i = start; i < stop; i++) yield(i);", CS_COMPILE_BLOCK|CS_ASYNC), 1, 10);
+                "for (int i = start; i < stop; i++) yield(i);", (<cs_opts>
+                    compile_block: 1,
+                    as_async: 1)), 1, 10);
             int sum;
             foreach (int num: cr)
                 sum += num;
@@ -642,7 +678,7 @@ mixed *tests =
     }),
     ({ "compile_string (this_coroutine)", 0,
        (:
-            coroutine cr = funcall(compile_string(0, "yield(this_coroutine())", CS_ASYNC));
+            coroutine cr = funcall(compile_string(0, "yield(this_coroutine())", (<cs_opts> as_async: 1)));
             return call_coroutine(cr) == cr;
        :)
     }),

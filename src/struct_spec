@@ -1,0 +1,24 @@
+/*---------------------------------------------------------------------------
+ * Specification of global structs.
+ *
+ *---------------------------------------------------------------------------
+ * For a full explanation, see make_func.y
+ *---------------------------------------------------------------------------
+ */
+
+/* Argument for compile_string() efun.
+ */
+struct compile_string_options
+{
+    mapping|closure functions;
+    mapping|closure variables;
+    mapping|closure structs;
+
+    int use_object_functions;
+    int use_object_variables;
+    int use_object_structs;
+
+    int compile_expression;
+    int compile_block;
+    int as_async;
+};

@@ -135,6 +135,9 @@ extern string_t * struct_t_unique_name (struct_type_t *pSType);
 #define struct_unique_name(pStruct) struct_t_unique_name(pStruct->type)
 extern int struct_baseof(struct_type_t *base, struct_type_t *st) __attribute__((nonnull(1,2)));
 extern struct_type_t* struct_baseof_name(struct_name_t *base, struct_type_t *st) __attribute__((nonnull(1,2)));
+extern void test_efun_arg_struct_type(const char* efun_name, int pos, struct_t *pStruct, struct_type_t *pSType);
+extern struct_type_t* create_std_struct_type(int std_struct_idx, lpctype_t *lpctype, const char* name, lpctype_t *member_types[], const char *member_names[]);
+extern struct_type_t* get_std_struct_type(int std_struct_idx);
 
 #ifdef GC_SUPPORT
 
@@ -145,6 +148,8 @@ extern void clear_tabled_struct_refs (void);
 extern void count_struct_type_ref (struct_type_t * pSType);
 extern void count_struct_name_ref (struct_name_t * pSName);
 extern void count_struct_ref (struct_t * pStruct);
+extern void clear_std_struct_refs();
+extern void count_std_struct_refs();
 extern void remove_unreferenced_structs (void);
 
 #endif /* GC_SUPPORT */

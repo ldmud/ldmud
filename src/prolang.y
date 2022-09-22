@@ -98,6 +98,7 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#include "stdstructs.h"
 #include "structs.h"
 #include "svalue.h"
 #include "swap.h"
@@ -1321,7 +1322,7 @@ lpctype_t _lpctype_unknown_array, _lpctype_any_array,    _lpctype_int_float,
           _lpctype_any_object_or_lwobject_array,
           _lpctype_any_object_or_lwobject_array_array,
           _lpctype_int_or_string, _lpctype_string_or_string_array,
-          _lpctype_symbol_array, _lpctype_catch_msg_arg;
+          _lpctype_symbol_array, _lpctype_catch_msg_arg, _lpctype_mapping_or_closure;
 lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_any_array     = &_lpctype_any_array,
           *lpctype_int_float     = &_lpctype_int_float,
@@ -1341,7 +1342,8 @@ lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_int_or_string = &_lpctype_int_or_string,
           *lpctype_string_or_string_array = &_lpctype_string_or_string_array,
           *lpctype_symbol_array = &_lpctype_symbol_array,
-          *lpctype_catch_msg_arg = &_lpctype_catch_msg_arg;
+          *lpctype_catch_msg_arg = &_lpctype_catch_msg_arg,
+          *lpctype_mapping_or_closure = &_lpctype_mapping_or_closure;
 
 
 /*-------------------------------------------------------------------------*/
@@ -6552,8 +6554,8 @@ static int
 find_struct ( ident_t * ident, efun_override_t override )
 
 /* Find the struct <name> and return its index. Return -1 if not found.
- * <override> descibes whether to look at local (OVERRIDE_LFUN) or
- * simul-efun (OVERRIDE_SEFUN) structs only.
+ * <override> descibes whether to look at local (OVERRIDE_LFUN),
+ * simul-efun (OVERRIDE_SEFUN) or standard (OVERRIDE_EFUN) structs only.
  */
 
 {
@@ -6562,7 +6564,7 @@ find_struct ( ident_t * ident, efun_override_t override )
     while (name != NULL && name->type != I_TYPE_GLOBAL)
         name = name->inferior;
 
-    if (string_context && override != OVERRIDE_SEFUN)
+    if (string_context && override != OVERRIDE_SEFUN && override != OVERRIDE_EFUN)
     {
         if (name == NULL)
             name = add_global_name(insert_shared_identifier_mstr(ident->name, I_TYPE_GLOBAL, 0));
@@ -6704,7 +6706,7 @@ find_struct ( ident_t * ident, efun_override_t override )
 
                         /* Add this as a lambda value. */
                         id = LAMBDA_STRUCTS_COUNT;
-                        if (id == USHRT_MAX)
+                        if (id >= STD_STRUCT_OFFSET)
                         {
                             /* Not enough space to do so. */
                             free_lpctype(lpctype);
@@ -6741,7 +6743,7 @@ find_struct ( ident_t * ident, efun_override_t override )
 
                         /* Add this as a hidden struct to our program. */
                         id = STRUCT_COUNT;
-                        if (id == USHRT_MAX)
+                        if (id >= STD_STRUCT_OFFSET)
                         {
                             /* Not enough space to do so. */
                             free_lpctype(lpctype);
@@ -6764,6 +6766,14 @@ find_struct ( ident_t * ident, efun_override_t override )
 
                 return id;
             }
+
+            if (override == OVERRIDE_SEFUN)
+                break;
+            /* else FALLTHROUGH */
+
+        case OVERRIDE_EFUN:
+            if (name->u.global.std_struct_id != I_GLOBAL_STD_STRUCT_NONE)
+                return STD_STRUCT_OFFSET + name->u.global.std_struct_id;
             break;
     }
 
@@ -7068,7 +7078,7 @@ create_struct_literal ( int sidx, struct_type_t * stype, int length, struct_init
 } /* create_struct_literal() */
 
 /*-------------------------------------------------------------------------*/
-static short
+static int
 get_struct_index (lpctype_t* stype)
 
 /* Return the index of struct <stype> in this program's A_STRUCT_DEFS.
@@ -7138,7 +7148,7 @@ get_struct_index (lpctype_t* stype)
         }
     }
 
-    if (!string_context)
+    if (!string_context && idx < STD_STRUCT_OFFSET)
     {
         assert(idx < STRUCT_COUNT);
         assert(STRUCT_DEF(idx).type->name == stype->t_struct.name);
@@ -7149,7 +7159,7 @@ get_struct_index (lpctype_t* stype)
 
 /*-------------------------------------------------------------------------*/
 static lpctype_t*
-get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool strict_lookup, short* struct_index, int* member_index)
+get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool strict_lookup, int* struct_index, int* member_index)
 
 /* Determines the result type of a struct member lookup operation
  * <structure> -> <member_name> resp. <structure> . <member_name>.
@@ -7284,7 +7294,7 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool
                 struct_type_t *pdef = unionmember->t_struct.def;
                 if (pdef == NULL)
                 {
-                    short idx;
+                    int idx;
 
                     if (!string_context)
                         break;
@@ -10040,17 +10050,17 @@ opt_base_struct:
               {
                   yyerrorf("Unknown base struct '%s'", get_txt($2->name));
               }
-              else if (STRUCT_DEF(num).flags & NAME_PROTOTYPE)
+              else if (num < STD_STRUCT_OFFSET && STRUCT_DEF(num).flags & NAME_PROTOTYPE)
               {
                   yyerrorf("Undefined base struct '%s'", get_txt($2->name));
               }
-              else if (!struct_t_unique_name(STRUCT_DEF(num).type))
+              else if (num < STD_STRUCT_OFFSET && !struct_t_unique_name(STRUCT_DEF(num).type))
               {
                   yyerrorf("Incomplete base struct '%s'", get_txt($2->name));
               }
               else
               {
-                  struct_type_t *ptype = STRUCT_DEF(num).type;
+                  struct_type_t *ptype = (num >= STD_STRUCT_OFFSET) ? get_std_struct_type(num - STD_STRUCT_OFFSET) : STRUCT_DEF(num).type;
                   struct_type_t *ctype = STRUCT_DEF(current_struct).type;
                   // record pointer to base struct even if the base struct has no members
                   ctype->base = ref_struct_type(ptype);
@@ -10587,6 +10597,8 @@ single_basic_non_void_type:
               yyerrorf("Unknown struct '%s'", get_txt($2.real->name));
               $$ = lpctype_any_struct;
           }
+          else if (num >= STD_STRUCT_OFFSET)
+              $$ = get_struct_type(get_std_struct_type(num - STD_STRUCT_OFFSET));
           else
           {
               if (string_context)
@@ -14838,7 +14850,7 @@ expr4:
           }
           $<number>$ = num;
 
-          if (string_context && LAMBDA_STRUCT(num).index.kind == LAMBDA_IDENT_VALUE)
+          if (string_context && num < STD_STRUCT_OFFSET && LAMBDA_STRUCT(num).index.kind == LAMBDA_IDENT_VALUE)
           {
               // Need to put the lambda value as a struct template on the stack.
               int idx = LAMBDA_STRUCT(num).index.value_index;
@@ -14863,7 +14875,9 @@ expr4:
           int num = $<number>5;
           struct_type_t *stype;
 
-          if (string_context)
+          if (num >= STD_STRUCT_OFFSET)
+              stype = get_std_struct_type(num - STD_STRUCT_OFFSET);
+          else if (string_context)
           {
               stype = LAMBDA_STRUCT(num).type;
               if (LAMBDA_STRUCT(num).index.kind == LAMBDA_IDENT_OBJECT)
@@ -15099,7 +15113,7 @@ expr4:
     | expr4 member_operator struct_member_name %prec L_ARROW
       {
           /* Lookup a struct member */
-          short s_index = -1;
+          int s_index = -1;
           int m_index = -1;
 
 %line
@@ -15614,7 +15628,7 @@ lvalue:
     | expr4 member_operator struct_member_name %prec L_ARROW
       {
           /* Create a struct member lvalue */
-          short s_index = -1;
+          int s_index = -1;
           int m_index = -1;
 
 %line
@@ -16783,7 +16797,9 @@ struct_name:
       {
           check_identifier($3);
 
-          if (mstreq($1->name, STR_SEFUN))
+          if (mstreq($1->name, STR_EFUN))
+              $$.override = OVERRIDE_EFUN;
+          else if (mstreq($1->name, STR_SEFUN))
               $$.override = OVERRIDE_SEFUN;
           else
           {
@@ -21543,6 +21559,7 @@ init_compiler ()
     make_static_type(get_array_type(lpctype_any_object_or_lwobject_array), &_lpctype_any_object_or_lwobject_array_array);
     make_static_type(get_union_type(lpctype_int, lpctype_string),   &_lpctype_int_or_string);
     make_static_type(get_union_type(lpctype_string, lpctype_string_array), &_lpctype_string_or_string_array);
+    make_static_type(get_union_type(lpctype_mapping, lpctype_closure), &_lpctype_mapping_or_closure);
 
     temp1 = get_union_type(lpctype_any_object_or_lwobject, lpctype_any_struct);
     temp2 = get_union_type(temp1, lpctype_mapping);
@@ -21921,6 +21938,9 @@ epilog (void)
      */
     if (STRING_COUNT > 0x10000)
         yyerror("Too many strings");
+
+    if (STRUCT_COUNT >= STD_STRUCT_OFFSET)
+        yyerror("Too many structs");
 
     /* Get and check the numbers of functions, strings, and variables */
     num_functions = FUNCTION_COUNT;
@@ -22899,6 +22919,7 @@ clear_compiler_refs (void)
     clear_lpctype_ref(lpctype_int_or_string);
     clear_lpctype_ref(lpctype_string_or_string_array);
     clear_lpctype_ref(lpctype_catch_msg_arg);
+    clear_lpctype_ref(lpctype_mapping_or_closure);
 }
 
 void
@@ -22931,6 +22952,7 @@ count_compiler_refs (void)
     count_lpctype_ref(lpctype_any_object_or_lwobject_array_array);
     count_lpctype_ref(lpctype_int_or_string);
     count_lpctype_ref(lpctype_string_or_string_array);
+    count_lpctype_ref(lpctype_mapping_or_closure);
 
     /* lpctype_catch_msg_arg has non-static union members,
      * we need to handle them explicitly.
