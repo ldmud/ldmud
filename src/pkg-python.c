@@ -2082,7 +2082,7 @@ ldmud_program_lfun_get_arguments (ldmud_program_and_index_t *lfun, void *closure
         arg->type = NULL;
 
         if (progp->argument_types && progp->type_start && progp->type_start[fx] != INDEX_START_NONE)
-            arg->type = lpctype_to_pythontype(progp->argument_types[progp->type_start[fx] + i]);
+            arg->type = lpctype_to_pythontype(progp->types[progp->argument_types[progp->type_start[fx] + i]]);
 
         PyList_SET_ITEM(result, i, (PyObject*)arg);
     }
@@ -9871,6 +9871,7 @@ lpctype_to_pythontype (lpctype_t *type)
                     Py_INCREF(&PyBytes_Type);
                     return (PyObject *)&PyBytes_Type;
 
+                case TYPE_LPCTYPE: // TODO
                 case TYPE_UNKNOWN:
                 case TYPE_ANY:
                     break;

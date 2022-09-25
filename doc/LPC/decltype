@@ -1,0 +1,31 @@
+NAME
+        decltype
+
+SYNTAX
+        decltype(<expr>)
+
+DESCRIPTION
+        The expression will compiled just to determine the resulting type.
+        The expression itself will not be executed. The result of this
+        operator is the lpctype value representing the expression result.
+
+NOTE
+        The result of this operator depends on a lot of factors, for example
+        if any type information is preserved for any inherited programs that
+        are referenced in the expression. But it also depends on the type
+        inference capabilities of the LPC compiler. So future versions of
+        LDMud might have different results on the same expression.
+
+
+EXAMPLES
+        int var;
+        decltype(var)   /* result: [int] */
+
+        string fun();
+        decltype(fun()) /* result: [string], fun() will not be called. */
+
+HISTORY
+        Introduced in LDMud 3.6.7.
+
+SEE ALSO
+        lpctypes(LPC)

@@ -519,6 +519,7 @@ static long lpc_types[MAX_ARGTYPES];
 #    define LPC_T_BYTES         (1 << 13)
 #    define LPC_T_LWOBJECT      (1 << 14)
 #    define LPC_T_COROUTINE     (1 << 15)
+#    define LPC_T_LPCTYPE       (1 << 16)
 
 
 static int last_current_type = 0;
@@ -902,8 +903,8 @@ move_to_arg_types ()
 %token NAME ID
 
 %token VOID INT STRING BYTES BYTES_OR_STRING OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
-%token MIXED UNKNOWN NUL STRUCT LWOBJECT OBJECT_OR_LWOBJECT COROUTINE MAPPING_OR_CLOSURE
-%token INT_OR_STRING STRING_OR_STRING_ARRAY CATCH_MSG_ARG
+%token MIXED UNKNOWN NUL STRUCT LWOBJECT OBJECT_OR_LWOBJECT COROUTINE LPCTYPE
+%token MAPPING_OR_CLOSURE INT_OR_STRING STRING_OR_STRING_ARRAY CATCH_MSG_ARG
 
 %token DEFAULT NO_LIGHTWEIGHT
 
@@ -919,7 +920,7 @@ move_to_arg_types ()
 %token LVALUE
 
 %type <number> VOID MIXED UNKNOWN NUL STRUCT
-%type <number> INT STRING BYTES OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY LWOBJECT COROUTINE
+%type <number> INT STRING BYTES OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY LWOBJECT COROUTINE LPCTYPE
 %type <number> basic basic_utype
   /* Value is the basic type value
    */
@@ -1239,7 +1240,7 @@ type: basic opt_star opt_ref { $$ = (lpc_type_t){$1, $2 | $3, NULL}; }
     ;
 
 basic: VOID | INT | STRING | BYTES | MAPPING | FLOAT | MIXED | OBJECT | CLOSURE |
-        UNKNOWN | SYMBOL | QUOTED_ARRAY | STRUCT | LWOBJECT | COROUTINE | NUL ;
+        UNKNOWN | SYMBOL | QUOTED_ARRAY | STRUCT | LWOBJECT | COROUTINE | LPCTYPE | NUL ;
 
 opt_star : '*'     { $$ = MF_TYPE_MOD_POINTER;         }
         |  '*' '*' { $$ = MF_TYPE_MOD_POINTER_POINTER; }
@@ -1562,6 +1563,7 @@ static struct type types[]
     , { "struct",       STRUCT }
     , { "lwobject",     LWOBJECT }
     , { "coroutine",    COROUTINE }
+    , { "lpctype",      LPCTYPE }
     };
 
 static struct type visibility[]
@@ -2981,6 +2983,7 @@ etype (long n)
     CONVERT(LPC_T_STRUCT, "TF_STRUCT");
     CONVERT(LPC_T_LWOBJECT, "TF_LWOBJECT");
     CONVERT(LPC_T_COROUTINE, "TF_COROUTINE");
+    CONVERT(LPC_T_LPCTYPE, "TF_LPCTYPE");
 
 #   undef CONVERT
 
@@ -3028,6 +3031,7 @@ type2flag (lpc_type_t t)
       case STRUCT:  return LPC_T_STRUCT;  break;
       case LWOBJECT:return LPC_T_LWOBJECT; break;
       case COROUTINE: return LPC_T_COROUTINE; break;
+      case LPCTYPE: return LPC_T_LPCTYPE; break;
     default: yyerror("(type2flag) Bad type!"); return 0;
     }
 } /* type2flag() */
@@ -3067,6 +3071,7 @@ lpctypestr (lpc_type_t t)
       case FLOAT:   p = "&_lpctype_float";        break;
       case CLOSURE: p = "&_lpctype_closure";      break;
       case COROUTINE: p="&_lpctype_coroutine";    break;
+      case LPCTYPE: p = "&_lpctype_lpctype";      break;
       case SYMBOL:  p = "&_lpctype_symbol";       break;
       case MIXED:   p = "&_lpctype_mixed";        break;
       case UNKNOWN: p = "&_lpctype_unknown";      break;

@@ -70,6 +70,9 @@ union u {
     coroutine_t *coroutine;
       /* T_COROUTINE: pointer to the coroutine structure.
        */
+    lpctype_t *lpctype;
+      /* T_LPCTYPE: pointer to the type object.
+       */
 #ifdef FLOAT_FORMAT_2
     double  float_number;
     /* T_FLOAT: the double value for this float in FLOAT_FORMAT_2.
@@ -223,33 +226,34 @@ struct svalue_s
 #ifdef USE_PYTHON
 #define T_PYTHON        0xf  /* a Python object */
 #endif
+#define T_LPCTYPE       0x10
 
-#define T_CALLBACK      0x10
+#define T_CALLBACK      0x11
   /* A callback structure referenced from the stack to allow
    * proper cleanup during error recoveries. The interpreter
    * knows how to free it, but that's all.
    */
 
-#define T_ERROR_HANDLER 0x11
+#define T_ERROR_HANDLER 0x12
   /* Not an actual value, this is used internally for cleanup
    * operations. See the description of the error_handler() member
    * for details.
    */
 
-#define T_BREAK_ADDR    0x12
+#define T_BREAK_ADDR    0x13
   /* Not an actual type, it's used internally for saving
    * the address where break statements within switch statements
    * should branch to.
    */
 
-#define T_ARG_FRAME     0x13
+#define T_ARG_FRAME     0x14
   /* Not an actual type, it's used internally for saving
    * the surrounding argument frame pointer, when a new
    * argument frame is created.
    */
 
 #undef T_NULL /* There is some T_NULL definition in system headers. */
-#define T_NULL          0x14
+#define T_NULL          0x15
   /* Not an actual type, this is used in the efun_lpc_types[] table
    * to encode the acceptance of '0' instead of the real datatype.
    */
@@ -434,6 +438,7 @@ struct svalue_s
 #define TF_BYTES         (1 << T_BYTES)
 #define TF_LWOBJECT      (1 << T_LWOBJECT)
 #define TF_COROUTINE     (1 << T_COROUTINE)
+#define TF_LPCTYPE       (1 << T_LPCTYPE)
 
 #define TF_ANYTYPE       (~0)
   /* This is used in the efun_lpc_types[]
@@ -650,6 +655,15 @@ static INLINE svalue_t svalue_coroutine(coroutine_t * const cr)
     return (svalue_t){ T_COROUTINE, {}, {.coroutine = cr } };
 }
 
+static INLINE svalue_t svalue_lpctype(lpctype_t * const t)
+                        __attribute__((nonnull(1))) __attribute__((const));
+static INLINE svalue_t svalue_lpctype(lpctype_t * const t)
+/* Return an svalue for the lpctype <t>.
+ */
+{
+    return (svalue_t){ T_LPCTYPE, {}, {.lpctype = t } };
+}
+
 static INLINE svalue_t svalue_callback(callback_t * const cb)
                         __attribute__((nonnull(1))) __attribute__((const));
 static INLINE svalue_t svalue_callback(callback_t * const cb)
@@ -759,6 +773,15 @@ static INLINE void put_coroutine(svalue_t * const dest, coroutine_t * const cr)
     *dest = svalue_coroutine(cr);
 }
 
+static INLINE void put_lpctype(svalue_t * const dest, lpctype_t * const t)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_lpctype(svalue_t * const dest, lpctype_t * const t)
+/* Put the lpctype <t> into <dest>, which is considered empty.
+ */
+{
+    *dest = svalue_lpctype(t);
+}
+
 static INLINE void put_callback(svalue_t * const dest, callback_t * const cb)
                                                 __attribute__((nonnull(1,2)));
 static INLINE void put_callback(svalue_t * const dest, callback_t * const cb)
@@ -818,6 +841,9 @@ static INLINE void put_callback(svalue_t * const dest, callback_t * const cb)
 
 #define push_coroutine(sp,val) \
     ( (sp)++, put_coroutine(sp,val) )
+
+#define push_lpctype(sp,val) \
+    ( (sp)++, put_lpctype(sp,val) )
 
 #define push_callback(sp,val) \
     ( (sp)++, put_callback(sp,val) )

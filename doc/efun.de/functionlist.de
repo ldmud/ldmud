@@ -27,6 +27,9 @@ BESCHREIBUNG
             RETURN_FUNCTION_NAME        liefert den Funktionsnamen
             RETURN_FUNCTION_FLAGS       liefert die Flags der Funktion
             RETURN_FUNCTION_TYPE        liefert den Rueckgabetyp der Funktion
+                                        als Zahl.
+            RETURN_FUNCTION_LPCTYPE     liefert den Rueckgabetyp der Funktion
+                                        als lpctype.
             RETURN_FUNCTION_NUMARG      liefert die Anzahl moeglicher
                                         Argumente.
 
@@ -50,6 +53,9 @@ BESCHREIBUNG
                                 anderen Programm verwendet zu werden
             TYPE_MOD_NOMASK     die Funktion ist nomask deklariert
             TYPE_MOD_PUBLIC     die Funktion ist public deklariert
+
+GESCHICHTE
+        LDMud 3.6.7 fuehrte RETURN_FUNCTION_LPCTYPE ein.
 
 SIEHE AUCH
         inherit_list(E), function_exists(E), variable_list(E),

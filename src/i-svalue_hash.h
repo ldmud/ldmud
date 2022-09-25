@@ -137,6 +137,10 @@ svalue_hash (svalue_t *svp, int bits)
         case T_COROUTINE:
             result = (p_int)svp->u.coroutine;
             break;
+
+        case T_LPCTYPE:
+            result = (p_int)svp->u.lpctype;
+            break;
     }
 
 #if SIZEOF_CHAR_P > 4

@@ -253,6 +253,20 @@ mixed *tests =
     ({ "call_direct_resolved array 2",  0, (: int* result; return deep_eq(call_direct_resolved(&result, ({clone,clone,object_name(clone),this_object(),0}), "g", 10, ({ 20 })), ({0, 0, 0, 0, 0})) && deep_eq(result, ({  0,  0,  0,  0, 0})); :) }),
     ({ "call_direct_resolved array 3",  0, (: int* result; return deep_eq(call_direct_resolved(&result, ({clone,clone,object_name(clone),this_object(),0}), "h", 10, ({ 20 })), ({0, 0, 0, 0, 0})) && deep_eq(result, ({  0,  0,  0,  0, 0})); :) }),
     ({ "call_out", 0, (: last_rt_warning = 0; call_out("ThisFunctionDoesNotExist", 10); return sizeof(last_rt_warning); :) }),
+    ({ "check_type 1", 0,                  (: check_type(10,[int])                   == 1 :) }),
+    ({ "check_type 2", 0,                  (: check_type(10,[int|float])             == 1 :) }),
+    ({ "check_type 3", 0,                  (: check_type(10,[string])                == 0 :) }),
+    ({ "check_type 4", 0,                  (: check_type(10,[mixed])                 == 1 :) }),
+    ({ "check_type 5", 0,                  (: check_type(10,[void])                  == 0 :) }),
+    ({ "check_type 6", 0,                  (: check_type(({10}),[int*])              == 1 :) }),
+    ({ "check_type 7", 0,                  (: check_type(({10}),[string*])           == 0 :) }),
+    ({ "check_type 8", 0,                  (: check_type(({10}),[<int|string>*])     == 1 :) }),
+    ({ "check_type 9", 0,                  (: check_type(({10}),[int*|string*])      == 1 :) }),
+    ({ "check_type 10", 0,                 (: check_type(({10}),[int*|string*])      == 1 :) }),
+    ({ "check_type 11", 0,                 (: check_type(({10,"X"}),[<int|string>*]) == 1 :) }),
+    ({ "check_type 12", 0,                 (: check_type(({10,"X"}),[int*|string*])  == 0 :) }),
+    ({ "check_type 13", 0,                 (: check_type(({10}),[mixed])             == 1 :) }),
+    ({ "check_type 14", 0,                 (: check_type(({10}),[mixed*])            == 1 :) }),
     ({ "crypt", TF_ERROR,  (: crypt("ABC", "$$") :) }),
     ({ "ctime", TF_DONTCHECKERROR,  (: ctime(-1) :) }), /* This must be the first ctime call of this test suite. */
     ({ "clone_object 1", 0,
@@ -635,6 +649,17 @@ mixed *tests =
                 use_object_functions: 1,
                 use_object_variables: 1,
                 use_object_structs: 1))));
+       :)
+    }),
+    ({ "compile_string with decltype of these tests", 0,
+       (:
+            string file = read_file(__FILE__, 0, 0, "UTF-8");
+            string header = explode(file, "// String compiler header boundary\n")[1];
+            string code = explode(file, "// String compiler test boundary\n")[1];
+            return funcall(compile_string(0, "#define TF_ERROR 1\n#define TF_DONTCHECKERROR 2\n" + header + "decltype(" + code + ")", (<cs_opts>
+                use_object_functions: 1,
+                use_object_variables: 1,
+                use_object_structs: 1))) in [mixed*];
        :)
     }),
     ({ "compile_string (simple block)", 0,
@@ -1079,6 +1104,48 @@ mixed *tests =
     ({ "sprintf doc41", 0, (: sprintf("%8.3G",123.5)             == "     124"      :) }),
     ({ "sprintf doc42", 0, (: sprintf("%8.6g",123.5)             == "   123.5"      :) }),
 
+    ({ "to_array 1", 0, (: deep_eq(to_array([int]),           ({ [int] }))           :) }),
+    ({ "to_array 2", 0, (: deep_eq(to_array([void]),          ({ [void] }))          :) }),
+    ({ "to_array 3", 0, (: deep_eq(to_array([int*]),          ({ [int*] }))          :) }),
+    ({ "to_array 4", 0, (: deep_eq(to_array([<int|string>*]), ({ [<int|string>*] })) :) }),
+    ({ "to_array 5", 0, (: deep_eq(mkmapping(to_array([int|string])),        ([ [int], [string]          ])) :) }),
+    ({ "to_array 6", 0, (: deep_eq(mkmapping(to_array([int|float|string])),  ([ [int], [float], [string] ])) :) }),
+    ({ "to_array 7", 0, (: deep_eq(mkmapping(to_array([int|<int|string>*])), ([ [int], [<int|string>*]   ])) :) }),
+
+    ({ "to_lpctype 1",  0, (: to_lpctype("int") == [int] :) }),
+    ({ "to_lpctype 2",  0, (: to_lpctype("<int>") == [int] :) }),
+    ({ "to_lpctype 3",  0, (: to_lpctype("<<int>>") == [int] :) }),
+    ({ "to_lpctype 4",  0, (: to_lpctype("int|string") == [int|string] :) }),
+    ({ "to_lpctype 5",  0, (: to_lpctype("string|int") == [int|string] :) }),
+    ({ "to_lpctype 6",  0, (: to_lpctype("mixed") == [mixed] :) }),
+    ({ "to_lpctype 7",  0, (: to_lpctype("void") == [void] :) }),
+    ({ "to_lpctype 8",  0, (: to_lpctype("struct mixed") == [struct mixed] :) }),
+    ({ "to_lpctype 9",  0, (: to_lpctype("struct test_struct") == [struct test_struct] :) }),
+    ({ "to_lpctype 10",  0, (: to_lpctype("struct compile_string_options") == [struct compile_string_options] :) }),
+    ({ "to_lpctype 11",  0, (: to_lpctype("int**") == [int**] :) }),
+    ({ "to_lpctype 12",  0, (: to_lpctype("<int*|string>*") == [<int*|string>*] :) }),
+    ({ "to_lpctype 13",  0, (: to_lpctype("object") == [object] :) }),
+    ({ "to_lpctype 14",  0, (: to_lpctype("lwobject") == [lwobject] :) }),
+    ({ "to_lpctype 15",  0, (: to_lpctype("lwobject \"/object/\u00c4\"") == [lwobject "/object/\u00c4"] :) }),
+    ({ "to_lpctype 16",  TF_ERROR, (: to_lpctype("stuff") :) }),
+    ({ "to_lpctype 17",  TF_ERROR, (: to_lpctype("int what") :) }),
+    ({ "to_lpctype 18",  TF_ERROR, (: to_lpctype("<int> what") :) }),
+    ({ "to_lpctype 17",  TF_ERROR, (: to_lpctype("int>") :) }),
+    ({ "to_lpctype 18",  TF_ERROR, (: to_lpctype("struct whatever") :) }),
+
+    ({ "to_string(lpctype) 1",  0, (: to_lpctype(to_string([int])) == [int] :) }),
+    ({ "to_string(lpctype) 2",  0, (: to_lpctype(to_string([string|int])) == [int|string] :) }),
+    ({ "to_string(lpctype) 3",  0, (: to_lpctype(to_string([mixed])) == [mixed] :) }),
+    ({ "to_string(lpctype) 4",  0, (: to_lpctype(to_string([void])) == [void] :) }),
+    ({ "to_string(lpctype) 5",  0, (: to_lpctype(to_string([struct mixed])) == [struct mixed] :) }),
+    ({ "to_string(lpctype) 6",  0, (: to_lpctype(to_string([struct test_struct])) == [struct test_struct] :) }),
+    ({ "to_string(lpctype) 7",  0, (: to_lpctype(to_string([struct compile_string_options])) == [struct compile_string_options] :) }),
+    ({ "to_string(lpctype) 8",  0, (: to_lpctype(to_string([int**])) == [int**] :) }),
+    ({ "to_string(lpctype) 9",  0, (: to_lpctype(to_string([<int*|string>*])) == [<int*|string>*] :) }),
+    ({ "to_string(lpctype) 10",  0, (: to_lpctype(to_string([object])) == [object] :) }),
+    ({ "to_string(lpctype) 11",  0, (: to_lpctype(to_string([lwobject])) == [lwobject] :) }),
+    ({ "to_string(lpctype) 12",  0, (: to_lpctype(to_string([lwobject "/object/\u00c4"])) == [lwobject "/object/\u00c4"] :) }),
+
     ({ "to_text 1", 0, (: deep_eq(to_array(to_text( ({}) )), ({}) ) :) }),
     ({ "to_text 2", 0, (: deep_eq(to_array(to_text( ({0, 65, 66, 67}) )), ({0, 65, 66, 67}) ) :) }),
     ({ "to_text 3", 0, (: deep_eq(to_array(to_text( copy(({65, 66, 67, "ABC"})) )), ({65, 66, 67}) ) :) }),
@@ -1253,6 +1320,17 @@ mixed *tests =
                 ([1:"a";"b", 2:"c";"d"]),
                 to_struct((["a":1, "b": 4, "c": 16])),
                 to_struct(({1,2,3})),
+
+                [void],
+                [float],
+                [float|object],
+                [lpctype],
+                [struct mixed],
+                [struct test_struct],
+                [struct compile_string_options],
+                [string**],
+                [<symbol*|string>*],
+                [lwobject "/A/\"\n\""],
             }))
             {
                 if(!deep_eq(val, restore_value(save_value(val))))
@@ -1328,6 +1406,7 @@ mixed *tests =
     ({ "variable_list 4", 0, (: deep_eq(variable_list(this_object(), RETURN_FUNCTION_NAME | RETURN_FUNCTION_TYPE), 
                                 ({ "last_rt_warning", TYPE_MOD_POINTER|TYPE_STRING, "json_testdata", TYPE_MAPPING, "json_teststring", TYPE_STRING, "b", TYPE_BYTES, "dhe_testdata", TYPE_STRING, "global_var", TYPE_ANY, "clone", TYPE_OBJECT, "last_privi_op", TYPE_STRING, "last_privi_who", TYPE_ANY, "last_privi_args", TYPE_MOD_POINTER|TYPE_ANY, "tests", TYPE_MOD_POINTER|TYPE_ANY, "args", TYPE_NUMBER })) :) }),
     ({ "variable_list 5", 0, (: variable_list(this_object(), RETURN_VARIABLE_VALUE)[3] == b"\x00" :) }),
+    ({ "variable_list 6", 0, (: deep_eq(variable_list(this_object(), RETURN_FUNCTION_LPCTYPE), ({ [string*],                  [mapping],       [string],          [bytes],          [string],       [mixed],      [object],    [string],         [mixed],          [mixed*],                  [mixed*],                  [int] })) :) }),
 
 #ifdef __JSON__
     ({ "json_parse/_serialize 1", 0,

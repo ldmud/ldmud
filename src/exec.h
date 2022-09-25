@@ -654,16 +654,24 @@ struct program_s
       /* Index of the heart beat function. -1 means no heart beat
        */
 
-    /* The types of all function arguments are saved in the
-     * .argument_types[]. To look up the arguments types for
-     * function <n>, retrieve the start index from the .type_start[]
-     * as .type_start[n]. If this index is INDEX_START_NONE, the function
-     * has no type information.
+    lpctype_t **types;
+      /* A list of all types used in the program.
+       */
+
+    /* The types of all function arguments are saved in the .argument_types[].
+     * To look up the arguments types for function <n>:
+     *  - Retrieve the start index from the .type_start[] as i=.type_start[n].
+     *    If this index is INDEX_START_NONE, the function has no type
+     *    information.
+     *  - Get the type indices from .argument_types[] for the arguments
+     *    starting with i as j=.argument_types[i+x] (x is argument position).
+     *  - Get the type from .types as .types[j].
      *
+     * This is also used for foreach() variables.
      * Both arrays will only be allocated if '#pragma save_types' has
      * been specified.
      */
-    lpctype_t **argument_types;
+    unsigned short *argument_types;
     unsigned short *type_start;
       /* TODO: Some code relies on this being unsigned short */
 
@@ -708,8 +716,8 @@ struct program_s
       /* Number of (directly) inherited programs */
     unsigned short num_structs;
       /* Number of listed struct definitions */
-    unsigned int   num_argument_types;
-      /* Number of argument types in .argument_types */
+    unsigned int   num_types;
+      /* Number of types in .types */
 };
 
 /* Constants for flags in program_s. */
@@ -810,7 +818,7 @@ struct function_s
         uint32 fx;       /* Function index, this is not an offset. */
 
         /* These entries are used by simul_efun.c. */
-        lpctype_t **argtypes;
+        unsigned short *argtypes;
            /* Argument types for this simul_efun. */
 
         uint32 next_sefun;

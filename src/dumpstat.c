@@ -102,6 +102,7 @@ svalue_size (svalue_t *v, mp_int * pTotal)
     case T_OBJECT:
     case T_NUMBER:
     case T_FLOAT:
+    case T_LPCTYPE:
         return 0;
 
     case T_STRING:

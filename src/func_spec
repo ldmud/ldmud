@@ -267,6 +267,7 @@
         pop_n
         put_array_element
         type_check
+        push_type
         call_other_cached
         call_strict_cached
 #ifdef USE_PYTHON
@@ -303,6 +304,7 @@ int     stringp(mixed);
 int     bytesp(mixed);
 int     structp(mixed);
 int     symbolp(mixed);
+int     lpctypep(mixed);
 int     typeof(mixed|mixed &);
 
 mixed   negate(int|float);
@@ -370,9 +372,10 @@ int     sgn(int|float);
 int     to_int(int|string|float|closure);
 float   to_float(float|string|int);
 string  to_string(mixed);
-mixed  *to_array(string|bytes|mixed*|symbol|quoted_array|struct);
+mixed  *to_array(string|bytes|mixed*|symbol|quoted_array|struct|lpctype);
 mixed   to_struct(mapping|mixed*|struct, void|struct);
 object  to_object(null|object|string|closure);
+lpctype to_lpctype(string);
 
 bytes   to_bytes(string|bytes|int*, void|string);
 string  to_text(string|bytes|int*, void|string);
@@ -384,6 +387,7 @@ mixed   copy(mixed);
 mixed   deep_copy(mixed);
 int     ed(void|string, void|null|string) no_lightweight;
 mixed   get_type_info(mixed, void|int);
+int     check_type(mixed, lpctype);
 mixed   quote(mixed *|quoted_array|symbol|string);
 mixed   unquote(quoted_array|symbol);
 

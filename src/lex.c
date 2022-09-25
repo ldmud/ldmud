@@ -536,6 +536,7 @@ static struct s_reswords reswords[]
    , { "closure",        L_CLOSURE_DECL  }
    , { "continue",       L_CONTINUE      }
    , { "coroutine",      L_COROUTINE     }
+   , { "decltype",       L_DECLTYPE      }
    , { "default",        L_DEFAULT       }
    , { "do",             L_DO            }
    , { "else",           L_ELSE          }
@@ -550,6 +551,7 @@ static struct s_reswords reswords[]
    , { "inherit",        L_INHERIT       }
    , { "int",            L_INT           }
    , { "lwobject",       L_LWOBJECT      }
+   , { "lpctype",        L_LPCTYPE       }
    , { "mapping",        L_MAPPING       }
    , { "mixed",          L_MIXED         }
    , { "nomask",         L_NO_MASK       }
@@ -911,6 +913,7 @@ init_lexer(void)
     add_permanent_define_str("__LPC_LWOBJECTS__", -1, "1");
     add_permanent_define_str("__LPC_INLINE_CLOSURES__", -1, "1");
     add_permanent_define_str("__LPC_COROUTINES__", -1, "1");
+    add_permanent_define_str("__LPC_LPCTYPES__", -1, "1");
     add_permanent_define_str("__LPC_ARRAY_CALLS__", -1, "1");
 #ifdef USE_TLS
     add_permanent_define_str("__TLS__", -1, "1");
@@ -1869,7 +1872,7 @@ undefined_function:
          * Check it with a privilege violation.
          */
         if (!privileged && efun_override == OVERRIDE_EFUN && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-         && get_simul_efun_header(p)->flags & TYPE_MOD_NO_MASK)
+         && get_simul_efun_header(p, NULL)->flags & TYPE_MOD_NO_MASK)
         {
             svalue_t *res;
 
@@ -5175,7 +5178,7 @@ closure (char *in_yyp)
      */
     if (efun_override == OVERRIDE_EFUN
      && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-     && (get_simul_efun_header(p)->flags & TYPE_MOD_NO_MASK)
+     && (get_simul_efun_header(p, NULL)->flags & TYPE_MOD_NO_MASK)
      && (p->u.global.efun != I_GLOBAL_EFUN_OTHER
 #ifdef USE_PYTHON
       || is_python_efun(p)

@@ -49,7 +49,8 @@ extern ident_t *all_simul_efuns;
 extern void invalidate_simul_efuns (void);
 extern Bool assert_simul_efun_object(void);
 extern string_t *query_simul_efun_file_name(void);
-extern function_t *get_simul_efun_header(ident_t* name) __attribute__((nonnull));
+extern program_t *get_simul_efun_program();
+extern function_t *get_simul_efun_header(ident_t* name, const program_t **progp) __attribute__((nonnull(1)));
 extern void sefun_driver_info (svalue_t *svp, int value) __attribute__((nonnull(1)));
 
 #ifdef GC_SUPPORT

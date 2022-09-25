@@ -401,12 +401,16 @@ enum e_saved_areas {
      * variables and functions of an obsolete virtually inherited
      * program.
      */
- , A_ARGUMENT_TYPES
-    /* (lpctype_t*) Types of the arguments of all functions with
-     * typechecking. The argument types for a specific function
-     * can be found using the ARGUMENT_INDEX. All entries
-     * are counted references.
+ , A_TYPES
+    /* (lpctype_t*) Types used in the program. All entries are
+     * counted references.
      */
+
+ , A_ARGUMENT_TYPE_INDEX
+    /* (unsigned short) Index into A_TYPES for every entry in
+     * A_ARGUMENT_TYPES. This is only created during epilog.
+     */
+
  , A_ARGUMENT_INDEX
     /* (unsigned short) Index of the first argument type of function <n>.
      * INDEX_START_NONE is used for functions with no type information.
@@ -431,7 +435,8 @@ typedef variable_t     A_VIRTUAL_VAR_t;
 typedef char           A_LINENUMBERS_t;
 typedef inherit_t      A_INHERITS_t;
 typedef unsigned short A_UPDATE_INDEX_MAP_t;
-typedef lpctype_t*     A_ARGUMENT_TYPES_t;
+typedef lpctype_t*     A_TYPES_t;
+typedef unsigned short A_ARGUMENT_TYPE_INDEX_t;
 typedef unsigned short A_ARGUMENT_INDEX_t;
 typedef include_t      A_INCLUDES_t;
 typedef struct_def_t   A_STRUCT_DEFS_t;
@@ -459,10 +464,18 @@ enum e_internal_areas {
     * therefore not virtual) global variables.
     */
 
+ , A_ARGUMENT_TYPES
+    /* (lpctype_t*) Types of the arguments of all functions with
+     * typechecking. The argument types for a specific function
+     * can be found using the ARGUMENT_INDEX. All entries
+     * are counted references.
+     */
+
  , A_INLINE_PROGRAM
     /* (bytecode_t, char): Program and linenumbers saved from the compiled
      * but not yet inserted inline closures.
      */
+
  , A_INLINE_CLOSURE
     /* (inline_closure_t): The currently pending inline closures. The lexical
      * nesting is achieved with the .prev/.next pointers in the
@@ -553,6 +566,7 @@ typedef function_t        A_FUNCTIONS_t;
 typedef int               A_STRING_NEXT_t;
 typedef local_variable_t  A_LOCAL_VARIABLES_t;
 typedef global_variable_t A_GLOBAL_VARIABLES_t;
+typedef lpctype_t*        A_ARGUMENT_TYPES_t;
 typedef bytecode_t        A_INLINE_PROGRAM_t;
 typedef inline_closure_t  A_INLINE_CLOSURE_t;
 typedef struct_member_t   A_STRUCT_MEMBERS_t;
@@ -632,6 +646,17 @@ static mem_block_t mem_block[NUMAREAS];
   /* Lookup the start index of the types for function number <n>.
    */
 
+#define PROG_TYPE_COUNT         GET_BLOCK_COUNT(A_TYPES)
+  /* Number of lpctype_t* stored so far in A_TYPES.
+   */
+
+#define PROG_TYPE(n)            GET_BLOCK(A_TYPES)[n]
+  /* Get the lpctype_t* with index <n>.
+   */
+
+#define ARGUMENT_TYPE_INDEX(n)  GET_BLOCK(A_ARGUMENT_TYPE_INDEX)[n]
+  /* Get the index into A_TYPES at position <n>.
+   */
 
 #define ARGTYPE_COUNT           GET_BLOCK_COUNT(A_ARGUMENT_TYPES)
   /* Number of lpctype_t* stored so far in A_ARGUMENT_TYPES.
@@ -1307,6 +1332,11 @@ static code_context_t* string_context;
    * NULL when we are compiling a program.
    */
 
+static int compiling_decltype;
+  /* The level of decltype() operations that are currently compilied.
+   * When this is > 0, code generation can be omitted.
+   */
+
   /* A few standard types we often need.
    * We'll initialize them later (using the type functions, so all pointers
    * are correctly set) and then put them into a static storage (and set
@@ -1358,6 +1388,8 @@ static void use_variable (ident_t* name, enum variable_usage usage);
 static void warn_variable_usage (string_t* name, enum variable_usage usage, const char* prefix);
 static Bool add_lvalue_code (lvalue_block_t lv, int instruction);
 static void insert_pop_value(void);
+static int get_type_index(lpctype_t *t);
+static int ins_prog_type(lpctype_t *t);
 static void add_type_check (lpctype_t *expected, enum type_check_operation op);
 static int insert_inherited(char *super_name, string_t *real_name, program_t **super_p, function_t *fun_p, int num_arg);
   /* Returnvalues from insert_inherited(): */
@@ -1705,6 +1737,7 @@ add_to_mem_block (int n, void *data, size_t size)
             sizeof(BLOCK_NAME##_t) * count);                      \
     }
 
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_PROG_TYPE, A_TYPES)
 DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_ARGUMENT_TYPE, A_ARGUMENT_TYPES)
 DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_ARGUMENT_INDEX, A_ARGUMENT_INDEX)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_FUNCTION, A_FUNCTIONS)
@@ -1826,7 +1859,7 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
     static char *type_name[] = { "unknown", "int", "string", "void",
                                  "mapping", "float", "mixed", "closure",
                                  "symbol", "quoted_array", "bytes",
-                                 "coroutine" };
+                                 "coroutine", "lpctype" };
 
     if (bufsize <= 0)
         return 0;
@@ -1894,20 +1927,27 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
 
             if (type->t_object.program_name)
             {
-                size_t proglen =  mstrsize(type->t_object.program_name);
-                size_t len = proglen + obtypenamelen + 4;
-                if (len < bufsize)
+                if (obtypenamelen + 6 < bufsize)
                 {
                     char *bufptr = buf + obtypenamelen;
+                    size_t proglen;
 
                     memcpy(buf, obtypename, obtypenamelen);
                     memcpy(bufptr, " \"/", 3);
                     bufptr += 3;
 
-                    memcpy(bufptr, get_txt(type->t_object.program_name), proglen);
-                    buf[len-1] = '"';
-                    buf[len] = 0;
-                    return len;
+                    proglen = escape_string(get_txt(type->t_object.program_name), mstrsize(type->t_object.program_name),
+                                            bufptr, bufsize - obtypenamelen - 4, true);
+                    if (!proglen || proglen + obtypenamelen + 5 > bufsize)
+                    {
+                        buf[0] = '\0';
+                        return 0;
+                    }
+
+                    bufptr += proglen;
+                    *bufptr++ = '"';
+                    *bufptr = 0;
+                    return bufptr - buf;
                 }
                 else
                 {
@@ -2510,21 +2550,41 @@ binary_op_types_t types_binary_and_assignment[] = {
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                   , NULL                   },
     { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_lpctype,   &_lpctype_lpctype,   &_lpctype_lpctype, NULL                  , NULL                   , NULL                   },
     { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
-/* Operator type table for assignment with the binary or and xor.
+/* Operator type table for assignment with the binary or.
  */
 binary_op_types_t types_binary_or_assignment[] = {
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_sub_array_type   , &get_first_type        , &get_common_array_type },
+    { &_lpctype_lpctype,   &_lpctype_lpctype,   &_lpctype_lpctype, NULL                  , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for assignment with the binary xor.
+ */
+binary_op_types_t types_binary_xor_assignment[] = {
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_sub_array_type   , &get_first_type        , &get_common_array_type },
     { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
-/* Operator type table for the binary or and xor,
- * allowing <int>|<int> and <mixed*>|<mixed*>.
+/* Operator type table for the binary or,
+ * allowing <int>|<int>, <mixed*>|<mixed*> and <lpctype>|<lpctype>
  */
 binary_op_types_t types_binary_or[] = {
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_union_array_type , NULL                   , NULL                   },
+    { &_lpctype_lpctype,   &_lpctype_lpctype,   &_lpctype_lpctype, NULL                  , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for the binary xor,
+ * allowing <int>|<int> and <mixed*>|<mixed*>.
+ */
+binary_op_types_t types_binary_xor[] = {
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_union_array_type , NULL                   , NULL                   },
     { NULL, NULL, NULL, NULL, NULL, NULL }
@@ -2540,6 +2600,7 @@ binary_op_types_t types_binary_and[] = {
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                   , NULL                   },
     { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_lpctype,   &_lpctype_lpctype,   &_lpctype_lpctype, NULL                  , NULL                   , NULL                   },
     { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -2562,6 +2623,7 @@ binary_op_types_t types_in[] = {
     { &_lpctype_int,       &_lpctype_bytes,     &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { &_lpctype_string,    &_lpctype_string,    &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_lpctype,   &_lpctype_lpctype,   &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -3326,10 +3388,12 @@ check_assignment_types (fulltype_t src, lpctype_t *dest)
 
 /*-------------------------------------------------------------------------*/
 static void
-check_function_call_types (fulltype_t *aargs, int num_aarg, function_t *funp, lpctype_t **dargs)
+check_function_call_types (fulltype_t *aargs, int num_aarg, function_t *funp, unsigned short *dargs, lpctype_t **types)
 
 /* Checks the actual function arguments (<aargs> with <num_aarg> entries)
- * against the function definition <funp> with <dargs> argument type list.
+ * against the function definition <funp> with <dargs> argument type index
+ * list into <types>. If <dargs> is NULL, then a direct lookup into <types>
+ * should be done.
  */
 
 {
@@ -3347,21 +3411,25 @@ check_function_call_types (fulltype_t *aargs, int num_aarg, function_t *funp, lp
 
     for (int argno = 1; argno <= num_darg; argno++)
     {
-        if (!check_assignment_types(*aargs, *dargs))
+        lpctype_t *expected = dargs ? types[*dargs] : *types;
+        if (!check_assignment_types(*aargs, expected))
         {
             yyerrorf("Bad type for argument %d of %s %s",
                 argno,
                 get_txt(funp->name),
-                get_two_lpctypes(*dargs, aargs->t_type));
+                get_two_lpctypes(expected, aargs->t_type));
         }
 
         aargs++;
-        dargs++;
+        if (dargs)
+            dargs++;
+        else
+            types++;
     } /* for (all args) */
 
     if ((funp->flags & TYPE_MOD_XVARARGS) && !missingargs)
     {
-        lpctype_t *flat_type = get_flattened_type(*dargs);
+        lpctype_t *flat_type = get_flattened_type(dargs ? types[*dargs] : *types);
 
         for (int argno = num_darg+1; argno <= num_aarg; argno++)
         {
@@ -7648,7 +7716,7 @@ printf("DEBUG:   depth %d, locals: %d/%d, break: %d/%d\n",
     length = current_inline->length;
     end = current_inline->end;
 
-    if (!bAbort && !string_context)
+    if (!bAbort && !string_context && !compiling_decltype)
     {
         backup_start = INLINE_PROGRAM_SIZE;
 #ifdef DEBUG_INLINES
@@ -7692,7 +7760,7 @@ printf("DEBUG:   program size: %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
     /* Move the linenumber data into the backup storage */
     start = current_inline->li_start;
     length = current_inline->li_length;
-    if (!bAbort && !string_context)
+    if (!bAbort && !string_context && !compiling_decltype)
     {
         backup_start = INLINE_PROGRAM_SIZE;
 #ifdef DEBUG_INLINES
@@ -7847,7 +7915,7 @@ prepare_inline_closure (lpctype_t *returntype, bool coroutine)
     fulltype_t funtype;
     ident_t * ident;
 
-    if (!string_context)
+    if (!string_context && !compiling_decltype)
     {
         /* Create the name of the new inline function.
          * We have to make sure the name is really unique.
@@ -7920,7 +7988,7 @@ inline_closure_prototype (int num_args)
 printf("DEBUG: inline_closure_prototype(%d)\n", num_args);
 #endif /* DEBUG_INLINES */
     def_function_argument_check(true);
-    if (!string_context)
+    if (!string_context && !compiling_decltype)
         def_function_prototype(num_args, MY_TRUE);
 
 #ifdef DEBUG_INLINES
@@ -8012,7 +8080,7 @@ printf("DEBUG:           current depth: %d: %d\n", block_depth, block_scope[bloc
 
     /* Generate the function header and update the ident-table entry.
      */
-    if (!string_context)
+    if (!string_context && !compiling_decltype)
     {
         int fnum = current_inline->ident->u.global.function;
         FUNCTION(fnum)->num_opt_arg = current_inline->num_opt_args;
@@ -8113,7 +8181,7 @@ printf("DEBUG:     -> F_CONTEXT_CLOSURE %d %d %d\n", current_inline->function
       , num_explicit_context, context->num_locals - num_explicit_context);
 #endif /* DEBUG_INLINES */
 
-        if (string_context)
+        if (string_context && !compiling_decltype)
         {
             /* We are compiling a lambda closure. Therefore we cannot insert
              * the inline closure into a program and need to make that
@@ -8405,6 +8473,12 @@ store_lambda_value (svalue_t *svp)
     int result;
 
     assert(hash < 0x100);
+
+    if (compiling_decltype > 0)
+    {
+        free_svalue(svp);
+        return 0;
+    }
 
     if (lambda_values_table_level*0x100 + hash >= LAMBDA_VALUE_TABLE_SIZE)
     {
@@ -8812,6 +8886,7 @@ get_global_variable_lvalue (ident_t *ident)
 %token L_CONTINUE
 %token L_COROUTINE
 %token L_DEC
+%token L_DECLTYPE
 %token L_DEFAULT
 %token L_DO
 %token L_DUMMY
@@ -8835,6 +8910,7 @@ get_global_variable_lvalue (ident_t *ident)
 %token L_LAND
 %token L_LE
 %token L_LOR
+%token L_LPCTYPE
 %token L_LSH
 %token L_LWOBJECT
 %token L_MAPPING
@@ -10569,6 +10645,7 @@ single_basic_non_void_type:
     | L_STRING_DECL  { $$ = pragma_no_bytes_type ? lpctype_string_bytes : lpctype_string; }
     | L_CLOSURE_DECL { $$ = lpctype_closure;    }
     | L_COROUTINE    { $$ = lpctype_coroutine;  }
+    | L_LPCTYPE      { $$ = lpctype_lpctype;    }
     | L_SYMBOL_DECL  { $$ = lpctype_symbol;     }
     | L_FLOAT_DECL   { $$ = lpctype_float;      }
     | L_MAPPING      { $$ = lpctype_mapping;    }
@@ -13053,7 +13130,7 @@ expr0:
 
               case F_XOR_EQ:
                   op_name = "^=";
-                  op_table = types_binary_or_assignment;
+                  op_table = types_binary_xor_assignment;
 %ifdef USE_PYTHON
                   python_left_op = PYTHON_OP_XOR;
                   python_right_op = PYTHON_OP_RXOR;
@@ -13431,7 +13508,7 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '^' expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "^", types_binary_or,
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "^", types_binary_xor,
 %ifdef USE_PYTHON
                                 PYTHON_OP_XOR, PYTHON_OP_RXOR, PYTHON_OP_NONE,
 %endif
@@ -14603,7 +14680,7 @@ expr4:
     | L_SIMUL_EFUN_CLOSURE
       {
           int sefun = $1->u.global.sim_efun;
-          function_t *fun = get_simul_efun_header($1);
+          function_t *fun = get_simul_efun_header($1, NULL);
 
           if (fun->flags & TYPE_MOD_DEPRECATED)
           {
@@ -14705,15 +14782,15 @@ expr4:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | '(' note_start comma_expr ')'        %prec '~'
+    | '(' comma_expr ')' %prec '~'
       {
           /* A nested expression */
 
-          $$.type = $3.type;
-          $$.start = $2;
+          $$.type = $2.type;
+          $$.start = $2.start;
           $$.lvalue = (lvalue_block_t) {0, 0};
-          $$.name = $3.name;
-          $$.needs_use = $3.needs_use;
+          $$.name = $2.name;
+          $$.needs_use = $2.needs_use;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -14920,6 +14997,39 @@ expr4:
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.name =   NULL;
           $$.needs_use = true;
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' basic_type ']'
+      {
+          $$.type = get_fulltype_flags(lpctype_lpctype, TYPE_MOD_LITERAL);
+          $$.start = CURRENT_PROGRAM_SIZE;
+          $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =  NULL;
+          $$.needs_use = true;
+
+          ins_prog_type($2);
+          free_lpctype($2);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | L_DECLTYPE '('
+      {
+          $<address>$ = CURRENT_PROGRAM_SIZE;
+          compiling_decltype++;
+      }
+      expr0 ')'
+      {
+          compiling_decltype--;
+
+          $$.type = get_fulltype_flags(lpctype_lpctype, TYPE_MOD_LITERAL);
+          $$.start = CURRENT_PROGRAM_SIZE = $<address>3;
+          $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =  NULL;
+          $$.needs_use = true;
+
+          ins_prog_type($4.type.t_type);
+          free_fulltype($4.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -17045,8 +17155,6 @@ function_call:
 %line
           int         f;                 /* Function index */
           int         simul_efun;
-          lpctype_t **arg_types = NULL;  /* Argtypes from the program */
-          int         first_arg;         /* Startindex in arg_types[] */
           Bool        ap_needed;         /* TRUE if arg frame is needed */
           Bool        has_ellipsis;      /* TRUE if '...' was used */
 
@@ -17085,7 +17193,8 @@ function_call:
 
                   PREPARE_INSERT(6)
 
-                  function_t *funp = get_simul_efun_header($1.real);
+                  const program_t *progp;
+                  function_t *funp = get_simul_efun_header($1.real, &progp);
 
                   if (!(funp->flags & TYPE_MOD_VARARGS))
                   {
@@ -17118,7 +17227,7 @@ function_call:
                       ap_needed = MY_TRUE;
 
                   if (funp->offset.argtypes != NULL)
-                      check_function_call_types(get_argument_types_start($4), $4, funp, funp->offset.argtypes);
+                      check_function_call_types(get_argument_types_start($4), $4, funp, funp->offset.argtypes, progp->types);
 
                   if (simul_efun == I_GLOBAL_SEFUN_BY_NAME)
                   {
@@ -17169,6 +17278,9 @@ function_call:
 
                   function_t *funp;
                   function_t  inherited_function;
+                  unsigned short *arg_types = NULL;  /* arg types from the program */
+                  lpctype_t     **types = NULL;      /* actual types for lookup    */
+                  int             first_arg;         /* Start index in arg_types[] */
 
                   ap_needed = MY_TRUE;
 
@@ -17216,6 +17328,7 @@ function_call:
                        && NULL != (arg_types = super_prog->argument_types))
                       {
                           first_arg = super_prog->type_start[ix];
+                          types = super_prog->types;
                       }
                       else
                       {
@@ -17242,6 +17355,7 @@ function_call:
                           inherited_function.flags = prog->functions[f];
                           get_function_information(&inherited_function, prog, f);
                           arg_types = prog->argument_types;
+                          types = prog->types;
                           if (arg_types != NULL)
                               first_arg = prog->type_start[f];
                           else
@@ -17251,7 +17365,8 @@ function_call:
                       else
                       {
                           funp = FUNCTION(f);
-                          arg_types = GET_BLOCK(A_ARGUMENT_TYPES);
+                          arg_types = NULL;
+                          types = GET_BLOCK(A_ARGUMENT_TYPES);
                           first_arg = ARGUMENT_INDEX(f);
                       }
                   }
@@ -17312,7 +17427,13 @@ function_call:
                   /* Check the argument types.
                    */
                   if (exact_types && first_arg != INDEX_START_NONE)
-                      check_function_call_types(get_argument_types_start($4), $4, funp, arg_types + first_arg);
+                  {
+                      if (arg_types)
+                          arg_types += first_arg;
+                      else
+                          types += first_arg;
+                      check_function_call_types(get_argument_types_start($4), $4, funp, arg_types, types);
+                  }
 
               } /* if (inherited lfun) */
 
@@ -17794,7 +17915,7 @@ function_call:
                               , get_txt(funp->name));
 
                   if (funp->offset.argtypes != NULL)
-                      check_function_call_types(get_argument_types_start(num_arg), num_arg, funp, funp->offset.argtypes);
+                      check_function_call_types(get_argument_types_start(num_arg), num_arg, funp, funp->offset.argtypes, simul_efun_table[sefun].program->types);
 
                   if (!(funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
                    && !has_ellipsis)
@@ -18007,7 +18128,7 @@ function_name:
           if ( !strcmp($1, "efun")
            && fun->type == I_TYPE_GLOBAL
            && fun->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-           && (get_simul_efun_header(fun)->flags & TYPE_MOD_NO_MASK)
+           && (get_simul_efun_header(fun, NULL)->flags & TYPE_MOD_NO_MASK)
            && master_ob
            && (!EVALUATION_TOO_LONG())
              )
@@ -18708,8 +18829,59 @@ insert_pop_value (void)
 } /* insert_pop_value() */
 
 /*-------------------------------------------------------------------------*/
+static int
+get_type_index (lpctype_t *t)
+
+/* Add <t> to the programs type list.
+ */
+
+{
+    int idx;
+    for (idx = 0; idx < PROG_TYPE_COUNT; idx++)
+        if (PROG_TYPE(idx) == t)
+            break;
+
+    if (idx == PROG_TYPE_COUNT)
+    {
+        if (idx > (long)USHRT_MAX)
+            return -1;
+
+        ADD_PROG_TYPE(ref_lpctype(t));
+    }
+
+    return idx;
+} /* get_type_index() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ins_prog_type (lpctype_t *t)
+
+/* Add the type <t> to the program types and insert codes to put it
+ * on the stack into the current bytecode. The references are not adopted.
+ * Returns the number of bytes written to the bytecode.
+ */
+{
+    if (string_context)
+    {
+        svalue_t sv = svalue_lpctype(ref_lpctype(t));
+        return ins_lambda_value(&sv);
+    }
+    else
+    {
+        PREPARE_INSERT(3);
+
+        add_f_code(F_PUSH_TYPE);
+        add_short(get_type_index(t));
+
+        CURRENT_PROGRAM_SIZE += 3;
+        return 3;
+    }
+} /* ins_prog_type() */
+
+/*-------------------------------------------------------------------------*/
 static void
 add_type_check (lpctype_t *expected, enum type_check_operation op)
+
 /* Adds an instruction for type checking the topmost value
  * on the stack against <expected>.
  */
@@ -18730,25 +18902,7 @@ add_type_check (lpctype_t *expected, enum type_check_operation op)
         return;
 
     /* Now get an index for the type in our type list. */
-    for (idx = 0; idx < ARGTYPE_COUNT; idx++)
-        if (ARGUMENT_TYPE(idx) == expected)
-            break;
-
-    if (idx == ARGTYPE_COUNT)
-    {
-        /* Check that there is space in the argument type list. */
-        if (arg_types_exhausted)
-            return;
-
-        if (idx > (long)USHRT_MAX)
-        {
-            arg_types_exhausted = true;
-            yywarnf("Type buffer exhausted, cannot store and verify argument types.");
-            return;
-        }
-
-        ADD_ARGUMENT_TYPE(ref_lpctype(expected));
-    }
+    idx = get_type_index(expected);
 
     ins_f_code(F_TYPE_CHECK);
     ins_byte(op);
@@ -19676,7 +19830,8 @@ inherit_functions (program_t *from, uint32 inheritidx)
         A_ARGUMENT_INDEX_t argindex = INDEX_START_NONE; /* Presume not available. */
         if (from->type_start != 0)
         {
-            if (from->type_start[i] != INDEX_START_NONE)
+            unsigned short arg_type_idx = from->type_start[i];
+            if (arg_type_idx != INDEX_START_NONE)
             {
                 /* They are available for function number 'i'. Copy types of
                  * all arguments, and remember where they started.
@@ -19684,18 +19839,9 @@ inherit_functions (program_t *from, uint32 inheritidx)
                 argindex = ARGTYPE_COUNT;
                 if (fun_p->num_arg)
                 {
-                    int ix;
-
-                    ix = ARGTYPE_COUNT;
-
-                    add_to_mem_block(
-                      A_ARGUMENT_TYPES,
-                      &from->argument_types[from->type_start[i]],
-                      (sizeof (A_ARGUMENT_TYPES_t)) * fun_p->num_arg
-                    );
-
-                    for ( ; (size_t)ix < ARGTYPE_COUNT; ix++)
-                        ref_lpctype(ARGUMENT_TYPE(ix));
+                    reserve_mem_block(A_ARGUMENT_TYPES, sizeof(A_ARGUMENT_TYPES_t) * fun_p->num_arg);
+                    for (int pos = 0; pos < fun_p->num_arg; pos++)
+                        ADD_ARGUMENT_TYPE(ref_lpctype(from->types[from->argument_types[arg_type_idx+pos]]));
                 }
 
             }
@@ -21649,6 +21795,7 @@ prolog (const char * fname, Bool isMasterObj)
     string_context = NULL;
     lambda_values_table_level = 0;
     lambda_values_offset = 0;
+    compiling_decltype = 0;
 
     free_all_local_names();   /* In case of earlier error */
 
@@ -21834,6 +21981,9 @@ epilog_free_all (void)
                        );
 
     /* Free the type information */
+    for (size_t i = 0; i < PROG_TYPE_COUNT; i++)
+        free_lpctype(PROG_TYPE(i));
+
     for (size_t i = 0; i < ARGTYPE_COUNT; i++)
         free_lpctype(ARGUMENT_TYPE(i));
 
@@ -22255,6 +22405,22 @@ epilog (void)
 
     } /* if (parse successful) */
 
+    /* Save argument types into A_TYPES. */
+    if (pragma_save_types)
+    {
+        extend_mem_block(A_ARGUMENT_TYPE_INDEX, ARGTYPE_COUNT * sizeof(A_ARGUMENT_TYPE_INDEX_t));
+        for (i = 0; i < ARGTYPE_COUNT; i++)
+            ARGUMENT_TYPE_INDEX(i) = get_type_index(ARGUMENT_TYPE(i));
+    }
+    else
+        mem_block[A_ARGUMENT_INDEX].current_size = 0;
+
+    if (PROG_TYPE_COUNT > USHRT_MAX)
+        yyerror("Too many types");
+    for (i = 0; (size_t)i < ARGTYPE_COUNT; i++)
+        free_lpctype(ARGUMENT_TYPE(i));
+    mem_block[A_ARGUMENT_TYPES].current_size = 0;
+
     /* Remove the concrete struct definition from the lpctype object
      * and free the reference we took.
      */
@@ -22318,13 +22484,6 @@ epilog (void)
 
         size = align(sizeof (program_t));
 
-        if (!pragma_save_types)
-        {
-            for (i = 0; (size_t)i < ARGTYPE_COUNT; i++)
-                free_lpctype(ARGUMENT_TYPE(i));
-            mem_block[A_ARGUMENT_TYPES].current_size = 0;
-            mem_block[A_ARGUMENT_INDEX].current_size = 0;
-        }
         for (i = 0; i< NUMPAREAS; i++)
         {
             if (i != A_LINENUMBERS)
@@ -22510,20 +22669,34 @@ epilog (void)
             prog->includes = NULL;
         p += align(mem_block[A_INCLUDES].current_size);
 
-        /* Add the argument type information
+        /* Add the type information
          */
-        if (pragma_save_types)
+        prog->num_types = PROG_TYPE_COUNT;
+        if (prog->num_types)
         {
-            if (mem_block[A_ARGUMENT_TYPES].current_size)
-                memcpy(p, mem_block[A_ARGUMENT_TYPES].block,
-                       mem_block[A_ARGUMENT_TYPES].current_size);
-            prog->argument_types = (A_ARGUMENT_TYPES_t *)p;
-            prog->num_argument_types = ARGTYPE_COUNT;
-            p += align(mem_block[A_ARGUMENT_TYPES].current_size);
+            memcpy(p, mem_block[A_TYPES].block
+                    , mem_block[A_TYPES].current_size);
+            prog->types = (A_TYPES_t *)p;
+        }
+        else
+        {
+            assert(GET_BLOCK_COUNT(A_ARGUMENT_TYPE_INDEX) == 0);
+            prog->types = NULL;
+        }
+        p += align(mem_block[A_TYPES].current_size);
+
+        /* Add argument type information.
+         */
+        if (GET_BLOCK_COUNT(A_ARGUMENT_TYPE_INDEX))
+        {
+            memcpy(p, mem_block[A_ARGUMENT_TYPE_INDEX].block
+                    , mem_block[A_ARGUMENT_TYPE_INDEX].current_size);
+            prog->argument_types = (A_ARGUMENT_TYPE_INDEX_t *)p;
+            p += align(mem_block[A_ARGUMENT_TYPE_INDEX].current_size);
 
             if (mem_block[A_ARGUMENT_INDEX].current_size)
-                memcpy(p, mem_block[A_ARGUMENT_INDEX].block,
-                       mem_block[A_ARGUMENT_INDEX].current_size);
+                memcpy(p, mem_block[A_ARGUMENT_INDEX].block
+                        , mem_block[A_ARGUMENT_INDEX].current_size);
             prog->type_start = (A_ARGUMENT_INDEX_t *)p;
             p += align(mem_block[A_ARGUMENT_INDEX].current_size);
         }
@@ -22531,10 +22704,6 @@ epilog (void)
         {
             prog->argument_types = NULL;
             prog->type_start = NULL;
-            prog->num_argument_types = 0;
-
-            for (i = 0; (size_t)i < ARGTYPE_COUNT; i++)
-                free_lpctype(ARGUMENT_TYPE(i));
         }
 
         /* Add the lightweight object call cache.

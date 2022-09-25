@@ -148,6 +148,8 @@ DESCRIPTION
 
     o struct    A collection of values. See structs(LPC).
 
+    o lpctype   A type itself. See lpctypes(LPC).
+
     o union     A range of types, either of which the variable
                 can contain at runtime. See unions(LPC).
 
@@ -168,5 +170,6 @@ HISTORY
 
 SEE ALSO
     alists(LPC), arrays(LPC), mappings(LPC), closures(LPC), coroutines(LPC),
-    objects(LPC), structs(LPC), unions(LPC), typeof(E), get_type_info(E),
-    inheritance(LPC), pragma(LPC), modifiers(LPC), escape(LPC)
+    objects(LPC), structs(LPC), unions(LPC), lpctypes(E), typeof(E),
+    get_type_info(E), inheritance(LPC), pragma(LPC), modifiers(LPC),
+    escape(LPC)

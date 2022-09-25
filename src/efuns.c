@@ -6374,6 +6374,14 @@ f_to_string (svalue_t *sp)
         break;
       }
 
+    case T_LPCTYPE:
+      {
+        string_t * rc = new_unicode_mstring(get_lpctype_name(sp->u.lpctype));
+        free_lpctype(sp->u.lpctype);
+        put_string(sp, rc);
+        break;
+      }
+
     case T_SYMBOL:
       {
         /* Easy: the symbol value is a string */
@@ -6403,6 +6411,7 @@ f_to_array (svalue_t *sp)
  *   mixed *to_array(quotedarray)
  *   mixed *to_array(mixed *)
  *   mixed *to_array(struct)
+ *   lpctype *to_array(lpctype)
  *
  * Strings and symbols are converted to an int array that
  * consists of the args characters.
@@ -6499,10 +6508,69 @@ f_to_array (svalue_t *sp)
     case T_POINTER:
         /* Good as it is */
         break;
+    case T_LPCTYPE:
+      {
+        lpctype_t *t = sp->u.lpctype;
+        vector_t *vec;
+        size_t pos = 0;
+
+        len = 1;
+        for (lpctype_t *cur = t; cur->t_class == TCLASS_UNION; cur = cur->t_union.head)
+            len++;
+
+        vec = allocate_array(len);
+        while (true)
+        {
+            if (t->t_class == TCLASS_UNION)
+            {
+                put_ref_lpctype(vec->item + pos, t->t_union.member);
+                t = t->t_union.head;
+            }
+            else
+            {
+                put_ref_lpctype(vec->item + pos, t);
+                break;
+            }
+            pos++;
+        }
+        free_lpctype(sp->u.lpctype);
+        put_array(sp, vec);
+        break;
+      }
     }
 
     return sp;
 } /* f_to_array() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_to_lpctype (svalue_t *sp)
+
+/* EFUN to_lpctype()
+ *
+ *   lpctype to_lpctype(string type)
+ *
+ * Interpret <type> as an lpctype and return the corresponding type object.
+ *
+ * We could use the LPC parser for this, but it has a high overhead.
+ * So we implement our own type parser here.
+ */
+
+{
+    const char *str = get_txt(sp->u.str);
+    const char *end = str + mstrsize(sp->u.str);
+    lpctype_t *result = parse_lpctype(&str, end);
+    if (!result)
+        errorf("Syntax error.\n");
+    if (str < end)
+    {
+        free_lpctype(result);
+        errorf("Extraneous characters at the end.\n");
+    }
+    free_mstring(sp->u.str);
+    put_lpctype(sp, result);
+    return sp;
+} /* f_to_lpctype() */
 
 /*-------------------------------------------------------------------------*/
 
@@ -8232,6 +8300,24 @@ v_get_type_info (svalue_t *sp, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_check_type (svalue_t *sp)
+
+/* EFUN check_type()
+ *
+ *   int check_type(mixed arg, lpctype type)
+ *
+ * Does RTTC of <type> against <arg> and return 1 if correct.
+ */
+
+{
+    bool result = check_rtt_compatibility(sp[0].u.lpctype, sp-1);
+    sp = pop_n_elems(2, sp);
+    push_number(sp, result ? 1 : 0);
+    return sp;
+} /* f_check_type() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 v_map (svalue_t *sp, int num_arg)
 
 /* EFUN map()
@@ -8474,6 +8560,7 @@ v_member (svalue_t *sp, int num_arg)
             case T_COROUTINE:
             case T_POINTER:
             case T_STRUCT:
+            case T_LPCTYPE:
 #ifdef USE_PYTHON
             case T_PYTHON:
 #endif
@@ -8787,6 +8874,7 @@ v_rmember (svalue_t *sp, int num_arg)
         case T_COROUTINE:
         case T_POINTER:
         case T_STRUCT:
+        case T_LPCTYPE:
 #ifdef USE_PYTHON
         case T_PYTHON:
 #endif

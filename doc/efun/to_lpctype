@@ -1,0 +1,12 @@
+SYNOPSIS
+        lpctype to_lpctype(string type)
+
+DESCRIPTION
+        Interprets the given string as an lpc type. This efun basically
+        returns the same type as the [<type>] literal.
+
+HISTORY
+        Introduced in LDMud 3.6.7.
+
+SEE ALSO
+        to_string(E), lpctypes(LPC)

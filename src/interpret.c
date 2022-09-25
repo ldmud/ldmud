@@ -438,6 +438,7 @@ static const char * svalue_typename[]
    , /* T_LWOBJECT */       "lwobject"
    , /* T_COROUTINE */      "coroutine"
    , /* T_PYTHON */         "python-object"
+   , /* T_LPCTYPE */        "lpctype"
    , /* T_CALLBACK */       "callback"
    , /* T_ERROR_HANDLER */  "error-handler"
    , /* T_BREAK_ADDR */     "break-address"
@@ -1237,6 +1238,10 @@ int_free_svalue (svalue_t *v)
         break;
 #endif
 
+    case T_LPCTYPE:
+        free_lpctype(v->u.lpctype);
+        break;
+
     case T_CALLBACK:
         free_callback(v->u.cb);
         xfree(v->u.cb);
@@ -1711,6 +1716,10 @@ internal_assign_svalue_no_free (svalue_t *to, svalue_t *from)
 
     case T_MAPPING:
         (void)ref_mapping(to->u.map);
+        break;
+
+    case T_LPCTYPE:
+        ref_lpctype(to->u.lpctype);
         break;
 
     case T_LVALUE:
@@ -8203,6 +8212,10 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
             valuetype = get_struct_type(bsvp->u.strct->type);
             break;
 
+        case T_LPCTYPE:
+            valuetype = lpctype_lpctype;
+            break;
+
 #ifdef USE_PYTHON
         case T_PYTHON:
             valuetype = get_python_type(bsvp->x.python_type);
@@ -8298,7 +8311,7 @@ check_function_args(int fx, program_t *progp, bytecode_p funstart)
         && progp->type_start && progp->type_start[fx] != INDEX_START_NONE)
     {
         // check for the correct argument types
-        lpctype_t **arg_type = progp->argument_types + progp->type_start[fx];
+        unsigned short *arg_type_idx = progp->argument_types + progp->type_start[fx];
         svalue_t *firstarg = inter_sp - csp->num_local_variables + 1;
         function_t *header = current_prog->function_headers + FUNCTION_HEADER_INDEX(funstart);
 
@@ -8306,16 +8319,17 @@ check_function_args(int fx, program_t *progp, bytecode_p funstart)
         int i = 0;
         while (i < formal_args)
         {
+            lpctype_t *arg_type = progp->types[arg_type_idx[i]];
             // do the types match (in case of structs also the structure)
             // or is the formal argument of type TYPE_ANY (mixed)?
-            if (!check_rtt_compatibility(arg_type[i], firstarg+i))
+            if (!check_rtt_compatibility(arg_type, firstarg+i))
             {
                 // How many control stack frames to remove.
                 int num_csf = 0;
 
-                // Determine the lpctype of arg_type[i] for a better error message.
+                // Determine the lpctype of arg[i] for a better error message.
                 static char buff[512];
-                lpctype_t *realtype = get_rtt_type(arg_type[i], firstarg+i);
+                lpctype_t *realtype = get_rtt_type(arg_type, firstarg+i);
                 get_lpctype_name_buf(realtype, buff, sizeof(buff));
                 free_lpctype(realtype);
 
@@ -8371,7 +8385,7 @@ check_function_args(int fx, program_t *progp, bytecode_p funstart)
                     // warnf will return (errors are caught).
                     warnf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
                            , i+1, get_txt(header->name), buff,
-                           get_lpctype_name(arg_type[i]));
+                           get_lpctype_name(arg_type));
 
                     for (int j = num_csf; j >= 0; j--)
                         *(++csp) = saved_csf[j];
@@ -8385,7 +8399,7 @@ check_function_args(int fx, program_t *progp, bytecode_p funstart)
 
                     errorf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
                            , i+1, get_txt(header->name), buff,
-                           get_lpctype_name(arg_type[i]));
+                           get_lpctype_name(arg_type));
                 }
             }
             ++i;
@@ -13538,6 +13552,10 @@ again:
                 i = (sp-1)->u.map == sp->u.map;
                 break;
 
+            case T_LPCTYPE:
+                i = (sp-1)->u.lpctype == sp->u.lpctype;
+                break;
+
 #ifdef USE_PYTHON
             case T_PYTHON:
                 i = (sp-1)->u.generic == sp->u.generic;
@@ -13634,6 +13652,10 @@ again:
                 break;
             case T_MAPPING:
                 i = (sp-1)->u.map != sp->u.map;
+                break;
+
+            case T_LPCTYPE:
+                i = (sp-1)->u.lpctype != sp->u.lpctype;
                 break;
 
 #ifdef USE_PYTHON
@@ -13763,8 +13785,20 @@ again:
                 break;
             }
 
+            case T_LPCTYPE:
+                if (item->type == T_LPCTYPE)
+                {
+                    if (item->u.lpctype == lpctype_void)
+                        result = 1;
+                    else
+                        result = lpctype_contains(item->u.lpctype, container->u.lpctype) ? 1 : 0;
+                }
+                else
+                    OP_ARG_ERROR(1, TF_LPCTYPE, item);
+                break;
+
             default:
-                OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING|TF_STRING|TF_BYTES, sp);
+                OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING|TF_STRING|TF_BYTES|TF_LPCTYPE, sp);
                 /* NOTREACHED */
         }
 
@@ -13803,6 +13837,7 @@ again:
          *   vector & mapping  -> vector
          *   mapping & vector  -> mapping
          *   mapping & mapping -> mapping
+         *   lpctype & lpctype -> lpctype
          *
          */
 
@@ -13862,8 +13897,22 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER|TF_MAPPING);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER|TF_MAPPING);
+        if (sp->type == T_LPCTYPE && (sp-1)->type == T_LPCTYPE)
+        {
+            lpctype_t * result = get_common_type(sp[-1].u.lpctype, sp[0].u.lpctype);
+
+            free_lpctype(sp[-1].u.lpctype);
+            free_lpctype(sp[0].u.lpctype);
+            sp--;
+            if (result)
+                sp->u.lpctype = result;
+            else
+                sp->u.lpctype = lpctype_void;
+            break;
+        }
+
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER|TF_MAPPING|TF_LPCTYPE);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER|TF_MAPPING|TF_LPCTYPE);
         ERRORF(("Arguments to & don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -13876,8 +13925,9 @@ again:
          * the result on the stack.
          *
          * Possible type combinations:
-         *   int    | int    -> int
-         *   array  | array  -> array
+         *   int     | int     -> int
+         *   array   | array   -> array
+         *   lpctype | lpctype -> lpctype
          *
          * TODO: Extend this to mappings.
          */
@@ -13890,7 +13940,7 @@ again:
         }
 #endif
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_POINTER);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_POINTER|TF_LPCTYPE);
         if ((sp-1)->type == T_NUMBER)
         {
             TYPE_TEST_RIGHT(sp, T_NUMBER);
@@ -13905,6 +13955,16 @@ again:
             inter_pc = pc;
             sp--;
             sp->u.vec = join_array(sp->u.vec, (sp+1)->u.vec);
+        }
+        else if (sp->type == T_LPCTYPE && (sp-1)->type == T_LPCTYPE)
+        {
+            TYPE_TEST_RIGHT(sp, T_LPCTYPE);
+            lpctype_t * result = get_union_type(sp[-1].u.lpctype, sp[0].u.lpctype);
+
+            free_lpctype(sp[-1].u.lpctype);
+            free_lpctype(sp[0].u.lpctype);
+            sp--;
+            sp->u.lpctype = result;
         }
 
         break;
@@ -15327,6 +15387,7 @@ again:
          *   array  & mapping -> array
          *   mapping & array -> mapping
          *   mapping & mapping -> mapping
+         *   lpctype & lpctype -> lpctype
          */
 
         svalue_t *argp;
@@ -15487,8 +15548,26 @@ again:
                 /* NOTREACHED */
             }
             break;
+
+        case T_LPCTYPE:
+            if (sp[-1].type == T_LPCTYPE)
+            {
+                lpctype_t * result = get_common_type(argp->u.lpctype, sp[-1].u.lpctype);
+
+                free_lpctype(argp->u.lpctype);
+                if (result)
+                    argp->u.lpctype = result;
+                else
+                    argp->u.lpctype = lpctype_void;
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_LPCTYPE, sp-1);
+            }
+            break;
+
         default:
-            OP_ARG_ERROR(1, TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER, argp);
+            OP_ARG_ERROR(1, TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER|TF_LPCTYPE, argp);
             /* NOTREACHED */
         }
 
@@ -15609,8 +15688,22 @@ again:
             }
             break;
 
+        case T_LPCTYPE:
+            if (sp[-1].type == T_LPCTYPE)
+            {
+                lpctype_t * result = get_union_type(argp->u.lpctype, sp[-1].u.lpctype);
+
+                free_lpctype(argp->u.lpctype);
+                argp->u.lpctype = result;
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_LPCTYPE, sp-1);
+            }
+            break;
+
         default:
-            OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER, argp);
+            OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER|TF_LPCTYPE, argp);
             /* NOTREACHED */
         }
 
@@ -18541,7 +18634,7 @@ again:
                 /* Do runtime type checks. */
                 for (int i = 0; i <= left; i++)
                 {
-                    lpctype_t* exptype = current_prog->argument_types[typeidx + i];
+                    lpctype_t* exptype = current_prog->types[current_prog->argument_types[typeidx + i]];
                     svalue_t * val = i ? (values + i - 1) : (indices->item + ix);
                     if (!check_rtt_compatibility(exptype, val))
                     {
@@ -18709,7 +18802,7 @@ again:
             if (typeidx != USHRT_MAX && current_prog->argument_types)
             {
                 /* Do runtime type checks. */
-                lpctype_t* exptype = current_prog->argument_types[typeidx];
+                lpctype_t* exptype = current_prog->types[current_prog->argument_types[typeidx]];
                 if (!check_rtt_compatibility(exptype, val))
                 {
                     char buf[512];
@@ -18998,10 +19091,9 @@ again:
     CASE(F_TYPE_CHECK);             /* --- type_check <op> <ix> --- */
     {
         /* Check the top value off the stack against the type
-         * at prog->argument_types[<ix>]. Raise an error if
-         * it doesn't match. Do nothing otherwise.
-         * <op> contains a value of enum type_check_operation to
-         * give a specific error message.
+         * at prog->types[<ix>]. Raise an error if it doesn't match.
+         * Do nothing otherwise. <op> contains a value of
+         * enum type_check_operation to give a specific error message.
          */
 
         unsigned short ix, op = LOAD_UINT8(pc);
@@ -19010,10 +19102,10 @@ again:
         LOAD_SHORT(ix, pc);
 
         /* Types were saved? */
-        if (!current_prog->argument_types)
+        if (!current_prog->types)
             break;
 
-        exptype = current_prog->argument_types[ix];
+        exptype = current_prog->types[ix];
         if (!check_rtt_compatibility(exptype, sp))
         {
             static char buff[512];
@@ -19053,6 +19145,23 @@ again:
                    op_str, buff, get_lpctype_name(exptype));
         }
 
+        break;
+    }
+
+    CASE(F_PUSH_TYPE);              /* --- push_type <ix> --- */
+    {
+        /* Push the type at prog->types[<ix>] as an lpctype onto
+         * the stack.
+         */
+        unsigned short ix;
+
+        LOAD_SHORT(ix, pc);
+
+        /* Types were saved? */
+        if (!current_prog->types)
+            break;
+
+        push_ref_lpctype(sp, current_prog->types[ix]);
         break;
     }
 
@@ -19374,6 +19483,25 @@ again:
         CALL_PYTHON_TYPE_EFUN(F_SYMBOLP, 1);
 
         i = sp->type == T_SYMBOL;
+        free_svalue(sp);
+        put_number(sp, i);
+        break;
+    }
+
+    CASE(F_LPCTYPEP);               /* --- lpctypep            --- */
+    {
+        /* EFUN lpctypep()
+         *
+         *   int lpctypep(mixed)
+         *
+         * Returns 1 if the argument is an LPC type object.
+         */
+
+        int i;
+
+        CALL_PYTHON_TYPE_EFUN(F_LPCTYPEP, 1);
+
+        i = sp->type == T_LPCTYPE;
         free_svalue(sp);
         put_number(sp, i);
         break;

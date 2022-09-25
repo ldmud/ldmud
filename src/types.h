@@ -13,6 +13,7 @@
 
 #include "driver.h"
 #include "typedefs.h"
+#include "svalue.h"
 
 typedef enum type_classes    type_classes_t;
 typedef enum primary_types   primary_types_t;
@@ -49,11 +50,11 @@ enum type_classes
     TCLASS_PRIMARY,
     TCLASS_STRUCT,
     TCLASS_OBJECT,
-#ifdef USE_PYTHON
-    TCLASS_PYTHON,
-#endif
     TCLASS_ARRAY,
-    TCLASS_UNION
+    TCLASS_UNION,
+#ifdef USE_PYTHON
+    TCLASS_PYTHON
+#endif
 };
 
 /* --- Primary type values --- */
@@ -71,6 +72,7 @@ enum primary_types
     TYPE_QUOTED_ARRAY =  9,
     TYPE_BYTES        = 10,
     TYPE_COROUTINE    = 11,
+    TYPE_LPCTYPE      = 12,
 };
 
 /* -- Object types -- */
@@ -264,7 +266,7 @@ struct fulltype_s
 extern lpctype_t *lpctype_int, *lpctype_string, *lpctype_bytes,
                  *lpctype_mapping, *lpctype_float, *lpctype_mixed,
                  *lpctype_closure, *lpctype_symbol, *lpctype_coroutine,
-                 *lpctype_quoted_array,
+                 *lpctype_lpctype, *lpctype_quoted_array,
                  *lpctype_any_struct, *lpctype_any_object,
                  *lpctype_any_lwobject, *lpctype_void, *lpctype_unknown;
 
@@ -272,7 +274,7 @@ extern lpctype_t *lpctype_int, *lpctype_string, *lpctype_bytes,
 extern lpctype_t _lpctype_int, _lpctype_string, _lpctype_bytes,
                  _lpctype_mapping, _lpctype_float, _lpctype_mixed,
                  _lpctype_closure, _lpctype_symbol, _lpctype_coroutine,
-                 _lpctype_quoted_array,
+                 _lpctype_lpctype, _lpctype_quoted_array,
                  _lpctype_any_struct, _lpctype_any_object,
                  _lpctype_any_lwobject, _lpctype_void, _lpctype_unknown;
 
@@ -296,6 +298,7 @@ extern void _free_lpctype(lpctype_t *t);
 extern bool lpctype_contains(lpctype_t* src, lpctype_t* dest);
 extern bool is_compatible_object(object_t *ob, lpctype_t *t);
 extern bool is_compatible_lwobject(lwobject_t *ob, lpctype_t *t);
+extern lpctype_t *parse_lpctype(const char** start, const char* end);
 extern int get_type_compat_int(lpctype_t *t);
 extern void types_driver_info(svalue_t *svp, int value) __attribute__((nonnull(1)));
 
@@ -363,6 +366,18 @@ static INLINE fulltype_t get_fulltype_flags(lpctype_t *t, typeflags_t f)
 {
     return ((fulltype_t) { .t_type = t, .t_flags = f });
 }
+
+static INLINE void put_ref_lpctype(svalue_t * const dest, lpctype_t * const t)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_ref_lpctype(svalue_t * const dest, lpctype_t * const t)
+/* Put the type <t> into <dest>, which is considered empty,
+ * and increment the refcount of <t>.
+ */
+{
+    *dest = svalue_lpctype(ref_lpctype(t));
+}
+
+#define push_ref_lpctype(sp,val) put_ref_lpctype(++(sp),val)
 
 #ifdef GC_SUPPORT
 

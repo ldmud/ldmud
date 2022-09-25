@@ -31,7 +31,7 @@
 #define RETURN_FUNCTION_NAME	0x01
 #define RETURN_FUNCTION_FLAGS	0x02
 #define RETURN_FUNCTION_TYPE	0x04
-
+#define RETURN_FUNCTION_LPCTYPE	0x20
 
 /* Additional return value flag types for functionlist() */
 
@@ -45,8 +45,8 @@
 
 
 /* Masks of the flag unions allowed for various efuns: */
-#define RETURN_FUNCTION_MASK    0x0f  /* functionlist() */
-#define RETURN_VARIABLE_MASK    0x0f  /* variable_list() */
+#define RETURN_FUNCTION_MASK    0x2f  /* functionlist() */
+#define RETURN_VARIABLE_MASK    0x2f  /* variable_list() */
 
 /* Return value flag types for function_exists() */
 

@@ -335,9 +335,10 @@ locate_out (program_t *prog)
     prog->includes           = MAKEOFFSET(include_t *, includes);
     if (prog->lwo_call_cache)
         prog->lwo_call_cache = MAKEOFFSET(call_cache_t *, lwo_call_cache);
+    prog->types              = MAKEOFFSET(lpctype_t **, types);
     if (prog->type_start)
     {
-        prog->argument_types = MAKEOFFSET(lpctype_t **, argument_types);
+        prog->argument_types = MAKEOFFSET(unsigned short *, argument_types);
         prog->type_start     = MAKEOFFSET(unsigned short *, type_start);
     }
     return MY_TRUE;
@@ -383,9 +384,10 @@ locate_in (program_t *prog)
     prog->includes           = MAKEPTR(include_t*, includes);
     if (prog->lwo_call_cache)
         prog->lwo_call_cache = MAKEPTR(call_cache_t *, lwo_call_cache);
+    prog->types              = MAKEPTR(lpctype_t **, types);
     if (prog->type_start)
     {
-        prog->argument_types = MAKEPTR(lpctype_t **, argument_types);
+        prog->argument_types = MAKEPTR(unsigned short *, argument_types);
         prog->type_start     = MAKEPTR(unsigned short *, type_start);
     }
 
@@ -1077,6 +1079,7 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
         case T_LWOBJECT:
         case T_CLOSURE:
         case T_COROUTINE:
+        case T_LPCTYPE:
         case T_LVALUE:
 #ifdef USE_PYTHON
         case T_PYTHON:
@@ -1240,6 +1243,7 @@ check_swapped_values (mp_int num, unsigned char * p)
         case T_LWOBJECT:
         case T_CLOSURE:
         case T_COROUTINE:
+        case T_LPCTYPE:
         case T_LVALUE:
 #ifdef USE_PYTHON
         case T_PYTHON:
@@ -1407,6 +1411,7 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
         case T_LWOBJECT:
         case T_CLOSURE:
         case T_COROUTINE:
+        case T_LPCTYPE:
         case T_LVALUE:
 #ifdef USE_PYTHON
         case T_PYTHON:
@@ -1599,6 +1604,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_MAPPING:
         case T_NUMBER:
         case T_FLOAT:
+        case T_LPCTYPE:
         case T_LVALUE:
 #ifdef USE_PYTHON
         case T_PYTHON:
@@ -2116,6 +2122,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_LWOBJECT:
         case T_CLOSURE:
         case T_COROUTINE:
+        case T_LPCTYPE:
         case T_LVALUE:
 #ifdef USE_PYTHON
         case T_PYTHON:

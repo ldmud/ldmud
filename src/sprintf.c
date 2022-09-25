@@ -87,6 +87,7 @@
 #include "mstrings.h"
 #include "object.h"
 #include "pkg-python.h"
+#include "prolang.h"
 #include "ptrtable.h"
 #include "random.h"
 #include "sent.h"
@@ -1191,6 +1192,15 @@ svalue_to_string ( fmt_state_t *st
         string_t *rc = coroutine_to_string(obj->u.coroutine);
         stradd(st, &str, get_txt(rc));
         free_mstring(rc);
+
+        break;
+      }
+
+    case T_LPCTYPE:
+      {
+        stradd(st, &str, "[");
+        stradd(st, &str, get_lpctype_name(obj->u.lpctype));
+        stradd(st, &str, "]");
 
         break;
       }

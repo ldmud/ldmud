@@ -27,7 +27,8 @@ DESCRIPTION
           Control of returned information:
             RETURN_FUNCTION_NAME    include the variable name
             RETURN_FUNCTION_FLAGS   include the variable flags
-            RETURN_FUNCTION_TYPE    include the return type
+            RETURN_FUNCTION_TYPE    include the variable type as an integer
+            RETURN_FUNCTION_LPCTYPE include the variable type as an lpctype
             RETURN_VARIABLE_VALUE   include the variable value
 
           Control of listed variables:
@@ -50,6 +51,7 @@ DESCRIPTION
 
 HISTORY
         Introduced in LDMud 3.2.10.
+        LDMud 3.6.7 introduced RETURN_FUNCTION_LPCTYPE.
 
 SEE ALSO
         inherit_list(E), functionlist(E), variable_exists(E)

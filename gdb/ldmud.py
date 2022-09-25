@@ -226,11 +226,12 @@ class SValuePrinter:
     T_LWOBJECT                       = 0xd
     T_COROUTINE                      = 0xe
     T_PYTHON                         = 0xf
-    T_CALLBACK                       = 0x10
-    T_ERROR_HANDLER                  = 0x11
-    T_BREAK_ADDR                     = 0x12
-    T_ARG_FRAME                      = 0x13
-    T_NULL                           = 0x14
+    T_LPCTYPE                        = 0x10
+    T_CALLBACK                       = 0x11
+    T_ERROR_HANDLER                  = 0x12
+    T_BREAK_ADDR                     = 0x13
+    T_ARG_FRAME                      = 0x14
+    T_NULL                           = 0x15
 
     LVALUE_UNPROTECTED               = 0x00
     LVALUE_UNPROTECTED_CHAR          = 0x01
@@ -260,6 +261,7 @@ class SValuePrinter:
         T_LWOBJECT:                       "T_LWOBJECT",
         T_COROUTINE:                      "T_COROUTINE",
         T_PYTHON:                         "T_PYTHON",
+        T_LPCTYPE:                        "T_LPCTYPE",
         T_CALLBACK:                       "T_CALLBACK",
         T_ERROR_HANDLER:                  "T_ERROR_HANDLER",
         T_BREAK_ADDR:                     "T_BREAK_ADDR",
@@ -358,9 +360,10 @@ class SValuePrinter:
             return [(".u.strct", val["u"]["strct"])]
         elif stype == self.T_PYTHON:
             return [(".u.generic", val["u"]["generic"])]
+        elif stype == self.T_LPCTYPE:
+            return [(".u.lpctype", val["u"]["lpctype"])]
         elif stype == self.T_CALLBACK:
-            return [(".u.cb", val["u"]["cb"]),
-                    (".x.extern_args", val["x"]["extern_args"])]
+            return [(".u.cb", val["u"]["cb"])]
         elif stype == self.T_ERROR_HANDLER:
             return [(".u.error_handler", val["u"]["error_handler"])]
         elif stype == self.T_BREAK_ADDR:
@@ -495,6 +498,8 @@ class TypePrinter:
     TYPE_SYMBOL       =  8
     TYPE_QUOTED_ARRAY =  9
     TYPE_BYTES        = 10
+    TYPE_COROUTINE    = 11
+    TYPE_LPCTYPE      = 12
 
     OBJECT_REGULAR    =  0
     OBJECT_LIGHTWEIGHT=  1
@@ -511,6 +516,8 @@ class TypePrinter:
         TYPE_SYMBOL:       "symbol",
         TYPE_QUOTED_ARRAY: "quoted_array",
         TYPE_BYTES:        "bytes",
+        TYPE_COROUTINE:    "coroutine",
+        TYPE_LPCTYPE:      "lpctype",
     }
 
     def __init__(self, val):

@@ -688,8 +688,8 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
         }
 
         /* Free all argument types. */
-        for (i = progp->num_argument_types; --i >= 0; )
-            free_lpctype(progp->argument_types[i]);
+        for (i = progp->num_types; --i >= 0; )
+            free_lpctype(progp->types[i]);
 
         /* Free the strings, variable names and include filenames. */
         do_free_sub_strings( progp->num_strings, progp->strings
@@ -1785,7 +1785,8 @@ f_functionlist (svalue_t *sp)
  *   Control of returned information:
  *     RETURN_FUNCTION_NAME    include the function name
  *     RETURN_FUNCTION_FLAGS   include the function flags
- *     RETURN_FUNCTION_TYPE    include the return type
+ *     RETURN_FUNCTION_TYPE    include the return type as int
+ *     RETURN_FUNCTION_LPCTYPE include the return type as lpctype
  *     RETURN_FUNCTION_NUMARG  include the number of arguments.
  *
  *     The name RETURN_FUNCTION_ARGTYPE is defined but not implemented.
@@ -2011,6 +2012,11 @@ f_functionlist (svalue_t *sp)
         if (mode_flags & RETURN_FUNCTION_NUMARG) {
             svp--;
             svp->u.number = header->num_arg;
+        }
+
+        if (mode_flags & RETURN_FUNCTION_LPCTYPE) {
+            svp--;
+            put_ref_lpctype(svp, header->type);
         }
 
         if (mode_flags & RETURN_FUNCTION_TYPE) {
@@ -2294,7 +2300,8 @@ f_variable_list (svalue_t *sp)
  *   Control of returned information:
  *     RETURN_FUNCTION_NAME    include the variable name
  *     RETURN_FUNCTION_FLAGS   include the variable flags
- *     RETURN_FUNCTION_TYPE    include the return type
+ *     RETURN_FUNCTION_TYPE    include the return type as int
+ *     RETURN_FUNCTION_LPCTYPE include the return type as lpctype
  *     RETURN_VARIABLE_VALUE   include the variable value
  *
  *   Control of listed variables:
@@ -2508,6 +2515,12 @@ f_variable_list (svalue_t *sp)
         {
             svp--;
             assign_svalue_no_free(svp, variables+i);
+        }
+
+        if (mode_flags & RETURN_FUNCTION_LPCTYPE)
+        {
+            svp--;
+            put_ref_lpctype(svp, var->type.t_type);
         }
 
         if (mode_flags & RETURN_FUNCTION_TYPE)
@@ -4811,6 +4824,7 @@ e_say (svalue_t *v, vector_t *avoid)
     case T_POINTER:
     case T_MAPPING:
     case T_STRUCT:
+    case T_LPCTYPE:
 #ifdef USE_PYTHON
     case T_PYTHON:
 #endif
@@ -5018,6 +5032,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     case T_POINTER:
     case T_MAPPING:
     case T_STRUCT:
+    case T_LPCTYPE:
 #ifdef USE_PYTHON
     case T_PYTHON:
 #endif
@@ -6966,6 +6981,26 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         break;
       }
 
+    case T_LPCTYPE:
+        if (!recall_pointer(v->u.lpctype))
+        {
+            const char *t = get_lpctype_name(v->u.lpctype);
+            if (t)
+            {
+                L_PUTC_PROLOG
+                L_PUTC('[')
+                while (*t)
+                    L_PUTC(*t++);
+                L_PUTC(']')
+                L_PUTC_EPILOG
+            }
+            else if (writable)
+                rc = MY_FALSE;
+            else
+                MY_PUTC('0');
+        }
+        break;
+
 #ifdef USE_PYTHON
     case T_PYTHON:
       {
@@ -7268,6 +7303,10 @@ register_svalue (svalue_t *svp)
 
       case T_CLOSURE:
         register_closure(svp);
+        break;
+
+      case T_LPCTYPE:
+        register_pointer(ptable, svp->u.lpctype);
         break;
 
       case T_LVALUE:
@@ -8025,6 +8064,28 @@ skip_element (char **str)
             *str = tmp_par.str;
             return true;
         }
+
+        case '[': /* lpctype */
+            while (true)
+            {
+               /* We look for ']', and skip any strings. */
+                char *end = strchr(pt, ']');
+                char *s = strchr(pt, '"');
+
+                if (!end)
+                    return false;
+
+                if (!s || s > end)
+                {
+                    *str = end+1;
+                    return true;
+                }
+
+                if (!skip_element(&s))
+                    return false;
+                pt = s;
+            }
+            break; /* NOTREACHED */
 
         case '#': /* A closure: skip the header and restart this check
                    * again from the data part.
@@ -9816,6 +9877,34 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
             return MY_FALSE;
         }
         break;
+
+    case '[': /* lpctype */
+      {
+        lpctype_t *result = NULL;
+        char *end = cp;
+
+        if (skip_element(&end))
+        {
+            const char *s = cp + 1;
+            result = parse_lpctype(&s, end - 1);
+            *pt = end;
+
+            if (s < end - 1)
+            {
+                free_lpctype(result);
+                result = NULL;
+            }
+        }
+
+        if (!result)
+        {
+            *svp = const0;
+            return MY_FALSE;
+        }
+
+        put_lpctype(svp, result);
+        break;
+      }
 
     case '-':  /* A number */
     case '0': case '1': case '2': case '3': case '4':

@@ -35,6 +35,9 @@ extern void strbuf_copy (strbuf_t *buf, char *cbuf);
 extern string_t * trim_all_spaces (const string_t * txt);
 extern char * xstrncpy(char * dest, const char * src, size_t num);
 extern size_t get_escaped_character(p_int c, char* buf, size_t buflen);
+extern bool string_needs_escape(const char * text, size_t len, bool allow_unicode);
+extern size_t escape_string(const char * text, size_t len, char * buf, size_t buflen, bool allow_unicode);
+extern size_t unescape_string(const char * text, size_t len, char * buf, size_t buflen);
 
 extern size_t parse_input_encoding(string_t* encoding, bool* ignore, bool* replace);
 

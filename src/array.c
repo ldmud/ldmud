@@ -3215,6 +3215,8 @@ sameval (svalue_t *arg1, svalue_t *arg2)
         return arg1->u.lwob == arg2->u.lwob;
     } else if (arg1->type == T_COROUTINE && arg2->type == T_COROUTINE) {
         return arg1->u.coroutine == arg2->u.coroutine;
+    } else if (arg1->type == T_LPCTYPE && arg2->type == T_LPCTYPE) {
+        return arg1->u.lpctype == arg2->u.lpctype;
     } else
         return 0;
 } /* sameval() */

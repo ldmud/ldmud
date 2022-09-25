@@ -493,6 +493,161 @@ get_escaped_character (p_int c, char* buf, size_t buflen)
 
     return 0;
 } /* get_escaped_character() */
+/*--------------------------------------------------------------------*/
+bool
+string_needs_escape (const char * text, size_t len, bool allow_unicode)
+
+/* Checks whether <text> (of size <len>) contains characters that would
+ * need escaping. If <allow_unicode> is false, all characters > 0x7f
+ * will need escape. Returns the number of additional bytes needed.
+ */
+
+{
+    for (size_t i = 0; i < len; i++)
+    {
+        char c = text[i];
+        if (c < 0x20)
+            return true;
+        if (c > 0x7f)
+        {
+            if (allow_unicode)
+                continue;
+            else
+                return true;
+        }
+        if (isescaped(c))
+            return true;
+    }
+    return false;
+} /* string_needs_escape() */
+
+/*--------------------------------------------------------------------*/
+size_t
+escape_string (const char * text, size_t len, char * buf, size_t buflen, bool allow_unicode)
+
+/* Escapes all characters of <text> (of size <len>) and puts the result
+ * into <buf> (of size <buflen>)). If the target buffer is not big enough,
+ * this function will return 0, otherwise returns the number of bytes
+ * written. No final zero byte is written.
+ */
+
+{
+    if (len > buflen)
+        return 0;
+
+    if (!string_needs_escape(text, len, allow_unicode))
+    {
+        memcpy(buf, text, len);
+        return len;
+    }
+    else
+    {
+        char * dest = buf;
+        for (size_t i = 0; i < len; )
+        {
+            p_int c;
+            size_t clen = utf8_to_unicode(text + i, len - i, &c);
+            if (!clen)
+            {
+                c = *(unsigned char*)text;
+                i++;
+            }
+            else
+                i += clen;
+
+            if (!allow_unicode || c < 0x80)
+            {
+                int s = get_escaped_character(c, dest, buf + buflen - dest);
+                if (!s)
+                    return 0;
+                dest += s;
+            }
+            else if (dest + 4 <= buf + buflen)
+                dest += unicode_to_utf8(c, dest);
+            else
+                return 0;
+        }
+
+        return dest - buf;
+    }
+} /* escape_string() */
+
+/*--------------------------------------------------------------------*/
+size_t
+unescape_string (const char * text, size_t len, char * buf, size_t buflen)
+
+/* Copies <text> (of size <len>) into <buf> (of size <buflen>) and
+ * thereby unescaping any escaped characters. If the target buffer is
+ * not big enough, this function will return 0, otherwise returns the
+ * number of bytes written (or 0 for any other error).
+ */
+
+{
+    char *dest = buf, *end = buf + buflen;
+    for (int i = 0; i < len ; i++)
+    {
+        if (dest == end)
+            return 0;
+
+        if (text[i] == '\\')
+        {
+            switch (text[++i])
+            {
+                case '0': *dest++ = '\0';   break;
+                case 'a': *dest++ = '\007'; break;
+                case 'b': *dest++ = '\b'  ; break;
+                case 'e': *dest++=  '\033'; break;
+                case 't': *dest++ = '\t'  ; break;
+                case 'n': *dest++ = '\n'  ; break;
+                case 'r': *dest++ = '\r'  ; break;
+                case 'u':
+                case 'U':
+                case 'x':
+                {
+                    int num_digits = (text[i] == 'x') ? 2 : (text[i] == 'u') ? 4 : 8;
+                    int check_digits = (text[i] != 'x');
+                    int value = 0;
+
+                    while (num_digits > 0)
+                    {
+                        int c = text[i+1];
+                        if (c >= '0' && c <= '9')
+                            value = (value<<4) + (c - '0');
+                        else if (c >= 'a' && c <= 'f')
+                            value = (value<<4) + (c - 'a');
+                        else
+                            break;
+
+                        i++;
+                        num_digits--;
+                    }
+
+                    /* All digits for u/U, at least one digit for x. */
+                    if (check_digits ? (num_digits > 0) : (num_digits == 2))
+                        return 0;
+
+                    /* Unicode range. */
+                    if (value >= 0x110000)
+                        return 0;
+
+                    if (dest + 4 > end)
+                        return 0;
+
+                    dest += unicode_to_utf8(value, dest);
+                    break;
+                }
+
+                default:
+                    *dest++ = text[i];
+                    break;
+            }
+        }
+        else
+            *dest++ = text[i];
+    }
+
+    return dest - buf;
+} /* unescape_string() */
 
 /*====================================================================*/
 

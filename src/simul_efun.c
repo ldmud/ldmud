@@ -491,12 +491,25 @@ query_simul_efun_file_name(void)
 }
 
 /*-------------------------------------------------------------------------*/
+program_t *
+get_simul_efun_program ()
+
+/* Return the program of the primary simul_efun object.
+ */
+
+{
+    return simul_efun_program;
+} /* get_simul_efun_program() */
+
+/*-------------------------------------------------------------------------*/
 function_t *
-get_simul_efun_header (ident_t* name)
+get_simul_efun_header (ident_t* name, const program_t **progp)
 
 /* Return the function header for the simul-efun <name>.
  * <name> must be a valid simul-efun identifier (i.e. there
  * must be a simul-efun object with such a function).
+ * If <progp> is not NULL, the corresponding program pointer
+ * will be returned there.
  */
 
 {
@@ -511,10 +524,12 @@ get_simul_efun_header (ident_t* name)
         if (fx == -1)
             fatal("Can't find simul_efun %s", get_txt(name->name));
 
-        return get_function_header(simul_efun_object->prog, fx);
+        return get_function_header_extended(simul_efun_object->prog, fx, progp, NULL);
     }
     else
     {
+        if (progp)
+            *progp = simul_efun_table[name->u.global.sim_efun].program;
         return &simul_efun_table[name->u.global.sim_efun].function;
     }
 } /* get_simul_efun_header() */

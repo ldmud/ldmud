@@ -1163,11 +1163,11 @@ clear_program_ref (program_t *p, Bool clear_ref)
         }
     }
 
-    if (p->argument_types)
+    if (p->types)
     {
-        lpctype_t** arg_type = p->argument_types;
-        for (i = p->num_argument_types; --i >= 0; arg_type++)
-            clear_lpctype_ref(*arg_type);
+        lpctype_t** t = p->types;
+        for (i = p->num_types; --i >= 0; t++)
+            clear_lpctype_ref(*t);
     }
 
 } /* clear_program_ref() */
@@ -1299,11 +1299,11 @@ gc_mark_program_ref (program_t *p)
             str = p->includes[i].filename; MARK_MSTRING_REF(str);
         }
 
-        if (p->argument_types)
+        if (p->types)
         {
-            lpctype_t** arg_type = p->argument_types;
-            for (i = p->num_argument_types; --i >= 0; arg_type++)
-                count_lpctype_ref(*arg_type);
+            lpctype_t** t = p->types;
+            for (i = p->num_types; --i >= 0; t++)
+                count_lpctype_ref(*t);
         }
     }
     else
@@ -1516,6 +1516,10 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
             clear_coroutine_ref(p->u.coroutine);
             continue;
 
+        case T_LPCTYPE:
+            clear_lpctype_ref(p->u.lpctype);
+            continue;
+
         case T_LVALUE:
             switch (p->x.lvalue_type)
             {
@@ -1719,6 +1723,10 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num
 
         case T_SYMBOL:
             MARK_MSTRING_REF(p->u.str);
+            continue;
+
+        case T_LPCTYPE:
+            count_lpctype_ref(p->u.lpctype);
             continue;
 
         case T_LVALUE:

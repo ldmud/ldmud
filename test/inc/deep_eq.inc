@@ -23,6 +23,7 @@ int deep_eq(mixed arg1, mixed arg2)
         case T_OBJECT:
         case T_LWOBJECT:
         case T_COROUTINE:
+        case T_LPCTYPE:
             return arg1 == arg2;
 
         case T_POINTER:

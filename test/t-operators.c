@@ -103,6 +103,55 @@ mixed *tests = ({
     ({ "&(bytes[]) in &(bytes[]) 1",   0, (: bytes str = b"Some String"; return   &(str[5..7]) in &(str[5..7])  &&   &(str[5..5]) in &(str[5..7])  &&   &(str[0..0]) in &(str[5..7]);  :) }),
     ({ "&(bytes[]) in &(bytes[]) 2",   0, (: bytes str = b"Some String"; return !(&(str[0..4]) in &(str[5..7])) && !(&(str[4..5]) in &(str[5..7])) && !(&(str[5..8]) in &(str[5..7])); :) }),
 
+    ({ "[int] == [int]", 0,               (:   [int]        == [int]         :) }),
+    ({ "[int] == [string]", 0,            (: !([int]        == [string])     :) }),
+    ({ "[int|string] == [string|int]", 0, (:   [int|string] == [string|int]  :) }),
+    ({ "[int|string] == [object|int]", 0, (: !([int|string] == [object|int]) :) }),
+    ({ "[int] == [mixed]", 0,             (: !([int]        == [mixed])      :) }),
+    ({ "[int] == [void]", 0,              (: !([int]        == [void])       :) }),
+
+    ({ "[int] != [int]", 0,               (: !([int]        != [int])        :) }),
+    ({ "[int] != [string]", 0,            (:   [int]        != [string]      :) }),
+    ({ "[int|string] != [string|int]", 0, (: !([int|string] != [string|int]) :) }),
+    ({ "[int|string] != [object|int]", 0, (:   [int|string] != [object|int]  :) }),
+    ({ "[int] != [mixed]", 0,             (:   [int]        != [mixed]       :) }),
+    ({ "[int] != [void]", 0,              (:   [int]        != [void]        :) }),
+
+    ({ "[int] | [float]", 0,              (: ([int]        | [float])     == [int|float]        :) }),
+    ({ "[int] | [int|float]", 0,          (: ([int]        | [int|float]) == [int|float]        :) }),
+    ({ "[int|string] | [int|float]", 0,   (: ([int|string] | [int|float]) == [int|string|float] :) }),
+    ({ "[int] | [mixed]", 0,              (: ([int]        | [mixed])     == [mixed]            :) }),
+    ({ "[int] | [void]", 0,               (: ([int]        | [void])      == [int]              :) }),
+
+    ({ "[int] & [float]", 0,              (: ([int]        & [float])     == [void]             :) }),
+    ({ "[int] & [int|float]", 0,          (: ([int]        & [int|float]) == [int]              :) }),
+    ({ "[int|string] & [int|float]", 0,   (: ([int|string] & [int|float]) == [int]              :) }),
+    ({ "[int] & [mixed]", 0,              (: ([int]        & [mixed])     == [int]              :) }),
+    ({ "[int] & [void]", 0,               (: ([int]        & [void])      == [void]             :) }),
+
+    ({ "[int] |= [float]", 0,             (: lpctype val = [int];        val |= [float];     return val == [int|float];        :) }),
+    ({ "[int] |= [int|float]", 0,         (: lpctype val = [int];        val |= [int|float]; return val == [int|float];        :) }),
+    ({ "[int|string] |= [int|float]", 0,  (: lpctype val = [int|string]; val |= [int|float]; return val == [int|string|float]; :) }),
+    ({ "[int] |= [mixed]", 0,             (: lpctype val = [int];        val |= [mixed];     return val == [mixed];            :) }),
+    ({ "[int] |= [void]", 0,              (: lpctype val = [int];        val |= [void];      return val == [int];              :) }),
+
+    ({ "[int] &= [float]", 0,             (: lpctype val = [int];        val &= [float];     return val == [void];             :) }),
+    ({ "[int] &= [int|float]", 0,         (: lpctype val = [int];        val &= [int|float]; return val == [int];              :) }),
+    ({ "[int|string] &= [int|float]", 0,  (: lpctype val = [int|string]; val &= [int|float]; return val == [int];              :) }),
+    ({ "[int] &= [mixed]", 0,             (: lpctype val = [int];        val &= [mixed];     return val == [int];              :) }),
+    ({ "[int] &= [void]", 0,              (: lpctype val = [int];        val &= [void];      return val == [void];             :) }),
+
+    ({ "[int] in [float]", 0,             (: !([int]        in [float])     :) }),
+    ({ "[int] in [int|float]", 0,         (:   [int]        in [int|float]  :) }),
+    ({ "[int|string] in [int|float]", 0,  (: !([int|string] in [int|float]) :) }),
+    ({ "[int] in [mixed]", 0,             (:   [int]        in [mixed]      :) }),
+    ({ "[int] in [void]", 0,              (: !([int]        in [void])      :) }),
+    ({ "[mixed] in [int]", 0,             (: !([mixed]      in [int])       :) }),
+    ({ "[void] in [int]", 0,              (:   [void]       in [int]        :) }),
+
+    ({ "decltype(42)", 0,                 (: decltype(42) == [int]                    :) }),
+    ({ "decltype(int var)", 0,            (: int var; return decltype(var) ==  [int]; :) }),
+    ({ "decltype(fun())", 0,              (: decltype(deep_eq("A","B")) ==  [int]     :) }),
 });
 
 void run_test()
