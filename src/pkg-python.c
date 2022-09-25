@@ -6539,6 +6539,7 @@ ldmud_closure_init (ldmud_closure_t *self, PyObject *args, PyObject *kwds)
                 PyErr_SetString(PyExc_MemoryError, "out of memory while unswapping");
                 return -1;
             }
+            prog = sv_lfun_ob.u.ob->prog;
         }
 
         funname = find_tabled_str_n(name, length, STRING_UTF8);
