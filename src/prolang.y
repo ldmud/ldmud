@@ -7137,7 +7137,7 @@ get_struct_index (lpctype_t* stype)
             if (idx == USHRT_MAX)
                 return -2; /* Not enough space to do so. */
 
-            sdef.type = stype->t_struct.def;
+            sdef.type = ref_struct_type(stype->t_struct.def);
             sdef.flags = NAME_HIDDEN;
             sdef.inh = STRUCT_INH_USAGE;
 
