@@ -5,6 +5,7 @@ public inherit "tl-private-struct2-a";
 
 int run_test()
 {
+#if __EFUN_DEFINED__(last_instructions)
     string *instrs;
 
     if (sv2.member2 != 42)
@@ -25,4 +26,7 @@ int run_test()
     }
     /* Instruction not found? */
     return 0;
+#else
+    return sv2.member2 == 42;
+#endif
 }

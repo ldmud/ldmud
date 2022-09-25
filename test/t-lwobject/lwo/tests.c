@@ -270,6 +270,7 @@ int run_tests()
                     && !sizeof(({cl3, cl2, cl1, lwob2, lwob1})^({lwob1, lwob2, cl1, cl2, cl3}));
             }
         }),
+#if __EFUN_DEFINED__(last_instructions)
         ({ "last_instructions()", 0,
             function int()
             {
@@ -278,6 +279,7 @@ int run_tests()
                 return 1;
             }
         }),
+#endif
         ({ "typeof(TO)", 0,
             function int()
             {

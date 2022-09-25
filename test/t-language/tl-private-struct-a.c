@@ -5,6 +5,7 @@ public inherit "ti-private-struct";
 
 int run_test()
 {
+#if __EFUN_DEFINED__(last_instructions)
     string *instrs;
 
     if (sv.member != 42)
@@ -25,4 +26,7 @@ int run_test()
     }
     /* Instruction not found? */
     return 0;
+#else
+    return sv.member == 42;
+#endif
 }

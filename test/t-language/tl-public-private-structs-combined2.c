@@ -6,6 +6,7 @@ public inherit "ti-private-struct2";
 
 int run_test2()
 {
+#if __EFUN_DEFINED__(last_instructions)
     string *instrs;
 
     if (sv2.member2 != 42)
@@ -27,10 +28,14 @@ int run_test2()
 
     /* Instruction not found? */
     return 0;
+#else
+    return sv2.member2 == 42;
+#endif
 }
 
 int run_test1()
 {
+#if __EFUN_DEFINED__(last_instructions)
     string *instrs;
 
     struct s v = (<s> 100);
@@ -54,6 +59,11 @@ int run_test1()
 
     /* Instruction not found? */
     return 0;
+#else
+    struct s v = (<s> 100);
+
+    return v.member == 100;
+#endif
 }
 
 int run_test()
