@@ -3505,7 +3505,7 @@ ldmud_lwobject_init (ldmud_lwobject_t *self, PyObject *args, PyObject *kwds)
         {
             if(self->lpc_lwobject)
                 free_lwobject(self->lpc_lwobject);
-            self->lpc_lwobject = ref_lwobject(data.lwob);
+            self->lpc_lwobject = data.lwob;
             return 0;
         }
         else
