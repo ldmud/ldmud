@@ -273,6 +273,11 @@ void run_test()
                 string elem = r.choice(elems);
                 if (sizeof(elem) != 1 || elem[0] < 'A' || elem[0] > 'D')
                     return 0;
+
+                /* We cannot save that, but it should not bring an error. */
+                if (restore_value(save_value(r)) != 0)
+                    return 0;
+
                 return 1;
             :)
         }),

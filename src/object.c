@@ -6995,10 +6995,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         }
         else
         {
-            L_PUTC_PROLOG
-            L_PUTC('0');
-            L_PUTC(delimiter);
-            L_PUTC_EPILOG
+            MY_PUTC('0');
         }
 
         break;
