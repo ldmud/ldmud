@@ -609,6 +609,7 @@ f_sl_close (svalue_t * sp)
     return sp;
 } /* f_sl_close() */
 
+#if defined(ALLOCATOR_WRAPPERS)
 /*-------------------------------------------------------------------------*/
 static void *
 sl_mem_malloc (int size)
@@ -717,6 +718,7 @@ sl_mem_shutdown (void* data)
 
 {
 } /* sl_mem_shutdown() */
+#endif /* ALLOCATOR_WARPPERS */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -876,6 +878,7 @@ pkg_sqlite_init ()
  */
 
 {
+#if defined(ALLOCATOR_WRAPPERS)
     static const sqlite3_mem_methods mem_methods = {
         sl_mem_malloc,
         sl_mem_free,
@@ -886,6 +889,7 @@ pkg_sqlite_init ()
         sl_mem_shutdown,
         NULL
     };
+#endif /* ALLOCATOR_WRAPPERS */
 
     static sqlite3_vfs vfs_methods = {
         3,
@@ -917,7 +921,9 @@ pkg_sqlite_init ()
 
     sqlite3_vfs *orig_vfs;
 
+#if defined(ALLOCATOR_WRAPPERS)
     sqlite3_config(SQLITE_CONFIG_MALLOC, &mem_methods);
+#endif
     sqlite3_config(SQLITE_CONFIG_LOG, &sl_log, NULL);
 
     /* Disable URI handling, so no other VFS can be selected. */

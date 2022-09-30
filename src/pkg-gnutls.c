@@ -290,7 +290,7 @@ initialize_tls_session (gnutls_session_t *session, Bool outgoing)
     gnutls_session_set_ptr( *session, (void*)(intptr_t) current_key);
 } /* initialize_tls_session() */
 
-#if GNUTLS_VERSION_NUMBER < 0x030300
+#if defined(ALLOCATOR_WRAPPERS) && GNUTLS_VERSION_NUMBER < 0x030300
 /*-------------------------------------------------------------------------*/
 static void *
 tls_xalloc (size_t size)
@@ -331,7 +331,7 @@ tls_xfree (void *p)
 {
     return pfree(p);
 } /* tls_xfree() */
-#endif // GNUTLS_VERSION_NUMBER
+#endif /* ALLOCATOR_WRAPPERS && GNUTLS_VERSION_NUMBER */
 
 /*-------------------------------------------------------------------------*/
 static gnutls_datum_t
@@ -862,7 +862,7 @@ tls_global_init (void)
     keys = NULL;
     current_key = 0;
 
-#if GNUTLS_VERSION_NUMBER < 0x030300
+#if defined(ALLOCATOR_WRAPPERS) && GNUTLS_VERSION_NUMBER < 0x030300
     /* In order to be able to identify gnutls allocations as such, we redirect
      * all allocations through the driver's allocator. The wrapper functions
      * make sure that the allocations are annotated properly with this source
@@ -873,7 +873,8 @@ tls_global_init (void)
                                     NULL,
                                     tls_rexalloc,
                                     tls_xfree);
-
+    gnutls_global_init();
+#elif GNUTLS_VERSION_NUMBER < 0x030300
     gnutls_global_init();
 #endif
 

@@ -293,6 +293,15 @@
  */
 @cdef_malloc_replaceable@ MALLOC_REPLACEABLE
 
+/* Should third party libraries have their allocators wrapped to use our own?
+ * If third party libraries (e.g. pkg-openssl) will be invoked by threads
+ * other than the game driver these wrappers will cause crashes from overlapping
+ * stack/heap memory and should be disabled. Most users will not need to
+ * change this value from the default. Disabling the wrappers will obscure
+ * the driver's ability to track memory usage related to the third party libs.
+ */
+@cdef_allocator_wrappers@ ALLOCATOR_WRAPPERS
+
 /* --- Wizlist --- */
 
 /* Where to save the WIZLIST information.

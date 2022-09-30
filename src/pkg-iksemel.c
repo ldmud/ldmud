@@ -51,6 +51,7 @@ struct xml_cleanup_s
     iksparser *parser;
 };
 
+#if defined(ALLOCATOR_WRAPPERS)
 void *
 iksemel_alloc(size_t size)
 {
@@ -62,6 +63,7 @@ iksemel_free(void *ptr)
 {
     pfree(ptr);
 }
+#endif /* ALLOCATOR_WRAPPERS */
 
 void
 add_string_to_mapping(mapping_t *map, char *skey, char *svalue)
@@ -406,7 +408,9 @@ generate_xml_node(vector_t *vnode, iks *parent)
 void
 pkg_iksemel_init()
 {
+#if defined(ALLOCATOR_WRAPPERS)
     iks_set_mem_funcs(iksemel_alloc, iksemel_free);
+#endif /* ALLOCATOR_WRAPPERS */
 }
 
 /*=========================================================================*/
