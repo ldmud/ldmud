@@ -56,6 +56,7 @@ struct xml_cleanup_s
     xmlBufferPtr buf;
 };
 
+#if defined(ALLOCATOR_WRAPPERS)
 static void *
 xml_pkg_malloc (size_t size)
 
@@ -105,6 +106,7 @@ xml_pkg_strdup (const char * str)
     }
     return p;
 }
+#endif /* ALLOCATOR_WRAPPERS */
 
 static void
 add_string_to_mapping (mapping_t *map, const char *skey, const char *svalue)
@@ -433,8 +435,10 @@ write_xml_node(svalue_t * vnode, mp_int vsize, xmlTextWriterPtr writer)
 void
 pkg_xml2_init ()
 {
+#if defined(ALLOCATOR_WRAPPERS)
     // First override the default memory access functions
     xmlMemSetup(xml_pkg_free, xml_pkg_malloc, xml_pkg_realloc, xml_pkg_strdup);
+#endif
 
     // Check for correct libxml version.
     LIBXML_TEST_VERSION
