@@ -116,6 +116,7 @@ extern struct_type_t * struct_new_type ( string_t        *name
                                        , struct_type_t   *base
                                        , int              num_members
                                        , struct_member_t *member);
+extern struct_name_t * struct_new_name (string_t *name, string_t *prog_name);
 extern struct_t * struct_new_anonymous (int num_members);
 extern void struct_free_empty (struct_t *pStruct);
 extern void struct_free (struct_t *pStruct);

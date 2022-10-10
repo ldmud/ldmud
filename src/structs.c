@@ -426,6 +426,57 @@ add_struct_name (struct_name_t * pSName)
 } /* add_struct_name() */
 
 /*-------------------------------------------------------------------------*/
+static struct_name_t*
+create_struct_name (string_t *name, string_t *prog_name)
+
+/* Create a new struct name for given program and struct name.
+ * The references on both strings are adopted.
+ * If there is an existing name for it, return a new reference to that.
+ */
+
+{
+    struct_name_t * pSName;
+    hash32_t hash = hash2(name, prog_name);
+
+    pSName = find_by_name(name, prog_name, hash);
+    if (pSName == NULL)
+    {
+        /* No name yet, create one. */
+        pSName = xalloc(STRUCT_NAME_MEMSIZE);
+        if (pSName == NULL)
+        {
+            free_mstring(name);
+            free_mstring(prog_name);
+            return NULL;
+        }
+        size_struct_type += STRUCT_NAME_MEMSIZE;
+
+        pSName->hash = hash;
+
+        pSName->ref = 1;
+        pSName->name = name;
+        pSName->prog_name = prog_name;
+
+        pSName->lpctype = NULL;
+        pSName->current = NULL;
+
+        if (!add_struct_name(pSName))
+        {
+            free_struct_name(pSName);
+            return NULL;
+        }
+    }
+    else
+    {
+        ref_struct_name(pSName);
+        free_mstring(name);
+        free_mstring(prog_name);
+    }
+
+    return pSName;
+} /* create_struct_name() */
+
+/*-------------------------------------------------------------------------*/
 static void
 remove_struct_name (struct_name_t * pSName)
 
@@ -505,42 +556,10 @@ struct_new_prototype ( string_t *name, string_t *prog_name )
 {
     struct_type_t * pSType;
     struct_name_t * pSName;
-    hash32_t hash = hash2(name, prog_name);
 
-    pSName = find_by_name(name, prog_name, hash);
+    pSName = create_struct_name(name, prog_name);
     if (pSName == NULL)
-    {
-        /* No name yet, create one. */
-        pSName = xalloc(STRUCT_NAME_MEMSIZE);
-        if (pSName == NULL)
-        {
-            free_mstring(name);
-            free_mstring(prog_name);
-            return NULL;
-        }
-        size_struct_type += STRUCT_NAME_MEMSIZE;
-
-        pSName->hash = hash;
-
-        pSName->ref = 1;
-        pSName->name = name;
-        pSName->prog_name = prog_name;
-
-        pSName->lpctype = NULL;
-        pSName->current = NULL;
-
-        if (!add_struct_name(pSName))
-        {
-            free_struct_name(pSName);
-            return NULL;
-        }
-    }
-    else
-    {
-        ref_struct_name(pSName);
-        free_mstring(name);
-        free_mstring(prog_name);
-    }
+        return NULL;
 
     pSType = xalloc(STRUCT_TYPE_MEMSIZE);
     if (pSType != NULL)
@@ -763,6 +782,30 @@ struct_type_update ( struct_type_t * pSType
         pSType->base = ref_struct_type(pNew);
     }
 } /* struct_type_update() */
+
+/*-------------------------------------------------------------------------*/
+struct_name_t *
+struct_new_name (string_t *name, string_t *prog_name)
+
+/* Create a new struct name for given program and struct name.
+ * The references on both strings are adopted.
+ * If there is an existing name for it, return a new reference to that.
+ */
+
+{
+    const char* sane_prog_name = make_name_sane(get_txt(prog_name), false, true);
+    string_t *prog_str;
+
+    if (sane_prog_name)
+    {
+        prog_str = new_tabled(sane_prog_name, prog_name->info.unicode);
+        free_mstring(prog_name);
+    }
+    else
+        prog_str = make_tabled(prog_name);
+
+    return create_struct_name(name, prog_str);
+} /* struct_new_name() */
 
 /*-------------------------------------------------------------------------*/
 struct_t *

@@ -116,14 +116,12 @@ lpctype_touch (lpctype_t *uniontype)
 
 /*-------------------------------------------------------------------------*/
 lpctype_t *
-get_struct_type (struct_type_t* def)
+get_struct_name_type (struct_name_t* name)
 
-/* Create an lpctype_t around <def>, check for already
- * existing definitions.
+/* Create an lpctype_t for struct name <name>.
  */
 
 {
-    struct_name_t* name = def->name;
     lpctype_t *type = name->lpctype;
 
     if (type != NULL)
@@ -134,7 +132,22 @@ get_struct_type (struct_type_t* def)
         type->t_class = TCLASS_STRUCT;
         type->t_struct.name = ref_struct_name(name);
         type->t_struct.def_idx = USHRT_MAX;
+        type->t_struct.def = NULL;
     }
+
+    return type;
+} /* get_struct_name_type() */
+
+/*-------------------------------------------------------------------------*/
+lpctype_t *
+get_struct_type (struct_type_t* def)
+
+/* Create an lpctype_t around <def>, check for already
+ * existing definitions.
+ */
+
+{
+    lpctype_t *type = get_struct_name_type(def->name);
 
     type->t_struct.def = def;
 

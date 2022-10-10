@@ -9,6 +9,28 @@ class TestModule(unittest.TestCase):
     def testSimulEfun(self):
         self.assertIsNone(ldmud.get_simul_efun())
 
+class TestBasicTypes(unittest.TestCase):
+    def testInteger(self):
+        self.assertEqual(ldmud.Integer(10), 10)
+        self.assertEqual(ldmud.Integer(10)+ldmud.Integer(10), 20)
+
+    def testFloat(self):
+        self.assertAlmostEqual(ldmud.Float(1.5), 1.5)
+        self.assertAlmostEqual(ldmud.Float(1.5)+ldmud.Integer(2), 3.5)
+
+    def testString(self):
+        self.assertEqual(ldmud.String("ABC"), "ABC")
+        self.assertEqual(ldmud.String("ABC")+ldmud.String("DEF"), "ABCDEF")
+
+    def testString(self):
+        self.assertEqual(ldmud.Bytes(b"ABC"), b"ABC")
+        self.assertEqual(ldmud.Bytes(b"ABC")+ldmud.Bytes(b"DEF"), b"ABCDEF")
+
+    def testMixed(self):
+        self.assertEqual(ldmud.Mixed(10), 10)
+        self.assertAlmostEqual(ldmud.Mixed(1.5) + ldmud.Mixed(2), 3.5)
+        self.assertEqual(list(ldmud.Mixed(ldmud.Array([42, 1.5, "Hi"]))), [42, 1.5, "Hi"])
+
 class TestObject(unittest.TestCase):
     def testEarlyObjectLoad(self):
         self.assertTrue(early_ob_worked)
@@ -46,7 +68,7 @@ class TestObject(unittest.TestCase):
         self.assertEqual(fun.name, "testfun")
         self.assertEqual(fun.file_name, "/testob.c")
         self.assertGreater(fun.line_number, 0)
-        self.assertEqual(fun.return_type, int)
+        self.assertEqual(fun.return_type, ldmud.Integer)
         self.assertEqual(fun.flags, ldmud.LF_NOMASK)
         self.assertEqual(fun.visibility, ldmud.VIS_PROTECTED)
         self.assertTrue("testfun" in repr(fun) and "testob" in repr(fun))
@@ -57,10 +79,10 @@ class TestObject(unittest.TestCase):
         args = fun.arguments
         self.assertEqual(len(args), 2)
         self.assertEqual(args[0].position, 1)
-        self.assertSetEqual(set(args[0].type), set((int, float,)))
+        self.assertSetEqual(set(args[0].type), set((ldmud.Integer, ldmud.Float,)))
         self.assertEqual(args[1].position, 2)
         self.assertEqual(args[1].flags, ldmud.LA_VARARGS)
-        self.assertEqual(args[1].type, ldmud.Array)
+        self.assertEqual(args[1].type, ldmud.Array[ldmud.String])
 
         self.assertEqual(fun(10, "A", "B", "C"), 3)
 
@@ -75,7 +97,7 @@ class TestObject(unittest.TestCase):
         self.assertIsNotNone(var)
         self.assertEqual(var.name, "testvar")
         self.assertEqual(var.value, 42)
-        self.assertSetEqual(set(var.type), set((int, float,)))
+        self.assertSetEqual(set(var.type), set((ldmud.Integer, ldmud.Float,)))
         self.assertEqual(var.flags, ldmud.VF_NOSAVE)
         self.assertEqual(var.visibility, ldmud.VIS_PROTECTED)
         self.assertTrue("testvar" in repr(var) and "testob" in repr(var))
@@ -128,7 +150,7 @@ class TestObject(unittest.TestCase):
             swap(ob)
             self.assertEqual(fun.file_name, "/testob.c")
             swap(ob)
-            self.assertEqual(fun.arguments[1].type, ldmud.Array)
+            self.assertEqual(fun.arguments[1].type, ldmud.Array[ldmud.String])
             swap(ob)
             self.assertEqual(fun(10, "A", "B", "C"), 3)
 
@@ -176,7 +198,7 @@ class TestLWObject(unittest.TestCase):
         self.assertEqual(fun.name, "testfun")
         self.assertEqual(fun.file_name, "/testob.c")
         self.assertGreater(fun.line_number, 0)
-        self.assertEqual(fun.return_type, int)
+        self.assertEqual(fun.return_type, ldmud.Integer)
         self.assertEqual(fun.flags, ldmud.LF_NOMASK)
         self.assertEqual(fun.visibility, ldmud.VIS_PROTECTED)
         self.assertTrue("testfun" in repr(fun) and "testob" in repr(fun))
@@ -187,10 +209,10 @@ class TestLWObject(unittest.TestCase):
         args = fun.arguments
         self.assertEqual(len(args), 2)
         self.assertEqual(args[0].position, 1)
-        self.assertSetEqual(set(args[0].type), set((int, float,)))
+        self.assertSetEqual(set(args[0].type), set((ldmud.Integer, ldmud.Float,)))
         self.assertEqual(args[1].position, 2)
         self.assertEqual(args[1].flags, ldmud.LA_VARARGS)
-        self.assertEqual(args[1].type, ldmud.Array)
+        self.assertEqual(args[1].type, ldmud.Array[ldmud.String])
 
         self.assertEqual(fun(10, "A", "B", "C"), 3)
 
@@ -206,7 +228,7 @@ class TestLWObject(unittest.TestCase):
         self.assertTrue(var)
         self.assertEqual(var.name, "testvar")
         self.assertEqual(var.value, 42)
-        self.assertSetEqual(set(var.type), set((int, float,)))
+        self.assertSetEqual(set(var.type), set((ldmud.Integer, ldmud.Float,)))
         self.assertEqual(var.flags, ldmud.VF_NOSAVE)
         self.assertEqual(var.visibility, ldmud.VIS_PROTECTED)
         self.assertTrue("testvar" in repr(var) and "testob" in repr(var))
@@ -506,7 +528,7 @@ class TestStruct(unittest.TestCase):
         mem = s.members.t_int
         self.assertIsNotNone(mem)
         self.assertEqual(mem.name, "t_int")
-        self.assertEqual(mem.type, int)
+        self.assertEqual(mem.type, ldmud.Integer)
 
     def testInitValueTuple(self):
         s = ldmud.Struct(self.master, "test_struct", (42, 1.5, 'Hi',))
@@ -876,6 +898,110 @@ class TestLvalue(unittest.TestCase):
     def testUninitializedLvalue(self):
         lv = ldmud.Lvalue.__new__(ldmud.Lvalue)
         self.assertEqual(ldmud.efuns.copy(lv), 0)
+
+class TestLPCType(unittest.TestCase):
+    def testPythonType(self):
+        lpctype = ldmud.LPCType
+        self.assertEqual(lpctype, lpctype.__class__)
+
+    def testConcreteArrayType(self):
+        obarray = ldmud.Array[ldmud.Object]
+        self.assertIn("Object", repr(obarray))
+        self.assertNotEqual(ldmud.efuns.check_type(obarray((ldmud.get_master(),)), obarray), 0)
+        self.assertEqual(ldmud.efuns.check_type(ldmud.Array((10,)), obarray), 0)
+        self.assertIn(obarray, ldmud.Array)
+
+        intarray = ldmud.Array[int]
+        self.assertIn("Integer", repr(intarray))
+        self.assertEqual(ldmud.efuns.check_type(obarray((ldmud.get_master(),)), intarray), 0)
+        self.assertNotEqual(ldmud.efuns.check_type(intarray((10,)), intarray), 0)
+        self.assertIn(intarray, ldmud.Array)
+        self.assertEqual(len(intarray((1,2,3,))), 3)
+
+    def testConcreteStructType(self):
+        master = ldmud.efuns.find_object("/master")
+        stype = ldmud.Struct[master, "test_struct"]
+        self.assertIn("Struct", repr(stype))
+        self.assertIn("test_struct", repr(stype))
+        self.assertNotEqual(ldmud.efuns.check_type(ldmud.Struct(master, "test_struct"), stype), 0)
+        self.assertEqual(ldmud.efuns.check_type(ldmud.Struct(master, "other_struct"), stype), 0)
+        self.assertIn(stype, ldmud.Struct)
+
+    def testUnloadedConcreteStructType(self):
+        master = ldmud.efuns.find_object("/master")
+        stype = ldmud.Struct["/teststruct", "test_struct"]
+        self.assertIn("Struct", repr(stype))
+        self.assertIn("test_struct", repr(stype))
+        self.assertNotEqual(ldmud.Struct[master, "test_struct"], stype)
+        self.assertIn(stype, ldmud.Struct)
+
+        # Should not be loaded
+        ob = ldmud.efuns.find_object("/teststruct")
+        self.assertFalse(ob)
+
+        s = stype([42])
+        self.assertIsNotNone(s)
+        self.assertEqual(s.members.value.value, 42)
+
+        # Should be loaded by now.
+        ob = ldmud.efuns.find_object("/teststruct")
+        self.assertTrue(ob)
+
+        stype2 = ldmud.Struct["/teststruct.c", "test_struct"]
+        self.assertEqual(stype, stype2)
+        s2 = stype([100])
+        self.assertIsNotNone(s2)
+        self.assertEqual(s2.members.value.value, 100)
+        ldmud.efuns.destruct(ob)
+
+    def testNamedObjectType(self):
+        obt1 = ldmud.Object["/master"]
+        obt2 = ldmud.Object["/master.c"]
+        obt3 = ldmud.Object["/testob"]
+        self.assertIn("Object", repr(obt1))
+        self.assertIn("testob", repr(obt3))
+        self.assertEqual(obt1, obt2)
+        self.assertNotEqual(obt1, obt3)
+        self.assertNotEqual(ldmud.efuns.check_type(ldmud.Object("/master"), obt1), 0)
+        self.assertEqual(ldmud.efuns.check_type(ldmud.Object("/master"), obt3), 0)
+        self.assertIn(obt1, ldmud.Object)
+        self.assertEqual(ldmud.Object("/master"), obt1("/master"))
+
+    def testNamedLWObjectType(self):
+        obt1 = ldmud.LWObject["/master"]
+        obt2 = ldmud.LWObject["/master.c"]
+        obt3 = ldmud.LWObject["/testob"]
+        self.assertIn("LWObject", repr(obt1))
+        self.assertIn("testob", repr(obt3))
+        self.assertEqual(obt1, obt2)
+        self.assertNotEqual(obt1, obt3)
+        self.assertEqual(ldmud.efuns.check_type(ldmud.LWObject("/testob"), obt1), 0)
+        self.assertNotEqual(ldmud.efuns.check_type(ldmud.LWObject("/testob"), obt3), 0)
+        self.assertNotEqual(ldmud.efuns.check_type(obt3("/testob"), obt3), 0)
+        self.assertIn(obt3, ldmud.LWObject)
+
+    def testInstantiation(self):
+        with self.assertRaises(Exception):
+            empty = ldmud.LPCType()
+        self.assertEqual(ldmud.LPCType(int), ldmud.Integer)
+
+    def testMixed(self):
+        self.assertIn(ldmud.Integer, ldmud.Mixed)
+        self.assertNotIn(ldmud.Mixed, ldmud.Integer)
+
+    def testVoid(self):
+        self.assertIn("Void", repr(ldmud.Void))
+        self.assertEqual(ldmud.Void | ldmud.Integer, ldmud.Integer)
+        self.assertEqual(ldmud.Integer | ldmud.Void, ldmud.Integer)
+
+    def testUnions(self):
+        self.assertSetEqual(set(ldmud.Integer | ldmud.String), set((ldmud.Integer, ldmud.String,)))
+        self.assertEqual(ldmud.Integer | ldmud.String, ldmud.Integer|str)
+        self.assertEqual(ldmud.Integer | ldmud.String, ldmud.String|int)
+        self.assertEqual(ldmud.Integer | ldmud.Mixed, ldmud.Mixed)
+        self.assertIn(ldmud.String, ldmud.Integer | ldmud.String)
+        self.assertEqual(ldmud.LPCType((ldmud.Integer, ldmud.String)), ldmud.Integer | ldmud.String)
+
 
 class TestEfuns(unittest.TestCase):
     def testDir(self):

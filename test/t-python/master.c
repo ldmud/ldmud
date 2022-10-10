@@ -18,6 +18,10 @@ struct test_struct
     coroutine t_coroutine;
 };
 
+struct other_struct
+{
+};
+
 void run_test()
 {
 #ifdef __PYTHON__
@@ -94,7 +98,7 @@ void run_test()
                        python_return(arr) == arr;
             :)
         }),
-        ({ "passing arrays", 0,
+        ({ "passing mappings", 0,
             (:
                 mapping m = ([1,2,3]);
                 return python_return(m) == m;
@@ -144,6 +148,33 @@ void run_test()
                 mixed* result = ({ &(python_return(&x)) });
                 result[0] = 66606;
                 return x == 66606;
+            :)
+        }),
+        ({ "passing lpctype", 0,
+            (:
+                return python_return([int])                == [int] &&
+                       python_return([string])             == [string] &&
+                       python_return([void])               == [void] &&
+                       python_return([mapping])            == [mapping] &&
+                       python_return([float])              == [float] &&
+                       python_return([closure])            == [closure] &&
+                       python_return([coroutine])          == [coroutine] &&
+                       python_return([symbol])             == [symbol] &&
+                       python_return([bytes])              == [bytes] &&
+                       python_return([lpctype])            == [lpctype] &&
+                       python_return([mixed])              == [mixed] &&
+                       python_return([object])             == [object] &&
+                       python_return([object "/master"])   == [object "/master"] &&
+                       python_return([lwobject])           == [lwobject] &&
+                       python_return([lwobject "/master"]) == [lwobject "/master"] &&
+                       python_return([struct mixed])       == [struct mixed] &&
+                       python_return([struct test_struct]) == [struct test_struct] &&
+                       python_return([mixed*])             == [mixed*] &&
+                       python_return([int*])               == [int*] &&
+                       python_return([symbol*])            == [symbol*] &&
+                       python_return([int|string])         == [int|string] &&
+                       python_return([lpctype])            == [lpctype] &&
+                       python_return([box])                == [box];
             :)
         }),
         ({ "passing too many arguments", TF_ERROR,

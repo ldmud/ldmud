@@ -175,6 +175,9 @@ LDMUD MODULE
                           One of the following:
                           VIS_PRIVATE, VIS_PROTECTED, VIS_VISIBLE, VIS_PUBLIC
 
+                For type checks the type object can be subscripted with a
+                filename to create a named object type: Object["/name"]
+
           - LWObject(filename)
                 Corresponds to the LPC lwobject type.
                 On instantiation a filename of a blueprint to create
@@ -194,12 +197,18 @@ LDMUD MODULE
                       Contains all variables as attributes. They are similar
                       to the same member of the Object type.
 
+                For type checks the type object can be subscripted with a
+                filename to create a named lwobject type: LWObject["/name"]
+
           - Array([values | size])
                 Corresponds to an LPC array.
                 Can either be initialized with a list of values
                 or to a given size.
 
                 Supports element access with [], len() and __contains__.
+
+                For type checks the type object can be subscripted with an
+                element type to create a concrete array type: Array[Mapping]
 
           - Mapping([values | width])
                 Corresponds to an LPC mapping.
@@ -237,6 +246,11 @@ LDMUD MODULE
                       type
                           The type as a Python object (maybe missing if
                           unknown or mixed).
+
+                For type checks the type object can be subscripted to create
+                a specific struct type: Struct[program, name], whereas the
+                program can be given as a file name or object. When using this
+                for creating a struct, only values need to be passed.
 
           - Closure(object [,name [, lfun_object]])
                 Corresponds to an LPC closure.
@@ -297,6 +311,22 @@ LDMUD MODULE
                 be created with the members attribute. It contains all
                 the struct members as attributes and will return an Lvalue
                 object to the struct member.
+
+          - LPCType(type)
+                Corresponds to an LPC lpctype value. For basic types this
+                is a no-op and returns the basic type. This type will provide
+                the corresponding LDMud type object for basic python types,
+                and it can be used to construct a union type by passing a
+                tuple of types.
+
+                A union type allows iteration over its basic types and
+                supports __contains__.
+
+          - Integer, Float, String, Bytes
+                These are derived types from Python's int, float, str and
+                bytes. They offer the | (or) operator to create union of
+                types.
+
 
         This module contains the following sub-namespaces:
 

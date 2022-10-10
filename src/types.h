@@ -279,6 +279,7 @@ extern lpctype_t _lpctype_int, _lpctype_string, _lpctype_bytes,
                  _lpctype_any_lwobject, _lpctype_void, _lpctype_unknown;
 
 
+extern lpctype_t *get_struct_name_type(struct_name_t* name);
 extern lpctype_t *get_struct_type(struct_type_t* def);
 extern lpctype_t *get_object_type(string_t* prog);
 extern lpctype_t *get_lwobject_type(string_t* prog);
