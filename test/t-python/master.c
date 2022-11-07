@@ -481,6 +481,13 @@ void run_test()
                     return;
                 }
 
+                if(has_gil_log_message())
+                {
+                    msg("Python GIL was held during backend loop!\n");
+                    shutdown(1);
+                    return;
+                }
+
                 start_gc(#'shutdown);
             });
         }

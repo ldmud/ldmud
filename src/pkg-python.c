@@ -4,6 +4,22 @@
  * This file contains the glue for the interaction between
  * python and the LPC runtime.
  *------------------------------------------------------------------
+ * For a context switch from LPC to Python the following needs to
+ * happen:
+ *  - python_start_thread(), acquires the Python GIL. This needs
+ *    to happen for every access to a Python object.
+ *  - python_save_context(): Save the current object and command
+ *    giver. (python_clear_context() for external calls).
+ *  - set python_is_external accordingly.
+ *
+ * When calling LPC from Python:
+ *  - python_restore_context(): Restore current object and command
+ *    giver.
+ *
+ * When returning to LPC from Python:
+ *  - If python_is_external was changed, restore the previous value.
+ *  - python_finish_thread()
+ *------------------------------------------------------------------
  */
 #include "driver.h"
 #include "machine.h"
@@ -326,6 +342,8 @@ static ldmud_gc_var_t *gc_object_list = NULL,
                       *gc_quoted_array_list = NULL,
                       *gc_lvalue_list = NULL;
 
+static PyThreadState * thread_state = NULL;
+
 #ifdef USE_PYTHON_CONTEXT
 static PyObject * python_contextvar_current_object = NULL;
 static PyObject * python_contextvar_command_giver = NULL;
@@ -342,6 +360,8 @@ static PyObject* svalue_to_python(svalue_t *svp);
 static PyObject* rvalue_to_python(svalue_t *svp);
 static bool python_eq_svalue(PyObject* pval, svalue_t *sval);
 static bool call_lpc_secure(CClosureFun fun, int num_arg, void* data);
+static bool python_start_thread();
+static void python_finish_thread(bool started);
 static void python_save_context();
 static void python_clear_context();
 static void python_restore_context();
@@ -10606,9 +10626,10 @@ call_lpc_secure (CClosureFun fun, int num_arg, void* data)
 
 /*-------------------------------------------------------------------------*/
 static void
-raise_python_error (const char* prefix)
+raise_python_error (const char* prefix, bool thread_started)
 
 /* Raise an LPC error upon a Python exception.
+ * <thread_started> is true, if we need to finish a Python thread.
  * This function will not return.
  */
 
@@ -10653,8 +10674,43 @@ raise_python_error (const char* prefix)
     PyErr_Print();
     PyErr_Clear();
 
+    python_finish_thread(thread_started);
     errorf("%s: %s\n", prefix, msg);
 } /* raise_python_error() */
+
+/*-------------------------------------------------------------------------*/
+static bool
+python_start_thread ()
+
+/* Do anything necessary to execute Python code or access Python objects.
+ * This basically means acquiring the global interpreter lock. Returns
+ * true, if this function indeed started the thread (false if already
+ * in Python mode).
+ */
+
+{
+    if (!thread_state)
+        return false;
+
+    PyEval_RestoreThread(thread_state);
+    thread_state = NULL;
+    return true;
+} /* python_start_thread() */
+
+/*-------------------------------------------------------------------------*/
+static void
+python_finish_thread (bool started)
+
+/* Revert python_start_thread(), basically releasing the global interpreter
+ * lock. <started> is the return value of python_start_thread().
+ */
+
+{
+    if (!started)
+        return;
+
+    thread_state = PyEval_SaveThread();
+} /* python_finish_thread() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef USE_PYTHON_CONTEXT
@@ -10943,6 +10999,8 @@ pkg_python_init (char* prog_name)
     }
 
     assert(sizeof(python_operation_fun) / sizeof(python_operation_fun[0]) == PYTHON_OPERATIONS_COUNT);
+
+    python_finish_thread(true);
 } /* pkg_python_init() */
 
 
@@ -11016,7 +11074,7 @@ check_python_efun_args (ident_t *p, int num_arg, bool has_ellipsis, fulltype_t *
 
 /*-------------------------------------------------------------------------*/
 static PyObject*
-build_python_efun_args (python_efun_info_t *efun_info, svalue_t *argp, int num_arg, const char* name, bool skip_first)
+build_python_efun_args (python_efun_info_t *efun_info, svalue_t *argp, int num_arg, const char* name, bool skip_first, bool thread_started)
 
 /* Check the <num_arg> arguments starting at <argp> against the type
  * annotations in <efun_info> and raise any type error.
@@ -11057,6 +11115,7 @@ build_python_efun_args (python_efun_info_t *efun_info, svalue_t *argp, int num_a
                 free_lpctype(realtype);
 
                 Py_DECREF(args);
+                python_finish_thread(thread_started);
 
                 errorf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
                       , pos + 1, name
@@ -11069,6 +11128,7 @@ build_python_efun_args (python_efun_info_t *efun_info, svalue_t *argp, int num_a
         {
             PyErr_Clear();
             Py_DECREF(args);
+            python_finish_thread(thread_started);
 
             errorf("Bad argument %d to %s().\n", pos+1, name);
         }
@@ -11090,6 +11150,7 @@ call_python_efun (int idx, int num_arg)
 {
     PyObject *result, *args;
     bool was_external = python_is_external;
+    bool started;
     python_efun_t* python_efun_entry = python_efun_table + idx;
 
     /* Efun still registered?
@@ -11099,10 +11160,12 @@ call_python_efun (int idx, int num_arg)
         errorf("Python-defined efun vanished: %s\n"
              , get_txt(python_efun_entry->name->name));
 
+    started = python_start_thread();
+
     /* We leave the argument count check to Python.
      * But we check the types if there are annotations about it.
      */
-    args = build_python_efun_args(&(python_efun_entry->info), inter_sp - num_arg + 1, num_arg, get_txt(python_efun_entry->name->name), false);
+    args = build_python_efun_args(&(python_efun_entry->info), inter_sp - num_arg + 1, num_arg, get_txt(python_efun_entry->name->name), false, started);
     inter_sp = pop_n_elems(num_arg, inter_sp);
 
     python_is_external = false;
@@ -11115,12 +11178,13 @@ call_python_efun (int idx, int num_arg)
     if (result == NULL)
     {
         /* Exception occurred. */
-        raise_python_error(get_txt(python_efun_entry->name->name));
+        raise_python_error(get_txt(python_efun_entry->name->name), started);
     }
     else
     {
         const char *err = python_to_svalue(inter_sp + 1, result);
         Py_DECREF(result);
+        python_finish_thread(started);
 
         if (err != NULL)
         {
@@ -11142,6 +11206,8 @@ python_set_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int *nfds)
  */
 
 {
+    bool started = python_start_thread();
+
     python_is_external = true;
     interrupt_execution = false;
     python_clear_context();
@@ -11185,6 +11251,7 @@ python_set_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int *nfds)
         if((events & (POLLIN|POLLOUT|POLLPRI)) && *nfds <= fds->fd)
             (*nfds) = fds->fd + 1;
     }
+    python_finish_thread(started);
 } /* python_set_fds() */
 
 /*-------------------------------------------------------------------------*/
@@ -11197,6 +11264,7 @@ python_handle_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int nfd
 
 {
     int num_cbs = 0, pos_cbs = 0;
+    bool started;
     PyObject **cb_funs, **cb_args;
 
     /* First count the number of calls we need to make. */
@@ -11220,6 +11288,8 @@ python_handle_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int nfd
      */
     if (!cb_funs || !cb_args)
         return;
+
+    started = python_start_thread();
 
     for (python_poll_fds_t *fds = poll_fds; fds != NULL; fds = fds->next)
     {
@@ -11287,6 +11357,7 @@ python_handle_fds (fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int nfd
 
     xfree(cb_funs);
     xfree(cb_args);
+    python_finish_thread(started);
 } /* python_handle_fds() */
 
 /*-------------------------------------------------------------------------*/
@@ -11297,6 +11368,7 @@ python_call_hook (int hook, bool is_external)
  */
 
 {
+    bool started = python_start_thread();
     bool was_external = python_is_external;
     python_is_external = is_external;
     if (is_external)
@@ -11324,6 +11396,7 @@ python_call_hook (int hook, bool is_external)
 
     python_clear_context();
     python_is_external = was_external;
+    python_finish_thread(started);
 } /* python_call_hook() */
 
 /*-------------------------------------------------------------------------*/
@@ -11334,11 +11407,13 @@ python_call_hook_object (int hook, bool is_external, object_t *ob)
  */
 
 {
+    bool started;
     bool was_external = python_is_external;
     PyObject *args, *arg;
     if (python_hooks[hook] == NULL)
         return;
 
+    started = python_start_thread();
     if (is_external)
     {
         python_clear_context();
@@ -11351,6 +11426,7 @@ python_call_hook_object (int hook, bool is_external, object_t *ob)
     if (args == NULL)
     {
         PyErr_Clear();
+        python_finish_thread(started);
         return;
     }
 
@@ -11359,6 +11435,7 @@ python_call_hook_object (int hook, bool is_external, object_t *ob)
     {
         PyErr_Clear();
         Py_DECREF(args);
+        python_finish_thread(started);
         return;
     }
 
@@ -11385,6 +11462,7 @@ python_call_hook_object (int hook, bool is_external, object_t *ob)
 
     python_clear_context();
     python_is_external = was_external;
+    python_finish_thread(started);
 } /* python_call_hook_object() */
 
 /*-------------------------------------------------------------------------*/
@@ -11440,10 +11518,20 @@ python_process_pending_jobs ()
  */
 
 {
+#if PY_VERSION_HEX >= 0x03040000
+    if (PyGILState_Check())
+    {
+        debug_message("%s Warning: Python GIL was held during backend loop.\n", time_stamp());
+        python_finish_thread(true);
+    }
+#endif
+
     if (python_pending_sigchld)
     {
+        bool started = python_start_thread();
         python_pending_sigchld = false;
         python_call_hook(PYTHON_HOOK_ON_SIGCHLD, true);
+        python_finish_thread(started);
     }
 } /* python_process_pending_jobs() */
 
@@ -11696,7 +11784,10 @@ python_ob_has_last_ref (svalue_t *pval)
  */
 
 {
-    return Py_REFCNT((PyObject*)pval->u.generic) == 1;
+    bool started = python_start_thread();
+    bool result = Py_REFCNT((PyObject*)pval->u.generic) == 1;
+    python_finish_thread(started);
+    return result;
 } /* python_ob_has_last_ref() */
 
 /*-------------------------------------------------------------------------*/
@@ -11707,8 +11798,10 @@ ref_python_ob (svalue_t *pval)
  */
 
 {
+    bool started = python_start_thread();
     Py_INCREF((PyObject*)pval->u.generic);
     num_lpc_python_references++;
+    python_finish_thread(started);
 } /* ref_python_ob() */
 
 /*-------------------------------------------------------------------------*/
@@ -11719,8 +11812,10 @@ free_python_ob (svalue_t *pval)
  */
 
 {
+    bool started = python_start_thread();
     Py_DECREF((PyObject*)pval->u.generic);
     num_lpc_python_references--;
+    python_finish_thread(started);
 } /* free_python_ob() */
 
 /*-------------------------------------------------------------------------*/
@@ -11733,6 +11828,7 @@ copy_python_ob (svalue_t *dest, svalue_t *src)
 
 {
     PyObject *fun;
+    bool started = python_start_thread();
 
     assert(src->type == T_PYTHON);
     assert(python_type_table[src->x.python_type] != NULL);
@@ -11757,7 +11853,7 @@ copy_python_ob (svalue_t *dest, svalue_t *src)
         Py_DECREF(fun);
 
         if (result == NULL)
-            raise_python_error("copy");
+            raise_python_error("copy", started);
         else if (result == Py_NotImplemented)
             Py_DECREF(result);
         else
@@ -11765,6 +11861,7 @@ copy_python_ob (svalue_t *dest, svalue_t *src)
             const char* err = python_to_svalue(dest, result);
             Py_DECREF(result);
 
+            python_finish_thread(started);
             if (err != NULL)
                 errorf("Bad return value from copy: %s\n", err);
 
@@ -11776,6 +11873,7 @@ copy_python_ob (svalue_t *dest, svalue_t *src)
     *dest = *src;
     ref_python_ob(src);
 
+    python_finish_thread(started);
 } /* copy_python_ob() */
 
 /*-------------------------------------------------------------------------*/
@@ -11790,6 +11888,7 @@ save_python_ob (svalue_t *dest, string_t **name, svalue_t *ob)
 
 {
     PyObject *fun;
+    bool started = python_start_thread();
 
     assert(ob->type == T_PYTHON);
     assert(python_type_table[ob->x.python_type] != NULL);
@@ -11798,6 +11897,7 @@ save_python_ob (svalue_t *dest, string_t **name, svalue_t *ob)
     if (fun == NULL)
     {
         PyErr_Clear();
+        python_finish_thread(started);
         return false;
     }
     else
@@ -11815,16 +11915,18 @@ save_python_ob (svalue_t *dest, string_t **name, svalue_t *ob)
         Py_DECREF(fun);
 
         if (result == NULL)
-            raise_python_error("save");
+            raise_python_error("save", started);
         else if (result == Py_NotImplemented)
         {
             Py_DECREF(result);
+            python_finish_thread(started);
             return false;
         }
         else
         {
             const char* err = python_to_svalue(dest, result);
             Py_DECREF(result);
+            python_finish_thread(started);
 
             if (err != NULL)
             {
@@ -11859,6 +11961,7 @@ restore_python_ob (svalue_t *dest, string_t *name, svalue_t *value)
     ident_t *ident;
     PyObject *type, *fun, *arg, *args, *ob;
     const char* err;
+    bool started;
 
     /* Get the type for the type name. */
     ident = find_shared_identifier_mstr(name, I_TYPE_PYTHON_TYPE, 0);
@@ -11885,6 +11988,7 @@ restore_python_ob (svalue_t *dest, string_t *name, svalue_t *value)
      * saved somehow) that it has and check it later.
      */
 
+    started = python_start_thread();
     python_is_external = false;
     python_save_context();
 
@@ -11894,6 +11998,7 @@ restore_python_ob (svalue_t *dest, string_t *name, svalue_t *value)
         PyErr_Clear();
         free_svalue(value);
         python_is_external = was_external;
+        python_finish_thread(started);
         return false;
     }
 
@@ -11904,6 +12009,7 @@ restore_python_ob (svalue_t *dest, string_t *name, svalue_t *value)
         Py_DECREF(fun);
         free_svalue(value);
         python_is_external = was_external;
+        python_finish_thread(started);
         return false;
     }
 
@@ -11916,6 +12022,7 @@ restore_python_ob (svalue_t *dest, string_t *name, svalue_t *value)
         Py_DECREF(fun);
         Py_DECREF(args);
         python_is_external = was_external;
+        python_finish_thread(started);
         return false;
     }
 
@@ -11930,17 +12037,20 @@ restore_python_ob (svalue_t *dest, string_t *name, svalue_t *value)
     if (ob == NULL)
     {
         PyErr_Clear();
+        python_finish_thread(started);
         return false;
     }
     else if (ob == Py_NotImplemented)
     {
         Py_DECREF(ob);
+        python_finish_thread(started);
         return false;
     }
 
     /* And finally return the result. */
     err = python_to_svalue(dest, ob);
     Py_DECREF(ob);
+    python_finish_thread(started);
 
     if (err != NULL)
         return false;
@@ -11956,6 +12066,7 @@ python_ob_to_string (svalue_t *pval)
  */
 
 {
+    bool started = python_start_thread();
     PyObject *repr = PyObject_Repr((PyObject*) pval->u.generic);
 
     if (!repr)
@@ -11979,11 +12090,15 @@ python_ob_to_string (svalue_t *pval)
             Py_DECREF(utf8);
 
             if (str != NULL)
+            {
+                python_finish_thread(started);
                 return str;
+            }
         }
     }
 
     Py_XDECREF(repr);
+    python_finish_thread(started);
 
     return ref_mstring(get_python_type_name(pval->x.python_type)->name);
 } /* python_ob_to_string() */
@@ -12011,12 +12126,14 @@ do_single_python_operation (svalue_t *sp, svalue_t *arg1, svalue_t *arg2, bool r
 
     if (check_rtt_compatibility(py_op->argtype, arg2))
     {
+        bool started = python_start_thread();
         PyObject *arg = svalue_to_python(arg2);
         PyObject *fun, *args, *result;
 
         if (arg == NULL)
         {
             PyErr_Clear();
+            python_finish_thread(started);
 
             inter_sp = sp;
             errorf("Bad %s argument to %s.\n", reverse ? "left" : "right", op_name);
@@ -12040,7 +12157,7 @@ do_single_python_operation (svalue_t *sp, svalue_t *arg1, svalue_t *arg2, bool r
             if (result == NULL)
             {
                 inter_sp = sp;
-                raise_python_error(python_operation_fun[op].name);
+                raise_python_error(python_operation_fun[op].name, started);
             }
             else if (result == Py_NotImplemented)
             {
@@ -12065,6 +12182,7 @@ do_single_python_operation (svalue_t *sp, svalue_t *arg1, svalue_t *arg2, bool r
             sp = pop_n_elems(2, sp);
             err = python_to_svalue(sp+1, result);
             Py_DECREF(result);
+            python_finish_thread(started);
 
             if (err != NULL)
             {
@@ -12074,6 +12192,8 @@ do_single_python_operation (svalue_t *sp, svalue_t *arg1, svalue_t *arg2, bool r
 
             return sp+1;
         }
+
+        python_finish_thread(started);
     }
 
     return NULL;
@@ -12123,6 +12243,7 @@ do_python_unary_operation (svalue_t *sp, enum python_operation op, const char* o
 
     if (py_op->returntype != NULL)
     {
+        bool started = python_start_thread();
         PyObject *fun = PyObject_GetAttrString((PyObject*)sp->u.generic, python_operation_fun[op].name);
         if (fun)
         {
@@ -12140,7 +12261,7 @@ do_python_unary_operation (svalue_t *sp, enum python_operation op, const char* o
             if (result == NULL)
             {
                 inter_sp = sp;
-                raise_python_error(python_operation_fun[op].name);
+                raise_python_error(python_operation_fun[op].name, started);
             }
             else if (result == Py_NotImplemented)
             {
@@ -12153,6 +12274,7 @@ do_python_unary_operation (svalue_t *sp, enum python_operation op, const char* o
                 free_svalue(sp);
                 err = python_to_svalue(sp, result);
                 Py_DECREF(result);
+                python_finish_thread(started);
 
                 if (err != NULL)
                 {
@@ -12165,6 +12287,7 @@ do_python_unary_operation (svalue_t *sp, enum python_operation op, const char* o
         }
         else
             PyErr_Clear();
+        python_finish_thread(started);
     }
 
     errorf("Unsupported operation %s for %s.\n",
@@ -12276,6 +12399,7 @@ call_python_type_efun(svalue_t *sp, int efun, int num_arg)
     python_efun_info_t* efun_info;
     char funname[64];
     PyObject *fun, *args, *result;
+    bool started;
     bool was_external = python_is_external;
 
     if (num_arg == 0)
@@ -12290,9 +12414,11 @@ call_python_type_efun(svalue_t *sp, int efun, int num_arg)
     if (efun_info == NULL)
         return NULL;
 
+    started = python_start_thread();
+
     /* Check the arguments. */
     inter_sp = sp;
-    args = build_python_efun_args(efun_info, arg, num_arg, instrs[efun].name, true);
+    args = build_python_efun_args(efun_info, arg, num_arg, instrs[efun].name, true, started);
 
     /* Object (still) does have this fun? */
     snprintf(funname, sizeof(funname), "__efun_%s__", instrs[efun].name);
@@ -12303,6 +12429,7 @@ call_python_type_efun(svalue_t *sp, int efun, int num_arg)
         Py_XDECREF(fun);
         Py_XDECREF(args);
         PyErr_Clear();
+        python_finish_thread(started);
         return NULL;
     }
 
@@ -12320,7 +12447,7 @@ call_python_type_efun(svalue_t *sp, int efun, int num_arg)
     if (result == NULL)
     {
         /* Exception occurred. */
-        raise_python_error(instrs[efun].name);
+        raise_python_error(instrs[efun].name, started);
     }
     else if (instrs[efun].ret_type != lpctype_void)
     {
@@ -12329,6 +12456,7 @@ call_python_type_efun(svalue_t *sp, int efun, int num_arg)
 
         if (err != NULL)
         {
+            python_finish_thread(started);
             errorf("Bad return value from %s(): %s\n"
                   , instrs[efun].name
                   , err);
@@ -12339,6 +12467,7 @@ call_python_type_efun(svalue_t *sp, int efun, int num_arg)
     else
         Py_DECREF(result);
 
+    python_finish_thread(started);
     return inter_sp;
 } /* call_python_type_efun() */
 
@@ -12350,8 +12479,13 @@ python_free_object (object_t *ob)
  */
 
 {
+
     if (ob->python_dict != NULL)
+    {
+        bool started = python_start_thread();
         Py_DECREF((PyObject*) ob->python_dict);
+        python_finish_thread(started);
+    }
 } /* python_free_object() */
 
 /*-------------------------------------------------------------------------*/
@@ -12367,8 +12501,11 @@ python_free_replace_program_protector (replace_ob_t *r_ob)
     while (prpp)
     {
         struct python_replace_program_protector *next = prpp->next;
+        bool started = python_start_thread();
 
         Py_DECREF(prpp->ref);
+        python_finish_thread(started);
+
         xfree(prpp);
 
         prpp = next;
@@ -12410,6 +12547,7 @@ python_replace_program_adjust (replace_ob_t *r_ob)
     while (prpp)
     {
         struct python_replace_program_protector *next = prpp->next;
+        bool started = python_start_thread();
 
         /* At least one more reference, otherwise we don't need to care. */
         if (prpp->ref->ob_refcnt > 1)
@@ -12425,6 +12563,8 @@ python_replace_program_adjust (replace_ob_t *r_ob)
         }
 
         Py_DECREF(prpp->ref);
+        python_finish_thread(started);
+
         xfree(prpp);
 
         prpp = next;
@@ -12438,6 +12578,7 @@ cleanup_python_data (cleanup_t * context)
 /* Cleanup any Python-held LPC values. */
 
 {
+    bool started = python_start_thread();
     for(ldmud_gc_var_t* var = gc_object_list; var != NULL; var = var->gcnext)
     {
         object_t* ob = ((ldmud_object_t*)var)->lpc_object;
@@ -12527,6 +12668,7 @@ cleanup_python_data (cleanup_t * context)
         cleanup_vector(&((ldmud_lvalue_t*)var)->lpc_lvalue, 1, context);
     }
 
+    python_finish_thread(started);
 } /* cleanup_python_data() */
 
 #ifdef GC_SUPPORT
@@ -12539,6 +12681,8 @@ python_clear_refs ()
  */
 
 {
+    bool started = python_start_thread();
+
     for (int idx = 0; idx < PYTHON_EFUN_TABLE_SIZE; idx++)
     {
         if (python_efun_table[idx].info.types)
@@ -12648,6 +12792,8 @@ python_clear_refs ()
     {
         clear_ref_in_vector(&((ldmud_lvalue_t*)var)->lpc_lvalue, 1);
     }
+
+    python_finish_thread(started);
 } /* python_clear_refs() */
 
 /*-------------------------------------------------------------------------*/
@@ -12658,6 +12804,8 @@ python_count_refs ()
  */
 
 {
+    bool started = python_start_thread();
+
     /* The efun table */
     for (int idx = 0; idx < PYTHON_EFUN_TABLE_SIZE; idx++)
     {
@@ -12818,6 +12966,8 @@ python_count_refs ()
     {
         count_ref_in_vector(&((ldmud_lvalue_t*)var)->lpc_lvalue, 1);
     }
+
+    python_finish_thread(started);
 } /* python_count_refs() */
 
 #endif /* GC_SUPPORT */
@@ -12830,6 +12980,8 @@ count_python_extra_refs ()
  */
 
 {
+    bool started = python_start_thread();
+
     /* All Python objects that reference LPC data. */
     for(ldmud_gc_var_t* var = gc_object_list; var != NULL; var = var->gcnext)
     {
@@ -12915,6 +13067,8 @@ count_python_extra_refs ()
     {
         count_extra_ref_in_vector(&((ldmud_lvalue_t*)var)->lpc_lvalue, 1);
     }
+
+    python_finish_thread(started);
 } /* count_python_extra_refs() */
 
 #endif /* DEBUG */

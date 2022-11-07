@@ -1063,6 +1063,15 @@ class box:
 def create_box(value) -> box:
     return box(value)
 
+def has_gil_log_message() -> bool:
+    # DC_DEBUG_FILE = 14
+    logfile = ldmud.efuns.driver_info(14)
+    with open(logfile, 'rt') as f:
+        for line in f:
+            if "Python GIL" in line:
+                return True
+    return False
+
 ldmud.register_hook(ldmud.ON_HEARTBEAT, hb_hook)
 ldmud.register_hook(ldmud.ON_OBJECT_CREATED, ob_created)
 ldmud.register_hook(ldmud.ON_OBJECT_DESTRUCTED, ob_destroyed)
@@ -1074,6 +1083,7 @@ ldmud.register_type("random_generator", random_generator)
 ldmud.register_efun("create_random_generator", create_random_generator)
 ldmud.register_type("box", box)
 ldmud.register_efun("create_box", create_box)
+ldmud.register_efun("has_gil_log_message", has_gil_log_message)
 
 # Test loading objects at startup
 early_ob = ldmud.Object("/testob")
