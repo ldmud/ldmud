@@ -33,7 +33,7 @@ EXAMPLE
             assign(&(a[<0..<1]), ({1,2,3,"sink","x","y","x"}));
             assign(&(a[5][0]), 'w');
             assign(&(a[5][<1]), 'g');
-            printf("%O", a));
+            printf("%O", a);
         }
 
         ({ /* sizeof() == 9 */
