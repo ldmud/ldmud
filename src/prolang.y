@@ -2015,7 +2015,7 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
         {
             lpctype_t *curtype = type;
             char* curbuf = buf;
-            size_t sublen;
+            size_t sublen = 0;
 
             if (bufsize < 5)
             {
@@ -19874,17 +19874,10 @@ inherit_variable (variable_t *variable, funflag_t varmodifier, int redeclare)
 
 {
     ident_t *p;
-    funflag_t new_type = varmodifier;
 
     p = make_global_identifier(get_txt(variable->name), I_TYPE_GLOBAL);
     if (!p)
         return false;
-
-    /* 'public' variables should not become private when inherited
-     * 'private'.
-     */
-    if (variable->type.t_flags & TYPE_MOD_PUBLIC)
-        new_type &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED);
 
     fulltype_t vartype = variable->type;
     vartype.t_flags = inherit_visibility_flags(vartype.t_flags, varmodifier) | NAME_INHERITED;

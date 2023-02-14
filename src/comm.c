@@ -3434,7 +3434,7 @@ refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) )
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-set_default_conn_charset (char charset[32])
+set_default_conn_charset (char charset[16])
 
 /* Set the default connection charset bitmask in <charset>.
  */
@@ -3446,7 +3446,7 @@ set_default_conn_charset (char charset[32])
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-set_default_combine_charset (char charset[32])
+set_default_combine_charset (char charset[16])
 
 /* Set the default combine charset bitmask in <charset>.
  */
