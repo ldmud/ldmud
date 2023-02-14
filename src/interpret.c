@@ -10042,6 +10042,8 @@ eval_instruction (bytecode_p first_instruction
         sp = restore_argument_frames(sp-1, &ap)+1;
         if (sp < inter_sp)
             *sp = *inter_sp;
+
+        tracedepth++;
     }
     SET_TRACE_EXEC();
 
@@ -11389,7 +11391,7 @@ again:
 
         tracedepth--; /* We leave this level */
         if (trace_level)
-            do_trace_return(sp);
+            do_trace_return(inter_sp);
 
         pop_control_stack();
 
