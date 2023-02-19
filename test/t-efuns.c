@@ -875,10 +875,31 @@ mixed *tests =
                               "'return <value>' statement") ==
                          "902588f647e39421f274f94303e7d397bda55cd12b562d36e51ffb37f59d17e63edc77443dfb3a0e92996215b82ae067b1a700f3356baeb513cd619ce05b9a39" :)
     }),
-    ({ "hash string (RIPEMD160)", 0, (:
-                         hash(TLS_HASH_RIPEMD160, "line 13: Warning: Missing "
-                              "'return <value>' statement") ==
-                         "fe9de95923c1200b31db7905d997a81e121c7640" :)
+    ({ "hash string (RIPEMD160)", 0,
+        (:
+            string str;
+            /* Might not be supported by OpenSSL anymore. */
+            if (catch(str = hash(TLS_HASH_RIPEMD160, "line 13: Warning: Missing "
+                              "'return <value>' statement")))
+                return 1;
+            return str == "fe9de95923c1200b31db7905d997a81e121c7640";
+        :)
+    }),
+    ({ "hmac (SHA1) 1",    0, (: hmac(TLS_HASH_SHA1,      "LDMud", "Data")           == "20e110fa593df97bdf1c39af53d90c8d4b39ae12" :) }),
+    ({ "hmac (SHA1) 2",    0, (: hmac(TLS_HASH_SHA1,     b"LDMud", b"Data")          == "20e110fa593df97bdf1c39af53d90c8d4b39ae12" :) }),
+    ({ "hmac (SHA1) 3",    0, (: hmac(TLS_HASH_SHA1,      "LDMud", ({68,97,116,97})) == "20e110fa593df97bdf1c39af53d90c8d4b39ae12" :) }),
+    ({ "hmac (SHA224)",    0, (: hmac(TLS_HASH_SHA224,    "LDMud", "Data") == "856f849af90a540804140cf06a7d7399301c034f9714382fbf6f0ba5" :) }),
+    ({ "hmac (SHA256)",    0, (: hmac(TLS_HASH_SHA256,    "LDMud", "Data") == "605c5218001dfa8178109bd9f7a3c50c69bfcebc25f4c7419e209fdecaad737d" :) }),
+    ({ "hmac (SHA384)",    0, (: hmac(TLS_HASH_SHA384,    "LDMud", "Data") == "1c729213077a8a024a72d979b34a56ae3cfb050036ec20141d67bdd6370140fc8520a0c9e06e9a88c0a523e340c6b0a2" :) }),
+    ({ "hmac (SHA512)",    0, (: hmac(TLS_HASH_SHA512,    "LDMud", "Data") == "450f0707e2539451413150d19f1146abb75ff11c7d842d5c860c6d47a4ba743429e0bfc5b5ac25f8de46b68ef452bdc4c1312b473a366c147ca2a7abc0464524" :) }),
+    ({ "hmac (MD5)",       0, (: hmac(TLS_HASH_MD5,       "LDMud", "Data") == "59af8cdc963113ee6680f33944e81557" :) }),
+    ({ "hmac (RIPEMD160)", 0,
+        (:
+            string str;
+            if (catch(str = hmac(TLS_HASH_RIPEMD160, "LDMud", "Data")))
+                return 1;
+            return str == "92b0b388aa915819fadeb5558cbe2901fcf187e1";
+        :)
     }),
 #endif
     ({ "write_file 1", 0, 
