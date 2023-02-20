@@ -20,7 +20,7 @@ jobs:
                 sudo apt-get update -y
                 sudo apt-get install -y --no-install-recommends ${{ matrix.cc }} bison autoconf autogen ${{matrix.machine=='i386' && 'gcc-multilib' || ''}} libgcrypt20-dev:${{matrix.machine}} libgnutls28-dev:${{matrix.machine}} libsqlite3-dev:${{matrix.machine}} libpq-dev:${{matrix.machine}} libmysqlclient-dev:${{matrix.machine}} ${{ matrix.machine == 'amd64' && 'python3-dev python3' || '' }} libpcre3-dev:${{matrix.machine}} libjson-c-dev:${{matrix.machine}} libxml2-dev:${{matrix.machine}} zlib1g-dev:${{matrix.machine}} ${{ (matrix.cc == 'gcc' && matrix.coverage) && 'lcov python3-pip' || ''}} ${{ (matrix.cc == 'clang' && matrix.coverage) && 'llvm' || ''}}
             - name: Checkout sources
-              uses: actions/checkout@v2
+              uses: actions/checkout@v3
             - name: Generate build files
               working-directory: src
               run: ./autogen.sh
@@ -63,7 +63,7 @@ jobs:
                 llvm-cov show ../src/ldmud -instr-profile=coverage.profdata -format=html -output-dir=html -show-instantiations=false
             - name: Upload coverage report
               if: matrix.coverage
-              uses: actions/upload-artifact@v2
+              uses: actions/upload-artifact@v3
               with:
                 name: coverage ${{ matrix.cc }}
                 path: test/html
