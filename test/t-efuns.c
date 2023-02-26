@@ -410,9 +410,14 @@ mixed *tests =
             return 1;
        :)
     }),
-    ({ "compile_string (RTTCs)", 0,
+    ({ "compile_string (RTTCs) 1", 0,
        (:
             return funcall(compile_string(({'a}), "#pragma rtt_checks\n({int})a"), 11) == 11;
+       :)
+    }),
+    ({ "compile_string (RTTCs) 2", TF_ERROR,
+       (:
+            funcall(compile_string(({'a}), "#pragma rtt_checks\n({int})a"), "X");
        :)
     }),
     ({ "compile_string (illegal options)", TF_ERROR,
@@ -670,6 +675,11 @@ mixed *tests =
     ({ "compile_string (simple variable declarations)", 0,
        (:
             return funcall(compile_string(({'a}), "int i = 10; return a+i;", (<cs_opts> compile_block: 1)), 32)==42;
+       :)
+    }),
+    ({ "compile_string (RTTCs in a block)", TF_ERROR,
+       (:
+            funcall(compile_string(({'a}), "#pragma rtt_checks\nint i = a; return i;", (<cs_opts> compile_block: 1)), "X");
        :)
     }),
     ({ "compile_string (struct (from object) variable declarations)", 0,

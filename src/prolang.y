@@ -18893,18 +18893,26 @@ add_type_check (lpctype_t *expected, enum type_check_operation op)
     if (!pragma_rtt_checks || !pragma_save_types)
         return;
 
-    /* TODO: Implement this for string-compiler using type objects. */
-    if (string_context)
-        return;
-
     /* Also we don't check for mixed... */
     if (expected == lpctype_mixed || expected == lpctype_unknown)
         return;
 
-    /* Now get an index for the type in our type list. */
-    idx = get_type_index(expected);
+    if (string_context)
+    {
+        /* Store the type as a lambda value. */
+        svalue_t sv = svalue_lpctype(ref_lpctype(expected));
+        idx = store_lambda_value(&sv);
 
-    ins_f_code(F_TYPE_CHECK);
+        ins_f_code(F_LAMBDA_TYPE_CHECK);
+    }
+    else
+    {
+        /* Now get an index for the type in our type list. */
+        idx = get_type_index(expected);
+
+        ins_f_code(F_TYPE_CHECK);
+    }
+
     ins_byte(op);
     ins_short(idx);
 } /* add_type_check() */

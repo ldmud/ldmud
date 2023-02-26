@@ -267,6 +267,7 @@
         pop_n
         put_array_element
         type_check
+        lambda_type_check
         push_type
         call_other_cached
         call_strict_cached

@@ -19091,9 +19091,11 @@ again:
     }
 
     CASE(F_TYPE_CHECK);             /* --- type_check <op> <ix> --- */
+    CASE(F_LAMBDA_TYPE_CHECK);      /* --- lambda_type_check <op> <ix> --- */
     {
         /* Check the top value off the stack against the type
-         * at prog->types[<ix>]. Raise an error if it doesn't match.
+         * at prog->types[<ix>] resp. lambda constant <ix>.
+         * Raise an error if it doesn't match.
          * Do nothing otherwise. <op> contains a value of
          * enum type_check_operation to give a specific error message.
          */
@@ -19104,10 +19106,21 @@ again:
         LOAD_SHORT(ix, pc);
 
         /* Types were saved? */
-        if (!current_prog->types)
-            break;
+        if (instruction == F_TYPE_CHECK)
+        {
+            if (!current_prog->types)
+                break;
 
-        exptype = current_prog->types[ix];
+            exptype = current_prog->types[ix];
+        }
+        else /* F_LAMBDA_TYPE_CHECK */
+        {
+            svalue_t * cstart = (svalue_t *)((char *)(csp->funstart) - LAMBDA_VALUE_OFFSET);
+
+            assert(cstart[-ix].type == T_LPCTYPE);
+            exptype = cstart[-ix].u.lpctype;
+        }
+
         if (!check_rtt_compatibility(exptype, sp))
         {
             static char buff[512];
