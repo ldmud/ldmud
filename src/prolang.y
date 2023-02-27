@@ -18370,7 +18370,7 @@ catch:
           ins_f_code(F_RESTORE_ARG_FRAME);
 
           $$.start = origstart;
-          $$.type  = get_fulltype(lpctype_string);
+          $$.type  = get_fulltype(lpctype_mixed);
           $$.name  = NULL;
           $$.needs_use = false;
       }
