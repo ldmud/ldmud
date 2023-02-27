@@ -3379,6 +3379,8 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                             if (reserve == NULL)
                                 lambda_error("Missing expression for 'reserve "
                                              "catch-modifier.\n");
+                            if (flags & CATCH_FLAG_RESERVE)
+                                lambda_error("Multiple 'reserve catch-modifiers.\n");
                             flags |= CATCH_FLAG_RESERVE;
                             if (compile_value(reserve, 0) & VOID_GIVEN)
                                 lambda_error("Expression for 'reserve "
