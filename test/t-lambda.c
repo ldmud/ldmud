@@ -1035,6 +1035,13 @@ struct TestCase* cases = ({
         test:           function int(mixed result) { return result == 12345 && global_var == 3000; },
     ),
     (<TestCase>
+        name:           "#'catch with multiple 'reserve options",
+        flags:          TF_LAMBDA_ERROR,
+        vars:           0,
+        expr:           ({#'catch, ({#',, 1}), 'reserve, 1000, 'reserve, 2000 }),
+        result:         0,
+    ),
+    (<TestCase>
         name:           "#'({ (0 args)",
         flags:          0,
         vars:           0,
