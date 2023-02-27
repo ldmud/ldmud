@@ -18303,10 +18303,10 @@ catch:
           free_fulltype($4.type);
 
           /* If there were code creating modifiers, move their code
-           * before the F_CATCH (currently only 'reserve' does that).
+           * before the F_CATCH (currently only 'reserve' & 'limit' do that).
            * We need to do this before we add the END_CATCH.
            */
-          if (flags & CATCH_FLAG_RESERVE)
+          if (flags & (CATCH_FLAG_RESERVE|CATCH_FLAG_LIMIT))
           {
               shuffle_code(start, modstart, CURRENT_PROGRAM_SIZE);
               start += CURRENT_PROGRAM_SIZE - modstart;
@@ -18401,6 +18401,20 @@ opt_catch_mod_list :
               yywarnf("Multiple 'reserve' modifiers in catch()");
               insert_pop_value();
           }
+          if ($1 & $3 & CATCH_FLAG_LIMIT)
+          {
+              /* On multiple 'reserve's, use only the first one */
+              yywarnf("Multiple 'limit' modifiers in catch()");
+              insert_pop_value();
+          }
+          else if (($1 & CATCH_FLAG_RESERVE) && $3 == CATCH_FLAG_LIMIT)
+          {
+              /* 'reserve' before 'limit', we need to swap values as F_CATCH
+               * expects them in a different order.
+               * We cannot swap the code, because they might have side effects.
+               */
+              ins_f_code(F_SWAP_VALUES);
+          }
           $$ = $1 | $3;
       }
 
@@ -18422,6 +18436,8 @@ opt_catch_modifier :
               $$ = CATCH_FLAG_PUBLISH;
           else if (mstreq($1, STR_RESERVE))
               yyerrorf("Bad 'reserve' modifier in catch(): missing expression");
+          else if (mstreq($1, STR_LIMIT))
+              yyerrorf("Bad 'limit' modifier in catch(): missing expression");
           else
               yyerrorf("Illegal modifier '%s' in catch() - "
                       "expected 'nolog', 'publish' or 'reserve <expr>'"
@@ -18450,6 +18466,16 @@ opt_catch_modifier :
                           , get_fulltype_name($2.type)
                           );
               $$ = CATCH_FLAG_RESERVE;
+          }
+          else if (mstreq($1, STR_LIMIT))
+          {
+              if (!check_unknown_type($2.type.t_type)
+               && !lpctype_contains(lpctype_int, $2.type.t_type))
+                  yyerrorf("Bad 'limit' expression type to catch(): %s, "
+                           "expected int"
+                          , get_fulltype_name($2.type)
+                          );
+              $$ = CATCH_FLAG_LIMIT;
           }
           else
               yyerrorf("Illegal modifier '%s' in catch() - "

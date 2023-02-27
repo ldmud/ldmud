@@ -32,6 +32,9 @@ DESCRIPTION
                      of eval ticks to reserve, instead of the default
                      of __CATCH_EVAL_COST__. The minimum required
                      are 2 * __MASTER_EVAL_COST__.
+          'limit <expr>': The expression has to evaluate to a number
+                     greater than 0 and is used to limit the eval cost
+                     for the evaluation of the expression.
 
         catch() itself is not expensive as far as execution time is
         concerned: it is about the same as a intra-object function call.
@@ -58,6 +61,7 @@ HISTORY
         LDMud 3.3.559 moved the check regarding __CATCH_EVAL_COST__ inside
           the catch().
         LDMud 3.3.560 added the 'reserve' modifier.
+        LDMud 3.6.7 added the 'limit' modifier.
 
 SEE ALSO
         throw(E), raise_error(E), predefined(D), runtime_error(M)

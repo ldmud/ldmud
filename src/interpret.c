@@ -12032,6 +12032,9 @@ again:
          * If CATCH_FLAG_RESERVE is set, the top most stack value denotes
          * the eval cost to reserve for the catch handling - it is removed
          * from the stack before continuing.
+         * If CATCH_FLAG_LIMIT is set, the (next) top most stack value
+         * contains the eval limit for the expression - it is also removed
+         * from the stack.
          *
          * The implementation is such that a control-stack entry is created
          * as if the instructions following catch are called as a subroutine
@@ -12054,6 +12057,7 @@ again:
         uint offset;
         int  flags;
         int32 reserve_cost = CATCH_RESERVED_COST;
+        int32 cost_limit = -1;
 
         /* Get the flags */
         flags = LOAD_UINT8(pc);
@@ -12078,6 +12082,28 @@ again:
             reserve_cost = sp->u.number;
             sp--;
         }
+
+        if (flags & CATCH_FLAG_LIMIT)
+        {
+            if (sp->type != T_NUMBER)
+            {
+                ERRORF(("Illegal 'limit' type for catch(): got %s, expected number.\n"
+                       , typename(sp->type)
+                       ));
+            }
+
+            if (sp->u.number <= 0)
+            {
+                ERRORF(("Illegal 'limit' value for catch(): got %"PRIdPINT
+                        ", expected a positive value.\n"
+                       , sp->u.number
+                       ));
+            }
+
+            cost_limit = sp->u.number;
+            sp--;
+        }
+
         /* Get the offset to the next instruction after the CATCH statement.
          */
         offset = LOAD_UINT8(pc);
@@ -12096,6 +12122,7 @@ again:
 #endif
                               , inter_pc, inter_fp
                               , reserve_cost
+                              , cost_limit
                               , inter_context
                               )
            )

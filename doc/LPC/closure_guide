@@ -516,8 +516,8 @@ Table of Contents
 
       #'catch executes the closure given as argument, but catches any
            runtime error (see catch(E)). Optionally the symbols 'nolog,
-           'publish and 'reserve may be given as additional arguments to
-           modify the behaviour of the catch.
+           'publish, 'reserve and 'limit may be given as additional
+           arguments to modify the behaviour of the catch.
 
       #'= and the #'<op>= variants are also special because the first
            argument has to be an lvalue.

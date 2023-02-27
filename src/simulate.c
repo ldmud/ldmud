@@ -361,6 +361,7 @@ catch_instruction ( int flags, uint offset
                   , volatile svalue_t ** volatile i_sp
                   , bytecode_p i_pc, svalue_t * i_fp
                   , int32 reserve_cost
+                  , int32 limit_eval
                   , svalue_t * i_context
                   )
 
@@ -386,6 +387,7 @@ catch_instruction ( int flags, uint offset
     volatile Bool old_out_of_memory = out_of_memory;
 
     bytecode_p new_pc;  /* Address of first instruction after the catch() */
+    int32 orig_max_eval_cost = max_eval_cost;
 
     /* Compute address of next instruction after the CATCH statement.
      */
@@ -441,6 +443,9 @@ catch_instruction ( int flags, uint offset
         eval_cost -= reserve_cost;
         assigned_eval_cost -= reserve_cost;
 
+        if (limit_eval > 0)
+            max_eval_cost = orig_max_eval_cost;
+
         /* If we ran out of memory, throw a new error */
         if (!old_out_of_memory && out_of_memory)
         {
@@ -470,6 +475,10 @@ catch_instruction ( int flags, uint offset
             return MY_TRUE;
         }
 
+        if (limit_eval > 0
+         && (!max_eval_cost || eval_cost + limit_eval < max_eval_cost))
+            max_eval_cost = eval_cost + limit_eval;
+
         /* Recursively call the interpreter */
         rc = eval_instruction(i_pc, INTER_SP);
 
@@ -488,6 +497,9 @@ catch_instruction ( int flags, uint offset
 
         eval_cost -= reserve_cost;
         assigned_eval_cost -= reserve_cost;
+
+        if (limit_eval > 0)
+            max_eval_cost = orig_max_eval_cost;
     }
 
     return rc;

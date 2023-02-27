@@ -3327,6 +3327,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                  * ({#'catch, <body>, 'publish })
                  * ({#'catch, <body>, 'nolog, 'publish })
                  * ({#'catch, <body>, 'nolog, 'publish, 'reserve, <expr> })
+                 * ({#'catch, <body>, 'nolog, 'publish, 'reserve, <expr>, 'limit, <expr> })
                  */
                 case F_CATCH:
                   {
@@ -3344,7 +3345,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     mp_int start, offset;
                     int flags;
 
-                    if (it.size < 2 || it.size > 6)
+                    if (it.size < 2 || it.size > 8)
                         lambda_error("Wrong number of arguments to #'catch\n");
 
                     if (current.code_left < 1)
@@ -3386,9 +3387,32 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                 lambda_error("Expression for 'reserve "
                                              "doesn't return a value.\n");
                         }
+                        else if (roption->type == T_SYMBOL
+                         && mstreq(roption->u.str, STR_LIMIT)
+                                 )
+                        {
+                            svalue_t *limit = it.next_value(&it);
+                            if (limit == NULL)
+                                lambda_error("Missing expression for 'limit "
+                                             "catch-modifier.\n");
+                            if (flags & CATCH_FLAG_LIMIT)
+                                lambda_error("Multiple 'limit catch-modifiers.\n");
+                            flags |= CATCH_FLAG_LIMIT;
+                            if (compile_value(limit, 0) & VOID_GIVEN)
+                                lambda_error("Expression for 'limit "
+                                             "doesn't return a value.\n");
+                            if (flags & CATCH_FLAG_RESERVE)
+                            {
+                                /* The reserve value needs to be on top of the stack. */
+                                if (current.code_left < 1)
+                                    realloc_code();
+                                current.code_left--;
+                                STORE_CODE(current.codep, F_SWAP_VALUES);
+                            }
+                        }
                         else
-                            lambda_error("Expected 'nolog, 'publish or "
-                                         "'reserve as catch-modifier.\n");
+                            lambda_error("Expected 'nolog, 'publish, 'reserve "
+                                         "or 'limit as catch-modifier.\n");
                     }
 
                     if (current.code_left < 3)
