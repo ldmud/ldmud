@@ -373,6 +373,11 @@ handle_signal (int sig)
             break;
     }
 
+#ifdef USE_PYTHON
+    /* Notify the python package. Python will not react immediately. */
+    python_handle_signal(sig);
+#endif
+
     switch (action)
     {
         case DCS_IGNORE:

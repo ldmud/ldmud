@@ -97,6 +97,30 @@ LDMUD MODULE
                     was received. This could also happen for processes
                     spawned by the driver itself (eg. erq).
 
+                  ON_SIGINT
+                    Called without any argument whenever a SIGINT signal
+                    was received. (This is just informative, the driver
+                    will execute the DC_SIGACTION_SIGINT action also.)
+
+                  ON_SIGTERM
+                    Called without any argument whenever a SIGTERM signal
+                    was received. The driver will terminate afterwards.
+
+                  ON_SIGHUP
+                    Called without any argument whenever a SIGHUP signal
+                    was received. (This is just informative, the driver
+                    will execute the DC_SIGACTION_SIGHUP action also.)
+
+                  ON_SIGUSR1
+                    Called without any argument whenever a SIGUSR1 signal
+                    was received. (This is just informative, the driver
+                    will execute the DC_SIGACTION_SIGUSR1 action also.)
+
+                  ON_SIGUSR2
+                    Called without any argument whenever a SIGUSR2 signal
+                    was received. (This is just informative, the driver
+                    will execute the DC_SIGACTION_SIGUSR2 action also.)
+
           - unregister_hook(hook, function) -> None
                 Removes a hook function.
 

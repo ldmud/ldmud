@@ -94,6 +94,11 @@ enum python_hooks
     PYTHON_HOOK_ON_OBJECT_CREATED,
     PYTHON_HOOK_ON_OBJECT_DESTRUCTED,
     PYTHON_HOOK_ON_SIGCHLD,
+    PYTHON_HOOK_ON_SIGINT,
+    PYTHON_HOOK_ON_SIGTERM,
+    PYTHON_HOOK_ON_SIGHUP,
+    PYTHON_HOOK_ON_SIGUSR1,
+    PYTHON_HOOK_ON_SIGUSR2,
 
     PYTHON_HOOK_COUNT,
 };
@@ -153,6 +158,7 @@ extern void python_call_hook_object(int hook, bool is_external, object_t *ob);
 
 extern void python_interrupt();
 extern void python_handle_sigchld();
+extern void python_handle_signal(int sig);
 extern void python_process_pending_jobs();
 
 extern void python_free_object(object_t *ob);

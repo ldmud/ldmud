@@ -233,7 +233,12 @@ struct python_replace_program_protector
 char * python_startup_script = NULL;
 
 static volatile bool python_pending_sigchld = false;
- /* We received a SIGCHLD and need to pass it to Python.
+static volatile bool python_pending_sigint = false;
+static volatile bool python_pending_sigterm = false;
+static volatile bool python_pending_sighup = false;
+static volatile bool python_pending_sigusr1 = false;
+static volatile bool python_pending_sigusr2 = false;
+ /* We received a signal and need to pass it to Python.
   */
 
 static bool python_is_external = true;
@@ -303,6 +308,11 @@ static const char* python_hook_names[] = {
     "ON_OBJECT_CREATED",
     "ON_OBJECT_DESTRUCTED",
     "ON_CHILD_PROCESS_TERMINATED",
+    "ON_SIGINT",
+    "ON_SIGTERM",
+    "ON_SIGHUP",
+    "ON_SIGUSR1",
+    "ON_SIGUSR2",
 };
 
 static const char* lfun_flag_names[] = {
@@ -13974,6 +13984,58 @@ python_handle_sigchld ()
 
 /*-------------------------------------------------------------------------*/
 void
+python_handle_signal (int sig)
+
+/* Called from the general signal handler for <sig>.
+ * We will remember that and handle it in the backend loop.
+ */
+
+{
+    comm_return_to_backend = true;
+    switch (sig)
+    {
+        case SIGINT:
+            python_pending_sigint = true;
+            break;
+
+        case SIGTERM:
+            python_pending_sigterm = true;
+            break;
+
+        case SIGHUP:
+            python_pending_sighup = true;
+            break;
+
+        case SIGUSR1:
+            python_pending_sigusr1 = true;
+            break;
+
+        case SIGUSR2:
+            python_pending_sigusr2 = true;
+            break;
+    }
+} /* python_handle_signal() */
+
+/*-------------------------------------------------------------------------*/
+void
+python_process_pending_signal (volatile bool *pending_flag, int hook)
+
+/* Process some pending signal if <*pending_flag> is true
+ * by calling <hook>.
+ */
+
+{
+    if (*pending_flag)
+    {
+        bool started = python_start_thread();
+        *pending_flag = false;
+        python_call_hook(hook, true);
+        python_finish_thread(started);
+    }
+} /* python_process_pending_signal() */
+
+/*-------------------------------------------------------------------------*/
+void
 python_process_pending_jobs ()
 
 /* Called from the backend to do some pending jobs,
@@ -13989,13 +14051,12 @@ python_process_pending_jobs ()
     }
 #endif
 
-    if (python_pending_sigchld)
-    {
-        bool started = python_start_thread();
-        python_pending_sigchld = false;
-        python_call_hook(PYTHON_HOOK_ON_SIGCHLD, true);
-        python_finish_thread(started);
-    }
+    python_process_pending_signal(&python_pending_sigchld, PYTHON_HOOK_ON_SIGCHLD);
+    python_process_pending_signal(&python_pending_sigint,  PYTHON_HOOK_ON_SIGINT);
+    python_process_pending_signal(&python_pending_sigterm, PYTHON_HOOK_ON_SIGTERM);
+    python_process_pending_signal(&python_pending_sighup,  PYTHON_HOOK_ON_SIGHUP);
+    python_process_pending_signal(&python_pending_sigusr1, PYTHON_HOOK_ON_SIGUSR1);
+    python_process_pending_signal(&python_pending_sigusr2, PYTHON_HOOK_ON_SIGUSR2);
 } /* python_process_pending_jobs() */
 
 /*-------------------------------------------------------------------------*/
