@@ -2728,8 +2728,9 @@ dnl
 dnl Ok. now lets make the Makefiles; also these in subdirs! [Mubo]
 dnl make config.h, too. [Mubo]
 dnl
-AC_OUTPUT(Makefile config.h util/Makefile util/indent/Makefile
+AC_CONFIG_FILES(Makefile config.h util/Makefile util/indent/Makefile
 util/xerq/Makefile util/erq/Makefile)
+AC_OUTPUT
 
 dnl
 dnl At last, warn if any feature could not be enabled
