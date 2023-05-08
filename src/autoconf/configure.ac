@@ -352,7 +352,7 @@ EOF
 eval `sed -n -f conftest.sed <settings/$withval`
 rm conftest.sed
 else
-AC_MSG_ERROR(Setting \"$withval\" not available)
+AC_MSG_ERROR(Setting "$withval" not available)
 fi
 ])
 
