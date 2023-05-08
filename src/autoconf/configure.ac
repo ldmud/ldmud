@@ -754,12 +754,6 @@ dnl select a C-Compiler
 dnl
 AC_PROG_CC
 
-# check for ANSI-C  (for compiling LDMUD project)
-AC_PROG_CC_STDC
-if test "${ac_cv_prog_cc_stdc}" = "no"; then
-  AC_MSG_ERROR(You need an ANSI-C89 or ISO-C (C99) compiler! sorry..)
-fi
-
 # --- check for support of various command line switches ---
 # -fwrapv is currently needed to enforce defined signed integr overflow (wrap)
 # in gcc.
