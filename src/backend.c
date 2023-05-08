@@ -115,19 +115,19 @@ volatile mp_int total_alarms = 0;
   /* The total number of alarm()s so far, incremented from the alarm handler.
    */
 
-uint32 total_player_commands = 0;
+uint32_t total_player_commands = 0;
   /* Total number of player commands so far.
    */
 
-uint num_listed_objs = 0;
+uint32_t num_listed_objs = 0;
   /* Number of objects in the object list.
    */
 
-uint num_last_processed = 0;
+uint32_t num_last_processed = 0;
   /* Number of object processed in last process_objects().
    */
 
-uint num_last_data_cleaned = 0;
+uint32_t num_last_data_cleaned = 0;
   /* Number of object data-cleaned in last process_objects().
    */
 

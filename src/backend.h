@@ -1,6 +1,8 @@
 #ifndef BACKEND_H__
 #define BACKEND_H__ 1
 
+#include <stdint.h>
+
 #include "driver.h"
 #include "typedefs.h"
 #include "main.h"       /* max_time */
@@ -16,7 +18,7 @@
 struct statistic_s
 {
     mp_int  last_time;    /* Time of last weighted-average calculation. */
-    long    sum;          /* Sum since last weighted-average calculation. */
+    uint64_t    sum;          /* Sum since last weighted-average calculation. */
     double  weighted_avg; /* The current weighted average. */
 };
 
@@ -26,11 +28,11 @@ extern mp_int current_time;
 extern Bool time_to_call_heart_beat;
 extern volatile Bool comm_time_to_call_heart_beat;
 extern volatile Bool comm_return_to_backend;
-extern uint32 total_player_commands;
+extern uint32_t total_player_commands;
 extern volatile mp_int total_alarms;
-extern uint num_listed_objs;
-extern uint num_last_processed;
-extern uint num_last_data_cleaned;
+extern uint32_t num_listed_objs;
+extern uint32_t num_last_processed;
+extern uint32_t num_last_data_cleaned;
 extern statistic_t stat_last_processed;
 extern statistic_t stat_last_data_cleaned;
 extern statistic_t stat_in_list;

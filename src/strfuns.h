@@ -1,11 +1,11 @@
 #ifndef STRFUNS_H_
 #define STRFUNS_H_ 1
 
+#include <stdint.h>
+
 #include "driver.h"
 #include "iconv_opt.h"
 #include "typedefs.h"
-
-#include <sys/types.h> /* TODO: Does C99 guarantee u_long in here? */
 
 /* --- strbuf_t: extendable stringbuffer ---
  *
@@ -14,8 +14,8 @@
 
 struct strbuf_s
 {
-    u_long alloc_len;   /* Allocated size */
-    u_long length;      /* Used size in the string, excl. trailing \0 */
+    uint64_t alloc_len;   /* Allocated size */
+    uint64_t length;      /* Used size in the string, excl. trailing \0 */
     char *buf;          /* The string */
 };
 
