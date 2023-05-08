@@ -138,7 +138,7 @@ AC_DEFUN([AC_MY_SEARCH_LIB],
                 else
                     CFLAGS="$saveflags"
                 fi
-                AC_TRY_COMPILE([$6],,
+                AC_COMPILE_IFELSE([AC_LANG_SOURCE([$6])],
                     [$3]=yes
                     if test "x$TESTPATH" != "x"; then
                         EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
@@ -948,7 +948,7 @@ main() {
 }
 ],lp_cv_func_inet_ntoa_ok=yes,
 lp_cv_func_inet_ntoa_ok=no,
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([
 #if defined(sun) && !defined(__svr4__)
 #include <sys/types.h> /* needed for netinet/in.h */
 #include <netinet/in.h>
@@ -962,7 +962,7 @@ char *inet_ntoa(ad)
 #else
 use inet_ntoa() from the library.
 #endif
-],,lp_cv_func_inet_ntoa_ok=no,
+])],lp_cv_func_inet_ntoa_ok=no,
 lp_cv_func_inet_ntoa_ok=yes
 )))
 if test "$lp_cv_func_inet_ntoa_ok" = "yes" ; then
@@ -975,7 +975,7 @@ fi
 AC_CACHE_CHECK(for IPv6 support,lp_cv_has_ipv6,
     saveflags="$CFLAGS"
     CFLAGS="$CFLAGS -I/usr/inet6/include"
-    AC_TRY_COMPILE([
+    AC_COMPILE_IFELSE([AC_LANG_SOURCE([
 #include <sys/types.h>
 #include <netinet/in.h>
 
@@ -985,7 +985,7 @@ struct sockaddr_in6 foo(void)
     
     return ad;
 }
-    ],,lp_cv_has_ipv6=yes,
+    ])],lp_cv_has_ipv6=yes,
     lp_cv_has_ipv6=no
     CFLAGS="$saveflags"
 ))
@@ -1047,14 +1047,14 @@ fi
 if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
 
     AC_CACHE_CHECK(for OpenSSL support,lp_cv_has_openssl,
-        AC_TRY_COMPILE([
+        AC_COMPILE_IFELSE([AC_LANG_SOURCE([
     #include <openssl/ssl.h>
 
     void foo(void)
     {
         int i = SSL_MAX_SSL_SESSION_ID_LENGTH;
     }
-        ],,lp_cv_has_openssl=yes,
+        ])],lp_cv_has_openssl=yes,
         lp_cv_has_openssl=no
     ))
 
@@ -1119,14 +1119,14 @@ fi
 if test "$tls_package" = "any" -o "$tls_package" = "gnu"; then
 
     AC_CACHE_CHECK(for GnuTLS support,lp_cv_has_gnutls,
-        AC_TRY_COMPILE([
+        AC_COMPILE_IFELSE([AC_LANG_SOURCE([
     #include <gnutls/gnutls.h>
 
     void foo(void)
     {
         int i = GNUTLS_CIPHER_RIJNDAEL_256_CBC;
     }
-        ],,lp_cv_has_gnutls=yes,
+        ])],lp_cv_has_gnutls=yes,
         lp_cv_has_gnutls=no
     ))
 
@@ -1193,14 +1193,14 @@ if test "$tls_package" != "ssl"; then
         if test "x$TESTPATH" != "x"; then
             CFLAGS="$saveflags -I$TESTPATH"
         fi
-    AC_TRY_COMPILE([
+    AC_COMPILE_IFELSE([AC_LANG_SOURCE([
     #include <gcrypt.h>
 
     void foo(void)
     {
         int algo = GCRY_MD_SHA1;
     }
-    ],,
+    ])],
     lp_cv_has_gcrypt=yes
     if test "x$TESTPATH" != "x"; then
         EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
@@ -1304,14 +1304,14 @@ for TESTPATH in "" "/usr/local/include"; do
     if test "x$TESTPATH" != "x"; then
         CFLAGS="-I$TESTPATH $saveflags"
     fi
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([
 #include <iconv.h>
 
 iconv_t * foo(void)
 {
     return 0;
 }
-],,
+])],
 lp_cv_has_iconv=yes
 if test "x$TESTPATH" != "x"; then
     EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
@@ -1430,7 +1430,7 @@ for TESTPATH in "" "${mysql_path}/include/mysql" "${mysql_path}/include" "${mysq
     if test "x$TESTPATH" != "x"; then
         CFLAGS="-I$TESTPATH $saveflags"
     fi
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([
 #include <sys/types.h>
 #include <mysql.h>
 #include <errmsg.h>
@@ -1441,7 +1441,7 @@ struct MYSQL * foo(void)
     
     return &var;
 }
-],,
+])],
 lp_cv_has_mysql=yes
 if test "x$TESTPATH" != "x"; then
     EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
@@ -1580,7 +1580,7 @@ for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include
     if test "x$TESTPATH" != "x"; then
         CFLAGS="$saveflags -I$TESTPATH"
     fi
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([
 #include <libpq-fe.h>
 
 PGconn * foo(void)
@@ -1589,7 +1589,7 @@ PGconn * foo(void)
     
     return var;
 }
-],,
+])],
 lp_cv_has_pgsql=yes
 if test "x$TESTPATH" != "x"; then
     EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
@@ -1901,7 +1901,7 @@ rmdir conftestdirfrom conftestdirto 2> /dev/null
 if test "$ac_cv_func_getrusage" = "yes" ; then
 AC_CACHE_CHECK(full availability of struct rusage members,
 lp_cv_struct_rusage_full,
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([
 #include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
 #include <sys/time.h>
 #ifdef HAVE_SYS_RUSAGE_H
@@ -1929,13 +1929,13 @@ AC_TRY_COMPILE([
     *v++ = rus.ru_nsignals;
     *v++ = rus.ru_nvcsw;
     *v++ = rus.ru_nivcsw;
-],lp_cv_struct_rusage_full=yes,lp_cv_struct_rusage_full=no))
+])],lp_cv_struct_rusage_full=yes,lp_cv_struct_rusage_full=no))
 if test "$lp_cv_struct_rusage_full" = "no"; then
   AC_DEFINE(GETRUSAGE_RESTRICTED, 1, [If so, is it restricted to user and system time?])
 fi
 AC_CACHE_CHECK(struct rusage timeval members with tv_usec,
 lp_cv_struct_rusage_usec,
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([
 #include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
 #include <sys/time.h>
 #ifdef HAVE_SYS_RUSAGE_H
@@ -1951,14 +1951,14 @@ AC_TRY_COMPILE([
     getrusage(RUSAGE_SELF, &rus);
     *v++ = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
     *v++ = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
-], lp_cv_struct_rusage_usec=yes, lp_cv_struct_rusage_usec=no))
+])], lp_cv_struct_rusage_usec=yes, lp_cv_struct_rusage_usec=no))
 if test "$lp_cv_struct_rusage_usec" = "yes"; then
   AC_DEFINE(RUSAGE_USEC, 1, [Can ru_utime / ru_stime be accessed as a timeval with tv_sec and tv_usec?])
 fi
 else
 AC_CACHE_CHECK(for getrusage() via syscall(),
 lp_cv_func_getrusage_via_syscall,
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([
 #include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
 #include <sys/syscall.h>
 #include <sys/resource.h>
@@ -1968,7 +1968,7 @@ AC_TRY_COMPILE([
 ],[
 struct rusage rus;
 syscall(SYS_GETRUSAGE, RUSAGE_SELF, rus);
-], lp_cv_func_getrusage_via_syscall=yes, lp_cv_func_getrusage_via_syscall=no))
+])], lp_cv_func_getrusage_via_syscall=yes, lp_cv_func_getrusage_via_syscall=no))
 if test "$lp_cv_func_getrusage_via_syscall" = "yes"; then
   AC_DEFINE(HAVE_GETRUSAGE, 1, [Does the system have a getrusage call?])
   AC_DEFINE(GETRUSAGE_VIA_SYSCALL, 1, [Is it available as a subfunction of syscall()?])
@@ -1978,7 +1978,7 @@ fi
 dnl I have seen malloc() being declared in <memory.h> on some machines.
 AC_CACHE_CHECK(if return type of free is void,
 lp_cv_prop_free_returns_void,
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
@@ -1989,14 +1989,14 @@ AC_TRY_COMPILE([
 #include <memory.h>
 #endif
 void free();
-],, lp_cv_prop_free_returns_void=yes, lp_cv_prop_free_returns_void=no))
+])],, lp_cv_prop_free_returns_void=yes, lp_cv_prop_free_returns_void=no))
 if test "$lp_cv_prop_free_returns_void" = "yes"; then
   AC_DEFINE(FREE_RETURNS_VOID, 1, [does free() have void as its returntype?])
 fi
 
 AC_CACHE_CHECK(if void* or char* from malloc,
 lp_cv_prop_malloc_return_type,
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([
 #include <sys/types.h>
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
@@ -2019,13 +2019,13 @@ void free PROT((POINTER));
 #else
 int free PROT((POINTER));
 #endif
-],,lp_cv_prop_malloc_return_type="void *",
+])],,lp_cv_prop_malloc_return_type="void *",
 lp_cv_prop_malloc_return_type="char *"))
 AC_DEFINE_UNQUOTED(POINTER,$lp_cv_prop_malloc_return_type,[what kind of pointer is used by malloc() et al])
 
 AC_CACHE_CHECK(if CHAR_BIT == 8 or undef,
 lp_cv_prop_charbits_eq_8,
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -2034,7 +2034,7 @@ AC_TRY_COMPILE([
 #include <values.h>
 #endif
 int i=[1/(CHAR_BIT-8)];
-],,lp_cv_prop_charbits_eq_8=no, lp_cv_prop_charbits_eq_8=yes))
+])],,lp_cv_prop_charbits_eq_8=no, lp_cv_prop_charbits_eq_8=yes))
 if test "$lp_cv_prop_charbits_eq_8" = "yes"; then
   AC_DEFINE(CHARBIT_MASK, 0xff, [A mask that allows to extract an unsigned char from a signed])
 else
