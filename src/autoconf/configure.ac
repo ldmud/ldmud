@@ -876,13 +876,6 @@ AC_CHECK_FUNCS(getcwd sysconf gettimeofday wait3 waitpid)
 AC_CHECK_FUNCS(fcntl getdomainname poll trunc)
 AC_CHECK_FUNCS(mmap getpagesize)
 
-if test "x$ac_cv_type_signal" = "xvoid"; then
-  AC_DEFINE(RETSIGTYPE_VOID, 1,                                                                                                                                                                                    
-    [Set in response to the signal handler return type, since not all                                                                                                                                              
-     compilers understand direct definition comparisons.                                                                                                                                                           
-    ])                                                                                                                                                                                                             
-fi
-
 # --- Check for common system libraries ---
 
 AC_CHECK_LIB(m,main)
