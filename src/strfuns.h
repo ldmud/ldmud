@@ -14,8 +14,8 @@
 
 struct strbuf_s
 {
-    u_long alloc_len;   /* Allocated size */
-    u_long length;      /* Used size in the string, excl. trailing \0 */
+    unsigned long alloc_len;   /* Allocated size */
+    unsigned long length;      /* Used size in the string, excl. trailing \0 */
     char *buf;          /* The string */
 };
 
