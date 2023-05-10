@@ -138,15 +138,13 @@ AC_DEFUN([AC_MY_SEARCH_LIB],
                 else
                     CFLAGS="$saveflags"
                 fi
-                AC_TRY_COMPILE([$6],,
-                    [$3]=yes
+                AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[$6]], [[]])],[$3=yes
                     if test "x$TESTPATH" != "x"; then
                         EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
                     fi
                     break;
-                    ,
-                    CFLAGS="$saveflags"
-                )
+                    ],[CFLAGS="$saveflags"
+                ])
             done
             AC_MSG_RESULT($[$3])
         elif test "x$[$1]_CFLAGS" != "x"; then
@@ -192,7 +190,7 @@ AC_DEFUN([AC_MY_SEARCH_LIB],
 
 dnl
 dnl let's start
-AC_INIT([LDMud], [3.5.0], [https://mantis.ldmud.eu/mantis/], [ldmud], [http://www.ldmud.eu/])
+AC_INIT([LDMud],[3.5.0],[https://mantis.ldmud.eu/mantis/],[ldmud],[http://www.ldmud.eu/])
 
 dnl set the default prefix
 AC_PREFIX_DEFAULT(/usr/local/mud)
@@ -883,7 +881,7 @@ if test "$ac_cv_lib_socket_main" = "yes" || test "$ac_cv_lib_ucb_main" = "yes"; 
 fi
 
 AC_CACHE_CHECK(if -lresolv is needed, lp_cv_need_lib_resolv,
-    AC_TRY_RUN([
+    AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <netdb.h>
 void t (void)
 {
@@ -893,10 +891,8 @@ int main(void)
 {
     return 0;
 }
-    ],
-    lp_cv_need_lib_resolv=no,
-    lp_cv_need_lib_resolv=yes
-))
+    ]])],[lp_cv_need_lib_resolv=no],[lp_cv_need_lib_resolv=yes
+],[]))
 if test "$lp_cv_need_lib_resolv" = "yes"; then
     AC_CHECK_LIB(resolv,main, LIBS="$LIBS -lresolv")
 fi
@@ -924,47 +920,43 @@ for lp_lib in crypt crypto; do
 done
 
 AC_CACHE_CHECK(if inet_ntoa() ok,lp_cv_func_inet_ntoa_ok,
-AC_TRY_RUN([
-#include <sys/types.h> /* needed for netinet/in.h */
-#include <netinet/in.h>
-#include <arpa/inet.h>
-main() {
-    char addr1[[]] = "176.88.1.16";
-    char addr2[[]] = "88.176.128.2";
-    struct in_addr tmp;
-
-#if SIZEOF_INT == 4
-#define ADDR_TYPE unsigned int
-#else
-#define ADDR_TYPE unsigned long
-#endif
-    *((ADDR_TYPE *)&tmp) = inet_addr(addr1);
-    if (strcmp(addr1, inet_ntoa(tmp)))
-        exit(1);
-    *((ADDR_TYPE *)&tmp) = inet_addr(addr2);
-    if (strcmp(addr2, inet_ntoa(tmp)))
-        exit(1);
-    exit(0);
-}
-],lp_cv_func_inet_ntoa_ok=yes,
-lp_cv_func_inet_ntoa_ok=no,
-AC_TRY_COMPILE([
-#if defined(sun) && !defined(__svr4__)
-#include <sys/types.h> /* needed for netinet/in.h */
-#include <netinet/in.h>
-#include <arpa/inet.h>
-char *inet_ntoa(ad)
-    struct in_addr ad;
-{
-    static char addr[[[20]]];
-    return addr;
-}
-#else
-use inet_ntoa() from the library.
-#endif
-],,lp_cv_func_inet_ntoa_ok=no,
-lp_cv_func_inet_ntoa_ok=yes
-)))
+AC_RUN_IFELSE([
+	AC_LANG_SOURCE([[#include <sys/types.h> /* needed for netinet/in.h */
+	#include <netinet/in.h>
+	#include <arpa/inet.h>
+	main() {
+	    char addr1[[]] = "176.88.1.16";
+	    char addr2[[]] = "88.176.128.2";
+	    struct in_addr tmp;
+	
+	#if SIZEOF_INT == 4
+	#define ADDR_TYPE unsigned int
+	#else
+	#define ADDR_TYPE unsigned long
+	#endif
+	    *((ADDR_TYPE *)&tmp) = inet_addr(addr1);
+	    if (strcmp(addr1, inet_ntoa(tmp)))
+	        exit(1);
+	    *((ADDR_TYPE *)&tmp) = inet_addr(addr2);
+	    if (strcmp(addr2, inet_ntoa(tmp)))
+	        exit(1);
+	    exit(0);
+	}]])],[lp_cv_func_inet_ntoa_ok=yes],[lp_cv_func_inet_ntoa_ok=no],[
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#if defined(sun) && !defined(__svr4__)
+	#include <sys/types.h> /* needed for netinet/in.h */
+	#include <netinet/in.h>
+	#include <arpa/inet.h>
+	char *inet_ntoa(ad)
+	    struct in_addr ad;
+	{
+	    static char addr[[[20]]];
+	    return addr;
+	}
+	#else
+	use inet_ntoa() from the library.
+	#endif
+	]], [[]])],[lp_cv_func_inet_ntoa_ok=no],[lp_cv_func_inet_ntoa_ok=yes])       ]
+))
 if test "$lp_cv_func_inet_ntoa_ok" = "yes" ; then
 dnl TODO: Is there any platform where this is not the case?
   AC_DEFINE(INET_NTOA_OK, 1, [Is the library function inet_ntoa() compatible with the compiler?])
@@ -975,7 +967,7 @@ fi
 AC_CACHE_CHECK(for IPv6 support,lp_cv_has_ipv6,
     saveflags="$CFLAGS"
     CFLAGS="$CFLAGS -I/usr/inet6/include"
-    AC_TRY_COMPILE([
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <sys/types.h>
 #include <netinet/in.h>
 
@@ -985,15 +977,14 @@ struct sockaddr_in6 foo(void)
     
     return ad;
 }
-    ],,lp_cv_has_ipv6=yes,
-    lp_cv_has_ipv6=no
+    ]], [[]])],[lp_cv_has_ipv6=yes],[lp_cv_has_ipv6=no
     CFLAGS="$saveflags"
-))
+]))
 if test "$lp_cv_has_ipv6" = "yes"; then
     AC_DEFINE(HAS_IPV6, 1, [Does the machine offer IPv6?])
     if test "$enable_use_ipv6" = "yes"; then
         AC_CACHE_CHECK(if -linet6 is needed, lp_cv_need_lib_inet6,
-            AC_TRY_RUN([
+            AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <sys/types.h>
 #include <netinet/in.h>
 void t (void)
@@ -1005,10 +996,8 @@ int main(void)
 {
     return 0;
 }
-            ],
-            lp_cv_need_lib_inet6=no,
-            lp_cv_need_lib_inet6=yes
-        ))
+            ]])],[lp_cv_need_lib_inet6=no],[lp_cv_need_lib_inet6=yes
+        ],[]))
         if test "$lp_cv_need_lib_inet6" = "yes"; then
             AC_CHECK_LIB(inet6,main, LIBS="$LIBS -linet6")
         fi
@@ -1047,16 +1036,15 @@ fi
 if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
 
     AC_CACHE_CHECK(for OpenSSL support,lp_cv_has_openssl,
-        AC_TRY_COMPILE([
+        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
     #include <openssl/ssl.h>
 
     void foo(void)
     {
         int i = SSL_MAX_SSL_SESSION_ID_LENGTH;
     }
-        ],,lp_cv_has_openssl=yes,
-        lp_cv_has_openssl=no
-    ))
+        ]], [[]])],[lp_cv_has_openssl=yes],[lp_cv_has_openssl=no
+    ]))
 
     if test "$lp_cv_has_openssl" = "yes"; then
         has_tls=yes
@@ -1065,7 +1053,7 @@ if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
 
         if test "$enable_use_tls" = "yes"; then
             AC_CACHE_CHECK(if -lssl or similar is needed, lp_cv_need_lib_ssl,
-                AC_TRY_RUN([
+                AC_RUN_IFELSE([AC_LANG_SOURCE([[
     #include <openssl/ssl.h>
     void t (void)
     {
@@ -1075,10 +1063,8 @@ if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
     {
         return 0;
     }
-                ],
-                lp_cv_need_lib_ssl=no,
-                lp_cv_need_lib_ssl=yes
-            ))
+                ]])],[lp_cv_need_lib_ssl=no],[lp_cv_need_lib_ssl=yes
+            ],[]))
             if test "$lp_cv_need_lib_ssl" = "yes"; then
                 lp_cv_has_lib_ssl=no
                 AC_CHECK_LIB(ssl,SSL_new,
@@ -1089,7 +1075,7 @@ if test "$tls_package" = "any" -o "$tls_package" = "ssl"; then
 
             if test "x$lp_cv_need_lib_crypto" != "xyes"; then
                 AC_CACHE_CHECK(if -lcrypto is needed for SSL, lp_cv_need_lib_crypto,
-                    AC_TRY_RUN([
+                    AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <openssl/ssl.h>
 void t (void)
 {
@@ -1100,10 +1086,8 @@ int main(void)
 {
     return 0;
 }
-                    ],
-                    lp_cv_need_lib_crypto=no,
-                    lp_cv_need_lib_crypto=yes
-                ))
+                    ]])],[lp_cv_need_lib_crypto=no],[lp_cv_need_lib_crypto=yes
+                ],[]))
                 if test "$lp_cv_need_lib_crypto" = "yes"; then
                     AC_CHECK_LIB(crypto,main, PKGLIBS="$PKGLIBS -lcrypto")
                 fi
@@ -1119,16 +1103,15 @@ fi
 if test "$tls_package" = "any" -o "$tls_package" = "gnu"; then
 
     AC_CACHE_CHECK(for GnuTLS support,lp_cv_has_gnutls,
-        AC_TRY_COMPILE([
+        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
     #include <gnutls/gnutls.h>
 
     void foo(void)
     {
         int i = GNUTLS_CIPHER_RIJNDAEL_256_CBC;
     }
-        ],,lp_cv_has_gnutls=yes,
-        lp_cv_has_gnutls=no
-    ))
+        ]], [[]])],[lp_cv_has_gnutls=yes],[lp_cv_has_gnutls=no
+    ]))
 
     if test "$lp_cv_has_gnutls" = "yes"; then
         has_tls=yes
@@ -1137,7 +1120,7 @@ if test "$tls_package" = "any" -o "$tls_package" = "gnu"; then
 
         if test "$enable_use_tls" = "yes"; then
             AC_CACHE_CHECK(if -lgnutls or similar is needed, lp_cv_need_lib_gnutls,
-                AC_TRY_RUN([
+                AC_RUN_IFELSE([AC_LANG_SOURCE([[
     #include <gnutls/gnutls.h>
     void t (void)
     {
@@ -1148,10 +1131,8 @@ if test "$tls_package" = "any" -o "$tls_package" = "gnu"; then
     {
         return 0;
     }
-                ],
-                lp_cv_need_lib_gnutls=no,
-                lp_cv_need_lib_gnutls=yes
-            ))
+                ]])],[lp_cv_need_lib_gnutls=no],[lp_cv_need_lib_gnutls=yes
+            ],[]))
             if test "$lp_cv_need_lib_gnutls" = "yes"; then
                 lp_cv_has_lib_gnutls=no
                 AC_CHECK_LIB(gnutls,gnutls_global_init,
@@ -1193,23 +1174,21 @@ if test "$tls_package" != "ssl"; then
         if test "x$TESTPATH" != "x"; then
             CFLAGS="$saveflags -I$TESTPATH"
         fi
-    AC_TRY_COMPILE([
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
     #include <gcrypt.h>
 
     void foo(void)
     {
         int algo = GCRY_MD_SHA1;
     }
-    ],,
-    lp_cv_has_gcrypt=yes
+    ]], [[]])],[lp_cv_has_gcrypt=yes
     if test "x$TESTPATH" != "x"; then
         EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
     fi
     break;
-    ,
-    lp_cv_has_gcrypt=no
+    ],[lp_cv_has_gcrypt=no
     CFLAGS="$saveflags"
-    )
+    ])
     done
     )
 
@@ -1269,7 +1248,7 @@ if test "$lp_cv_has_pcre_lib" = "yes"; then
     savelibs="$LIBS"
     LIBS="$LIBS -lpcre"
     AC_CACHE_CHECK(for PCRE usability,lp_cv_has_pcre,
-        AC_TRY_RUN([
+        AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <pcre.h>
 
 pcre_extra foo(void)
@@ -1280,10 +1259,8 @@ int main(void)
 {
     return 0;
 }
-            ],
-            lp_cv_has_pcre=yes,
-            lp_cv_has_pcre=no
-        ))
+            ]])],[lp_cv_has_pcre=yes],[lp_cv_has_pcre=no
+        ],[]))
     LIBS="$savelibs"
 
     if test "$lp_cv_has_pcre" = "yes"; then
@@ -1304,23 +1281,21 @@ for TESTPATH in "" "/usr/local/include"; do
     if test "x$TESTPATH" != "x"; then
         CFLAGS="-I$TESTPATH $saveflags"
     fi
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <iconv.h>
 
 iconv_t * foo(void)
 {
     return 0;
 }
-],,
-lp_cv_has_iconv=yes
+]], [[]])],[lp_cv_has_iconv=yes
 if test "x$TESTPATH" != "x"; then
     EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
 fi
 break;
-,
-lp_cv_has_iconv=no
+],[lp_cv_has_iconv=no
 CFLAGS="$saveflags"
-)
+])
 done
 )
 
@@ -1362,7 +1337,7 @@ EOF
 
     # Does the system need to link in libiconv?
     AC_CACHE_CHECK(if -liconv is needed, lp_cv_need_lib_iconv,
-        AC_TRY_RUN([
+        AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <stdlib.h>
 #include <iconv.h>
 int t (void)
@@ -1373,10 +1348,8 @@ int main(void)
 {
     return 0;
 }
-        ],
-        lp_cv_need_lib_iconv=no,
-        lp_cv_need_lib_iconv=yes
-    ))
+        ]])],[lp_cv_need_lib_iconv=no],[lp_cv_need_lib_iconv=yes
+    ],[]))
     if test "$lp_cv_need_lib_iconv" = "yes"; then
         # Search the libraries
 
@@ -1430,7 +1403,7 @@ for TESTPATH in "" "${mysql_path}/include/mysql" "${mysql_path}/include" "${mysq
     if test "x$TESTPATH" != "x"; then
         CFLAGS="-I$TESTPATH $saveflags"
     fi
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <sys/types.h>
 #include <mysql.h>
 #include <errmsg.h>
@@ -1441,16 +1414,14 @@ struct MYSQL * foo(void)
     
     return &var;
 }
-],,
-lp_cv_has_mysql=yes
+]], [[]])],[lp_cv_has_mysql=yes
 if test "x$TESTPATH" != "x"; then
     EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
 fi
 break;
-,
-lp_cv_has_mysql=no
+],[lp_cv_has_mysql=no
 CFLAGS="$saveflags"
-)
+])
 done
 )
 
@@ -1514,7 +1485,7 @@ if test "$lp_cv_has_mysql" = "yes"; then
       LIBS="$LIBS $PKGLIBS"
 
       AC_CACHE_CHECK(if -lz is needed, lp_cv_need_lib_z,
-          AC_TRY_RUN([
+          AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <mysql/mysql.h>
 void t (void)
 {
@@ -1526,16 +1497,14 @@ int main(void)
 {
     return 0;
 }
-          ],
-          lp_cv_need_lib_z=no,
-          lp_cv_need_lib_z=yes
-      ))
+          ]])],[lp_cv_need_lib_z=no],[lp_cv_need_lib_z=yes
+      ],[]))
       if test "$lp_cv_need_lib_z" = "yes"; then
           AC_CHECK_LIB(z,main, PKGLIBS="$PKGLIBS -lz")
       fi
 
       AC_CACHE_CHECK(if -lnsl is needed, lp_cv_need_lib_nsl,
-          AC_TRY_RUN([
+          AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <mysql/mysql.h>
 void t (void)
 {
@@ -1547,10 +1516,8 @@ int main(void)
 {
     return 0;
 }
-          ],
-          lp_cv_need_lib_nsl=no,
-          lp_cv_need_lib_nsl=yes
-      ))
+          ]])],[lp_cv_need_lib_nsl=no],[lp_cv_need_lib_nsl=yes
+      ],[]))
       if test "$lp_cv_need_lib_nsl" = "yes"; then
           AC_CHECK_LIB(nsl,main, PKGLIBS="$PKGLIBS -lnsl")
       fi
@@ -1580,7 +1547,7 @@ for TESTPATH in "" "$pgsql_path" "$pgsql_path/include" "/usr/local/pgsql/include
     if test "x$TESTPATH" != "x"; then
         CFLAGS="$saveflags -I$TESTPATH"
     fi
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <libpq-fe.h>
 
 PGconn * foo(void)
@@ -1589,16 +1556,14 @@ PGconn * foo(void)
     
     return var;
 }
-],,
-lp_cv_has_pgsql=yes
+]], [[]])],[lp_cv_has_pgsql=yes
 if test "x$TESTPATH" != "x"; then
     EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
 fi
 break;
-,
-lp_cv_has_pgsql=no
+],[lp_cv_has_pgsql=no
 CFLAGS="$saveflags"
-)
+])
 done
 )
 
@@ -1652,7 +1617,7 @@ if test "$lp_cv_has_pgsql" = "yes"; then
       LIBS="$LIBS $PKGLIBS"
 
       AC_CACHE_CHECK(if -lssl is needed, lp_cv_need_lib_ssl,
-          AC_TRY_RUN([
+          AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <libpq-fe.h>
 void t (void)
 {
@@ -1662,17 +1627,15 @@ int main(void)
 {
     return 0;
 }
-          ],
-          lp_cv_need_lib_ssl=no,
-          lp_cv_need_lib_ssl=yes
-      ))
+          ]])],[lp_cv_need_lib_ssl=no],[lp_cv_need_lib_ssl=yes
+      ],[]))
       if test "$lp_cv_need_lib_ssl" = "yes"; then
           AC_CHECK_LIB(ssl,main, PKGLIBS="$PKGLIBS -lssl")
       fi
 
       if test "x$lp_cv_need_lib_crypto" != "xyes"; then
           AC_CACHE_CHECK(if -lcrypto is needed, lp_cv_need_lib_crypto,
-              AC_TRY_RUN([
+              AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <libpq-fe.h>
 void t (void)
 {
@@ -1682,10 +1645,8 @@ int main(void)
 {
     return 0;
 }
-              ],
-              lp_cv_need_lib_crypto=no,
-              lp_cv_need_lib_crypto=yes
-          ))
+              ]])],[lp_cv_need_lib_crypto=no],[lp_cv_need_lib_crypto=yes
+          ],[]))
           if test "$lp_cv_need_lib_crypto" = "yes"; then
               AC_CHECK_LIB(crypto,main, PKGLIBS="$PKGLIBS -lcrypto")
           fi
@@ -1885,14 +1846,12 @@ fi
 
 AC_CACHE_CHECK(if rename handles directories,
 lp_cv_sys_rename_handles_directories,
-AC_TRY_RUN([
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
 main() {
     mkdir("conftestdirfrom", 0770);
     exit(rename("conftestdirfrom", "conftestdirto"));
 }
-],
-lp_cv_sys_rename_handles_directories=yes,
-lp_cv_sys_rename_handles_directories=no))
+]])],[lp_cv_sys_rename_handles_directories=yes],[lp_cv_sys_rename_handles_directories=no],[]))
 if test "$lp_cv_sys_rename_handles_directories" = "yes"; then
   AC_DEFINE(RENAME_HANDLES_DIRECTORIES, 1, [Can rename handle directories?])
 fi
@@ -1901,7 +1860,7 @@ rmdir conftestdirfrom conftestdirto 2> /dev/null
 if test "$ac_cv_func_getrusage" = "yes" ; then
 AC_CACHE_CHECK(full availability of struct rusage members,
 lp_cv_struct_rusage_full,
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
 #include <sys/time.h>
 #ifdef HAVE_SYS_RUSAGE_H
@@ -1911,7 +1870,7 @@ AC_TRY_COMPILE([
 #ifndef RUSAGE_SELF
 #define RUSAGE_SELF     0
 #endif
-],[
+]], [[
     struct rusage rus;
     long *v = (long *)main;
     getrusage(RUSAGE_SELF, &rus);
@@ -1929,13 +1888,13 @@ AC_TRY_COMPILE([
     *v++ = rus.ru_nsignals;
     *v++ = rus.ru_nvcsw;
     *v++ = rus.ru_nivcsw;
-],lp_cv_struct_rusage_full=yes,lp_cv_struct_rusage_full=no))
+]])],[lp_cv_struct_rusage_full=yes],[lp_cv_struct_rusage_full=no]))
 if test "$lp_cv_struct_rusage_full" = "no"; then
   AC_DEFINE(GETRUSAGE_RESTRICTED, 1, [If so, is it restricted to user and system time?])
 fi
 AC_CACHE_CHECK(struct rusage timeval members with tv_usec,
 lp_cv_struct_rusage_usec,
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
 #include <sys/time.h>
 #ifdef HAVE_SYS_RUSAGE_H
@@ -1945,30 +1904,30 @@ AC_TRY_COMPILE([
 #ifndef RUSAGE_SELF
 #define RUSAGE_SELF     0
 #endif
-],[
+]], [[
     struct rusage rus;
     long *v = (long *)main;
     getrusage(RUSAGE_SELF, &rus);
     *v++ = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
     *v++ = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
-], lp_cv_struct_rusage_usec=yes, lp_cv_struct_rusage_usec=no))
+]])],[lp_cv_struct_rusage_usec=yes],[lp_cv_struct_rusage_usec=no]))
 if test "$lp_cv_struct_rusage_usec" = "yes"; then
   AC_DEFINE(RUSAGE_USEC, 1, [Can ru_utime / ru_stime be accessed as a timeval with tv_sec and tv_usec?])
 fi
 else
 AC_CACHE_CHECK(for getrusage() via syscall(),
 lp_cv_func_getrusage_via_syscall,
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
 #include <sys/syscall.h>
 #include <sys/resource.h>
 #ifndef RUSAGE_SELF
 #define RUSAGE_SELF     0
 #endif
-],[
+]], [[
 struct rusage rus;
 syscall(SYS_GETRUSAGE, RUSAGE_SELF, rus);
-], lp_cv_func_getrusage_via_syscall=yes, lp_cv_func_getrusage_via_syscall=no))
+]])],[lp_cv_func_getrusage_via_syscall=yes],[lp_cv_func_getrusage_via_syscall=no]))
 if test "$lp_cv_func_getrusage_via_syscall" = "yes"; then
   AC_DEFINE(HAVE_GETRUSAGE, 1, [Does the system have a getrusage call?])
   AC_DEFINE(GETRUSAGE_VIA_SYSCALL, 1, [Is it available as a subfunction of syscall()?])
@@ -1978,7 +1937,7 @@ fi
 dnl I have seen malloc() being declared in <memory.h> on some machines.
 AC_CACHE_CHECK(if return type of free is void,
 lp_cv_prop_free_returns_void,
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
@@ -1989,14 +1948,14 @@ AC_TRY_COMPILE([
 #include <memory.h>
 #endif
 void free();
-],, lp_cv_prop_free_returns_void=yes, lp_cv_prop_free_returns_void=no))
+]], [[]])],[lp_cv_prop_free_returns_void=yes],[lp_cv_prop_free_returns_void=no]))
 if test "$lp_cv_prop_free_returns_void" = "yes"; then
   AC_DEFINE(FREE_RETURNS_VOID, 1, [does free() have void as its returntype?])
 fi
 
 AC_CACHE_CHECK(if void* or char* from malloc,
 lp_cv_prop_malloc_return_type,
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <sys/types.h>
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
@@ -2019,13 +1978,12 @@ void free PROT((POINTER));
 #else
 int free PROT((POINTER));
 #endif
-],,lp_cv_prop_malloc_return_type="void *",
-lp_cv_prop_malloc_return_type="char *"))
+]], [[]])],[lp_cv_prop_malloc_return_type="void *"],[lp_cv_prop_malloc_return_type="char *"]))
 AC_DEFINE_UNQUOTED(POINTER,$lp_cv_prop_malloc_return_type,[what kind of pointer is used by malloc() et al])
 
 AC_CACHE_CHECK(if CHAR_BIT == 8 or undef,
 lp_cv_prop_charbits_eq_8,
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -2034,7 +1992,7 @@ AC_TRY_COMPILE([
 #include <values.h>
 #endif
 int i=[1/(CHAR_BIT-8)];
-],,lp_cv_prop_charbits_eq_8=no, lp_cv_prop_charbits_eq_8=yes))
+]], [[]])],[lp_cv_prop_charbits_eq_8=no],[lp_cv_prop_charbits_eq_8=yes]))
 if test "$lp_cv_prop_charbits_eq_8" = "yes"; then
   AC_DEFINE(CHARBIT_MASK, 0xff, [A mask that allows to extract an unsigned char from a signed])
 else
@@ -2047,7 +2005,7 @@ dnl the following three tests would better be nested, but it seems to overflow
 dnl internal buffers of m4
 AC_CACHE_CHECK(nonblocking using ioctl with FIONBIO,
 lp_cv_prop_use_ioctl_fionbio,
-AC_TRY_RUN([
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <sys/types.h> /* needed for netinet/in.h */
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -2114,19 +2072,16 @@ main() {
     }
     exit(1);
 }
-],
-lp_cv_prop_use_ioctl_fionbio=yes,
-lp_cv_prop_use_ioctl_fionbio=no,
-lp_cv_prop_use_ioctl_fionbio=unknown
+]])],[lp_cv_prop_use_ioctl_fionbio=yes],[lp_cv_prop_use_ioctl_fionbio=no],[lp_cv_prop_use_ioctl_fionbio=unknown
 AC_MSG_WARN(You have to supply the correct way to set sockets non-blocking by hand.)
-))
+]))
 if test "$lp_cv_prop_use_ioctl_fionbio" = "yes"; then
   AC_DEFINE(USE_IOCTL_FIONBIO, 1, [How to set a socket non-blocking])
 fi
 
 AC_CACHE_CHECK(nonblocking using fcntl with O_NDELAY,
 lp_cv_prop_use_fnctl_o_ndelay,
-AC_TRY_RUN([
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <sys/types.h> /* needed for netinet/in.h */
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -2177,16 +2132,14 @@ main() {
     }
     exit(1);
 }
-], lp_cv_prop_use_fnctl_o_ndelay=yes,
-lp_cv_prop_use_fnctl_o_ndelay=no,
-lp_cv_prop_use_fnctl_o_ndelay=unknown))
+]])],[lp_cv_prop_use_fnctl_o_ndelay=yes],[lp_cv_prop_use_fnctl_o_ndelay=no],[lp_cv_prop_use_fnctl_o_ndelay=unknown]))
 if test "$lp_cv_prop_use_fnctl_o_ndelay" = "yes"; then
   AC_DEFINE(USE_FCNTL_O_NDELAY, 1, [nonblocking using fcntl with O_NDELAY])
 fi
 
 AC_CACHE_CHECK(nonblocking using fcntl with FNDELAY,
 lp_cv_prop_use_fcntl_fndelay,
-AC_TRY_RUN([
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <sys/types.h> /* needed for netinet/in.h */
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -2237,9 +2190,7 @@ main() {
     }
     exit(1);
 }
-],lp_cv_prop_use_fcntl_fndelay=yes,
-lp_cv_prop_use_fcntl_fndelay=no,
-lp_cv_prop_use_fcntl_fndelay=unknown))
+]])],[lp_cv_prop_use_fcntl_fndelay=yes],[lp_cv_prop_use_fcntl_fndelay=no],[lp_cv_prop_use_fcntl_fndelay=unknown]))
 if test "$lp_cv_prop_use_fcntl_fndelay" = "yes"; then
   AC_DEFINE(USE_FCNTL_FNDELAY, 1, [nonblocking using fcntl with FNDELAY])
 fi
@@ -2247,7 +2198,7 @@ fi
 
 AC_CACHE_CHECK(if fcntl with SETOWN works,
 lp_cv_prop_use_fcntl_setown,
-AC_TRY_RUN([
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <sys/types.h> /* needed for netinet/in.h */
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -2295,16 +2246,14 @@ main() {
     }
     exit(1);
 }
-],lp_cv_prop_use_fcntl_setown=yes,
-lp_cv_prop_use_fcntl_setown=no,
-lp_cv_prop_use_fcntl_setown=unknown))
+]])],[lp_cv_prop_use_fcntl_setown=yes],[lp_cv_prop_use_fcntl_setown=no],[lp_cv_prop_use_fcntl_setown=unknown]))
 if test "$lp_cv_prop_use_fcntl_setown" = "yes"; then
   AC_DEFINE(USE_FCNTL_SETOWN, 1, [Can F_SETOWN be used on a socket?])
 fi
 
 AC_CACHE_CHECK(if OOBINLINE works,
 lp_cv_prop_use_oobinline,
-AC_TRY_RUN([
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <sys/types.h> /* needed for netinet/in.h */
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -2355,9 +2304,7 @@ main() {
     }
     exit(1);
 }
-],lp_cv_prop_use_oobinline=yes,
-lp_cv_prop_use_oobinline=no,
-lp_cv_prop_use_oobinline=unknown))
+]])],[lp_cv_prop_use_oobinline=yes],[lp_cv_prop_use_oobinline=no],[lp_cv_prop_use_oobinline=unknown]))
 if test "$lp_cv_prop_use_oobinline" = "yes"; then
   AC_DEFINE(USE_OOBINLINE, 1, [Can SO_OOBINLINE be used on a socket?])
 fi
