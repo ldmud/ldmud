@@ -155,7 +155,7 @@ union ticket_u
 {
     struct ticket_s
     {
-        long rnd, seq;
+        int32_t rnd, seq;
     } s;
     char c[1];
 };
