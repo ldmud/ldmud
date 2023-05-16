@@ -11099,6 +11099,9 @@ again:
             }
         }
 
+        if (csp->extern_call)
+            assign_eval_cost_inl();
+
         if (current_coroutine)
         {
             /* Is there some coroutine waiting? Then continue there. */
@@ -11130,6 +11133,8 @@ again:
                 *(++sp) = value;
                 break;
             }
+
+            /* At this point, current_object might not be valid anymore. */
         }
 
         /* Restore the previous execution context */
@@ -11137,8 +11142,6 @@ again:
         if (extern_call)
         {
             /* eval_instruction() must be left - setup the globals */
-            assign_eval_cost_inl();
-
             current_object = csp->ob;
             previous_ob = csp->prev_ob;
         }
