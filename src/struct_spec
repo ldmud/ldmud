@@ -21,4 +21,6 @@ struct compile_string_options
     int compile_expression;
     int compile_block;
     int as_async;
+
+    int detect_end;
 };

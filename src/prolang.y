@@ -1,4 +1,5 @@
 %define lr.type ielr
+%define api.location.type {code_location_t}
 %{
 %line
 /*---------------------------------------------------------------------------
@@ -123,6 +124,20 @@
 #define lint  /* redef again to prevent spurious warnings */
 
 #define YYMAXDEPTH        600
+
+#define YYLLOC_DEFAULT(cur, rhs, n)                         \
+    do                                                      \
+    {                                                       \
+        if (n)                                              \
+        {                                                   \
+            (cur).start = YYRHSLOC(rhs, 1).start;           \
+            (cur).end   = YYRHSLOC(rhs, n).end;             \
+        }                                                   \
+        else                                                \
+        {                                                   \
+            (cur).start = (cur).end = YYRHSLOC(rhs, 0).end; \
+        }                                                   \
+    } while (0)
 
 /*-------------------------------------------------------------------------*/
 
@@ -8868,13 +8883,11 @@ get_global_variable_lvalue (ident_t *ident)
 
 /*-------------------------------------------------------------------------*/
 
-%token L_START_PROG
-%token L_START_EXPR
-%token L_START_BLOCK
+%token L_ARROW
 %token L_ASSIGN
 %token L_ASYNC
-%token L_ARROW
 %token L_AWAIT
+%token L_BEGIN_INLINE
 %token L_BREAK
 %token L_BYTES
 %token L_BYTES_DECL
@@ -8888,21 +8901,23 @@ get_global_variable_lvalue (ident_t *ident)
 %token L_DEC
 %token L_DECLTYPE
 %token L_DEFAULT
+%token L_DEPRECATED
 %token L_DO
 %token L_DUMMY
 %token L_ELLIPSIS
 %token L_ELSE
-%token L_EQ
-%token L_FUNC
-%token L_BEGIN_INLINE
 %token L_END_INLINE
+%token L_EQ
+%token L_EOF
 %token L_FLOAT
 %token L_FLOAT_DECL
 %token L_FOR
 %token L_FOREACH
+%token L_FUNC
 %token L_GE
 %token L_IDENTIFIER
 %token L_IF
+%token L_ILLEGAL_CHAR
 %token L_INC
 %token L_INHERIT
 %token L_INT
@@ -8918,7 +8933,6 @@ get_global_variable_lvalue (ident_t *ident)
 %token L_NE
 %token L_NO_MASK
 %token L_NOSAVE
-%token L_DEPRECATED
 %token L_NOT
 %token L_NUMBER
 %token L_OBJECT
@@ -8934,6 +8948,11 @@ get_global_variable_lvalue (ident_t *ident)
 %token L_RSH
 %token L_RSHL
 %token L_SIMUL_EFUN_CLOSURE
+%token L_START_BLOCK
+%token L_START_BLOCK_END_DETECTION
+%token L_START_EXPR
+%token L_START_EXPR_END_DETECTION
+%token L_START_PROG
 %token L_STATIC
 %token L_STATUS
 %token L_STRING
@@ -9290,6 +9309,7 @@ get_global_variable_lvalue (ident_t *ident)
 %destructor { free_fulltype($$.type1);
               free_fulltype($$.type2); } <index>
 %destructor { free_lpctype($$.expr_type); } <foreach_expression>
+%destructor { free_mstring($$.name); } <symbol>
 
 /*-------------------------------------------------------------------------*/
 
@@ -9398,15 +9418,48 @@ get_global_variable_lvalue (ident_t *ident)
 %right    '~'     L_NOT
 %nonassoc L_INC   L_DEC
 %left     '.'     L_ARROW '['
+
+/* Prefer string concatenation (shift) over end detection (reduce). */
+%right    L_BYTES L_STRING
+
+%initial-action
+{
+    @$.start = @$.end = 0;
+};
+
 %%
 
 /*-------------------------------------------------------------------------*/
 
 all:  L_START_PROG program
     | L_START_BLOCK statements_block
+    | L_START_BLOCK_END_DETECTION statements_block block_detected_end
+      {
+          string_context->end_position = @3.start;
+          if (@3.start >= 0)
+              YYACCEPT;
+          else
+          {
+              yyerror("syntax error");
+              YYABORT;
+          }
+      }
     | L_START_EXPR comma_expr
       {
           free_fulltype($2.type);
+      }
+    | L_START_EXPR_END_DETECTION expr0 expr_detected_end
+      {
+          free_lvalue_block($2.lvalue);
+          free_fulltype($2.type);
+          string_context->end_position = @3.start;
+          if (@3.start >= 0)
+              YYACCEPT;
+          else
+          {
+              yyerror("syntax error");
+              YYABORT;
+          }
       }
 ; /* all */
 
@@ -9419,6 +9472,130 @@ possible_semi_colon:
     | ';' { yywarn("Extra ';' ignored"); };
 
 note_start: { $$ = CURRENT_PROGRAM_SIZE; };
+
+/* All tokens that could not begin a statement. */
+block_detected_end:
+      /* empty */
+    | '%'
+    | ')'
+    | '*'
+    | '+'
+    | ','
+    | '.'
+    | '/'
+    | ':'
+    | '>'
+    | '?'
+    | ']'
+    | '^'
+    | '|'
+    | '}'
+    | L_ARROW
+    | L_ASSIGN
+    | L_CASE
+    | L_DEFAULT
+    | L_DEPRECATED
+    | L_ELLIPSIS
+    | L_ELSE
+    | L_EQ
+    | L_EOF
+    | L_GE
+    | L_ILLEGAL_CHAR
+    | L_INHERIT
+    | L_LAND
+    | L_LE
+    | L_LOR
+    | L_LSH
+    | L_NE
+    | L_NO_MASK
+    | L_NOSAVE
+    | L_PRIVATE
+    | L_PROTECTED
+    | L_PUBLIC
+    | L_RANGE
+    | L_RSH
+    | L_RSHL
+    | L_STATIC
+    | L_VARARGS
+    | L_VIRTUAL
+    | L_VISIBLE
+; /* block_detected_end */
+
+/* All tokens that are not consumed by an expression. */
+expr_detected_end:
+      /* empty */
+    | ')'
+    | ','
+    | ':'
+    | ';'
+    | ']'
+    | '{'
+    | '}'
+    | '~'
+    | L_ASYNC
+    | L_AWAIT
+    | L_BEGIN_INLINE
+    | L_BREAK
+    | L_BYTES
+    | L_BYTES_DECL
+    | L_CASE
+    | L_CATCH
+    | L_CLOSURE
+    | L_CLOSURE_DECL
+    | L_CONTINUE
+    | L_COROUTINE
+    | L_DECLTYPE
+    | L_DEFAULT
+    | L_DEPRECATED
+    | L_DO
+    | L_ELLIPSIS
+    | L_ELSE
+    | L_END_INLINE
+    | L_EOF
+    | L_FLOAT
+    | L_FLOAT_DECL
+    | L_FOR
+    | L_FOREACH
+    | L_FUNC
+    | L_IF
+    | L_ILLEGAL_CHAR
+    | L_INHERIT
+    | L_INT
+    | L_LAMBDA_CLOSURE_VALUE
+    | L_LPCTYPE
+    | L_LWOBJECT
+    | L_MAPPING
+    | L_MIXED
+    | L_NO_MASK
+    | L_NOSAVE
+    | L_NOT
+    | L_NUMBER
+    | L_OBJECT
+    | L_PRIVATE
+    | L_PROTECTED
+    | L_PUBLIC
+%ifdef USE_PYTHON
+    | L_PYTHON_TYPE
+%endif
+    | L_QUOTED_AGGREGATE
+    | L_RANGE
+    | L_RETURN
+    | L_SIMUL_EFUN_CLOSURE
+    | L_STATIC
+    | L_STATUS
+    | L_STRING
+    | L_STRING_DECL
+    | L_STRUCT
+    | L_SWITCH
+    | L_SYMBOL { free_mstring($1.name); }
+    | L_SYMBOL_DECL
+    | L_VARARGS
+    | L_VIRTUAL
+    | L_VISIBLE
+    | L_VOID
+    | L_WHILE
+    | L_YIELD
+; /* expr_detected_end */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -22959,9 +23136,9 @@ compile_string (string_t *expr, code_context_t *context, bool block)
     string_context->error_msg[0] = 0;
 
     if (block)
-        start_new_block(expr);
+        start_new_block(expr, context->detect_end);
     else
-        start_new_expr(expr);
+        start_new_expr(expr, context->detect_end);
     pragma_no_simul_efuns = false;
 
     block_depth = 1;

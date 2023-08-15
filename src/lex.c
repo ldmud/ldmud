@@ -276,6 +276,14 @@ static Mempool lexpool = NULL;
   /* Fifopool to hold the allocations for the include and lpc_ifstate_t stacks.
    */
 
+static bool with_end_detection;
+  /* For compile_string(), when true the Lexer will
+   *  - return an L_EOF token for the end of string, so the actual end
+   *    position can be determined correctly,
+   *  - return L_ILLEGAL_CHAR token for unhandled characters so they
+   *    can be used for end detection.
+   */
+
 /*-------------------------------------------------------------------------*/
 /* The lexer can take data from either a file or a string buffer.
  * The handling is unified using the struct source_s structure.
@@ -356,6 +364,14 @@ static unsigned long defbuf_len = 0;
 
 static char *outp;
   /* Pointer to the next character in defbuf[] to be processed.
+   */
+
+static char *lastp;
+  /* Pointer to the end of data in defbuf[].
+   */
+
+static char *expandend;
+  /* Pointer to the end of define expanded data in defbuf[].
    */
 
 static char *linebufstart;
@@ -512,6 +528,8 @@ static struct incstate
     ptrdiff_t    linebufoffset;  /* Position of linebufstart */
     mp_uint      inc_offset;     /* Handle returned by store_include_info() */
     char         saved_char;
+    char*        prev_lastp;
+    char*        prev_expandend;
 } *inctop = NULL;
 
 /*-------------------------------------------------------------------------*/
@@ -2443,7 +2461,7 @@ realloc_defbuf (void)
 
 /* Increase the size of defbuf[] (unless it would exceed MAX_TOTAL_BUF).
  * The old content of defbuf[] is copied to the end of the new buffer.
- * outp is corrected to the new position, other pointers into defbuf
+ * outp/lastp is corrected to the new position, other pointers into defbuf
  * become invalid.
  */
 
@@ -2473,6 +2491,8 @@ realloc_defbuf (void)
     memcpy(defbuf+defbuf_len-old_defbuf_len, old_defbuf, old_defbuf_len);
     xfree(old_defbuf);
     outp = &defbuf[defbuf_len] - outp_off;
+    lastp = lastp - old_outp + outp;
+    expandend = expandend - old_outp + outp;
 } /* realloc_defbuf() */
 
 /*-------------------------------------------------------------------------*/
@@ -2642,6 +2662,9 @@ _myfilbuf (void)
     if (linebufend - outp)
         memcpy(outp-MAXLINE, outp, (size_t)(linebufend - outp));
     outp -= MAXLINE;
+    expandend -= MAXLINE;
+    if (expandend < linebufstart)
+        expandend = linebufstart;
 
     *(outp-1) = '\n'; /* so an ungetc() gives a sensible result */
 
@@ -2772,7 +2795,7 @@ _myfilbuf (void)
             i = 0;
         }
 
-        p += i;
+        lastp = p += i;
         if ((p - outp) ? (p[-1] != '\n') : (current_loc.line == 1))
             *p++ = '\n';
         *p++ = CHAR_EOF;
@@ -2780,7 +2803,7 @@ _myfilbuf (void)
     }
 
     /* Buffer filled: mark the last line with the '\0' sentinel */
-    p += i;
+    lastp = p += i;
     while (*--p != '\n') NOOP; /* find last newline */
     if (p < linebufstart)
     {
@@ -3162,6 +3185,8 @@ start_new_include (int fd, string_t * str
     is->loc = current_loc;
     is->linebufoffset = linebufoffset;
     is->saved_char = saved_char;
+    is->prev_lastp = lastp;
+    is->prev_expandend = expandend;
     is->next = inctop;
 
 
@@ -3204,6 +3229,7 @@ start_new_include (int fd, string_t * str
     linebufend   = outp - 1; /* allow trailing zero */
     linebufstart = linebufend - MAXLINE;
     *(outp = linebufend) = '\0';
+    expandend  = linebufstart;
     set_input_source(fd, name, str);
     _myfilbuf();
 
@@ -5748,6 +5774,8 @@ yylex1 (void)
 
                     yyin = p->yyin;
                     saved_char = p->saved_char;
+                    lastp = p->prev_lastp;
+                    expandend = p->prev_expandend;
                     inctop = p->next;
                     *linebufend = '\n';
                     yyp = linebufend + 1;
@@ -5782,6 +5810,11 @@ yylex1 (void)
 
                 /* Return the EOF condition */
                 outp = yyp-1;
+                if (with_end_detection)
+                {
+                    with_end_detection = false; /* Next call will return -1. */
+                    return L_EOF;
+                }
                 return -1;
 
 
@@ -6135,6 +6168,7 @@ yylex1 (void)
                     break;
                 }
 
+                yyp--;
                 goto badlex;
 
 
@@ -6505,6 +6539,9 @@ badlex:
         {
             sprintf(buff, "Illegal character (hex %02" PRIxPINT") '%.*s'", c, (int)clen, yyp);
             outp = yyp + clen;
+
+            if (with_end_detection)
+                return L_ILLEGAL_CHAR;
         }
 
         yyerror(buff);
@@ -6515,6 +6552,57 @@ badlex:
 #undef RETURN
 
 } /* yylex1() */
+
+/*-------------------------------------------------------------------------*/
+static int
+get_string_position (void)
+
+/* When string compiling, return the current position in the string.
+ * If the current token is not from a string, return -1.
+ */
+
+{
+    source_t *src = &yyin;
+    struct incstate *inc = inctop;
+    char *yyp = outp;
+    char *lp = lastp;
+    char *expend = expandend;
+
+    while (src->fd != -1 || inc != NULL || expend > yyp)
+    {
+        // When we are not directly in the string,
+        // we try to peek ahead skipping whitespaces.
+        switch (*(unsigned char*)yyp)
+        {
+            case CHAR_EOF:
+                if (!inc)
+                    return -1;
+
+                src = &(inc->yyin);
+                expend = inc->prev_expandend;
+                lp = inc->prev_lastp;
+                yyp = linebufend+1;
+                inc = inc->next;
+                break;
+
+            case ' ':
+            case '\t':
+            case '\r':
+            case '\n':
+            case 0x1a:
+            case 0xef:
+            case 0xbb:
+            case 0xbf:
+                yyp++;
+                break;
+
+            default:
+                return -1;
+        }
+    }
+
+    return src->current - (lp - yyp);
+} /* get_string_position() */
 
 /*-------------------------------------------------------------------------*/
 int
@@ -6534,8 +6622,11 @@ yylex (void)
     {
         r = start_token;
         start_token = -1;
+        yylloc.start = yylloc.end = 0;
         return r;
     }
+
+    yylloc.start = get_string_position();
 
 #ifdef LEXDEBUG
     yytext[0] = '\0';
@@ -6544,6 +6635,9 @@ yylex (void)
 #ifdef LEXDEBUG
     fprintf(stderr, "%s lex=%d(%s) ", time_stamp(), r, yytext);
 #endif
+
+    yylloc.end = get_string_position();
+
     return r;
 }
 
@@ -6573,7 +6667,7 @@ start_lex ()
         defbuf_len = DEFBUF_1STLEN;
     }
 
-    *(outp = linebufend = (linebufstart = defbuf + DEFMAX) + MAXLINE) = '\0';
+    *(outp = linebufend = (expandend = linebufstart = defbuf + DEFMAX) + MAXLINE) = '\0';
 
     lex_fatal = MY_FALSE;
 
@@ -6606,6 +6700,7 @@ start_lex ()
     pragma_warn_unused_variables = false;
     pragma_warn_unused_values = false;
     pragma_warn_lightweight = true;
+    with_end_detection = false;
 
     nexpands = 0;
 
@@ -6723,13 +6818,14 @@ start_new_string (string_t* str, int token, int auto_include_hook_expr)
 
 /*-------------------------------------------------------------------------*/
 void
-start_new_expr (string_t* str)
+start_new_expr (string_t* str, bool end_detection)
 
 /* Start the compilation/lexing of the lpc string <str> as an expression.
  */
 
 {
-    start_new_string(str, L_START_EXPR, H_AUTO_INCLUDE_EXPRESSION);
+    start_new_string(str, end_detection ? L_START_EXPR_END_DETECTION : L_START_EXPR, H_AUTO_INCLUDE_EXPRESSION);
+    with_end_detection = end_detection;
 } /* start_new_expr() */
 
 /*-------------------------------------------------------------------------*/
@@ -6745,13 +6841,14 @@ end_new_expr ()
 
 /*-------------------------------------------------------------------------*/
 void
-start_new_block (string_t* str)
+start_new_block (string_t* str, bool end_detection)
 
 /* Start the compilation/lexing of the lpc string <str> as a block.
  */
 
 {
-    start_new_string(str, L_START_BLOCK, H_AUTO_INCLUDE_BLOCK);
+    start_new_string(str, end_detection ? L_START_BLOCK_END_DETECTION : L_START_BLOCK, H_AUTO_INCLUDE_BLOCK);
+    with_end_detection = end_detection;
 } /* start_new_block() */
 
 /*-------------------------------------------------------------------------*/
@@ -7589,6 +7686,8 @@ _expand_define (struct defn *p, ident_t * macro)
     if (p->nargs == -1)
     {
         /* --- Normal Macro --- */
+        if (expandend < outp)
+            expandend = outp;
 
         if (!p->special)
         {
@@ -7935,6 +8034,9 @@ _expand_define (struct defn *p, ident_t * macro)
             DEMUTEX;
             return MY_FALSE;
         }
+
+        if (expandend < outp)
+            expandend = outp;
 
         /* (Don't) handle dynamic function macros */
         if (p->special)

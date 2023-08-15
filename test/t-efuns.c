@@ -674,6 +674,69 @@ mixed *tests =
                 use_object_structs: 1))) in [mixed*];
        :)
     }),
+    ({ "compile_string (expression with end detection) 1", 0,
+       (:
+            string expr = "1+1!";
+            return funcall(compile_string(0, &expr, (<cs_opts>
+                detect_end: 1))) == 2 && expr == "!";
+       :)
+    }),
+    ({ "compile_string (expression with end detection) 2", 0,
+       (:
+            string expr = "1+1";
+            return funcall(compile_string(0, &expr, (<cs_opts>
+                detect_end: 1))) == 2 && expr == "";
+       :)
+    }),
+    ({ "compile_string (expression with end detection) 3", 0,
+       (:
+            string expr = "1+1@";
+            return funcall(compile_string(0, &expr, (<cs_opts>
+                detect_end: 1))) == 2 && expr == "@";
+       :)
+    }),
+    ({ "compile_string (expression with end detection) 4", 0,
+       (:
+            string expr = "\"LD\" \"Mud\"!";
+            return funcall(compile_string(0, &expr, (<cs_opts>
+                detect_end: 1))) == "LDMud" && expr == "!";
+       :)
+    }),
+    ({ "compile_string (expression with end detection) 5", 0,
+       (:
+            string expr = "\"LD\" \"Mud\"";
+            return funcall(compile_string(0, &expr, (<cs_opts>
+                detect_end: 1))) == "LDMud" && expr == "";
+       :)
+    }),
+    ({ "compile_string (expression with end detection) 6", 0,
+       (:
+            string exprs = "10, 20+30, \",\" ";
+            mixed *result = ({});
+
+            while (sizeof(exprs))
+            {
+                result += ({ funcall(compile_string(0, &exprs, (<cs_opts> detect_end: 1))) });
+                exprs = trim(exprs);
+                if (sizeof(exprs) && exprs[0] == ',')
+                    exprs = trim(exprs[1..]);
+            }
+
+            return deep_eq(result, ({10, 50, ","}));
+       :)
+    }),
+    ({ "compile_string (expression with end detection) 7", 0,
+       (:
+            string expr = "#define VALUE 42 \nVALUE;";
+            return funcall(compile_string(0, &expr, (<cs_opts> detect_end: 1))) == 42 && expr == ";";
+       :)
+    }),
+    ({ "compile_string (expression with end detection) 8", TF_ERROR,
+       (:
+            string expr = "#define VALUE 42 52\nVALUE";
+            funcall(compile_string(0, &expr, (<cs_opts> detect_end: 1)));
+       :)
+    }),
     ({ "compile_string (simple block)", 0,
        (:
             return funcall(compile_string(0, "return 42;", (<cs_opts> compile_block: 1)))==42;
@@ -775,6 +838,37 @@ mixed *tests =
                 {
                     return compile_string(0, "1+1");
                 }));
+       :)
+    }),
+    ({ "compile_string (block with end detection) 1", 0,
+       (:
+            string expr = "return 42;\n===";
+            return funcall(compile_string(0, &expr, (<cs_opts>
+                compile_block: 1,
+                detect_end: 1))) == 42 && expr == "\n===";
+       :)
+    }),
+    ({ "compile_string (block with end detection) 2", 0,
+       (:
+            string expr = "return 42;";
+            return funcall(compile_string(0, &expr, (<cs_opts>
+                compile_block: 1,
+                detect_end: 1))) == 42 && expr == "";
+       :)
+    }),
+    ({ "compile_string (block with end detection) 3", 0,
+       (:
+            string expr = "return 42;\n@";
+            return funcall(compile_string(0, &expr, (<cs_opts>
+                compile_block: 1,
+                detect_end: 1))) == 42 && expr == "\n@";
+       :)
+    }),
+    ({ "compile_string (block with end detection and this end in H_AUTO_INCLUDE_BLOCK)", TF_ERROR,
+       (:
+            /* As the end is not in the string itself, this should throw. */
+            set_driver_hook(H_AUTO_INCLUDE_BLOCK, "return 42;\n@");
+            compile_string(0, "", (<cs_opts> compile_block: 1, detect_end: 1));
        :)
     }),
     ({ "configure_interactive (privileged)", 0,

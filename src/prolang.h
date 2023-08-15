@@ -10,6 +10,7 @@
 
 typedef struct lvalue_block_s      lvalue_block_t;
 typedef struct code_context_s      code_context_t;
+typedef struct code_location_s     code_location_t;
 
 /* --- struct lvalue_block_s: Store code for an lvalue expression ---
  *
@@ -59,8 +60,22 @@ struct code_context_s
     bool use_prog_for_structs   : 1;  /* Search <prog> for struct defs.    */
 
     bool make_async             : 1;  /* Create a coroutine.               */
+    bool detect_end             : 1;  /* End parsing on wrong tokens.      */
 
     char error_msg[5120];       /* Returning error message (if any).       */
+    int end_position;           /* The detected end.                       */
+};
+
+/* --- struct code_location_s: Location information of source code ---
+ *
+ * This is the (byte) position of a token within the given string.
+ * If the token comes from a file or an auto-include string, the
+ * corresponding position will be -1.
+ */
+struct code_location_s
+{
+    int start;  /* Position of the first byte of the token. */
+    int end;    /* Position of the byte after the token.    */
 };
 
 /* --- Variables --- */

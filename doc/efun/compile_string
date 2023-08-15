@@ -4,6 +4,8 @@ SYNOPSIS
         closure compile_string(symbol* args, string str)
         closure compile_string(symbol* args, string str
                               , struct compile_string_options opts)
+        closure compile_string(symbol* args, string &str
+                              , struct compile_string_options opts)
 
 DESCRIPTION
         Compiles <str> into a closure. The closure will be bound to the
@@ -50,8 +52,16 @@ DESCRIPTION
               a value, the code needs a return statement.
 
           as_async:
-              if set (integer != 0) the code will be compiled as a coroutine,
+              If set (integer != 0) the code will be compiled as a coroutine,
               i.e. the resulting closure will return a coroutine when called.
+
+          detect_end:
+              If set (integer != 0) the driver will try(!) to detect the end
+              of the expression/block and return the remaining string in <str>
+              (<str> needs to be passed as a reference for this).
+              An end is detected if the word or character following a full
+              expression or block is not suitable to continue the expression
+              or block. Also a comma will end an expression.
 
         When compiling expressions the result of the H_AUTO_INCLUDE_EXPRESSION
         driver hook will be prepended, for blocks the H_AUTO_INCLUDE_BLOCK

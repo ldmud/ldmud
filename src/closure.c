@@ -6898,11 +6898,12 @@ v_compile_string (svalue_t *sp, int num_arg)
 
 /* EFUN compile_string()
  *
- *   closure compile_string(symbol* args, string str
+ *   closure compile_string(symbol* args, string(&) str
  *                         , struct compile_string_options opts)
  *
  * Compile <str> using the LPC compiler into a closure (of type
- * CLOSURE_LAMBDA).
+ * CLOSURE_LAMBDA). If opts.detect_end is active and <str> is an lvalue,
+ * return the remaining string in <str>.
  */
 
 {
@@ -6910,6 +6911,7 @@ v_compile_string (svalue_t *sp, int num_arg)
     code_context_t context;
     lambda_t *l;
     struct_t *opts = NULL;
+    string_t *str;
 
     /* We need to check the struct type of the options,
      * the interpreter will only check that it is a struct.
@@ -6970,18 +6972,47 @@ v_compile_string (svalue_t *sp, int num_arg)
     context.use_prog_for_variables = opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_USE_OBJECT_VARIABLES].u.number != 0;
     context.use_prog_for_structs = opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_USE_OBJECT_STRUCTS].u.number != 0;
     context.make_async = opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_AS_ASYNC].u.number != 0;
+    context.detect_end = opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_DETECT_END].u.number != 0;
 
     if (current_object.type == T_OBJECT
      && (current_object.u.ob->prog->flags & P_REPLACE_ACTIVE)
      && (context.use_prog_for_functions || context.use_prog_for_variables || context.use_prog_for_structs))
         errorf("Can't use current object's variables/functions/struct definitions when replace_program() is scheduled.\n");
 
-    if (opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_COMPILE_BLOCK].u.number != 0)
-        l = compile_block(argp[1].u.str, &context);
+    if (argp[1].type == T_LVALUE)
+    {
+        /* We need to make a copy of it, so it cannot be changed during compilation. */
+        push_rvalue(argp+1);
+        str = inter_sp->u.str;
+    }
     else
-        l = compile_expr(argp[1].u.str, &context);
+        str = argp[1].u.str;
+
+    if (opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_COMPILE_BLOCK].u.number != 0)
+        l = compile_block(str, &context);
+    else
+        l = compile_expr(str, &context);
     if (!l)
         errorf("%s", context.error_msg[0] ? context.error_msg : "Compilation error.\n");
+    if (context.detect_end && argp[1].type == T_LVALUE)
+    {
+        if (context.end_position < mstrsize(str))
+        {
+            string_t *rest = mstr_extract(str, context.end_position, -1);
+            if (rest)
+            {
+                svalue_t sv = svalue_string(rest);
+                transfer_svalue(argp+1, &sv);
+            }
+        }
+        else
+        {
+            svalue_t sv = svalue_string(STR_EMPTY);
+            assign_svalue(argp+1, &sv);
+        }
+    }
+    if (argp[1].type == T_LVALUE)
+        pop_stack();
 
     sp = pop_n_elems(num_arg, sp);
 
