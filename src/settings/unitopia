@@ -69,6 +69,7 @@ enable_use_deprecated=no
 enable_use_pcre=no
 enable_lpc_array_calls=yes
 enable_use_python=yes
+enable_keyword_in=yes
 
 # --- Runtime limits ---
 with_catch_reserved_cost=0x10000

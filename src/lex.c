@@ -563,7 +563,7 @@ static struct s_reswords reswords[]
    , { "foreach",        L_FOREACH       }
    , { "function",       L_FUNC          }
    , { "if",             L_IF            }
-#ifdef L_IN
+#ifdef KEYWORD_IN
    , { "in",             L_IN            }
 #endif
    , { "inherit",        L_INHERIT       }

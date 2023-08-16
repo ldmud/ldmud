@@ -30,7 +30,9 @@ FROM              " from "
 FUNCTIONS         "functions"
 GLOBAL            "global"
 HEART_BEAT        "heart_beat"
+#ifndef KEYWORD_IN
 IN                "in"
+#endif
 LINE              " line "
 LIMIT             "limit"
 MEMORY            "memory"

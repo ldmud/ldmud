@@ -5015,11 +5015,13 @@ check_identifier (ident_t *name)
  */
 
 {
+#ifndef KEYWORD_IN
     if (pragma_warn_deprecated && !warned_deprecated_in && mstreq(name->name, STR_IN))
     {
         warned_deprecated_in = true;
         yywarn("Usage of 'in' as an identifier is deprecated, it will be a reserved word in future versions");
     }
+#endif
 } /* check_identifier() */
 
 /*-------------------------------------------------------------------------*/
@@ -8918,6 +8920,9 @@ get_global_variable_lvalue (ident_t *ident)
 %token L_IDENTIFIER
 %token L_IF
 %token L_ILLEGAL_CHAR
+%ifdef KEYWORD_IN
+%token L_IN
+%endif
 %token L_INC
 %token L_INHERIT
 %token L_INT
@@ -9410,7 +9415,11 @@ get_global_variable_lvalue (ident_t *ident)
 %left     '|'
 %left     '^'
 %left     '&'
+%ifdef KEYWORD_IN
+%left     L_EQ    L_NE  L_IN
+%else
 %left     L_EQ    L_NE  L_IDENTIFIER
+%endif
 %left     '<'     L_LE  '>' L_GE
 %left     L_LSH   L_RSH L_RSHL
 %left     '+'     '-'
@@ -9501,6 +9510,9 @@ block_detected_end:
     | L_EOF
     | L_GE
     | L_ILLEGAL_CHAR
+%ifdef KEYWORD_IN
+    | L_IN
+%endif
     | L_INHERIT
     | L_LAND
     | L_LE
@@ -9557,6 +9569,9 @@ expr_detected_end:
     | L_FOR
     | L_FOREACH
     | L_FUNC
+%ifdef KEYWORD_IN
+    | L_IDENTIFIER
+%endif
     | L_IF
     | L_ILLEGAL_CHAR
     | L_INHERIT
@@ -12505,6 +12520,9 @@ foreach_expr:
 ; /* foreach_expr */
 
 keyword_in:
+%ifdef KEYWORD_IN
+      L_IN
+%else
       /* The purpose of this rule is to avoid making "in" a reserved word.
        * Instead we require an identifier/local with the name "in".
        */
@@ -12513,6 +12531,7 @@ keyword_in:
           if (!mstreq($1->name, STR_IN))
               yyerror("Expected keyword 'in'");
       }
+%endif
 ; /* keyword_in */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
