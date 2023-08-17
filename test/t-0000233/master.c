@@ -173,6 +173,11 @@ void run_test()
                         return d.c_wildcard_calc() == 1;
                     :)
                 }),
+                ({ "Run " + testname + ": variable_exists() on a_var.", 0,
+                    (:
+                        return funcall(bind_lambda(#'variable_exists, d), "a_var", d) == "/a";
+                    :)
+                }),
             }));
         }
     }

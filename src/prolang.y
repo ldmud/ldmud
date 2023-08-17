@@ -22377,6 +22377,19 @@ epilog (void)
             printf("(defined)\n");
     }
     printf("DEBUG: ------\n");
+
+    printf("DEBUG: ----- Variable list for %s: -----\n", current_loc.file->name);
+    for(i = 0; i < num_variables; i++)
+    {
+        variable_t *v = V_VARIABLE(i + VIRTUAL_VAR_TAG);
+
+        printf("DEBUG: [%03d: %08x] %-32s %-10s ", i, v->type.t_flags, get_txt(v->name), get_lpctype_name(v->type.t_type));
+        if (v->type.t_flags & NAME_INHERITED)
+            printf("(inherited)\n");
+        else
+            printf("(defined)\n");
+    }
+    printf("DEBUG: ------\n");
 #endif
 
     num_function_names = 0;

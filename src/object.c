@@ -2206,12 +2206,12 @@ v_variable_exists (svalue_t *sp, int num_arg)
         if (ix >= progp->num_variables)
             break;
 
+        /* Is it visible for the caller? */
+        flags = progp->variables[ix].type.t_flags;
+
         virtualvar = (ix < progp->num_virtual_variables);
         if (!virtualvar)
             ix -= progp->num_virtual_variables;
-
-        /* Is it visible for the caller? */
-        flags = progp->variables[ix].type.t_flags;
 
         if (!(mode_flags & NAME_HIDDEN)
          && (   (flags & TYPE_MOD_PRIVATE)
@@ -2228,16 +2228,18 @@ v_variable_exists (svalue_t *sp, int num_arg)
             {
                 inherit_t *ip = &progp->inherit[ic];
 
-                if ((ip->inherit_type == INHERIT_TYPE_NORMAL) == virtualvar)
+                if (ip->inherit_duplicate
+                 || ip->inherit_mapped
+                 || (ip->inherit_type == INHERIT_TYPE_NORMAL) == virtualvar)
                     continue;
 
-                if (ix >= ip->variable_index_offset + ip->prog->num_variables
+                if (ix >= ip->variable_index_offset + ip->prog->num_variables - ip->prog->num_virtual_variables
                  || ix < ip->variable_index_offset
                    )
                     continue;
                 ix -= ip->variable_index_offset;
                 progp = ip->prog;
-                flags = progp->variables[ix].type.t_flags;
+                flags = progp->variables[progp->num_virtual_variables + ix].type.t_flags;
                 virtualvar = false;
             }
         }
