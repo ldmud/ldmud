@@ -1,4 +1,4 @@
-FROM debian:11-slim
+FROM debian:bookworm-20230725-slim
 ENV LANG C.UTF-8
 RUN apt update
 RUN apt-get install -y --no-install-recommends clang ca-certificates bison
@@ -11,7 +11,7 @@ WORKDIR /ldmud/src
 RUN ./autogen.sh
 RUN ./configure --enable-compat-mode --enable-use-json
 RUN make install-driver
-FROM debian:11-slim
+FROM debian:bookworm-20230725-slim
 COPY --from=0 /usr/local/mud /usr/local/mud
 RUN apt update
 RUN apt-get install -y --no-install-recommends libjson-c-dev
