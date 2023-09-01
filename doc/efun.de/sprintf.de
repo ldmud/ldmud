@@ -56,10 +56,12 @@ BESCHREIBUNG
                      einem Fuellzeichen aufgefuellt. Beginnt n mit einer
                      '0' (etwa "08") so ist das Fuellzeichen '0' sonst
                      ist es per Default ' '. (sogenannte 'Feldbreite')
+                     Bei %O/%Q die maximale Rekursionstiefe.
         .n           Bei Ganzzahlen die Maxanzahl der Stellen, bei Gleit-
                      kommazahlen die Maximalzahl der Nachkommastellen.
                      Bei (einfachen) Strings die Maximallaenge.
-                     Bei %O/%Q die maximale Rekursionstiefe.
+                     Bei %O/%Q die maximale Anzahl an Elementen von Arrays/
+                     Mappings/Structs.
         :n           Ist dasselbe wie n.n - setzt also beide Werte auf
                      dieselbe Zahl.
         'X'          Als Fuellzeichen wird X genutzt. X koennen dabei

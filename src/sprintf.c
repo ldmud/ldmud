@@ -47,13 +47,14 @@
  *   n    specifies the field size, a '*' specifies to use the corresponding
  *        arg as the field size.  If n is prepended with a zero, then the field
  *        is printed with leading zeros.
+ *        with %O/%Q: limit recursion to n levels.
  *  "."n  precision of n
  *        floats are rounded to this precision
  *        simple strings truncate after this (if precision is greater than 
  *         field size, then field size = precision).
  *        tables use precision to specify the number of columns (if precision
  *         not specified then tables calculate a best fit).
- *        with %O/%Q: limit recursion to n levels.
+ *        with %O/%Q: limit the number of array/mapping/struct elements to n.
  *  ":"n  n specifies the fs _and_ the precision, if n is prepended by a zero
  *        then it is padded with zeros instead of spaces.
  *  "@"   the argument is an array.  the corresponding format_info (minus the
@@ -269,6 +270,8 @@ struct stsf_locals
     sprintf_buffer_t *spb;  /* Target buffer */
     int depth;              /* Recursion depth */
     int maxDepth;           /* Max recursion depth */
+    int count;
+    int maxCount;           /* Max number of elements */
     int num_values;         /* Mapping width */
     Bool quote;             /* TRUE: Quote strings */
     Bool compact;           /* TRUE: Compact output */
@@ -329,7 +332,7 @@ static fmt_state_t static_fmt;
 
 static sprintf_buffer_t *svalue_to_string(fmt_state_t *
                                          , svalue_t *, sprintf_buffer_t *
-                                         , int, Bool, Bool, Bool, Bool, int);
+                                         , int, Bool, Bool, Bool, Bool, int, int);
 
 /*-------------------------------------------------------------------------*/
 /* static helper functions */
@@ -589,13 +592,26 @@ svalue_to_string_filter(svalue_t *key, svalue_t *data, void *extra)
     stsf_locals_t *locals = (stsf_locals_t *)extra;
     char *delimiter = ": ";
 
+    if (locals->maxCount)
+    {
+        if (locals->count == locals->maxCount)
+        {
+            if (!locals->compact)
+                add_indent(locals->st, &locals->spb, locals->depth * SPRINTF_LPC_INDENT);
+            stradd(locals->st, &locals->spb, "...");
+        }
+        (locals->count)++;
+        if (locals->count > locals->maxCount)
+            return;
+    }
+
     i = locals->num_values;
     locals->spb =
-      svalue_to_string(locals->st, key, locals->spb, locals->depth, !i, locals->quote, locals->compact, MY_FALSE, locals->maxDepth);
+      svalue_to_string(locals->st, key, locals->spb, locals->depth, !i, locals->quote, locals->compact, MY_FALSE, locals->maxDepth, locals->maxCount);
     while (--i >= 0)
     {
         stradd(locals->st, &locals->spb, delimiter);
-        locals->spb = svalue_to_string(locals->st, data++, locals->spb, locals->depth, !i, locals->quote, locals->compact, MY_TRUE, locals->maxDepth);
+        locals->spb = svalue_to_string(locals->st, data++, locals->spb, locals->depth, !i, locals->quote, locals->compact, MY_TRUE, locals->maxDepth, locals->maxCount);
         delimiter = "; ";
     }
 } /* svalue_to_string_filter() */
@@ -692,7 +708,7 @@ static sprintf_buffer_t *
 svalue_to_string ( fmt_state_t *st
                  , svalue_t *obj, sprintf_buffer_t *str
                  , int depth, Bool trailing, Bool quoteStrings
-                 , Bool compact, Bool prefixed, int maxDepth)
+                 , Bool compact, Bool prefixed, int maxDepth, int maxCount)
 
 /* Print the value <obj> into the buffer <str> with recursion deptth <depth>.
  * If <trailing> is true, add ",\n" after the printed value.
@@ -700,8 +716,8 @@ svalue_to_string ( fmt_state_t *st
  * If <compact> is true, a short output format is used.
  * If <prefixed> is true, the caller has printed something ahead of this
  * value, meaning that for the first line no indentation is required.
- * If <maxDepth> recursions are reached, the content of arrays/mappings/structs
- * is only printed as "..."
+ * If <maxDepth> recursions are reached and/or <maxCount> values have been 
+ * printed, the content of arrays/mappings/structs is abbreviated to "..."
  *
  * Result is the (updated) string buffer.
  * The function calls itself for recursive values.
@@ -732,7 +748,7 @@ svalue_to_string ( fmt_state_t *st
                 if (depth >= maxDepth)
                     stradd(st, &str, "...");
                 else
-                    str = svalue_to_string(st, &(obj->u.protected_lvalue->val), str, depth+1, MY_FALSE, quoteStrings, compact, MY_TRUE, maxDepth);
+                    str = svalue_to_string(st, &(obj->u.protected_lvalue->val), str, depth+1, MY_FALSE, quoteStrings, compact, MY_TRUE, maxDepth, maxCount);
                 break;
 
             case LVALUE_PROTECTED_CHAR:
@@ -811,8 +827,8 @@ svalue_to_string ( fmt_state_t *st
                                 else
                                 {
                                     for (i = r->index1; i < r->index2-1; i++)
-                                        str = svalue_to_string(st, &(vec->u.vec->item[i]), str, depth+1, MY_TRUE, quoteStrings, compact, MY_FALSE, maxDepth);
-                                    str = svalue_to_string(st, &(vec->u.vec->item[i]), str, depth+1, MY_FALSE, quoteStrings, compact, MY_FALSE, maxDepth);
+                                        str = svalue_to_string(st, &(vec->u.vec->item[i]), str, depth+1, MY_TRUE, quoteStrings, compact, MY_FALSE, maxDepth, maxCount);
+                                    str = svalue_to_string(st, &(vec->u.vec->item[i]), str, depth+1, MY_FALSE, quoteStrings, compact, MY_FALSE, maxDepth, maxCount);
                                     if (!compact)
                                     {
                                         stradd(st, &str, "\n");
@@ -849,7 +865,7 @@ svalue_to_string ( fmt_state_t *st
             }
 
             case LVALUE_PROTECTED_MAPENTRY:
-            return svalue_to_string(st, get_rvalue(obj, NULL), str, depth, trailing, quoteStrings, compact, prefixed, maxDepth);
+            return svalue_to_string(st, get_rvalue(obj, NULL), str, depth, trailing, quoteStrings, compact, prefixed, maxDepth, maxCount);
 
             case LVALUE_PROTECTED_MAP_RANGE:
             {
@@ -906,8 +922,8 @@ svalue_to_string ( fmt_state_t *st
                         else
                         {
                             for (i = r->index1; i < r->index2-1; i++)
-                                str = svalue_to_string(st, item + i, str, depth+1, MY_TRUE, quoteStrings, compact, MY_FALSE, maxDepth);
-                            str = svalue_to_string(st, item + i, str, depth+1, MY_FALSE, quoteStrings, compact, MY_FALSE, maxDepth);
+                                str = svalue_to_string(st, item + i, str, depth+1, MY_TRUE, quoteStrings, compact, MY_FALSE, maxDepth, maxCount);
+                            str = svalue_to_string(st, item + i, str, depth+1, MY_FALSE, quoteStrings, compact, MY_FALSE, maxDepth, maxCount);
                         }
 
                         if (!compact)
@@ -1009,11 +1025,18 @@ svalue_to_string ( fmt_state_t *st
                     {
                         if (!compact)
                             stradd(st, &str, "\n");
-                        for (i = 0; (size_t)i < size-1; i++)
+                        for (i = 0; (size_t)i < size-1 && (!maxCount || i < maxCount); i++)
                         {
-                            str = svalue_to_string(st, &(obj->u.vec->item[i]), str, depth+1, MY_TRUE, quoteStrings, compact, MY_FALSE, maxDepth);
+                            str = svalue_to_string(st, &(obj->u.vec->item[i]), str, depth+1, MY_TRUE, quoteStrings, compact, MY_FALSE, maxDepth, maxCount);
                         }
-                        str = svalue_to_string(st, &(obj->u.vec->item[i]), str, depth+1, MY_FALSE, quoteStrings, compact, MY_FALSE, maxDepth);
+                        if (maxCount && i >= maxCount)
+                        {
+                            if (!compact)
+                                add_indent(st, &str, (depth+1) * SPRINTF_LPC_INDENT);
+                            stradd(st, &str, "...");
+                        }
+                        else
+                            str = svalue_to_string(st, &(obj->u.vec->item[i]), str, depth+1, MY_FALSE, quoteStrings, compact, MY_FALSE, maxDepth, maxCount);
                         if (!compact)
                         {
                             stradd(st, &str, "\n");
@@ -1073,7 +1096,7 @@ svalue_to_string ( fmt_state_t *st
                 {
                     if (!compact)
                         stradd(st, &str, "\n");
-                    for (i = 0; (size_t)i < size-1; i++)
+                    for (i = 0; (size_t)i < size-1 && (!maxCount || i < maxCount); i++)
                     {
                         if (!compact)
                         {
@@ -1082,16 +1105,25 @@ svalue_to_string ( fmt_state_t *st
                             stradd(st, &str, get_txt(strct->type->member[i].name));
                             stradd(st, &str, ": */ ");
                         }
-                        str = svalue_to_string(st, &(strct->member[i]), str, depth+1, MY_TRUE, quoteStrings, compact, !compact, maxDepth);
+                        str = svalue_to_string(st, &(strct->member[i]), str, depth+1, MY_TRUE, quoteStrings, compact, !compact, maxDepth, maxCount);
                     }
-                    if (!compact)
+                    if (maxCount && i >= maxCount)
                     {
-                        add_indent(st, &str, (depth+1) * SPRINTF_LPC_INDENT);
-                        stradd(st, &str, "/* ");
-                        stradd(st, &str, get_txt(strct->type->member[i].name));
-                        stradd(st, &str, ": */ ");
+                        if (!compact)
+                            add_indent(st, &str, (depth+1) * SPRINTF_LPC_INDENT);
+                        stradd(st, &str, "...");
                     }
-                    str = svalue_to_string(st, &(strct->member[i]), str, depth+1, MY_FALSE, quoteStrings, compact, !compact, maxDepth);
+                    else
+                    {
+                        if (!compact)
+                        {
+                            add_indent(st, &str, (depth+1) * SPRINTF_LPC_INDENT);
+                            stradd(st, &str, "/* ");
+                            stradd(st, &str, get_txt(strct->type->member[i].name));
+                            stradd(st, &str, ": */ ");
+                        }
+                        str = svalue_to_string(st, &(strct->member[i]), str, depth+1, MY_FALSE, quoteStrings, compact, !compact, maxDepth, maxCount);
+                    }
                     if (!compact)
                     {
                         stradd(st, &str, "\n");
@@ -1156,6 +1188,8 @@ svalue_to_string ( fmt_state_t *st
                         locals.spb = str;
                         locals.depth = depth+1;
                         locals.maxDepth = maxDepth;
+                        locals.count = 0;
+                        locals.maxCount = maxCount;
                         locals.num_values = obj->u.map->num_values;
                         locals.st = st;
                         locals.quote = quoteStrings;
@@ -2219,10 +2253,13 @@ for (fpos = 0; MY_TRUE; fpos++)
                                 , (finfo & INFO_T) == INFO_T_QLPC
                                 , (finfo & INFO_TABLE)
                                 , MY_FALSE
+                                , fs
                                 , pres
                                 );
-                        finfo &= ~INFO_TABLE; /* since we fall through */
-                        pres = 0; /* since we fall through */
+                        /* since we fall through, reset */
+                        finfo &= ~INFO_TABLE;
+                        fs = 0;
+                        pres = 0;
                         /* Store the created result in .clean and pass it
                          * to case INFO_T_STRING is 'the' carg.
                          */

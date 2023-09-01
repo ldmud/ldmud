@@ -46,9 +46,11 @@ DESCRIPTION
         Modifiers:
            n    specifies the field size. If the size is prepended with
                 a 0, the argument is printed with leading zeroes.
+                For %O/%Q this specifies the maximum recursion depth.
           "."n  specifies the precision, for simple (not columns or tables)
                 strings specifies the truncation length.
-                For %O/%Q this specifies the maximum recursion depth.
+                For %O/%Q this specifies the maximum number of array/mapping/
+                struct elements to print.
           ":"n  n specifies both the field size _and_ the presision, if n is
                 prepended by a zero then the pad string is set to "0".
           "'X'" the pad string is set to the char(s) between the single
