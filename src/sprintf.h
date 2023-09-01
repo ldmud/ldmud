@@ -7,4 +7,7 @@
 extern svalue_t *v_printf(svalue_t *sp, int num_arg);
 extern svalue_t *v_sprintf(svalue_t *sp, int num_arg);
 
+#define SPRINTF_LPC_INDENT 2
+
+
 #endif /* SPRINTF_H__ */
