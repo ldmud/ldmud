@@ -270,7 +270,7 @@ struct stsf_locals
     sprintf_buffer_t *spb;  /* Target buffer */
     int depth;              /* Recursion depth */
     int maxDepth;           /* Max recursion depth */
-    int count;
+    int count;              /* current element count */
     int maxCount;           /* Max number of elements */
     int num_values;         /* Mapping width */
     Bool quote;             /* TRUE: Quote strings */
@@ -710,7 +710,8 @@ svalue_to_string ( fmt_state_t *st
                  , int depth, Bool trailing, Bool quoteStrings
                  , Bool compact, Bool prefixed, int maxDepth, int maxCount)
 
-/* Print the value <obj> into the buffer <str> with recursion deptth <depth>.
+/* Print the value <obj> into the buffer <str> with <depth>*SPRINTF_LPC_INDENT
+ * spaces of indentation.
  * If <trailing> is true, add ",\n" after the printed value.
  * If <qoute> is true, special characters in strings are quoted LPC-style.
  * If <compact> is true, a short output format is used.
@@ -745,10 +746,7 @@ svalue_to_string ( fmt_state_t *st
                 break;
 
             case LVALUE_PROTECTED:
-                if (depth >= maxDepth)
-                    stradd(st, &str, "...");
-                else
-                    str = svalue_to_string(st, &(obj->u.protected_lvalue->val), str, depth+1, MY_FALSE, quoteStrings, compact, MY_TRUE, maxDepth, maxCount);
+                str = svalue_to_string(st, &(obj->u.protected_lvalue->val), str, depth+1, MY_FALSE, quoteStrings, compact, MY_TRUE, maxDepth, maxCount);
                 break;
 
             case LVALUE_PROTECTED_CHAR:
@@ -856,16 +854,20 @@ svalue_to_string ( fmt_state_t *st
                     }
 
                     default:
-                    stradd(st, &str, "!ERROR: GARBAGE RANGE TYPE (");
-                    numadd(st, &str, vec->type);
-                    stradd(st, &str, ")!");
-                    break;
+                    {
+                        stradd(st, &str, "!ERROR: GARBAGE RANGE TYPE (");
+                        numadd(st, &str, vec->type);
+                        stradd(st, &str, ")!");
+                        break;
+                    }
                 }
                 break;
             }
 
             case LVALUE_PROTECTED_MAPENTRY:
-            return svalue_to_string(st, get_rvalue(obj, NULL), str, depth, trailing, quoteStrings, compact, prefixed, maxDepth, maxCount);
+            {
+                return svalue_to_string(st, get_rvalue(obj, NULL), str, depth, trailing, quoteStrings, compact, prefixed, maxDepth, maxCount);
+            }
 
             case LVALUE_PROTECTED_MAP_RANGE:
             {
