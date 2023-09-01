@@ -59,6 +59,7 @@ BESCHREIBUNG
         .n           Bei Ganzzahlen die Maxanzahl der Stellen, bei Gleit-
                      kommazahlen die Maximalzahl der Nachkommastellen.
                      Bei (einfachen) Strings die Maximallaenge.
+                     Bei %O/%Q die maximale Rekursionstiefe.
         :n           Ist dasselbe wie n.n - setzt also beide Werte auf
                      dieselbe Zahl.
         'X'          Als Fuellzeichen wird X genutzt. X koennen dabei

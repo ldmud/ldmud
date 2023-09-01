@@ -48,6 +48,7 @@ DESCRIPTION
                 a 0, the argument is printed with leading zeroes.
           "."n  specifies the precision, for simple (not columns or tables)
                 strings specifies the truncation length.
+                For %O/%Q this specifies the maximum recursion depth.
           ":"n  n specifies both the field size _and_ the presision, if n is
                 prepended by a zero then the pad string is set to "0".
           "'X'" the pad string is set to the char(s) between the single
@@ -82,6 +83,8 @@ DESCRIPTION
                 For %O/%Q: compact output.
           "@"   the argument is an array.  the corresponding AFS (minus all
                 "@") is applied to each element of the array.
+          "*"   Can be placed instead of a number, the value is then expected
+                in an additional argument to the function call.
 
         When the formatting of an element results in several output lines
         (column or table mode) and no explicit pad strings has been
