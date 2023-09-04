@@ -20295,9 +20295,7 @@ sapply_lwob_int (string_t *fun, lwobject_t *lwob, int num_arg, bool b_find_stati
     if (!apply_lwob(fun, lwob, num_arg, b_find_static, NULL))
         return NULL;
 
-    free_svalue(&apply_return_value);
-    transfer_svalue_no_free(&apply_return_value, inter_sp);
-    inter_sp--;
+    pop_apply_value();
 
 #ifdef DEBUG
     if (expected_sp != inter_sp)
@@ -20357,9 +20355,7 @@ sapply_int (string_t *fun, object_t *ob, int num_arg
             inter_sp = _pop_n_elems(num_arg, inter_sp);
         return NULL;
     }
-    free_svalue(&apply_return_value);
-    transfer_svalue_no_free(&apply_return_value, inter_sp);
-    inter_sp--;
+    pop_apply_value();
 
 #ifdef DEBUG
     if (expected_sp != inter_sp)
@@ -21574,8 +21570,10 @@ secure_call_lambda (svalue_t *closure, int num_arg, bool external, svalue_t *bin
         if (external)
             mark_start_evaluation();
         call_lambda_ob(closure, num_arg, bind_ob);
-        transfer_svalue((result = &apply_return_value), inter_sp);
-        inter_sp--;
+
+        pop_apply_value();
+        result = &apply_return_value;
+
         if (external)
             mark_end_evaluation();
     }
