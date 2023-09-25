@@ -46,11 +46,8 @@ DESCRIPTION
         Modifiers:
            n    specifies the field size. If the size is prepended with
                 a 0, the argument is printed with leading zeroes.
-                For %O/%Q this specifies the maximum recursion depth.
           "."n  specifies the precision, for simple (not columns or tables)
                 strings specifies the truncation length.
-                For %O/%Q this specifies the maximum number of array/mapping/
-                struct elements to print.
           ":"n  n specifies both the field size _and_ the presision, if n is
                 prepended by a zero then the pad string is set to "0".
           "'X'" the pad string is set to the char(s) between the single
@@ -68,7 +65,7 @@ DESCRIPTION
           "|"   centered within field size.
           "$"   justified to field size. Ignored unless the type specifier
                 is 's'.
-          "="   column mode.  Ignored unless the argument type specifier is 's'.
+          "="   column mode. Ignored unless the argument type specifier is 's'.
                 Field size must be specified, if precision is specified then
                 it specifies the width for the string to be wordwrapped in, if
                 not then the field size is. The field size specifies the width
@@ -83,6 +80,10 @@ DESCRIPTION
                   'words' which are put in a format similar to that of
                   ls.
                 For %O/%Q: compact output.
+          "&"n  For %O/%Q: limit recursion into arrays/structs to n levels.
+                Has to occur after field-size/precision values.
+          "&.n" For %O/%Q: limit the number of array/mapping/struct elements
+                to n. Has to occur after field-size/precision values.
           "@"   the argument is an array.  the corresponding AFS (minus all
                 "@") is applied to each element of the array.
           "*"   Can be placed instead of a number, the value is then expected
