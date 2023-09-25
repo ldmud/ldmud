@@ -2034,10 +2034,10 @@ string_print_formatted (char *format_str, size_t format_len, int argc, svalue_t 
             num_elem = 0;
 
             tmp_num = 0;
-#define _NUM_FS   0b0001
-#define _NUM_PRES 0b0010
-#define _NUM_REC  0b0100
-#define _NUM_ELEM 0b1000
+#           define _NUM_FS   0b0001
+#           define _NUM_PRES 0b0010
+#           define _NUM_REC  0b0100
+#           define _NUM_ELEM 0b1000
             tmp_num_dst = _NUM_FS;
 
             /* Parse the formatting entry */
@@ -2059,8 +2059,9 @@ string_print_formatted (char *format_str, size_t format_len, int argc, svalue_t 
                             && (tmp_num_dst & _NUM_FS)
                        )
                     {
-                        /* leading zero in zero in field size */
+                        /* leading zero in field size */
                         finfo |= INFO_PS_ZERO;
+                        continue;
                     }
 
                     if (format_str[fpos] == '*')
@@ -2126,8 +2127,12 @@ string_print_formatted (char *format_str, size_t format_len, int argc, svalue_t 
                     case '=': finfo |= INFO_COLS; break;
                     case '#': finfo |= INFO_TABLE; break;
                     case '.': tmp_num_dst = (tmp_num_dst&(_NUM_FS|_NUM_REC)) << 1;
+                              if (tmp_num_dst & _NUM_PRES) pres = -1;
+                              if (tmp_num_dst & _NUM_ELEM) num_elem = -1;
                               break;
                     case ':': tmp_num_dst |= (tmp_num_dst&(_NUM_FS|_NUM_REC)) << 1;
+                              if (tmp_num_dst & _NUM_PRES) pres = -1;
+                              if (tmp_num_dst & _NUM_ELEM) num_elem = -1;
                               break;
                     case '&': tmp_num_dst = _NUM_REC; break;
                     case '%': finfo |= INFO_T_NULL; break; /* never reached */
@@ -2187,7 +2192,7 @@ string_print_formatted (char *format_str, size_t format_len, int argc, svalue_t 
                 }
             } /* for(format parsing) */
 
-            if (pres < 0)
+            if (pres < 0 || num_elem < 0)
                 ERROR(ERR_PREC_EXPECTED);
 
             /* Now handle the different arg types...
@@ -2227,7 +2232,7 @@ string_print_formatted (char *format_str, size_t format_len, int argc, svalue_t 
                     case INFO_T_QLPC:
                         {
                             sprintf_buffer_t *b;
-#                   define CLEANSIZ 0x200
+#                           define CLEANSIZ 0x200
 
                             if (st->clean.u.str)
                                 free_mstring(st->clean.u.str);
@@ -2258,6 +2263,7 @@ string_print_formatted (char *format_str, size_t format_len, int argc, svalue_t 
                                     , num_elem
                                     );
                             finfo &= ~INFO_TABLE; /* since we fall through, reset */
+
                             /* Store the created result in .clean and pass it
                              * to case INFO_T_STRING is 'the' carg.
                              */
