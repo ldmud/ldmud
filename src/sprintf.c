@@ -2056,7 +2056,7 @@ string_print_formatted (char *format_str, size_t format_len, int argc, svalue_t 
                                 && ( (format_str[fpos+1] >= '1'
                                         && format_str[fpos+1] <= '9')
                                     || format_str[fpos+1] == '*') )
-                            && tmp_num_dst == 0
+                            && (tmp_num_dst & _NUM_FS)
                        )
                     {
                         /* leading zero in zero in field size */
