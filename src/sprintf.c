@@ -47,16 +47,16 @@
  *   n    specifies the field size, a '*' specifies to use the corresponding
  *        arg as the field size.  If n is prepended with a zero, then the field
  *        is printed with leading zeros.
- *        with %O/%Q: limit recursion to n levels.
  *  "."n  precision of n
  *        floats are rounded to this precision
- *        simple strings truncate after this (if precision is greater than 
+ *        simple strings truncate after this (if precision is greater than
  *         field size, then field size = precision).
  *        tables use precision to specify the number of columns (if precision
  *         not specified then tables calculate a best fit).
- *        with %O/%Q: limit the number of array/mapping/struct elements to n.
  *  ":"n  n specifies the fs _and_ the precision, if n is prepended by a zero
  *        then it is padded with zeros instead of spaces.
+ *  "&"n  with %O/%Q: limit recursion into arrays/structs to n levels.
+ *  "&."n with %O/%Q: limit the number of array/mapping/struct elements to n.
  *  "@"   the argument is an array.  the corresponding format_info (minus the
  *        "@") is applyed to each element of the array.
  *  "'X'" The char(s) between the single-quotes are used to pad to field
@@ -1743,992 +1743,988 @@ string_print_formatted (char *format_str, size_t format_len, int argc, svalue_t 
     unsigned int  fpos;            /* position in format_str */
     p_uint        fs;              /* field size */
     int           pres;            /* precision */
+    int           rec_depth;       /* recursion depth for %O/%Q */
+    int           num_elem;        /* element count for %O/%Q */
     unsigned int  err_num;         /* error code */
     const char   *pad;             /* fs pad string */
     size_t        padlen;          /* length of pad string */
     int           column_stat;     /* Most recent column add status */
+    p_uint        tmp_num;         /* temporary variable for parsing numbers */
+    int           tmp_num_dst;     /* target variable of tmp_num */
 
 #   define GET_NEXT_ARG {\
-    if (++arg >= argc) ERROR(ERR_TO_FEW_ARGS); \
-    carg = (argv+arg);\
-}
+        if (++arg >= argc) ERROR(ERR_TO_FEW_ARGS); \
+        carg = (argv+arg);\
+    }
 
     result = NULL; /* To get rid of a warning */
 
-if (!static_fmt_used)
-{
-    st = &static_fmt;
-    static_fmt_used = MY_TRUE;
-}
-else
-xallocate(st, sizeof *st, "sprintf() context");
+    if (!static_fmt_used)
+    {
+        st = &static_fmt;
+        static_fmt_used = MY_TRUE;
+    }
+    else
+        xallocate(st, sizeof *st, "sprintf() context");
 
-st->clean.u.str = NULL;
-st->tmp = NULL;
-st->csts = NULL;
-st->ptable = NULL;
+    st->clean.u.str = NULL;
+    st->tmp = NULL;
+    st->csts = NULL;
+    st->ptable = NULL;
 
-vst = st;
+    vst = st;
 
-if (0 != (err_num = setjmp(((fmt_state_t*)st)->error_jmp)))
-{
-    /* error handling */
-    char *err;
-    cst  *tcst;
+    if (0 != (err_num = setjmp(((fmt_state_t*)st)->error_jmp)))
+    {
+        /* error handling */
+        char *err;
+        cst  *tcst;
+
+        st = (fmt_state_t*)vst;
+
+        if (st->ptable)
+            free_pointer_table(st->ptable);
+
+        /* Get rid of a temp string */
+        if (st->clean.u.str)
+            free_mstring(st->clean.u.str);
+        if (st->tmp)
+            xfree(st->tmp);
+
+        /* Free column and table data */
+        while ( NULL != (tcst = st->csts) )
+        {
+            st->csts = tcst->next;
+            if ((tcst->info & (INFO_COLS|INFO_TABLE)) == INFO_TABLE
+                    && tcst->d.tab)
+                xfree(tcst->d.tab);
+            xfree(tcst);
+        }
+
+        /* Select the error string */
+        switch(err_num & ERR_ID_NUMBER)
+        {
+            default:
+#ifdef DEBUG
+                fatal("undefined (s)printf() error 0x%X\n", err_num);
+#endif
+            case ERR_BUFF_OVERFLOW:
+                err = "BUFF_SIZE overflowed...";
+                break;
+
+            case ERR_LOCAL_BUFF_OVERFLOW:
+                err = "Local buffer on stack in sprintf() overflowed...";
+                break;
+
+            case ERR_TO_FEW_ARGS:
+                err = "More arguments specified than passed.";
+                break;
+
+            case ERR_INVALID_STAR:
+                err = "Incorrect argument type to *.";
+                break;
+
+            case ERR_PREC_EXPECTED:
+                err = "Expected precision not found.";
+                break;
+
+            case ERR_INVALID_FORMAT_STR:
+                err = "Error in format string.";
+                break;
+
+            case ERR_INCORRECT_ARG:
+                err = "incorrect argument type to %%%c.";
+                break;
+
+            case ERR_CST_REQUIRES_FS:
+                err = "Column/table mode requires a field size.";
+                break;
+
+            case ERR_UNDEFINED_TYPE:
+                err = "!feature - undefined type!";
+                break;
+
+            case ERR_QUOTE_EXPECTED:
+                err = "Quote expected in format string.";
+                break;
+
+            case ERR_UNEXPECTED_EOS:
+                err = "Unexpected end of format string.";
+                break;
+
+            case ERR_NULL_PS:
+                err = "Null pad string specified.";
+                break;
+
+            case ERR_ARRAY_EXPECTED:
+                err = "Array expected.";
+                break;
+
+            case ERR_NOMEM:
+                err = "Out of memory.";
+                break;
+
+            case ERR_SIZE_OVERFLOW:
+                err = "Fieldsize or precision too large.";
+                break;
+
+            case ERR_INVALID_CHAR:
+                err = "Invalid character in string.";
+                break;
+        }
+
+        /* Create the error message in buff[] */
+        st->buff[0]='\0';
+        if ((err_num & ERR_ID_NUMBER) != ERR_NOMEM)
+        {
+            int line;
+            string_t *file;
+
+            file = NULL;
+            line = get_line_number_if_any(&file);
+            snprintf(st->buff, sizeof(st->buff), "%s:%d: ", get_txt(file), line);
+
+            if (file)
+                free_mstring(file);
+        }
+
+#ifdef RETURN_ERROR_MESSAGES
+        strncat(st->buff, "(s)printf() error: ", sizeof(st->buff)-strlen(st->buff)-1);
+#else
+        strncat(st->buff, "(s)printf(): ",sizeof(st->buff)-strlen(st->buff)-1);
+#endif
+        snprintf(st->buff + strlen(st->buff), sizeof(st->buff)-strlen(st->buff)
+                , err, EXTRACT_ERR_ARGUMENT(err_num));
+        strncat(st->buff, "\n",sizeof(st->buff)-strlen(st->buff)-1);
+#ifndef RETURN_ERROR_MESSAGES
+        strncpy(buff, st->buff, sizeof(buff)-1); // leave one for \0.
+        buff[sizeof(buff)-1]='\0';  // ensure \0 termination
+        if (st == &static_fmt)
+            static_fmt_used = MY_FALSE;
+        else
+            xfree(st);
+        errorf("%s", buff); /* buff may contain a '%' */
+        /* NOTREACHED */
+#else
+        result = new_mstring(st->buff);
+        if (!result)
+            result = ref_mstring(STR_OUT_OF_MEMORY);
+        xfree(st);
+#endif /* RETURN_ERROR_MESSAGES */
+        return result;
+    }
 
     st = (fmt_state_t*)vst;
 
-    if (st->ptable)
-        free_pointer_table(st->ptable);
+    format_char = 0;
+    nelemno = 0;
+    column_stat = 0;
 
-    /* Get rid of a temp string */
-    if (st->clean.u.str)
-        free_mstring(st->clean.u.str);
-    if (st->tmp)
-        xfree(st->tmp);
+    arg = -1;
+    st->bpos = 0;
+    st->sppos = -1;
+    st->line_start = 0;
 
-    /* Free column and table data */
-    while ( NULL != (tcst = st->csts) )
+    /* Walk through the format string */
+    for (fpos = 0; MY_TRUE; fpos++)
     {
-        st->csts = tcst->next;
-        if ((tcst->info & (INFO_COLS|INFO_TABLE)) == INFO_TABLE
-                && tcst->d.tab)
-            xfree(tcst->d.tab);
-        xfree(tcst);
-    }
-
-    /* Select the error string */
-    switch(err_num & ERR_ID_NUMBER)
-    {
-        default:
-#ifdef DEBUG
-            fatal("undefined (s)printf() error 0x%X\n", err_num);
-#endif
-        case ERR_BUFF_OVERFLOW:
-            err = "BUFF_SIZE overflowed...";
-            break;
-
-        case ERR_LOCAL_BUFF_OVERFLOW:
-            err = "Local buffer on stack in sprintf() overflowed...";
-            break;
-
-        case ERR_TO_FEW_ARGS:
-            err = "More arguments specified than passed.";
-            break;
-
-        case ERR_INVALID_STAR:
-            err = "Incorrect argument type to *.";
-            break;
-
-        case ERR_PREC_EXPECTED:
-            err = "Expected precision not found.";
-            break;
-
-        case ERR_INVALID_FORMAT_STR:
-            err = "Error in format string.";
-            break;
-
-        case ERR_INCORRECT_ARG:
-            err = "incorrect argument type to %%%c.";
-            break;
-
-        case ERR_CST_REQUIRES_FS:
-            err = "Column/table mode requires a field size.";
-            break;
-
-        case ERR_UNDEFINED_TYPE:
-            err = "!feature - undefined type!";
-            break;
-
-        case ERR_QUOTE_EXPECTED:
-            err = "Quote expected in format string.";
-            break;
-
-        case ERR_UNEXPECTED_EOS:
-            err = "Unexpected end of format string.";
-            break;
-
-        case ERR_NULL_PS:
-            err = "Null pad string specified.";
-            break;
-
-        case ERR_ARRAY_EXPECTED:
-            err = "Array expected.";
-            break;
-
-        case ERR_NOMEM:
-            err = "Out of memory.";
-            break;
-
-        case ERR_SIZE_OVERFLOW:
-            err = "Fieldsize or precision too large.";
-            break;
-
-        case ERR_INVALID_CHAR:
-            err = "Invalid character in string.";
-            break;
-    }
-
-    /* Create the error message in buff[] */
-    st->buff[0]='\0';
-    if ((err_num & ERR_ID_NUMBER) != ERR_NOMEM)
-    {
-        int line;
-        string_t *file;
-
-        file = NULL;
-        line = get_line_number_if_any(&file);
-        snprintf(st->buff, sizeof(st->buff), "%s:%d: ", get_txt(file), line);
-
-        if (file)
-            free_mstring(file);
-    }
-
-#ifdef RETURN_ERROR_MESSAGES
-    strncat(st->buff, "(s)printf() error: ", sizeof(st->buff)-strlen(st->buff)-1);
-#else
-    strncat(st->buff, "(s)printf(): ",sizeof(st->buff)-strlen(st->buff)-1);
-#endif
-    snprintf(st->buff + strlen(st->buff), sizeof(st->buff)-strlen(st->buff)
-            , err, EXTRACT_ERR_ARGUMENT(err_num));
-    strncat(st->buff, "\n",sizeof(st->buff)-strlen(st->buff)-1);
-#ifndef RETURN_ERROR_MESSAGES
-    strncpy(buff, st->buff, sizeof(buff)-1); // leave one for \0.
-    buff[sizeof(buff)-1]='\0';  // ensure \0 termination
-    if (st == &static_fmt)
-        static_fmt_used = MY_FALSE;
-    else
-        xfree(st);
-    errorf("%s", buff); /* buff may contain a '%' */
-    /* NOTREACHED */
-#else
-    result = new_mstring(st->buff);
-    if (!result)
-        result = ref_mstring(STR_OUT_OF_MEMORY);
-    xfree(st);
-#endif /* RETURN_ERROR_MESSAGES */
-    return result;
-}
-
-st = (fmt_state_t*)vst;
-
-format_char = 0;
-nelemno = 0;
-column_stat = 0;
-
-arg = -1;
-st->bpos = 0;
-st->sppos = -1;
-st->line_start = 0;
-
-/* Walk through the format string */
-for (fpos = 0; MY_TRUE; fpos++)
-{
-    if (fpos == format_len || format_str[fpos] == '\n')
-    {
-        /* Line- or Format end */
-
-        if (!st->csts)
+        if (fpos == format_len || format_str[fpos] == '\n')
         {
-            /* No columns/tables to resolve, but add a second
-             * newline if there is one pending from an added
-             * column
-             */
+            /* Line- or Format end */
 
-            if (column_stat == 2)
+            if (!st->csts)
+            {
+                /* No columns/tables to resolve, but add a second
+                 * newline if there is one pending from an added
+                 * column
+                 */
+
+                if (column_stat == 2)
+                    ADD_CHAR(st, '\n');
+                column_stat = 0;
+                if (fpos == format_len)
+                    break;
+                ADD_CHAR(st, '\n');
+                st->line_start = st->bpos;
+                continue;
+            }
+
+            column_stat = 0; /* If there was a newline pending, it
+                              * will be implicitly added now.
+                              */
+            ADD_CHAR(st, '\n');
+            st->line_start = st->bpos;
+
+            /* Handle pending columns and tables */
+            while (st->csts)
+            {
+                cst **temp;
+
+                /* Add one line from each column/table */
+                temp = &st->csts;
+                while (*temp)
+                {
+                    p_int i;
+                    if ((*temp)->info & INFO_COLS)
+                    {
+                        if ((*temp)->d.col.str[-1] != '\n')
+                            while ((*temp)->d.col.len > 0 && (*temp)->d.col.str[0] == ' ')
+                            {
+                                (*temp)->d.col.str++;
+                                (*temp)->d.col.len--;
+                            }
+
+                        i = (*temp)->start - get_string_width(st->buff + st->line_start, st->bpos - st->line_start, NULL);
+                        if (i > 0)
+                            ADD_CHARN(st, ' ', i);
+                        column_stat = add_column(st, temp);
+                        if (!column_stat)
+                            temp = &((*temp)->next);
+                    }
+                    else
+                    {
+                        i = (*temp)->start - get_string_width(st->buff + st->line_start, st->bpos - st->line_start, NULL);
+                        if (i > 0)
+                            ADD_CHARN(st, ' ', i);
+                        if (!add_table(st, temp))
+                            temp = &((*temp)->next);
+                    }
+                } /* while (*temp) */
+
+                if (st->csts || fpos != format_len)
+                    ADD_CHAR(st, '\n');
+                st->line_start = st->bpos;
+            } /* while (csts) */
+
+            if (column_stat == 2 && fpos == format_len)
                 ADD_CHAR(st, '\n');
             column_stat = 0;
+
             if (fpos == format_len)
                 break;
-            ADD_CHAR(st, '\n');
-            st->line_start = st->bpos;
             continue;
-        }
+        } /* if newline or formatend */
 
-        column_stat = 0; /* If there was a newline pending, it
-                          * will be implicitly added now.
-                          */
-        ADD_CHAR(st, '\n');
-        st->line_start = st->bpos;
-
-        /* Handle pending columns and tables */
-        while (st->csts)
+        if (format_str[fpos] == '%')
         {
-            cst **temp;
+            /* Another format entry */
 
-            /* Add one line from each column/table */
-            temp = &st->csts;
-            while (*temp)
+            if (fpos + 1 == format_len || format_str[fpos+1] == '%')
             {
-                p_int i;
-                if ((*temp)->info & INFO_COLS)
-                {
-                    if ((*temp)->d.col.str[-1] != '\n')
-                        while ((*temp)->d.col.len > 0 && (*temp)->d.col.str[0] == ' ')
-                        {
-                            (*temp)->d.col.str++;
-                            (*temp)->d.col.len--;
-                        }
-
-                    i = (*temp)->start - get_string_width(st->buff + st->line_start, st->bpos - st->line_start, NULL);
-                    if (i > 0)
-                        ADD_CHARN(st, ' ', i);
-                    column_stat = add_column(st, temp);
-                    if (!column_stat)
-                        temp = &((*temp)->next);
-                }
-                else
-                {
-                    i = (*temp)->start - get_string_width(st->buff + st->line_start, st->bpos - st->line_start, NULL);
-                    if (i > 0)
-                        ADD_CHARN(st, ' ', i);
-                    if (!add_table(st, temp))
-                        temp = &((*temp)->next);
-                }
-            } /* while (*temp) */
-
-            if (st->csts || fpos != format_len)
-                ADD_CHAR(st, '\n');
-            st->line_start = st->bpos;
-        } /* while (csts) */
-
-        if (column_stat == 2 && fpos == format_len)
-            ADD_CHAR(st, '\n');
-        column_stat = 0;
-
-        if (fpos == format_len)
-            break;
-        continue;
-    } /* if newline or formatend */
-
-    if (format_str[fpos] == '%')
-    {
-        /* Another format entry */
-
-        if (fpos + 1 == format_len || format_str[fpos+1] == '%')
-        {
-            ADD_CHAR(st, '%');
-            fpos++;
-            continue;
-        }
-
-        if (format_str[fpos+1] == '^')
-        {
-            ADD_CHAR(st, '%');
-            fpos++;
-            ADD_CHAR(st, '^');
-            continue;
-        }
-
-        GET_NEXT_ARG;
-        fs = 0;
-        pres = 0;
-        pad = " ";
-        padlen = 1;
-        finfo = 0;
-
-        /* Parse the formatting entry */
-        for (fpos++; !(finfo & INFO_T); fpos++)
-        {
-            if (fpos == format_len)
-            {
-                finfo |= INFO_T_ERROR;
-                break;
+                ADD_CHAR(st, '%');
+                fpos++;
+                continue;
             }
-            if ((format_str[fpos] >= '0' && format_str[fpos] <= '9')
-                    || (format_str[fpos] == '*'))
+
+            if (format_str[fpos+1] == '^')
             {
-                /* Precision resp. fieldwidth */
-                if (pres == -1) /* then looking for pres */
+                ADD_CHAR(st, '%');
+                fpos++;
+                ADD_CHAR(st, '^');
+                continue;
+            }
+
+            GET_NEXT_ARG;
+            fs = 0;
+            pres = 0;
+            pad = " ";
+            padlen = 1;
+            finfo = 0;
+            rec_depth = 0;
+            num_elem = 0;
+
+            tmp_num = 0;
+#define _NUM_FS   0b0001
+#define _NUM_PRES 0b0010
+#define _NUM_REC  0b0100
+#define _NUM_ELEM 0b1000
+            tmp_num_dst = _NUM_FS;
+
+            /* Parse the formatting entry */
+            for (fpos++; !(finfo & INFO_T); fpos++)
+            {
+                if (fpos == format_len)
                 {
+                    finfo |= INFO_T_ERROR;
+                    break;
+                }
+                if ((format_str[fpos] >= '0' && format_str[fpos] <= '9')
+                        || (format_str[fpos] == '*'))
+                {
+                    if (format_str[fpos] == '0'
+                            && (fpos+1 < format_len
+                                && ( (format_str[fpos+1] >= '1'
+                                        && format_str[fpos+1] <= '9')
+                                    || format_str[fpos+1] == '*') )
+                            && tmp_num_dst == 0
+                       )
+                    {
+                        /* leading zero in zero in field size */
+                        finfo |= INFO_PS_ZERO;
+                    }
+
                     if (format_str[fpos] == '*')
                     {
                         /* Get the value from the args */
                         if (carg->type != T_NUMBER)
                             ERROR(ERR_INVALID_STAR);
-                        pres = carg->u.number;
-                        GET_NEXT_ARG;
-                        continue;
-                    }
-
-                    /* Parse the number */
-                    pres = format_str[fpos] - '0';
-                    for ( fpos++
-                            ; fpos < format_len && format_str[fpos]>='0' && format_str[fpos]<='9'
-                            ; fpos++)
-                    {
-                        int new_pres = pres*10 + format_str[fpos] - '0';
-
-                        if (new_pres < pres) /* Overflow */
-                            ERROR(ERR_SIZE_OVERFLOW);
-
-                        pres = new_pres;
-                    }
-                }
-                else /* then is fs (and maybe pres) */
-                {
-                    if (format_str[fpos] == '0'
-                            && (   (   fpos+1 < format_len
-                                    && format_str[fpos+1] >= '1'
-                                    && format_str[fpos+1] <= '9')
-                                || format_str[fpos+1] == '*')
-                       )
-                        finfo |= INFO_PS_ZERO;
-                    else
-                    {
-                        if (format_str[fpos] == '*')
+                        tmp_num = carg->u.number;
+                        if ((p_int)(tmp_num) < 0)
                         {
-                            if (carg->type != T_NUMBER)
-                                ERROR(ERR_INVALID_STAR);
-                            if ((p_int)(fs = carg->u.number) < 0)
+                            if (tmp_num_dst == _NUM_FS)
                             {
-                                if (fs == (p_uint)PINT_MIN)
-                                    fs = PINT_MAX;
+                                if (tmp_num == (p_uint)PINT_MIN)
+                                    tmp_num = PINT_MAX;
                                 else
-                                    fs = -fs;
+                                    tmp_num = -tmp_num;
                                 finfo |= INFO_A_LEFT;
                             }
-
-                            if (pres == -2)
-                                pres = fs; /* colon */
-                            GET_NEXT_ARG;
-                            continue;
+                            else
+                                ERROR(ERR_INVALID_STAR);
                         }
-                        fs = format_str[fpos] - '0';
+                        GET_NEXT_ARG;
                     }
-
-                    for ( fpos++
-                            ; fpos < format_len && format_str[fpos] >= '0' && format_str[fpos] <= '9'
-                            ; fpos++)
+                    else
                     {
-                        int new_fs = fs*10 + format_str[fpos] - '0';
+                        /* parse the number */
+                        tmp_num = format_str[fpos] - '0';
 
-                        if (new_fs < fs) /* Overflow */
-                            ERROR(ERR_SIZE_OVERFLOW);
+                        for ( fpos++
+                                ; fpos < format_len && format_str[fpos]>='0' && format_str[fpos]<='9'
+                                ; fpos++)
+                        {
+                            int new_tmp_num = tmp_num*10 + format_str[fpos] - '0';
 
-                        fs = new_fs;
+                            if (new_tmp_num < tmp_num) /* Overflow */
+                                ERROR(ERR_SIZE_OVERFLOW);
+
+                            tmp_num = new_tmp_num;
+                        }
+                        fpos--; /* bout to get incremented */
                     }
 
-                    if (pres == -2) /* colon */
-                        pres = fs;
-                }
+                    /* assign number to appropriate variable */
+                    if (tmp_num_dst & _NUM_FS) fs = tmp_num;
+                    if (tmp_num_dst & _NUM_PRES) pres = tmp_num;
+                    if (tmp_num_dst & _NUM_REC) rec_depth = tmp_num;
+                    if (tmp_num_dst & _NUM_ELEM) num_elem = tmp_num;
+                    tmp_num = 0;
 
-                fpos--; /* bout to get incremented */
-                continue;
-            } /* if (precision/alignment field) */
+                    continue;
+                } /* if (precision/alignment field) */
 
-            /* fpos now points to format type */
+                /* fpos now points to format type */
 
-            switch (format_str[fpos])
-            {
-                case ' ': finfo |= INFO_PP_SPACE; break;
-                case '+': finfo |= INFO_PP_PLUS; break;
-                case '-': finfo |= INFO_A_LEFT; break;
-                case '|': finfo |= INFO_A_CENTRE; break;
-                case '$': finfo |= INFO_A_JUSTIFY; break;
-                case '@': finfo |= INFO_ARRAY; break;
-                case '=': finfo |= INFO_COLS; break;
-                case '#': finfo |= INFO_TABLE; break;
-                case '.': pres = -1; break;
-                case ':': pres = -2; break;
-                case '%': finfo |= INFO_T_NULL; break; /* never reached */
-                case 'O': finfo |= INFO_T_LPC; break;
-                case 'Q': finfo |= INFO_T_QLPC; break;
-                case 's': finfo |= INFO_T_STRING; break;
-                case 'i': finfo |= INFO_T_INT; format_char = 'd'; break;
-                case 'd':
-                case 'c':
-                case 'o':
-                case 'b':
-                case 'B':
-                case 'x':
-                case 'X':
-                          format_char = format_str[fpos];
-                          finfo |= INFO_T_INT;
-                          break;
-                case 'f':
-                case 'F':
-                case 'g':
-                case 'G':
-                case 'e':
-                case 'E':
-                          format_char = format_str[fpos];
-                          finfo |= INFO_T_FLOAT;
-                          break;
-                case '\'':
-                          fpos++;
-                          pad = &(format_str[fpos]);
-                          finfo |= INFO_PS_KEEP;
-                          while (1)
-                          {
-                              if (fpos == format_len)
-                                  ERROR(ERR_UNEXPECTED_EOS);
-
-                              if (format_str[fpos] == '\\')
-                              {
-                                  if (fpos+1 == format_len)
-                                      ERROR(ERR_UNEXPECTED_EOS);
-                                  fpos += 2;
-                                  continue;
-                              }
-
-                              if (format_str[fpos] == '\'')
-                              {
-                                  padlen = format_str + fpos - pad;
-                                  if (padlen == 0)
-                                      ERROR(ERR_NULL_PS);
-                                  break;
-                              }
+                switch (format_str[fpos])
+                {
+                    case ' ': finfo |= INFO_PP_SPACE; break;
+                    case '+': finfo |= INFO_PP_PLUS; break;
+                    case '-': finfo |= INFO_A_LEFT; break;
+                    case '|': finfo |= INFO_A_CENTRE; break;
+                    case '$': finfo |= INFO_A_JUSTIFY; break;
+                    case '@': finfo |= INFO_ARRAY; break;
+                    case '=': finfo |= INFO_COLS; break;
+                    case '#': finfo |= INFO_TABLE; break;
+                    case '.': tmp_num_dst = (tmp_num_dst&(_NUM_FS|_NUM_REC)) << 1;
+                              break;
+                    case ':': tmp_num_dst |= (tmp_num_dst&(_NUM_FS|_NUM_REC)) << 1;
+                              break;
+                    case '&': tmp_num_dst = _NUM_REC; break;
+                    case '%': finfo |= INFO_T_NULL; break; /* never reached */
+                    case 'O': finfo |= INFO_T_LPC; break;
+                    case 'Q': finfo |= INFO_T_QLPC; break;
+                    case 's': finfo |= INFO_T_STRING; break;
+                    case 'i': finfo |= INFO_T_INT; format_char = 'd'; break;
+                    case 'd':
+                    case 'c':
+                    case 'o':
+                    case 'b':
+                    case 'B':
+                    case 'x':
+                    case 'X':
+                              format_char = format_str[fpos];
+                              finfo |= INFO_T_INT;
+                              break;
+                    case 'f':
+                    case 'F':
+                    case 'g':
+                    case 'G':
+                    case 'e':
+                    case 'E':
+                              format_char = format_str[fpos];
+                              finfo |= INFO_T_FLOAT;
+                              break;
+                    case '\'':
                               fpos++;
-                          }
-                          break;
-                default:
-                          finfo |= INFO_T_ERROR;
-                          break;
-            }
-        } /* for(format parsing) */
+                              pad = &(format_str[fpos]);
+                              finfo |= INFO_PS_KEEP;
+                              while (1)
+                              {
+                                  if (fpos == format_len)
+                                      ERROR(ERR_UNEXPECTED_EOS);
 
-        if (pres < 0)
-            ERROR(ERR_PREC_EXPECTED);
+                                  if (format_str[fpos] == '\\')
+                                  {
+                                      if (fpos+1 == format_len)
+                                          ERROR(ERR_UNEXPECTED_EOS);
+                                      fpos += 2;
+                                      continue;
+                                  }
 
-        /* Now handle the different arg types...
-         */
-        if (finfo & INFO_ARRAY)
-        {
-            if (carg->type != T_POINTER)
-                ERROR(ERR_ARRAY_EXPECTED);
-            if (carg->u.vec == &null_vector)
+                                  if (format_str[fpos] == '\'')
+                                  {
+                                      padlen = format_str + fpos - pad;
+                                      if (padlen == 0)
+                                          ERROR(ERR_NULL_PS);
+                                      break;
+                                  }
+                                  fpos++;
+                              }
+                              break;
+                    default:
+                              finfo |= INFO_T_ERROR;
+                              break;
+                }
+            } /* for(format parsing) */
+
+            if (pres < 0)
+                ERROR(ERR_PREC_EXPECTED);
+
+            /* Now handle the different arg types...
+             */
+            if (finfo & INFO_ARRAY)
             {
-                fpos--; /* 'bout to get incremented */
-                continue;
+                if (carg->type != T_POINTER)
+                    ERROR(ERR_ARRAY_EXPECTED);
+                if (carg->u.vec == &null_vector)
+                {
+                    fpos--; /* 'bout to get incremented */
+                    continue;
+                }
+                carg = (argv+arg)->u.vec->item;
+                nelemno = 1; /* next element number */
             }
-            carg = (argv+arg)->u.vec->item;
-            nelemno = 1; /* next element number */
-        }
 
-        while(1)
-        {
-            switch(finfo & INFO_T)
+            while(1)
             {
-                case INFO_T_ERROR:
-                    ERROR(ERR_INVALID_FORMAT_STR);
+                switch(finfo & INFO_T)
+                {
+                    case INFO_T_ERROR:
+                        ERROR(ERR_INVALID_FORMAT_STR);
 
-                case INFO_T_NULL:
-                    {
-                        /* never reached... */
-                        fprintf(stderr, "%s: (s)printf: INFO_T_NULL.... found.\n"
-                                , current_object.type == T_OBJECT   ? get_txt(current_object.u.ob->name)
-                                : current_object.type == T_LWOBJECT ? get_txt(current_object.u.lwob->prog->name)
-                                : "<unknown object>");
-                        ADD_CHAR(st, '%');
-                        break;
-                    }
+                    case INFO_T_NULL:
+                        {
+                            /* never reached... */
+                            fprintf(stderr, "%s: (s)printf: INFO_T_NULL.... found.\n"
+                                    , current_object.type == T_OBJECT   ? get_txt(current_object.u.ob->name)
+                                    : current_object.type == T_LWOBJECT ? get_txt(current_object.u.lwob->prog->name)
+                                    : "<unknown object>");
+                            ADD_CHAR(st, '%');
+                            break;
+                        }
 
-                case INFO_T_LPC:
-                case INFO_T_QLPC:
-                    {
-                        sprintf_buffer_t *b;
+                    case INFO_T_LPC:
+                    case INFO_T_QLPC:
+                        {
+                            sprintf_buffer_t *b;
 #                   define CLEANSIZ 0x200
 
-                        if (st->clean.u.str)
-                            free_mstring(st->clean.u.str);
-                        st->clean.u.str = NULL;
-                        if (st->tmp)
-                            xfree(st->tmp);
+                            if (st->clean.u.str)
+                                free_mstring(st->clean.u.str);
+                            st->clean.u.str = NULL;
+                            if (st->tmp)
+                                xfree(st->tmp);
 
-                        st->tmp = xalloc(CLEANSIZ);
-                        if (!st->tmp)
-                            ERROR(ERR_NOMEM);
-                        st->tmp[0] = '\0';
+                            st->tmp = xalloc(CLEANSIZ);
+                            if (!st->tmp)
+                                ERROR(ERR_NOMEM);
+                            st->tmp[0] = '\0';
 
-                        st->ptable = new_pointer_table();
-                        if (!st->ptable)
-                            ERROR(ERR_NOMEM);
-                        st->pointer_id = 1;
+                            st->ptable = new_pointer_table();
+                            if (!st->ptable)
+                                ERROR(ERR_NOMEM);
+                            st->pointer_id = 1;
 
-                        b = (sprintf_buffer_t *)
-                            ( st->tmp+CLEANSIZ-sizeof(sprintf_buffer_t) );
-                        b->offset = -CLEANSIZ+(p_int)sizeof(sprintf_buffer_t);
-                        b->size = CLEANSIZ;
-                        b->start = &st->tmp;
-                        b = svalue_to_string(st, carg, b, 0, MY_FALSE
-                                , (finfo & INFO_T) == INFO_T_QLPC
-                                , (finfo & INFO_TABLE)
-                                , MY_FALSE
-                                , fs
-                                , pres
-                                );
-                        /* since we fall through, reset */
-                        finfo &= ~INFO_TABLE;
-                        fs = 0;
-                        pres = 0;
-                        /* Store the created result in .clean and pass it
-                         * to case INFO_T_STRING is 'the' carg.
-                         */
-                        put_string(&st->clean, new_n_unicode_mstring(st->tmp, b->size + b->offset - (p_int)sizeof(sprintf_buffer_t) ));
-                        carg = &st->clean;
-
-                        free_pointer_table(st->ptable);
-                        st->ptable = NULL;
-                        /* FALLTHROUGH */
-                    }
-
-                case INFO_T_STRING:
-                    {
-                        mp_int slen;
-
-                        if (carg->type != T_STRING)
-                            ERROR1(ERR_INCORRECT_ARG, 's');
-                        slen = mstrsize(carg->u.str);
-
-                        if (finfo & (INFO_COLS | INFO_TABLE) )
-                        {
-                            /* Add a new column/table info
-                             * ... this is complicated ...
+                            b = (sprintf_buffer_t *)
+                                ( st->tmp+CLEANSIZ-sizeof(sprintf_buffer_t) );
+                            b->offset = -CLEANSIZ+(p_int)sizeof(sprintf_buffer_t);
+                            b->size = CLEANSIZ;
+                            b->start = &st->tmp;
+                            b = svalue_to_string(st, carg, b, 0, MY_FALSE
+                                    , (finfo & INFO_T) == INFO_T_QLPC
+                                    , (finfo & INFO_TABLE)
+                                    , MY_FALSE
+                                    , rec_depth
+                                    , num_elem
+                                    );
+                            finfo &= ~INFO_TABLE; /* since we fall through, reset */
+                            /* Store the created result in .clean and pass it
+                             * to case INFO_T_STRING is 'the' carg.
                              */
-                            cst **temp;
+                            put_string(&st->clean, new_n_unicode_mstring(st->tmp, b->size + b->offset - (p_int)sizeof(sprintf_buffer_t) ));
+                            carg = &st->clean;
 
-                            if (!fs)
-                                ERROR(ERR_CST_REQUIRES_FS);
+                            free_pointer_table(st->ptable);
+                            st->ptable = NULL;
+                            /* FALLTHROUGH */
+                        }
 
-                            if ((finfo & (INFO_COLS | INFO_TABLE))
-                                    == (INFO_COLS | INFO_TABLE)
-                               )
-                                ERROR(ERR_INVALID_FORMAT_STR);
+                    case INFO_T_STRING:
+                        {
+                            mp_int slen;
 
-                            /* Find the end of the list of columns/tables */
-                            temp = &st->csts;
-                            while (*temp)
-                                temp = &((*temp)->next);
+                            if (carg->type != T_STRING)
+                                ERROR1(ERR_INCORRECT_ARG, 's');
+                            slen = mstrsize(carg->u.str);
 
-                            if (finfo & INFO_COLS)
+                            if (finfo & (INFO_COLS | INFO_TABLE) )
                             {
-                                /* Create a new columns structure */
-                                *temp = xalloc(sizeof(cst));
-                                if (!*temp)
-                                    ERROR(ERR_NOMEM);
-                                (*temp)->next = NULL;
-                                (*temp)->d.col.str = get_txt(carg->u.str);
-                                (*temp)->d.col.len = slen;
-                                (*temp)->pad.str = pad;
-                                (*temp)->pad.len = padlen;
-                                (*temp)->size = fs;
-                                (*temp)->pres = (pres) ? (int)pres : (int)fs;
-                                (*temp)->info = finfo;
-                                (*temp)->start = get_string_width(st->buff + st->line_start, st->bpos - st->line_start, NULL);
+                                /* Add a new column/table info
+                                 * ... this is complicated ...
+                                 */
+                                cst **temp;
 
-                                /* Format the first line from the column */
-                                column_stat = add_column(st, temp);
-                            }
-                            else
-                            {
-                                /* (finfo & INFO_TABLE) */
-                                unsigned int n, len, max, pos, last_pos;
-                                int tpres;
-                                char *s, *start, *end;
-                                p_uint i;
+                                if (!fs)
+                                    ERROR(ERR_CST_REQUIRES_FS);
+
+                                if ((finfo & (INFO_COLS | INFO_TABLE))
+                                        == (INFO_COLS | INFO_TABLE)
+                                   )
+                                    ERROR(ERR_INVALID_FORMAT_STR);
+
+                                /* Find the end of the list of columns/tables */
+                                temp = &st->csts;
+                                while (*temp)
+                                    temp = &((*temp)->next);
+
+                                if (finfo & INFO_COLS)
+                                {
+                                    /* Create a new columns structure */
+                                    *temp = xalloc(sizeof(cst));
+                                    if (!*temp)
+                                        ERROR(ERR_NOMEM);
+                                    (*temp)->next = NULL;
+                                    (*temp)->d.col.str = get_txt(carg->u.str);
+                                    (*temp)->d.col.len = slen;
+                                    (*temp)->pad.str = pad;
+                                    (*temp)->pad.len = padlen;
+                                    (*temp)->size = fs;
+                                    (*temp)->pres = (pres) ? (int)pres : (int)fs;
+                                    (*temp)->info = finfo;
+                                    (*temp)->start = get_string_width(st->buff + st->line_start, st->bpos - st->line_start, NULL);
+
+                                    /* Format the first line from the column */
+                                    column_stat = add_column(st, temp);
+                                }
+                                else
+                                {
+                                    /* (finfo & INFO_TABLE) */
+                                    unsigned int n, len, max, pos, last_pos;
+                                    int tpres;
+                                    char *s, *start, *end;
+                                    p_uint i;
 
 #                    define TABLE get_txt(carg->u.str)
 #                    define TABLELEN slen
 
-                                /* Create the new table structure */
-                                (*temp) = (cst *)xalloc(sizeof(cst));
-                                if (!*temp)
-                                    ERROR(ERR_NOMEM);
-                                (*temp)->pad.str = pad;
-                                (*temp)->pad.len = padlen;
-                                (*temp)->info = finfo;
-                                (*temp)->start = get_string_width(st->buff + st->line_start, st->bpos - st->line_start, NULL);
-                                (*temp)->next = NULL;
+                                    /* Create the new table structure */
+                                    (*temp) = (cst *)xalloc(sizeof(cst));
+                                    if (!*temp)
+                                        ERROR(ERR_NOMEM);
+                                    (*temp)->pad.str = pad;
+                                    (*temp)->pad.len = padlen;
+                                    (*temp)->info = finfo;
+                                    (*temp)->start = get_string_width(st->buff + st->line_start, st->bpos - st->line_start, NULL);
+                                    (*temp)->next = NULL;
 
-                                /* Determine the size of the table */
-                                max = len = 0;
-                                n = 0;
-                                start = s = TABLE;
-                                end = s + TABLELEN;
-                                while (s != end)
-                                {
-                                    bool error;
-
-                                    while (*s != '\n')
+                                    /* Determine the size of the table */
+                                    max = len = 0;
+                                    n = 0;
+                                    start = s = TABLE;
+                                    end = s + TABLELEN;
+                                    while (s != end)
                                     {
-                                        s++;
-                                        if (s == end)
-                                            break;
+                                        bool error;
+
+                                        while (*s != '\n')
+                                        {
+                                            s++;
+                                            if (s == end)
+                                                break;
+                                        }
+
+                                        len = get_string_width(start, s - start, &error);
+                                        if (error)
+                                            ERROR(ERR_INVALID_CHAR);
+                                        if (len > max)
+                                            max = len;
+                                        n++;
+
+                                        if (s != end)
+                                            s++;
+                                        start = s;
+                                    } /* while() */
+
+                                    if (n == 0)
+                                        n = 1;
+
+                                    /* Now: n = number of lines
+                                     *      max = max length of the lines
+                                     */
+
+                                    tpres = pres;
+                                    if (tpres)
+                                    {
+                                        (*temp)->size = fs/tpres;
+                                    }
+                                    else
+                                    {
+                                        tpres = fs/(max+2);
+                                        /* at least two separating spaces */
+                                        if (!tpres)
+                                            tpres = 1;
+                                        (*temp)->size = fs/tpres;
                                     }
 
-                                    len = get_string_width(start, s - start, &error);
-                                    if (error)
-                                        ERROR(ERR_INVALID_CHAR);
-                                    if (len > max)
-                                        max = len;
-                                    n++;
+                                    len = n/tpres; /* length of average column */
 
-                                    if (s != end)
-                                        s++;
-                                    start = s;
-                                } /* while() */
+                                    if (n < (unsigned int)tpres)
+                                        tpres = n;
+                                    if (len*tpres < n)
+                                        len++;
+                                    /* Since the table will be filled by column,
+                                     * the result will be a rectangle with as little
+                                     * as possible empty space. This means we have
+                                     * to adjust the no of columns (tpres) to
+                                     * what the fill algorithm will actually
+                                     * produce.
+                                     */
+                                    if (len > 1 && n%tpres)
+                                        tpres -= (tpres - n%tpres)/len;
 
-                                if (n == 0)
-                                    n = 1;
+                                    (*temp)->d.tab = xalloc(tpres*sizeof(string_view_t));
+                                    if (!(*temp)->d.tab)
+                                        ERROR(ERR_NOMEM);
+                                    (*temp)->nocols = tpres; /* heavy sigh */
+                                    (*temp)->d.tab[0].str = TABLE;
+                                    (*temp)->d.tab[0].len = TABLELEN;
 
-                                /* Now: n = number of lines
-                                 *      max = max length of the lines
-                                 */
+                                    if (tpres == 1)
+                                        goto add_table_now;
 
-                                tpres = pres;
-                                if (tpres)
+                                    /* Subformat the table, replacing some characters
+                                     * in the given string.
+                                     * The original chars are saved for later restoring.
+                                     */
+                                    i = 0; /* the current column number */
+                                    n = 0; /* the current "word" number in this column */
+                                    last_pos = 0;
+                                    for (pos = 0; pos < TABLELEN; pos++)
+                                    {
+                                        /* Splitting the text here. */
+                                        if (TABLE[pos] == '\n')
+                                        {
+                                            if (++n >= len)
+                                            {
+                                                (*temp)->d.tab[i].len = pos - last_pos;
+
+                                                last_pos = ++pos;
+                                                i++;
+                                                (*temp)->d.tab[i].str = TABLE+pos;
+
+                                                if (i+1 >= (unsigned int)tpres)
+                                                    break;
+                                                n = 0;
+                                            }
+                                        }
+                                    } /* for (fs) */
+
+                                    (*temp)->d.tab[i].len = TABLELEN - last_pos;
+
+add_table_now:
+                                    /* Now add the table (at least the first line) */
+                                    add_table(st, temp);
+                                }
+                            }
+                            else
+                            {
+                                Bool justifyString;
+                                bool error = false;
+                                size_t reallen = get_string_width(get_txt(carg->u.str), slen, &error);
+
+                                if (error)
+                                    ERROR(ERR_INVALID_CHAR);
+
+                                /* not column or table */
+                                if (pres && pres < reallen)
                                 {
-                                    (*temp)->size = fs/tpres;
+                                    reallen = pres;
+                                    slen = get_string_up_to_width(get_txt(carg->u.str), slen, pres, NULL);
+                                }
+
+                                /* Determine whether to print this string
+                                 * justified, or not.
+                                 */
+                                justifyString = MY_FALSE;
+                                if (fs && (finfo & INFO_A) == INFO_A_JUSTIFY)
+                                {
+                                    /* Flush the string only if it doesn't
+                                     * end in a NL.
+                                     * Also, strip off trailing spaces.
+                                     */
+                                    for ( ;    slen > 0
+                                            && get_txt(carg->u.str)[slen-1] == ' '
+                                            ; slen--, reallen--
+                                        ) NOOP;
+
+                                    if ( slen != 0
+                                            && (unsigned int)reallen <= fs
+                                            && get_txt(carg->u.str)[slen-1] != '\n'
+                                       )
+                                        justifyString = MY_TRUE;
+                                }
+
+                                /* not column or table */
+
+                                if (justifyString)
+                                {
+                                    add_justified(st, get_txt(carg->u.str), slen, fs);
+                                }
+                                else if (fs && fs > reallen)
+                                {
+                                    add_aligned(st, get_txt(carg->u.str)
+                                            , slen, pad, padlen, fs, finfo);
                                 }
                                 else
                                 {
-                                    tpres = fs/(max+2);
-                                    /* at least two separating spaces */
-                                    if (!tpres)
-                                        tpres = 1;
-                                    (*temp)->size = fs/tpres;
+                                    ADD_STRN(st, get_txt(carg->u.str), slen);
                                 }
-
-                                len = n/tpres; /* length of average column */
-
-                                if (n < (unsigned int)tpres)
-                                    tpres = n;
-                                if (len*tpres < n)
-                                    len++;
-                                /* Since the table will be filled by column,
-                                 * the result will be a rectangle with as little
-                                 * as possible empty space. This means we have
-                                 * to adjust the no of columns (tpres) to
-                                 * what the fill algorithm will actually
-                                 * produce.
-                                 */
-                                if (len > 1 && n%tpres)
-                                    tpres -= (tpres - n%tpres)/len;
-
-                                (*temp)->d.tab = xalloc(tpres*sizeof(string_view_t));
-                                if (!(*temp)->d.tab)
-                                    ERROR(ERR_NOMEM);
-                                (*temp)->nocols = tpres; /* heavy sigh */
-                                (*temp)->d.tab[0].str = TABLE;
-                                (*temp)->d.tab[0].len = TABLELEN;
-
-                                if (tpres == 1)
-                                    goto add_table_now;
-
-                                /* Subformat the table, replacing some characters
-                                 * in the given string.
-                                 * The original chars are saved for later restoring.
-                                 */
-                                i = 0; /* the current column number */
-                                n = 0; /* the current "word" number in this column */
-                                last_pos = 0;
-                                for (pos = 0; pos < TABLELEN; pos++)
-                                {
-                                    /* Splitting the text here. */
-                                    if (TABLE[pos] == '\n')
-                                    {
-                                        if (++n >= len)
-                                        {
-                                            (*temp)->d.tab[i].len = pos - last_pos;
-
-                                            last_pos = ++pos;
-                                            i++;
-                                            (*temp)->d.tab[i].str = TABLE+pos;
-
-                                            if (i+1 >= (unsigned int)tpres)
-                                                break;
-                                            n = 0;
-                                        }
-                                    }
-                                } /* for (fs) */
-
-                                (*temp)->d.tab[i].len = TABLELEN - last_pos;
-
-add_table_now:
-                                /* Now add the table (at least the first line) */
-                                add_table(st, temp);
                             }
+                            break;
                         }
-                        else
-                        {
-                            Bool justifyString;
-                            bool error = false;
-                            size_t reallen = get_string_width(get_txt(carg->u.str), slen, &error);
 
-                            if (error)
-                                ERROR(ERR_INVALID_CHAR);
-
-                            /* not column or table */
-                            if (pres && pres < reallen)
-                            {
-                                reallen = pres;
-                                slen = get_string_up_to_width(get_txt(carg->u.str), slen, pres, NULL);
-                            }
-
-                            /* Determine whether to print this string
-                             * justified, or not.
-                             */
-                            justifyString = MY_FALSE;
-                            if (fs && (finfo & INFO_A) == INFO_A_JUSTIFY)
-                            {
-                                /* Flush the string only if it doesn't
-                                 * end in a NL.
-                                 * Also, strip off trailing spaces.
-                                 */
-                                for ( ;    slen > 0
-                                        && get_txt(carg->u.str)[slen-1] == ' '
-                                        ; slen--, reallen--
-                                    ) NOOP;
-
-                                if ( slen != 0
-                                        && (unsigned int)reallen <= fs
-                                        && get_txt(carg->u.str)[slen-1] != '\n'
-                                   )
-                                    justifyString = MY_TRUE;
-                            }
-
-                            /* not column or table */
-
-                            if (justifyString)
-                            {
-                                add_justified(st, get_txt(carg->u.str), slen, fs);
-                            }
-                            else if (fs && fs > reallen)
-                            {
-                                add_aligned(st, get_txt(carg->u.str)
-                                        , slen, pad, padlen, fs, finfo);
-                            }
-                            else
-                            {
-                                ADD_STRN(st, get_txt(carg->u.str), slen);
-                            }
-                        }
-                        break;
-                    }
-
-                case INFO_T_INT:
-                case INFO_T_FLOAT:
-                    /* We 'cheat' by using the systems sprintf() to format
-                     * the number in most of the formats.
-                     */
-                    if ((finfo & INFO_T ) == INFO_T_INT
-                            && (format_char == 'b' || format_char == 'B')
-                       )
-                    {
-                        /* Dummy for finding most significant bit */
-                        int signi = 0;
-                        int isize = sizeof(carg->u.number) * CHAR_BIT;
-                        char temp[sizeof(carg->u.number) * CHAR_BIT + 1];
-
-                        memset(temp, '\0', sizeof(temp));
-
-                        if (carg->type != T_NUMBER)
-                        {
-                            ERROR1(ERR_INCORRECT_ARG, format_char);
-                        }
-                        /* Calculate binary representation (2's compliment) */
-                        size_t tmpl = sizeof(temp);
-                        // only strcat if at least 2 bytes (1 byte after this bit) left
-                        while ( --isize > -1  && tmpl >= 1)
-                        {
-                            if ( ( carg->u.number & ( (p_uint)1 << isize ) ) != 0 )
-                            {
-                                // Gnomi: strcat is quite inefficient. isize
-                                // or tmpl could be used for direct indexing
-                                // (temp[sizeof(temp)-tmpl-1] = '0')
-                                // True. But strcat is much more readable, this code is
-                                // anyway crappy to read. And this particular piece here
-                                // is executed really seldom. Very few people want to
-                                // print numbers in binary representation and if they to,
-                                // they use mostly small numbers.
-                                signi = 1;
-                                strcat( temp, "1" );
-                                --tmpl;
-                            }
-                            else if ( signi || !isize)
-                            {
-                                strcat( temp, "0" );
-                                --tmpl;
-                            }
-                        }
-                        // if still bits left, but buffer is full, throw error.
-                        if (isize > -1 && tmpl < 1)
-                            ERROR(ERR_LOCAL_BUFF_OVERFLOW);
-                        if (pres && tmpl > pres)
-                            tmpl = pres; /* well.... */
-                        if ((unsigned int)tmpl < fs)
-                            add_aligned(st, temp, sizeof(temp) - tmpl, pad, padlen, fs, finfo);
-                        else
-                            ADD_STRN(st, temp, sizeof(temp) - tmpl);
-                        break;
-                    }
-                    else if ((finfo & INFO_T ) == INFO_T_INT && format_char == 'c')
-                    {
-                        char temp[4];
-                        size_t clen = unicode_to_utf8(carg->u.number, temp);
-                        if (!clen)
-                            ERROR1(ERR_INCORRECT_ARG, 'c');
-
-                        ADD_STRN(st, temp, clen);
-                        break;
-                    }
-                    else
-                    {
-                        /* Synthesized format for sprintf() */
-                        char cheat[6+sizeof(PRI_PINT_PREFIX)-1];
-                        char temp[1024];
-                        /* The buffer must be big enough to hold the biggest float
-                         * in non-exponential representation. 1 KByte is hopefully
-                         * far on the safe side.
-                         * TODO: Allocate it dynamically?
+                    case INFO_T_INT:
+                    case INFO_T_FLOAT:
+                        /* We 'cheat' by using the systems sprintf() to format
+                         * the number in most of the formats.
                          */
-                        double value;   /* The value to print */
-                        int    numdig;  /* (Estimated) number of digits before the '.' */
-                        Bool zeroCharHack = MY_FALSE;
-                        char *p = cheat; /* pointer to the format buffer */
-                        size_t tmpl; // no of bytes written to buffer temp
+                        if ((finfo & INFO_T ) == INFO_T_INT
+                                && (format_char == 'b' || format_char == 'B')
+                           )
+                        {
+                            /* Dummy for finding most significant bit */
+                            int signi = 0;
+                            int isize = sizeof(carg->u.number) * CHAR_BIT;
+                            char temp[sizeof(carg->u.number) * CHAR_BIT + 1];
 
-                        *(p++) = '%';
-                        switch (finfo & INFO_PP)
-                        {
-                            case INFO_PP_SPACE: *(p++) = ' '; break;
-                            case INFO_PP_PLUS:  *(p++) = '+'; break;
-                        }
-                        if ((finfo & INFO_T) == INFO_T_FLOAT)
-                        {
-                            if (carg->type != T_FLOAT) /* sigh... */
+                            memset(temp, '\0', sizeof(temp));
+
+                            if (carg->type != T_NUMBER)
                             {
                                 ERROR1(ERR_INCORRECT_ARG, format_char);
                             }
-                            *(p++) = '.';
-                            *(p++) = '*';
-                            *(p++) = format_char;
-                            *p = '\0';
-
-                            value = READ_DOUBLE(carg);
-
-                            if ('e' == format_char
-                                    || 'E' == format_char
-                                    || fabs(value) < 1.0)
-                                numdig = 1;
-                            else
-                                numdig = (int) ceil(log10(fabs(value)));
-                            if (value < 0.0)
-                                numdig++;
-
-                            if ((size_t)pres > (sizeof(temp) - 12 - numdig))
+                            /* Calculate binary representation (2's compliment) */
+                            size_t tmpl = sizeof(temp);
+                            // only strcat if at least 2 bytes (1 byte after this bit) left
+                            while ( --isize > -1  && tmpl >= 1)
                             {
-                                pres = sizeof(temp) - 12 - numdig;
+                                if ( ( carg->u.number & ( (p_uint)1 << isize ) ) != 0 )
+                                {
+                                    // Gnomi: strcat is quite inefficient. isize
+                                    // or tmpl could be used for direct indexing
+                                    // (temp[sizeof(temp)-tmpl-1] = '0')
+                                    // True. But strcat is much more readable, this code is
+                                    // anyway crappy to read. And this particular piece here
+                                    // is executed really seldom. Very few people want to
+                                    // print numbers in binary representation and if they to,
+                                    // they use mostly small numbers.
+                                    signi = 1;
+                                    strcat( temp, "1" );
+                                    --tmpl;
+                                }
+                                else if ( signi || !isize)
+                                {
+                                    strcat( temp, "0" );
+                                    --tmpl;
+                                }
                             }
-                            tmpl = snprintf(temp, sizeof(temp), cheat, pres, READ_DOUBLE(carg));
-                            if (tmpl >= sizeof(temp))
+                            // if still bits left, but buffer is full, throw error.
+                            if (isize > -1 && tmpl < 1)
                                 ERROR(ERR_LOCAL_BUFF_OVERFLOW);
-                            /* NOT REACHED */
-                        }
-                        else
-                        {
-                            if (carg->type != T_NUMBER) /* sigh... */
-                            {
-                                ERROR1(ERR_INCORRECT_ARG, format_char);
-                            }
-
-                            /* insert the correct length modifier for a p_int
-                             * type. (If the prefix is an empty string, this will
-                             * be probably optimized by the compiler anyway. */
-                            else {
-                                p = memcpy(p, PRI_PINT_PREFIX,
-                                        strlen(PRI_PINT_PREFIX));
-                                p += strlen(PRI_PINT_PREFIX);
-                            }
-                            *(p++) = format_char;
-                            *p = '\0';
-                            tmpl = snprintf(temp, sizeof(temp), cheat, carg->u.number);
-                            if (tmpl >= sizeof(temp))
-                                ERROR(ERR_LOCAL_BUFF_OVERFLOW);
-
                             if (pres && tmpl > pres)
                                 tmpl = pres; /* well.... */
-
-                            if (zeroCharHack)
-                            {
-                                int pos;
-                                for (pos = 0; pos < tmpl; ++pos)
-                                {
-                                    if (temp[pos] == 0x01)
-                                        temp[pos] = 0x00;
-                                }
-                            }
-                        }
-                        if ((unsigned int)tmpl < fs)
-                        {
-                            if ((finfo & INFO_PS_ZERO) != 0
-                                    && (   temp[0] == ' '
-                                        || temp[0] == '+'
-                                        || temp[0] == '-'
-                                       )
-                                    && (finfo & INFO_A) != INFO_A_LEFT
-                               )
-                            {
-                                /* Non-left alignment and we're printing
-                                 * with leading zeroes: preserve the sign
-                                 * character in the right place.
-                                 */
-                                ADD_STRN(st, temp, 1);
-                                add_aligned(st, temp+1, tmpl-1, pad, padlen, fs-1, finfo);
-                            }
+                            if ((unsigned int)tmpl < fs)
+                                add_aligned(st, temp, sizeof(temp) - tmpl, pad, padlen, fs, finfo);
                             else
-                                add_aligned(st, temp, tmpl, pad, padlen, fs, finfo);
+                                ADD_STRN(st, temp, sizeof(temp) - tmpl);
+                            break;
+                        }
+                        else if ((finfo & INFO_T ) == INFO_T_INT && format_char == 'c')
+                        {
+                            char temp[4];
+                            size_t clen = unicode_to_utf8(carg->u.number, temp);
+                            if (!clen)
+                                ERROR1(ERR_INCORRECT_ARG, 'c');
+
+                            ADD_STRN(st, temp, clen);
+                            break;
                         }
                         else
-                            ADD_STRN(st, temp, tmpl);
-                        break;
-                    }
-                default:        /* type not found */
-                    ERROR(ERR_UNDEFINED_TYPE);
-            }
+                        {
+                            /* Synthesized format for sprintf() */
+                            char cheat[6+sizeof(PRI_PINT_PREFIX)-1];
+                            char temp[1024];
+                            /* The buffer must be big enough to hold the biggest float
+                             * in non-exponential representation. 1 KByte is hopefully
+                             * far on the safe side.
+                             * TODO: Allocate it dynamically?
+                             */
+                            double value;   /* The value to print */
+                            int    numdig;  /* (Estimated) number of digits before the '.' */
+                            Bool zeroCharHack = MY_FALSE;
+                            char *p = cheat; /* pointer to the format buffer */
+                            size_t tmpl; // no of bytes written to buffer temp
 
-            if (!(finfo & INFO_ARRAY))
-                break;
+                            *(p++) = '%';
+                            switch (finfo & INFO_PP)
+                            {
+                                case INFO_PP_SPACE: *(p++) = ' '; break;
+                                case INFO_PP_PLUS:  *(p++) = '+'; break;
+                            }
+                            if ((finfo & INFO_T) == INFO_T_FLOAT)
+                            {
+                                if (carg->type != T_FLOAT) /* sigh... */
+                                {
+                                    ERROR1(ERR_INCORRECT_ARG, format_char);
+                                }
+                                *(p++) = '.';
+                                *(p++) = '*';
+                                *(p++) = format_char;
+                                *p = '\0';
 
-            if (nelemno >= (size_t)VEC_SIZE((argv+arg)->u.vec))
-                break;
+                                value = READ_DOUBLE(carg);
 
-            carg = (argv+arg)->u.vec->item+nelemno++;
-        } /* end of while (1) */
-        fpos--; /* bout to get incremented */
-        continue;
-    } /* if format entry */
+                                if ('e' == format_char
+                                        || 'E' == format_char
+                                        || fabs(value) < 1.0)
+                                    numdig = 1;
+                                else
+                                    numdig = (int) ceil(log10(fabs(value)));
+                                if (value < 0.0)
+                                    numdig++;
 
-    /* Nothing to format: just copy the character */
-    ADD_CHAR(st, format_str[fpos]);
-} /* for (fpos=0; 1; fpos++) */
+                                if ((size_t)pres > (sizeof(temp) - 12 - numdig))
+                                {
+                                    pres = sizeof(temp) - 12 - numdig;
+                                }
+                                tmpl = snprintf(temp, sizeof(temp), cheat, pres, READ_DOUBLE(carg));
+                                if (tmpl >= sizeof(temp))
+                                    ERROR(ERR_LOCAL_BUFF_OVERFLOW);
+                                /* NOT REACHED */
+                            }
+                            else
+                            {
+                                if (carg->type != T_NUMBER) /* sigh... */
+                                {
+                                    ERROR1(ERR_INCORRECT_ARG, format_char);
+                                }
 
-/* Free the temp string */
-if (st->clean.u.str)
-    free_mstring(st->clean.u.str);
-if (st->tmp)
-    xfree(st->tmp);
+                                /* insert the correct length modifier for a p_int
+                                 * type. (If the prefix is an empty string, this will
+                                 * be probably optimized by the compiler anyway. */
+                                else {
+                                    p = memcpy(p, PRI_PINT_PREFIX,
+                                            strlen(PRI_PINT_PREFIX));
+                                    p += strlen(PRI_PINT_PREFIX);
+                                }
+                                *(p++) = format_char;
+                                *p = '\0';
+                                tmpl = snprintf(temp, sizeof(temp), cheat, carg->u.number);
+                                if (tmpl >= sizeof(temp))
+                                    ERROR(ERR_LOCAL_BUFF_OVERFLOW);
+
+                                if (pres && tmpl > pres)
+                                    tmpl = pres; /* well.... */
+
+                                if (zeroCharHack)
+                                {
+                                    int pos;
+                                    for (pos = 0; pos < tmpl; ++pos)
+                                    {
+                                        if (temp[pos] == 0x01)
+                                            temp[pos] = 0x00;
+                                    }
+                                }
+                            }
+                            if ((unsigned int)tmpl < fs)
+                            {
+                                if ((finfo & INFO_PS_ZERO) != 0
+                                        && (   temp[0] == ' '
+                                            || temp[0] == '+'
+                                            || temp[0] == '-'
+                                           )
+                                        && (finfo & INFO_A) != INFO_A_LEFT
+                                   )
+                                {
+                                    /* Non-left alignment and we're printing
+                                     * with leading zeroes: preserve the sign
+                                     * character in the right place.
+                                     */
+                                    ADD_STRN(st, temp, 1);
+                                    add_aligned(st, temp+1, tmpl-1, pad, padlen, fs-1, finfo);
+                                }
+                                else
+                                    add_aligned(st, temp, tmpl, pad, padlen, fs, finfo);
+                            }
+                            else
+                                ADD_STRN(st, temp, tmpl);
+                            break;
+                        }
+                    default:        /* type not found */
+                        ERROR(ERR_UNDEFINED_TYPE);
+                }
+
+                if (!(finfo & INFO_ARRAY))
+                    break;
+
+                if (nelemno >= (size_t)VEC_SIZE((argv+arg)->u.vec))
+                    break;
+
+                carg = (argv+arg)->u.vec->item+nelemno++;
+            } /* end of while (1) */
+            fpos--; /* bout to get incremented */
+            continue;
+        } /* if format entry */
+
+        /* Nothing to format: just copy the character */
+        ADD_CHAR(st, format_str[fpos]);
+    } /* for (fpos=0; 1; fpos++) */
+
+    /* Free the temp string */
+    if (st->clean.u.str)
+        free_mstring(st->clean.u.str);
+    if (st->tmp)
+        xfree(st->tmp);
 
     /* Copy over the result */
-if  (st->bpos > 0)
-    result = new_n_unicode_mstring(st->buff, st->bpos);
+    if  (st->bpos > 0)
+        result = new_n_unicode_mstring(st->buff, st->bpos);
     else
-    result = ref_mstring(STR_EMPTY);
-if (!result)
-    result = ref_mstring(STR_OUT_OF_MEMORY);
+        result = ref_mstring(STR_EMPTY);
+    if (!result)
+        result = ref_mstring(STR_OUT_OF_MEMORY);
 
-if (st == &static_fmt)
-    static_fmt_used = MY_FALSE;
+    if (st == &static_fmt)
+        static_fmt_used = MY_FALSE;
     else
-    xfree(st);
+        xfree(st);
 
     /* Done */
     return result;
 
 #undef GET_NEXT_ARG
 
-    } /* string_print_formatted() */
+} /* string_print_formatted() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
