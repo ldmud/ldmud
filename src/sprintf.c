@@ -180,7 +180,7 @@ enum format_err {
   ERR_BUFF_OVERFLOW      =        0x1, /* buffer overflowed */
   ERR_TO_FEW_ARGS        =        0x2, /* more arguments spec'ed than passed */
   ERR_INVALID_STAR       =        0x3, /* invalid arg to * */
-  ERR_PREC_EXPECTED      =        0x4, /* expected precision not found */
+  ERR_INVALID_PREC       =        0x4, /* expected precision not found */
   ERR_INVALID_FORMAT_STR =        0x5, /* error in format string */
   ERR_INCORRECT_ARG      =        0x6, /* invalid arg to %[idcxXs] */
   ERR_CST_REQUIRES_FS    =        0x7, /* field size not given for c/t */
@@ -1824,8 +1824,8 @@ string_print_formatted (char *format_str, size_t format_len, int argc, svalue_t 
                 err = "Incorrect argument type to *.";
                 break;
 
-            case ERR_PREC_EXPECTED:
-                err = "Expected precision not found.";
+            case ERR_INVALID_PREC:
+                err = "Invalid precision (not found or negative).";
                 break;
 
             case ERR_INVALID_FORMAT_STR:
@@ -1833,7 +1833,7 @@ string_print_formatted (char *format_str, size_t format_len, int argc, svalue_t 
                 break;
 
             case ERR_INCORRECT_ARG:
-                err = "incorrect argument type to %%%c.";
+                err = "Incorrect argument type to %%%c.";
                 break;
 
             case ERR_CST_REQUIRES_FS:
@@ -2080,8 +2080,6 @@ string_print_formatted (char *format_str, size_t format_len, int argc, svalue_t 
                                     tmp_num = -tmp_num;
                                 finfo |= INFO_A_LEFT;
                             }
-                            else
-                                ERROR(ERR_INVALID_STAR);
                         }
                         GET_NEXT_ARG;
                     }
@@ -2192,8 +2190,8 @@ string_print_formatted (char *format_str, size_t format_len, int argc, svalue_t 
                 }
             } /* for(format parsing) */
 
-            if (pres < 0 || num_elem < 0)
-                ERROR(ERR_PREC_EXPECTED);
+            if (pres < 0 || rec_depth < 0 || num_elem < 0)
+                ERROR(ERR_INVALID_PREC);
 
             /* Now handle the different arg types...
              */
