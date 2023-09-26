@@ -2038,7 +2038,7 @@ string_print_formatted (char *format_str, size_t format_len, int argc, svalue_t 
 #           define _NUM_PRES 0b0010
 #           define _NUM_REC  0b0100
 #           define _NUM_ELEM 0b1000
-            tmp_num_dst = _NUM_FS;
+            tmp_num_dst = _NUM_FS; // first number is always field size
 
             /* Parse the formatting entry */
             for (fpos++; !(finfo & INFO_T); fpos++)
@@ -2072,7 +2072,8 @@ string_print_formatted (char *format_str, size_t format_len, int argc, svalue_t 
                         tmp_num = carg->u.number;
                         if ((p_int)(tmp_num) < 0)
                         {
-                            if (tmp_num_dst == _NUM_FS)
+                            /* negative field size -> left align */
+                            if (tmp_num_dst & _NUM_FS)
                             {
                                 if (tmp_num == (p_uint)PINT_MIN)
                                     tmp_num = PINT_MAX;
@@ -2124,11 +2125,13 @@ string_print_formatted (char *format_str, size_t format_len, int argc, svalue_t 
                     case '@': finfo |= INFO_ARRAY; break;
                     case '=': finfo |= INFO_COLS; break;
                     case '#': finfo |= INFO_TABLE; break;
-                    case '.': tmp_num_dst = (tmp_num_dst&(_NUM_FS|_NUM_REC)) << 1;
+                    case '.': tmp_num_dst = (tmp_num_dst & (_NUM_FS|_NUM_REC)
+                                      ) << 1;
                               if (tmp_num_dst & _NUM_PRES) pres = -1;
                               if (tmp_num_dst & _NUM_ELEM) num_elem = -1;
                               break;
-                    case ':': tmp_num_dst |= (tmp_num_dst&(_NUM_FS|_NUM_REC)) << 1;
+                    case ':': tmp_num_dst |= (tmp_num_dst & (_NUM_FS|_NUM_REC)
+                                      ) << 1;
                               if (tmp_num_dst & _NUM_PRES) pres = -1;
                               if (tmp_num_dst & _NUM_ELEM) num_elem = -1;
                               break;
