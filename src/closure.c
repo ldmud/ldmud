@@ -5879,8 +5879,6 @@ closure_lookup_lfun_prog ( lfun_closure_t * l
     if (*pProg != prog)
         is_inherited = MY_TRUE;
 
-    /* Copy the other result values */
-    *pProg = prog;
     *pIsInherited = is_inherited;
 } /* closure_lookup_lfun_prog() */
 

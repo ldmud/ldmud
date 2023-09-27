@@ -34,3 +34,8 @@ closure get_b_var_cl2()
 {
     return lambda(0, ({#'b_var}));
 }
+
+closure get_b_calc_cl()
+{
+    return #'b_calc;
+}
