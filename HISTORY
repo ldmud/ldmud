@@ -4,6 +4,53 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+01-Oct-2023 (LDMud Team) -- 3.6.7
+    - Fixed Crashes:
+       + Fixed a crash when accessing members of hidden structs.
+       + Fixed a crash with foreach on a mapping range reference.
+       + Fixed a crash when multiple 'reserve' modifiers were given
+         to #'catch in a lambda expression.
+       + Fixed a crash when calling coroutines within an active trace().
+       + Fixed crashes when cleaning up coroutines.
+       + Fixed a crash when Python was accessing a swapped object.
+       + variable_exists() could end up in an endless loop in certain
+         virtual inheritance scenarios.
+
+    - Language:
+       + Added new type: lpctype
+       + Added support for Python objects as LPC types.
+       + Added 'limit' modifier for catch().
+       + catch() is now considered to return a mixed value instead
+         of string.
+       + Added --enable-keyword-in configure option to make 'in'
+         a reserved word.
+       + Fixed that simul-efun structs were not found for inheritance.
+
+    - New Efuns:
+       + compile_string() compiles LPC code given as a string into a closure.
+
+    - Changed Efuns:
+       + closure_to_string() did not print the inherit's name for
+         inherited lfuns.
+       + driver_info() provides more statistics on Python objects.
+       + get_type_info(cl, 3) returned the wrong inherit.
+       + save_value()/save_object() misformatted Python objects.
+
+    - Networking:
+       + Allow specifying a host address for each listening port.
+
+    - Portability
+       + Adapted to OpenSSL 3.
+       + Adapted build scripts to Autoconf 2.71.
+
+    - Other:
+       + Added Python support for the full LPC type system.
+       + Added Python hooks for the signals SIGINT, SIGTERM, SIGHUP, SIGUSR1
+         and SIGUSR2.
+       + Release Python's GIL when not executing Python code.
+       + Added configuration option --disable-allocator-wrappers to disable
+         using LDMud's memory management functions in 3rd party libraries.
+
 10-Sep-2022 (LDMud Team) -- 3.6.6
     - Fixed Crashes:
        + Fixed a crash in configure_interactive() and input_to()
