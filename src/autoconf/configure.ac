@@ -192,7 +192,7 @@ AC_DEFUN([AC_MY_SEARCH_LIB],
 
 dnl
 dnl let's start
-AC_INIT([LDMud], [3.5.0], [https://mantis.ldmud.eu/mantis/], [ldmud], [http://www.ldmud.eu/])
+AC_INIT([LDMud], [3.5.7], [https://mantis.ldmud.eu/mantis/], [ldmud], [http://www.ldmud.eu/])
 
 dnl set the default prefix
 AC_PREFIX_DEFAULT(/usr/local/mud)

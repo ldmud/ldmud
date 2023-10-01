@@ -4,6 +4,11 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+01-Oct-2023 (LDMud Team) -- 3.5.7
+    - Fixed Crashes:
+       + Fixed a crash when multiple 'reserve' modifiers were given
+         to #'catch in a lambda expression.
+
 10-Sep-2022 (LDMud Team) -- 3.5.6
     - Fixed Crashes:
        + Fixed several crashes in lambda().
