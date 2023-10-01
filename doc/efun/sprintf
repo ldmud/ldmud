@@ -65,7 +65,7 @@ DESCRIPTION
           "|"   centered within field size.
           "$"   justified to field size. Ignored unless the type specifier
                 is 's'.
-          "="   column mode.  Ignored unless the argument type specifier is 's'.
+          "="   column mode. Ignored unless the argument type specifier is 's'.
                 Field size must be specified, if precision is specified then
                 it specifies the width for the string to be wordwrapped in, if
                 not then the field size is. The field size specifies the width
@@ -80,8 +80,14 @@ DESCRIPTION
                   'words' which are put in a format similar to that of
                   ls.
                 For %O/%Q: compact output.
+          "&"n  For %O/%Q: limit recursion into arrays/structs to n levels.
+                Has to occur after field-size/precision values.
+          "&.n" For %O/%Q: limit the number of array/mapping/struct elements
+                to n. Has to occur after field-size/precision values.
           "@"   the argument is an array.  the corresponding AFS (minus all
                 "@") is applied to each element of the array.
+          "*"   Can be placed instead of a number, the value is then expected
+                in an additional argument to the function call.
 
         When the formatting of an element results in several output lines
         (column or table mode) and no explicit pad strings has been

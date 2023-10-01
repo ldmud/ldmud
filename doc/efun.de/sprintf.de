@@ -78,7 +78,11 @@ BESCHREIBUNG
                      bei Strings (auch im Spaltenmodus).
         =            Spaltenmodus (siehe unten).
         #            Fuer Strings: Tabellenmodus (siehe unten).
-                     Fuer '%O'/'%Q': kompakte Ausgabe.
+                     Fuer %O/%Q: kompakte Ausgabe.
+        &n           Fuer %O/%Q: maximale Rekursionstiefe in Arrays/Structs.
+                     Muss nach Stringlaenge/Stellen stehen.
+        &.n          Fuer %O/%Q: maximale Anzahl an Elementen von Arrays/
+                     MAppings/Structs. Muss nach Stringlaenge/Stellen stehen.
         @            Arraymodus (siehe unten).
         *            Ein Stern kann immer dort eingesetzt werden, wo
                      hier weiter oben ein n fuer eine Ganzzahl steht.
