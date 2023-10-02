@@ -463,6 +463,15 @@ mixed *tests =
                     }))) == "ABCZ";
        :)
     }),
+    ({ "compile_string (same function multiple times from function)", 0,
+       (:
+            return funcall(compile_string(0, "fun1() + fun2() + fun3()", (<cs_opts>
+                functions: function closure(symbol name) : closure cl = function int() { return 10; }
+                    {
+                        return cl;
+                    }))) == 30;
+       :)
+    }),
     ({ "compile_string (missing function from function)", TF_ERROR,
        (:
             compile_string(0, "fun1() + fun2(\"z\")", (<cs_opts>
@@ -539,6 +548,15 @@ mixed *tests =
                             case "var2": return &v2;
                         }
                     }))) == "ABCX" && v2 == "X";
+       :)
+    }),
+    ({ "compile_string (same value multiple times from function)", 0,
+       (:
+            return funcall(compile_string(0, "a+b+c", (<cs_opts>
+                variables: function mixed(symbol name) : int value = 10
+                    {
+                        return &value;
+                    }))) == 30;
        :)
     }),
     ({ "compile_string (variable, missing in function)", TF_ERROR,
@@ -626,6 +644,16 @@ mixed *tests =
                     {
                         return 0;
                     }));
+       :)
+    }),
+    ({ "compile_string (same struct multiple times from function)", 0,
+       (:
+            return deep_eq(funcall(compile_string(0,
+                "({ (<my_struct1> ({10})), (<my_struct2> ({20})), (<my_struct3> ({30})) })", (<cs_opts>
+                structs: function struct mixed(symbol name) : struct test_struct s = (<test_struct>)
+                    {
+                        return s;
+                    }))), ({ (<test_struct> ({10})), (<test_struct> ({20})), (<test_struct> ({30})) }));
        :)
     }),
     ({ "compile_string (struct from object)", 0,
