@@ -26,6 +26,8 @@ mixed *tests = ({
     ({ "int* |= int*", 0,         (: int *val = ({0,1,2,3}); val |= ({4,2,1}); return deep_eq(val, ({0,1,2,3,4}));     :) }),
     ({ "int* ^= int*", 0,         (: int *val = ({0,1,2,3}); val ^= ({4,2,1}); return deep_eq(val, ({0,3,4}));         :) }),
 
+    ({ "negative zero", 0,        (: float val = -1.0 * 0.0; return val == 0.0 && !('-' in to_string(val)); :) }),
+
     ({ "mapping + mapping 1", 0,  (: deep_eq(([0,1,2,3])                                + ([4,2,1]),                        ([0,1,2,3,4]))                                                  :) }),
     ({ "mapping + mapping 2", 0,  (: deep_eq(([0:"a", 1:"b", 2:"c", 3:"d"])             + ([4:"x", 2:"y", 1:"z"]),          ([0:"a", 1:"z", 2:"y", 3:"d", 4: "x"]))                         :) }),
     ({ "mapping + mapping 3", 0,  (: deep_eq((['a:0;"a", 'b:1;"b", 'c:2;"c", 'd:3;"d"]) + (['d:4;"x", 'e:2;"y", 'f:1;"z"]), (['a:0;"a", 'b:1;"b", 'c:2;"c", 'd:4;"x", 'e:2;"y", 'f:1;"z"])) :) }),

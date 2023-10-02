@@ -501,7 +501,8 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
     }
 
     static INLINE void STORE_DOUBLE(svalue_t *dest, double doublevalue) {
-        dest->u.float_number = doublevalue;
+        /* Convert negative zeros to positive ones before storing. */
+        dest->u.float_number = doublevalue + 0.0;
     }
 #else
 /* --- The portable format, used if no other format is defined */
