@@ -8,5 +8,6 @@ HISTORY
         Introduced in 3.2@70
 
 SEE ALSO
-        bytesp(E), clonep(E), floatp(E), mappingp(E), objectp(E), intp(E),
-        referencep(E), pointerp(E), stringp(E), symbolp(E), structp(E)
+        bytesp(E), clonep(E), coroutinep(E), floatp(E), intp(E), lpctypep(E),
+        lwobjectp(E), mappingp(E), objectp(E), pointerp(E), referencep(E),
+        stringp(E), structp(E), symbolp(E)

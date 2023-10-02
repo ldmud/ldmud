@@ -11,6 +11,6 @@ HISTORY
         Introduced in 3.2@70
 
 SEE ALSO
-        quote(E), bytesp(E), clonep(E), closurep(E), floatp(E),
-        mappingp(E), objectp(E), intp(E), referencep(E), pointerp(E),
-        stringp(E), structp(E)
+        quote(E), bytesp(E), clonep(E), closurep(E), coroutinep(E),
+        floatp(E), intp(E), lpctypep(E), lwobjectp(E), mappingp(E),
+        objectp(E), pointerp(E), referencep(E), stringp(E), structp(E)

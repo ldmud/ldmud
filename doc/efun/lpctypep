@@ -1,0 +1,13 @@
+SYNOPSIS
+        int lpctypep(mixed arg)
+
+DESCRIPTION
+        Returns 1 if the argument is an LPC type.
+
+HISTORY
+        Introduced in LDMud 3.6.7.
+
+SEE ALSO
+        bytesp(E), clonep(E), closurep(E), coroutinep(E), floatp(E), intp(E),
+        lwobjectp(E), mappingp(E), objectp(E), pointerp(E), referencep(E),
+        stringp(E), structp(E), symbolp(E)
