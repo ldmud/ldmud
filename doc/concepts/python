@@ -356,8 +356,14 @@ LDMUD MODULE
 
           - efuns
                 This namespace contains all original efuns (without any
-                registered python efuns or simul-efuns). These can be called
+                registered Python efuns or simul-efuns). These can be called
                 as a regular function.
+
+          - registered_efuns
+                Contains all registered Python efuns.
+
+          - registered_types
+                Contains all registered Python types.
 
 
         There is mapping of LPC values to Python values for the following types:

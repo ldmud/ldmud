@@ -1002,7 +1002,6 @@ class TestLPCType(unittest.TestCase):
         self.assertIn(ldmud.String, ldmud.Integer | ldmud.String)
         self.assertEqual(ldmud.LPCType((ldmud.Integer, ldmud.String)), ldmud.Integer | ldmud.String)
 
-
 class TestEfuns(unittest.TestCase):
     def testDir(self):
         self.assertGreater(len(dir(ldmud.efuns)), 200)
@@ -1011,6 +1010,41 @@ class TestEfuns(unittest.TestCase):
         master = ldmud.efuns.find_object("/master")
         self.assertEqual(ldmud.efuns.call_other(master, "master_fun"), 54321)
         self.assertEqual(ldmud.efuns.object_name(master), "/master")
+
+class TestRegisteredEfuns(unittest.TestCase):
+    def testDir(self):
+        self.assertIn("python_test", dir(ldmud.registered_efuns))
+        self.assertGreater(len(dir(ldmud.registered_efuns)), 16)
+
+    def testDict(self):
+        self.assertIn("python_test", ldmud.registered_efuns.__dict__)
+        self.assertEqual(ldmud.registered_efuns.__dict__["python_test"], python_test)
+        self.assertEqual(len(ldmud.registered_efuns.__dict__), 16)
+
+    def testAttribute(self):
+        self.assertTrue(hasattr(ldmud.registered_efuns, 'python_test'))
+        self.assertEqual(ldmud.registered_efuns.python_test, python_test)
+        with self.assertRaises(AttributeError):
+            ldmud.registered_efuns.doesnt_exist
+        with self.assertRaises(AttributeError):
+            # Unregistered Efun
+            ldmud.registered_efuns.abc
+
+class TestRegisteredTypes(unittest.TestCase):
+    def testDir(self):
+        self.assertIn("bigint", dir(ldmud.registered_types))
+        self.assertGreater(len(dir(ldmud.registered_types)), 3)
+
+    def testDict(self):
+        self.assertIn("bigint", ldmud.registered_types.__dict__)
+        self.assertEqual(ldmud.registered_types.__dict__["bigint"], bigint)
+        self.assertEqual(len(ldmud.registered_types.__dict__), 3)
+
+    def testAttribute(self):
+        self.assertTrue(hasattr(ldmud.registered_types, 'bigint'))
+        self.assertEqual(ldmud.registered_types.bigint, bigint)
+        with self.assertRaises(AttributeError):
+            ldmud.registered_types.doesnt_exist
 
 def python_test():
     """Run the python test cases."""
