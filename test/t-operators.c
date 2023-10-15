@@ -124,24 +124,28 @@ mixed *tests = ({
     ({ "[int|string] | [int|float]", 0,   (: ([int|string] | [int|float]) == [int|string|float] :) }),
     ({ "[int] | [mixed]", 0,              (: ([int]        | [mixed])     == [mixed]            :) }),
     ({ "[int] | [void]", 0,               (: ([int]        | [void])      == [int]              :) }),
+    ({ "[int] | int", TF_ERROR,           (: mixed val = 42; return [int] | val;                :) }),
 
     ({ "[int] & [float]", 0,              (: ([int]        & [float])     == [void]             :) }),
     ({ "[int] & [int|float]", 0,          (: ([int]        & [int|float]) == [int]              :) }),
     ({ "[int|string] & [int|float]", 0,   (: ([int|string] & [int|float]) == [int]              :) }),
     ({ "[int] & [mixed]", 0,              (: ([int]        & [mixed])     == [int]              :) }),
     ({ "[int] & [void]", 0,               (: ([int]        & [void])      == [void]             :) }),
+    ({ "[int] & int", TF_ERROR,           (: mixed val = 42; return [int] & val;                :) }),
 
     ({ "[int] |= [float]", 0,             (: lpctype val = [int];        val |= [float];     return val == [int|float];        :) }),
     ({ "[int] |= [int|float]", 0,         (: lpctype val = [int];        val |= [int|float]; return val == [int|float];        :) }),
     ({ "[int|string] |= [int|float]", 0,  (: lpctype val = [int|string]; val |= [int|float]; return val == [int|string|float]; :) }),
     ({ "[int] |= [mixed]", 0,             (: lpctype val = [int];        val |= [mixed];     return val == [mixed];            :) }),
     ({ "[int] |= [void]", 0,              (: lpctype val = [int];        val |= [void];      return val == [int];              :) }),
+    ({ "[int] |= int", TF_ERROR,          (: mixed   val = [int];        val |= 42;                                            :) }),
 
     ({ "[int] &= [float]", 0,             (: lpctype val = [int];        val &= [float];     return val == [void];             :) }),
     ({ "[int] &= [int|float]", 0,         (: lpctype val = [int];        val &= [int|float]; return val == [int];              :) }),
     ({ "[int|string] &= [int|float]", 0,  (: lpctype val = [int|string]; val &= [int|float]; return val == [int];              :) }),
     ({ "[int] &= [mixed]", 0,             (: lpctype val = [int];        val &= [mixed];     return val == [int];              :) }),
     ({ "[int] &= [void]", 0,              (: lpctype val = [int];        val &= [void];      return val == [void];             :) }),
+    ({ "[int] &= int", TF_ERROR,          (: mixed   val = [int];        val &= 42;                                            :) }),
 
     ({ "[int] in [float]", 0,             (: !([int]        in [float])     :) }),
     ({ "[int] in [int|float]", 0,         (:   [int]        in [int|float]  :) }),
@@ -150,6 +154,7 @@ mixed *tests = ({
     ({ "[int] in [void]", 0,              (: !([int]        in [void])      :) }),
     ({ "[mixed] in [int]", 0,             (: !([mixed]      in [int])       :) }),
     ({ "[void] in [int]", 0,              (:   [void]       in [int]        :) }),
+    ({ "42 in [int]", TF_ERROR,           (: mixed val = 42; return val in [int];     :) }),
 
     ({ "decltype(42)", 0,                 (: decltype(42) == [int]                    :) }),
     ({ "decltype(int var)", 0,            (: int var; return decltype(var) ==  [int]; :) }),

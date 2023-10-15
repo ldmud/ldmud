@@ -13972,7 +13972,6 @@ again:
         }
 #endif
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_POINTER|TF_LPCTYPE);
         if ((sp-1)->type == T_NUMBER)
         {
             TYPE_TEST_RIGHT(sp, T_NUMBER);
@@ -13988,7 +13987,7 @@ again:
             sp--;
             sp->u.vec = join_array(sp->u.vec, (sp+1)->u.vec);
         }
-        else if (sp->type == T_LPCTYPE && (sp-1)->type == T_LPCTYPE)
+        else if ((sp-1)->type == T_LPCTYPE)
         {
             TYPE_TEST_RIGHT(sp, T_LPCTYPE);
             lpctype_t * result = get_union_type(sp[-1].u.lpctype, sp[0].u.lpctype);
@@ -13997,6 +13996,10 @@ again:
             free_lpctype(sp[0].u.lpctype);
             sp--;
             sp->u.lpctype = result;
+        }
+        else
+        {
+            OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER|TF_LPCTYPE, sp-1);
         }
 
         break;
