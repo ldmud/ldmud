@@ -6014,7 +6014,7 @@ f_attach_erq_demon (svalue_t *sp)
         if (privilege_violation4(STR_ATTACH_ERQ_DEMON,
             const0, suffix, sp[1].u.number, sp+1))
         {
-            char *native = convert_path_str_to_native_or_throw(suffix);
+            char *native = convert_path_str_to_native_or_throw(ref_mstring(suffix));
             if (erq_demon != FLAG_NO_ERQ)
             {
                 if (sp[1].u.number & 1) {
