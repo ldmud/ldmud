@@ -1959,6 +1959,8 @@ v_to_text (svalue_t *sp, int num_arg)
 
         if (!iconv_valid(cd))
         {
+            if (text->type == T_POINTER)
+                xfree(in_buf_start);
             if (errno == EINVAL)
                 errorf("Bad arg 2 to to_text(): Unsupported encoding '%s'.\n", get_txt(sp->u.str));
             else
@@ -1972,6 +1974,8 @@ v_to_text (svalue_t *sp, int num_arg)
         if (in_buf_size == 0)
         {
             iconv_close(cd);
+            if (text->type == T_POINTER)
+                xfree(in_buf_start);
 
             sp = pop_n_elems(2, sp);
             push_ref_string(sp, STR_EMPTY);

@@ -1375,6 +1375,8 @@ mixed *tests =
                         :) }),
     ({ "to_text 10", 0, (: deep_eq(to_array(to_text(({65, 192, 9786, 127154}))), ({65, 192, 9786, 127154}))
                         :) }),
+    ({ "to_text 11", 0, (: to_text(({"Ignored", 0}), "ASCII") :) }),
+    ({ "to_text 12", TF_ERROR, (: to_text(({0}), "Illegal Encoding") :) }),
 
     ({ "to_bytes 1", 0, (: deep_eq(to_array(to_bytes( ({}) )), ({}) ) :) }),
     ({ "to_bytes 2", 0, (: deep_eq(to_array(to_bytes( ({0, 130, 150, 200, 255}) )), ({0, 130, 150, 200, 255}) ) :) }),
