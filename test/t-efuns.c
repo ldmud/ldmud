@@ -1212,6 +1212,10 @@ mixed *tests =
     ({ "regreplace 3", 0, (: regreplace("A\x00BC", "B", "X", RE_TRADITIONAL) == "A\x00XC" :) }),
     ({ "regreplace 4", 0, (: regreplace("A\x00BC", "B", "X", RE_PCRE) == "A\x00XC" :) }),
 
+#ifdef __SQLITE__
+    ({ "sl_open with illegal path", TF_ERROR, (: sl_open("whatever/../../somethingelse.db"); :) }),
+#endif
+
     ({ "sscanf 1", 0, (: sscanf("A10", "A%~d") == 1 :) }),
     ({ "sscanf 2", 0, (: sscanf("B10", "A%~d") == 0 :) }),
     ({ "sscanf 3", 0, (: sscanf("A10", "A%!d") == 0 :) }),

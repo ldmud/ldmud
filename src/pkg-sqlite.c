@@ -783,25 +783,26 @@ sl_vfs_full_pathname (sqlite3_vfs* vfs, const char* name, int len, char* buf)
  */
 
 {
-    string_t *orig_file = new_unicode_mstring(name);
-    string_t *new_file = check_valid_path(orig_file, current_object, STR_SQLITE_OPEN , MY_TRUE);
+    string_t *file_name = new_unicode_mstring(name);
     char *native;
     int rc;
 
-    free_mstring(orig_file);
+    push_string(inter_sp, file_name);
+    file_name = check_valid_path(file_name, current_object, STR_SQLITE_OPEN , MY_TRUE);
+    pop_stack();
 
-    if (!new_file)
+    if (!file_name)
         return SQLITE_AUTH;
 
-    native = convert_path_to_native(get_txt(new_file), mstrsize(new_file));
+    native = convert_path_to_native(get_txt(file_name), mstrsize(file_name));
     if (!native || strlen(native) >= len)
     {
-        free_mstring(new_file);
+        free_mstring(file_name);
         return SQLITE_CANTOPEN;
     }
 
     rc = ((sqlite3_vfs*)vfs->pAppData)->xFullPathname((sqlite3_vfs*)vfs->pAppData, native, len, buf);
-    free_mstring(new_file);
+    free_mstring(file_name);
 
     return rc;
 } /* sl_vfs_full_pathname() */
