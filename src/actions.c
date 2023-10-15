@@ -1249,6 +1249,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
     {
         error_index = setup_closure_callback(&(p->cb), func
                                              , 0, NULL
+                                             , true
                                              );
         func->type = T_INVALID; /* So that an error won't free it again. */
     }

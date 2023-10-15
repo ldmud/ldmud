@@ -5780,6 +5780,55 @@ is_undef_closure (svalue_t *sp)
 } /* is_undef_closure() */
 
 /*-------------------------------------------------------------------------*/
+bool
+is_closure_callable (svalue_t *cl, bool expect_code)
+
+/* Returns true if <sp> is a callable closure. If <expect_code> is true,
+ * also identifier closures will not be accepted.
+ */
+
+{
+    assert(cl->type == T_CLOSURE);
+
+    int i = cl->x.closure_type;
+    switch (i)
+    {
+        case CLOSURE_LFUN:
+        case CLOSURE_BOUND_LAMBDA:
+        case CLOSURE_LAMBDA:
+            return true;
+
+        case CLOSURE_UNBOUND_LAMBDA:
+            return false;
+
+        case CLOSURE_IDENTIFIER:
+            return !expect_code;
+
+        default:
+            if (i >= 0)
+                fatal("Invalid closure type: %d.\n",  i);
+            if (i < CLOSURE_LWO)
+                i -= CLOSURE_LWO;
+            switch (i & -0x0800)
+            {
+                case CLOSURE_EFUN:
+                case CLOSURE_SIMUL_EFUN:
+#ifdef USE_PYTHON
+                case CLOSURE_PYTHON_EFUN:
+#endif
+                    return true;
+
+                case CLOSURE_OPERATOR:
+                    return false;
+
+                default:
+                    fatal("Invalid closure type: %d.\n",  cl->x.closure_type);
+            }
+    }
+    return false; /* NOTREACHED */
+} /* is_closure_callable() */
+
+/*-------------------------------------------------------------------------*/
 void
 closure_lookup_lfun_prog ( lfun_closure_t * l
                          , program_t ** pProg

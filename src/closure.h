@@ -152,6 +152,7 @@ extern void      closure_literal(svalue_t *dest, int ix, unsigned short inhIndex
 extern void      closure_identifier (svalue_t *dest, svalue_t obj, int ix, Bool raise_error);
 extern void      free_closure(svalue_t *svp);
 extern Bool      is_undef_closure (svalue_t *sp);
+extern bool      is_closure_callable (svalue_t *cl, bool expect_code);
 extern void      closure_lookup_lfun_prog (lfun_closure_t *l , program_t ** pProg , string_t ** pName , Bool * pIsInherited);
 extern const char * closure_operator_to_string (int type);
 extern const char * closure_efun_to_string (int type);

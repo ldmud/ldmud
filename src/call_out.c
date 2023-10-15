@@ -186,6 +186,7 @@ v_call_out (svalue_t *sp, int num_arg)
     else
         error_index = setup_closure_callback(&(cop->fun), arg
                                              , num_arg-2, arg+2
+                                             , true
                                              );
 
     if (error_index >= 0)

@@ -97,6 +97,10 @@ mixed *tests =
     ({ "acos 2", TF_ERROR, (: funcall(#'acos, "1.0") :) }),
     ({ "acos 3", TF_ERROR, (: acos(1.1) :) }),
     ({ "acos 4", TF_ERROR, (: acos(-1.1) :) }),
+    ({ "add_action with missing function",       0,        (: last_rt_warning = 0; add_action("ThisFunctionDoesNotExist", "test"); return sizeof(last_rt_warning); :) }),
+    ({ "add_action with operator closure",       TF_ERROR, (: add_action(#'switch,            "test"); :) }),
+    ({ "add_action with identifier closure",     TF_ERROR, (: add_action(#'global_var,        "test"); :) }),
+    ({ "add_action with unbound lambda closure", TF_ERROR, (: add_action(unbound_lambda(0,0), "test"); :) }),
     ({ "all_environment 1", 0,
 	(:
 	    object o = clone_object(this_object());
@@ -252,7 +256,10 @@ mixed *tests =
     ({ "call_direct_resolved array 1",  0, (: int* result; return deep_eq(call_direct_resolved(&result, ({clone,clone,object_name(clone),this_object(),0}), "f", 10, ({ 20 })), ({1, 1, 1, 1, 0})) && deep_eq(result, ({ 11, 11, 11, 11, 0})); :) }),
     ({ "call_direct_resolved array 2",  0, (: int* result; return deep_eq(call_direct_resolved(&result, ({clone,clone,object_name(clone),this_object(),0}), "g", 10, ({ 20 })), ({0, 0, 0, 0, 0})) && deep_eq(result, ({  0,  0,  0,  0, 0})); :) }),
     ({ "call_direct_resolved array 3",  0, (: int* result; return deep_eq(call_direct_resolved(&result, ({clone,clone,object_name(clone),this_object(),0}), "h", 10, ({ 20 })), ({0, 0, 0, 0, 0})) && deep_eq(result, ({  0,  0,  0,  0, 0})); :) }),
-    ({ "call_out", 0, (: last_rt_warning = 0; call_out("ThisFunctionDoesNotExist", 10); return sizeof(last_rt_warning); :) }),
+    ({ "call_out with missing function",0, (: last_rt_warning = 0; call_out("ThisFunctionDoesNotExist", 10); return sizeof(last_rt_warning); :) }),
+    ({ "call_out with operator closure",       TF_ERROR, (: call_out(#'switch, 0);            :) }),
+    ({ "call_out with identifier closure",     TF_ERROR, (: call_out(#'global_var, 0);        :) }),
+    ({ "call_out with unbound lambda closure", TF_ERROR, (: call_out(unbound_lambda(0,0), 0); :) }),
     ({ "catch 1", 0,                       (: catch(throw(''X)) == ''X                    :) }),
     ({ "catch 2", 0,                       (: catch(raise_error("X")) == "*X"             :) }),
     ({ "catch 3", 0,                       (: catch(1+1) == 0                             :) }),
@@ -446,6 +453,27 @@ mixed *tests =
                         'fun1: function string() { return "ABC"; },
                         'fun2: #'capitalize
                     ])))) == "ABCZ";
+       :)
+    }),
+    ({ "compile_string (uncallable closure from mapping) 1", TF_ERROR,
+       (:
+            funcall(compile_string(0, "fun1() + fun2(\"z\")", (<cs_opts>
+                functions:
+                    ([
+                        'fun1: #'switch,
+                        'fun2: unbound_lambda(0,0),
+                    ]))));
+       :)
+    }),
+    ({ "compile_string (uncallable closure from mapping) 2", 0,
+       (:
+            closure cl = unbound_lambda(0,0);
+            return deep_eq(funcall(compile_string(0, "({ #'fun1, #'fun2 })", (<cs_opts>
+                functions:
+                    ([
+                        'fun1: #'switch,
+                        'fun2: cl,
+                    ])))), ({ #'switch, cl }));
        :)
     }),
     ({ "compile_string (function from function)", 0,
@@ -957,6 +985,10 @@ mixed *tests =
             return 1;
         :)
     }),
+    ({ "input_to with missing function",       0,        (: last_rt_warning = 0; input_to("ThisFunctionDoesNotExist"); return sizeof(last_rt_warning); :) }),
+    ({ "input_to with operator closure",       TF_ERROR, (: input_to(#'switch);            :) }),
+    ({ "input_to with identifier closure",     TF_ERROR, (: input_to(#'global_var);        :) }),
+    ({ "input_to with unbound lambda closure", TF_ERROR, (: input_to(unbound_lambda(0,0)); :) }),
     ({ "save_object 1", 0, (: stringp(save_object()) :) }), /* Bug #594 */
     ({ "strstr 01", 0, (: strstr("","") == 0 :) }), /* Bug #536 */
     ({ "strstr 02", 0, (: strstr("","", 1) == -1 :) }),
@@ -982,7 +1014,7 @@ mixed *tests =
     ({ "text_width 11", 0, (: text_width("\U0001F1E9\U0001F1EA")             == 2 :) }),
     ({ "text_width 12", 0, (: text_width("\u1100\u1161\u11ab")               == 2 :) }),
     ({ "this_object", 0, (: this_object(({})...) == this_object() :) }),
-    ({ "this_player", 0, (: this_player(({})...) == 0 :) }),
+    ({ "this_player", 0, (: this_player(({})...) == this_object() :) }),
     ({ "hash string (MD5)", 0, (:
                          hash(TLS_HASH_MD5, "line 13: Warning: Missing "
                               "'return <value>' statement") ==
@@ -1082,27 +1114,44 @@ mixed *tests =
             return res;
         :)
     }),
-    ({ "filter array", TF_ERROR, (: filter(({1,2,3}), unbound_lambda(0,0), ({4,5,6})) :) }),
-    ({ "filter mapping", TF_ERROR, (: filter(([1,2,3]), unbound_lambda(0,0), ([4,5,6])) :) }),
+    ({ "filter string with operator closure",     TF_ERROR, (: filter("abc", #'switch, "xyz") :) }),
+    ({ "filter string with unbound lambda",       TF_ERROR, (: filter("abc", unbound_lambda(0,0), "xyz") :) }),
+    ({ "filter string with identifier closure",   0,        (: global_var = 0; return filter("abc", #'global_var, "xyz")==""; :) }),
+    ({ "filter array with operator closure",     TF_ERROR, (: filter(({1,2,3}), #'switch, ({4,5,6})) :) }),
+    ({ "filter array with unbound lambda",       TF_ERROR, (: filter(({1,2,3}), unbound_lambda(0,0), ({4,5,6})) :) }),
+    ({ "filter array with identifier closure",   0,        (: global_var = 0; return deep_eq(filter(({1,2,3}), #'global_var, ({4,5,6})), ({})); :) }),
+    ({ "filter mapping with operator closure",   TF_ERROR, (: filter(([1,2,3]), #'switch, ([4,5,6])) :) }),
+    ({ "filter mapping with unbound lambda",     TF_ERROR, (: filter(([1,2,3]), unbound_lambda(0,0), ([4,5,6])) :) }),
+    ({ "filter mapping with identifier closure", 0,        (: global_var = 1; return deep_eq(filter(([1,2,3]), #'global_var, ([4,5,6])), ([1,2,3])); :) }),
+
     ({ "map string 1", 0, (: map("abc", (['a':'x'])) == "xbc" :) }),
     ({ "map string 2", 0, (: map("abc", (['a':'x';'y']), 1) == "ybc" :) }),
     ({ "map string 3", TF_ERROR, (: map("abc", (['a']), 0) == "abc" :) }),
     ({ "map string 4", 0, (: map("abc", #'+, 1) == "bcd" :) }),
     ({ "map string 5", 0, (: map("abc", "f") == "bcd" :) }),
     ({ "map string 6", TF_ERROR, (: map("abc", unbound_lambda(0,0), ({1,2,3})) :) }),
-    ({ "map string x", TF_ERROR, (: map("abc", (['a':'x']), 2) :) }),
+    ({ "map string 7", TF_ERROR, (: map("abc", (['a':'x']), 2) :) }),
+    ({ "map string with operator closure", TF_ERROR, (: map("abc", #'switch) :) }),
+    ({ "map string with unbound lambda",   TF_ERROR, (: map("abc", unbound_lambda(0,0)) :) }),
+    ({ "map string with identifier closure", 0,      (: global_var = 'x'; return map("abc", #'global_var) == "xxx"; :) }),
     ({ "map array 1", 0, (: deep_eq(map(({1,2,3}), ([1:5])), ({5,2,3})) :) }),
     ({ "map array 2", 0, (: deep_eq(map(({1,2,3}), ([1:5;6]), 1),({6,2,3})) :) }),
     ({ "map array 3", TF_ERROR, (: map(({1,2,3}), ([1]), 0) :) }),
     ({ "map array 4", 0, (: deep_eq(map(({1,2,3}), #'+, 1), ({2,3,4})) :) }),
     ({ "map array 5", 0, (: deep_eq(map(({1,2,3}), "f"), ({2,3,4})) :) }),
     ({ "map array 6", TF_ERROR, (: map(({0}), unbound_lambda(0,0), ({1,2,3})) :) }),
+    ({ "map array with operator closure", TF_ERROR, (: map(({1,2,3}), #'switch) :) }),
+    ({ "map array with unbound lambda",   TF_ERROR, (: map(({1,2,3}), unbound_lambda(0,0)) :) }),
+    ({ "map array with identifier closure", 0,      (: global_var = 4; return deep_eq(map(({1,2,3}), #'global_var), ({4,4,4})); :) }),
     ({ "map mapping 1", TF_ERROR, (: deep_eq(map(([1,2,3]), ([1:5])), ({5,2,3})) :) }),
     ({ "map mapping 2", TF_ERROR, (: deep_eq(map(([1,2,3]), ([1:5;6]), 1),({6,2,3})) :) }),
     ({ "map mapping 3", TF_ERROR, (: map(([1,2,3]), ([1]), 0) :) }),
     ({ "map mapping 4", 0, (: deep_eq(map(([1,2,3]), (: $1 + $3 :), 1), ([1:2,2:3,3:4])) :) }),
     ({ "map mapping 5", 0, (: deep_eq(map(([1,2,3]), "f"), ([1:2,2:3,3:4])) :) }),
     ({ "map mapping 6", TF_ERROR, (: map(([]), unbound_lambda(0,0), ([1,2,3])) :) }),
+    ({ "map mapping with operator closure", TF_ERROR, (: map(([1,2,3]), #'switch) :) }),
+    ({ "map mapping with unbound lambda",   TF_ERROR, (: map(([1,2,3]), unbound_lambda(0,0)) :) }),
+    ({ "map mapping with identifier closure", 0,      (: global_var = "X"; return deep_eq(map(([1,2,3]), #'global_var), ([1:"X",2:"X",3:"X"])); :) }),
 
     ({ "lambda with many values", 0,
       (:
@@ -1130,6 +1179,10 @@ mixed *tests =
           return 0;
       :)
     }),
+
+    ({ "limited with operator closure", TF_ERROR, (: limited(#'switch) :) }),
+    ({ "limited with unbound_lambda",   TF_ERROR, (: limited(unbound_lambda(0,0)) :) }),
+    ({ "limited with identifier closure", 0,      (: global_var = "X"; return limited(#'global_var) == "X"; :) }),
 
     ({ "load_object 1", 0, (: load_object(__FILE__) == this_object() :) }),
     ({ "load_object 2", 0, (: load_object("/" __FILE__) == this_object() :) }),
@@ -1680,6 +1733,8 @@ string *epilog(int eflag)
 
         return 0;
     });
+
+    set_this_player(this_object());
 
     run_test();
     return 0;

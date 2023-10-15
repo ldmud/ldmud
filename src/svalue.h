@@ -362,10 +362,6 @@ struct svalue_s
   /* TRUE if the closure points to actual code.
    */
 
-#define CLOSURE_CALLABLE(c) ((c) >= CLOSURE_EFUN && (c) <= CLOSURE_LAMBDA)
-  /* TRUE if the closure is callable.
-   */
-
 
 /* T_LVALUE secondary information. */
 

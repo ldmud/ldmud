@@ -7346,6 +7346,7 @@ v_input_to (svalue_t *sp, int num_arg)
     else if (arg[0].type == T_CLOSURE)
         error_index = setup_closure_callback(&(it->fun), arg
                                             , extra, extra_arg
+                                            , true
                                             );
     else
         error_index = 1;

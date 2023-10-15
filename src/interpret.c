@@ -21626,27 +21626,10 @@ int_call_lambda (svalue_t *lsvp, int num_arg, bool external, svalue_t *bind_ob)
                 set_current_object(ob);
             }
 
-            if (i < CLOSURE_SIMUL_EFUN)
+            switch (i & -0x0800)
             {
-                /* It's an operator or efun */
-
-                if (i == CLOSURE_EFUN + F_UNDEF)
-                {
-                    /* The closure was discovered to be bound to a destructed
-                     * object and thus disabled.
-                     * This situation should no longer happen - in all situations
-                     * the closure should be zeroed out.
-                     */
-                    CLEAN_CSP
-                    pop_n_elems(num_arg);
-                    push_number(sp, 0);
-                    inter_sp = sp;
-                    return;
-                }
-
 #ifdef USE_PYTHON
-                if (i >= CLOSURE_PYTHON_EFUN && i < CLOSURE_EFUN)
-                {
+                case CLOSURE_PYTHON_EFUN:
                     inter_pc = csp->funstart = PYTHON_EFUN_FUNSTART;
                     csp->instruction = i - CLOSURE_PYTHON_EFUN;
                     csp->num_local_variables = 0;
@@ -21654,24 +21637,33 @@ int_call_lambda (svalue_t *lsvp, int num_arg, bool external, svalue_t *bind_ob)
                     call_python_efun(i - CLOSURE_PYTHON_EFUN, num_arg);
                     CLEAN_CSP
                     return;
-                }
 #endif
 
-                i -= CLOSURE_EFUN;
-                  /* Efuns have now a positive value, operators a negative one.
-                   */
-
-                if (i >= 0
-                 || instrs[i -= CLOSURE_OPERATOR-CLOSURE_EFUN].min_arg)
+                case CLOSURE_EFUN:
                 {
-                    /* To call an operator or efun, we have to construct
-                     * a small piece of program with this instruction.
-                     */
                     bytecode_t code[9];    /* the code fragment */
                     bytecode_p p;          /* the code pointer */
 
                     int min, max, def;
 
+                    i -= CLOSURE_EFUN;
+                    if (i == F_UNDEF)
+                    {
+                        /* The closure was discovered to be bound to a destructed
+                         * object and thus disabled.
+                         * This situation should no longer happen - in all situations
+                         * the closure should be zeroed out.
+                        */
+                        CLEAN_CSP
+                        pop_n_elems(num_arg);
+                        push_number(sp, 0);
+                        inter_sp = sp;
+                        return;
+                    }
+
+                    /* To call an efun, we have to construct a small piece
+                     * of program with this instruction.
+                     */
                     min = instrs[i].min_arg;
                     max = instrs[i].max_arg;
                     p = code;
@@ -21741,45 +21733,56 @@ int_call_lambda (svalue_t *lsvp, int num_arg, bool external, svalue_t *bind_ob)
                     /* The result is on the stack (inter_sp) */
                     return;
                 }
-                else
-                {
-                    /* It is an operator or syntactic marker: fall through
-                     * to uncallable closure type.
+
+                case CLOSURE_OPERATOR:
+                    /* It is an operator or syntactic marker.
                      */
+                    csp->extern_call = MY_TRUE;
+                    inter_pc = csp->funstart = EFUN_FUNSTART;
+                    csp->instruction = i - CLOSURE_OPERATOR;
                     break;
-                }
-            }
-            else
-            {
-                /* simul_efun */
-                object_t *ob;
 
-                /* Mark the call as sefun closure */
-                inter_pc = csp->funstart = SIMUL_EFUN_FUNSTART;
-
-                /* Get the simul_efun object */
-                if ( !(ob = simul_efun_object) )
+                case CLOSURE_SIMUL_EFUN:
                 {
-                    /* inter_sp == sp */
-                    if (!assert_simul_efun_object()
-                     || !(ob = simul_efun_object)
-                       )
+                    /* simul_efun */
+                    object_t *ob;
+
+                    /* Mark the call as sefun closure */
+                    inter_pc = csp->funstart = SIMUL_EFUN_FUNSTART;
+
+                    /* Get the simul_efun object */
+                    if ( !(ob = simul_efun_object) )
                     {
-                        csp->extern_call = MY_TRUE;
-                        errorf("Couldn't load simul_efun object\n");
-                        /* NOTREACHED */
-                        return;
+                        /* inter_sp == sp */
+                        if (!assert_simul_efun_object()
+                         || !(ob = simul_efun_object)
+                           )
+                        {
+                            csp->extern_call = MY_TRUE;
+                            errorf("Couldn't load simul_efun object\n");
+                            /* NOTREACHED */
+                            return;
+                        }
                     }
+                    call_simul_efun(i - CLOSURE_SIMUL_EFUN, ob, num_arg);
+                    CLEAN_CSP
+
+                    /* The result is on the stack (inter_sp) */
+                    return;
                 }
-                call_simul_efun(i - CLOSURE_SIMUL_EFUN, ob, num_arg);
-                CLEAN_CSP
+
+                default:
+                    fatal("Invalid closure type: %d.\n",  lsvp->x.closure_type);
             }
-            /* The result is on the stack (inter_sp) */
-            return;
+            break;
         }
     }
 
-    CLEAN_CSP
+    /* We need to have at least one stack entry for error handling. */
+    if (csp > CONTROL_STACK)
+    {
+        CLEAN_CSP
+    }
     errorf("Uncallable closure\n");
     /* NOTREACHED */
     return;
