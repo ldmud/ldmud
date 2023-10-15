@@ -10088,12 +10088,12 @@ again:
         TYPE_TEST_LEFT((sp-1), T_NUMBER);
         TYPE_TEST_RIGHT(sp, T_NUMBER);
         if (sp->u.number == 0)
-        {
             ERROR("Modulus by zero.\n");
-            break;
-        }
+        else if (sp->u.number == -1) // Shortcut, needed for sp[-1] == PINT_MIN
+            i = 0;
         else
             i = (sp-1)->u.number % sp->u.number;
+
         sp--;
         sp->u.number = i;
         break;
