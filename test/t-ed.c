@@ -115,6 +115,7 @@ void start_ed(string content, coroutine cb)
         rm("/dummy-ed");
 
     ed_cb = cb;
+    set_this_player(this_object());
     ed("/dummy-ed", "ed_ends");
 }
 

@@ -208,6 +208,11 @@
  */
 @cdef_use_ipv6@ USE_IPV6
 
+/* Define this if you want asynchronous name lookup using libanl
+ * instead of using the ERQ.
+ */
+@cdef_use_anl@ USE_ANL
+
 /* maximum number of concurrent outgoing connection attempts by net_connect()
  * (that is connections that are in progress but not fully established yet).
  */

@@ -215,6 +215,7 @@ AC_MY_ARG_ENABLE(filename-spaces,no,,[Allow space characters in filenames])
 AC_MY_ARG_ENABLE(share-variables,no,,[Enable clone initialization from blueprint variable values])
 AC_MY_ARG_ENABLE(keyword-in,no,,[Enable 'in' as a keyword])
 AC_MY_ARG_ENABLE(use-ipv6,no,,[Enables support for IPv6])
+AC_MY_ARG_ENABLE(use-anl,no,,[Enable asynchronous name lookup using C-Ares])
 AC_MY_ARG_ENABLE(use-mccp,no,,[Enables MCCP support])
 AC_MY_ARG_ENABLE(use-mysql,no,,[Enables mySQL support])
 AC_MY_ARG_ENABLE(use-pgsql,no,,[Enables PostgreSQL support])
@@ -516,6 +517,7 @@ AC_CDEF_FROM_ENABLE(share_variables)
 AC_CDEF_FROM_ENABLE(keyword_in)
 AC_CDEF_FROM_ENABLE(use_mccp)
 AC_CDEF_FROM_ENABLE(use_ipv6)
+AC_CDEF_FROM_ENABLE(use_anl)
 AC_CDEF_FROM_ENABLE(use_deprecated)
 AC_CDEF_FROM_ENABLE(use_parse_command)
 AC_CDEF_FROM_ENABLE(use_process_string)
@@ -1011,6 +1013,33 @@ else
     fi
     cdef_use_ipv6="#undef"
     enable_use_ipv6=no
+fi
+
+# --- Asynchronous Name Lookup ---
+
+ifdef([PKG_PROG_PKG_CONFIG],[PKG_PROG_PKG_CONFIG()],[])
+
+AC_MY_SEARCH_LIB(CARES,libcares,lp_cv_has_c_ares,,cares_path,
+[
+    #include <ares.h>
+
+    void callback(void *arg, int status, int timeouts, struct ares_addrinfo *result):
+    void foo(ares_channel channel)
+    {
+        ares_getaddrinfo(channel, "ldmud.eu", NULL, NULL, callback, NULL);
+    }
+],cares,ares_init,enable_use_anl)
+
+if test "$lp_cv_has_c_ares" = "yes"; then
+    AC_DEFINE(HAS_C_ARES, 1, [Does the machine offer C-Ares?])
+else
+    if test "$enable_use_anl" = "yes"; then
+        echo "C-Ares library not found - disabling asynchronous name lookup"
+        AC_NOT_AVAILABLE(use-anl)
+    fi
+
+    cdef_use_anl="#undef"
+    enable_use_anl="no"
 fi
 
 # --- TLS ---
@@ -1668,9 +1697,7 @@ fi
 
 # --- SQLite3 ---
 
-ifdef([PKG_PROG_PKG_CONFIG],[PKG_PROG_PKG_CONFIG()],[])
-
-AC_MY_SEARCH_LIB(SQLITE3,sqlite3,lp_cv_has_sqlite3,sqlite3,xml_path,
+AC_MY_SEARCH_LIB(SQLITE3,sqlite3,lp_cv_has_sqlite3,sqlite3,sqlite_path,
 [
     #include <sqlite3.h>
 
@@ -2541,6 +2568,7 @@ AC_SUBST(cdef_filename_spaces)
 AC_SUBST(cdef_share_variables)
 AC_SUBST(cdef_keyword_in)
 AC_SUBST(cdef_use_ipv6)
+AC_SUBST(cdef_use_anl)
 AC_SUBST(cdef_use_mysql)
 AC_SUBST(cdef_use_pgsql)
 AC_SUBST(cdef_use_sqlite)

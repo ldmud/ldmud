@@ -44,6 +44,7 @@ with_max_cost=500000
 with_portno=3333
 with_udp_port=3335
 enable_use_ipv6=yes
+enable_use_anl=yes
 enable_use_mccp=yes
 enable_use_tls=gnu
 with_tls_keyfile=no

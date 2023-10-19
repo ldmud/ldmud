@@ -430,6 +430,7 @@ extern statcounter_t inet_volume_in;
 
 /* --- Prototypes --- */
 
+extern void comm_init();
 extern void initialize_host_name (const char *hname);
 extern void initialize_host_ip_number(const char *, const char *);
 extern bool add_listen_port(const char *port);

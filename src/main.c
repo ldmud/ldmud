@@ -302,6 +302,7 @@ main (int argc, char **argv)
     mb_init();
     init_interpret();
     rx_init();
+    comm_init();
 
     put_number(&const0, 0);
     put_number(&const1, 1);

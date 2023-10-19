@@ -116,6 +116,14 @@
 #    include SOCKET_INC
 #endif
 
+#ifdef USE_ANL
+#    ifdef HAS_C_ARES
+#        include <ares.h>
+#    else
+#        undef USE_ANL
+#    endif
+#endif
+
 #include "comm.h"
 #include "access_check.h"
 #include "actions.h"
@@ -204,6 +212,10 @@ extern int socketpair(int, int, int, int[2]);
 #    define INET_ADDRSTRLEN 16
 #endif
 
+#if defined(ERQ_DEMON) || defined(USE_ANL)
+#    define LOOKUP_IP_ADRESS
+#endif
+
 /* Amazing how complicated networking can be, hm? */
 
 /*-------------------------------------------------------------------------*/
@@ -284,6 +296,10 @@ statcounter_t inet_volume_in = 0;
 
 #endif
 
+#ifdef USE_ANL
+ares_channel anl_channel;
+#endif
+
 /*-------------------------------------------------------------------------*/
 
 #ifdef ERQ_DEMON
@@ -340,6 +356,9 @@ static erq_callback_t pending_erq[MAX_PENDING_ERQ+1];
 static erq_callback_t *free_erq;
   /* The first free entry in the freelist in pending_erq[] */
 
+#endif /* ERQ_DEMON */
+
+#ifdef LOOKUP_IP_ADRESS
 /* The size of the IPTABLE depends on the number of users,
  * and is at least 200.
  */
@@ -371,7 +390,7 @@ static int ipcur = 0;
   /* Index of the next entry to use in the iptable[].
    */
 
-#endif /* ERQ_DEMON */
+#endif /* LOOKUP_IP_ADRESS */
 
 /*-------------------------------------------------------------------------*/
 
@@ -487,18 +506,32 @@ static interactive_t *first_player_for_flush = NULL;
 
 typedef enum {
       ocNotUsed    /* Entry not used */
+    , ocNameResolutionInThread
+                   /* Name resolution is performed for the connection,
+                    * the efun is still running an will return the status.
+                    */
+    , ocNameResolutionOutsideThread
+                   /* Name resolution is performed for the connection,
+                    * status needs to be passed to the logon() function.
+                    */
     , ocUsed       /* Entry holds pending connection */
     , ocLoggingOn  /* Entry is doing the LPC logon protocol.
                     * This value should not appear outside of
                     * check_for_out_connections(), if it does, it
                     * means that LPC logon threw an error.
                     */
+    , ocFailure    /* When ocNameResolutionInThread used to
+                    * report a failure.
+                    */
 } OutConnStatus;
 
 struct OutConn {
     sockaddr_in4or6      target;   /* Address connected to (allocated) */
     object_t           * curr_obj; /* Associated object */
-    int                  socket;   /* Socket on our side */
+    union {
+        int              socket;   /* Socket on our side */
+        int              error;    /* Error code for .ocFailure */
+    };
     OutConnStatus        status;   /* Status of this entry */
 } outconn[MAX_OUTCONN];
 
@@ -527,13 +560,18 @@ static long read_32(char *);
 static Bool send_erq(int handle, int request, const char *arg, size_t arglen);
 static void shutdown_erq_demon(void);
 static void stop_erq_demon(Bool);
-static string_t * lookup_ip_entry (in4or6_addr addr, Bool useErq);
 static void add_ip_entry(in4or6_addr addr, const char *name);
 #ifdef USE_IPV6
 static void update_ip_entry(const char *oldname, const char *newname);
 #endif
 
 #endif /* ERQ_DEMON */
+
+#ifdef LOOKUP_IP_ADRESS
+
+static string_t * lookup_ip_entry (in4or6_addr addr, Bool useErq);
+
+#endif /* LOOKUP_IP_ADRESS */
 
 static INLINE ssize_t comm_send_buf(char *msg, size_t size, interactive_t *ip);
 
@@ -958,6 +996,45 @@ add_inherited_port (const char *port)
 } /* add_inherited_port() */
 
 /*-------------------------------------------------------------------------*/
+#if defined(USE_ANL) && defined(ALLOCATOR_WRAPPERS)
+static void* comm_malloc (size_t size)             { return pxalloc(size); }
+static void  comm_free (void* ptr)                 { pfree(ptr); }
+static void* comm_realloc (void* ptr, size_t size) { return prexalloc(ptr, size); }
+#endif
+/*-------------------------------------------------------------------------*/
+void
+comm_init ()
+
+/* General initialization of communications functions.
+ */
+
+{
+#ifdef LOOKUP_IP_ADRESS
+    /* Initialize the IP name lookup table */
+    memset(iptable, 0, sizeof(iptable));
+#endif
+
+#ifdef USE_ANL
+    int res;
+
+#  ifdef ALLOCATOR_WRAPPERS
+    res = ares_library_init_mem(ARES_LIB_INIT_ALL, comm_malloc, comm_free, comm_realloc);
+#  else
+    res = ares_library_init(ARES_LIB_INIT_ALL);
+#  endif
+    if (res)
+        fatal("Initialization of C-Ares failed: %s\n", ares_strerror(res));
+
+    res = ares_init(&anl_channel);
+    if (res)
+        fatal("Initialization of C-Ares channel failed: %s\n", ares_strerror(res));
+#endif
+
+    for (int i = 0; i < MAX_OUTCONN; i++)
+        outconn[i].status = ocNotUsed;
+} /* comm_init() */
+
+/*-------------------------------------------------------------------------*/
 void
 initialize_host_name (const char *hname)
 
@@ -1233,14 +1310,6 @@ prepare_ipc(void)
     int i;
     struct sigaction sa; // for installing the signal handlers
 
-#ifdef ERQ_DEMON
-    /* Initialize the IP name lookup table */
-    memset(iptable, 0, sizeof(iptable));
-#endif
-
-    for (i = 0; i < MAX_OUTCONN; i++)
-        outconn[i].status = ocNotUsed;
-
     /* Initialize the telnet machine unless mudlib_telopts() already
      * did that.
      */
@@ -1355,6 +1424,10 @@ ipc_remove (void)
     shutdown_erq_demon();
 #endif
 
+#ifdef USE_ANL
+    ares_destroy(anl_channel);
+    ares_library_cleanup();
+#endif
 } /* ipc_remove() */
 
 /*-------------------------------------------------------------------------*/
@@ -2281,6 +2354,11 @@ get_message (char *buff, size_t *bufflength)
                 }
 
             } /* for (all players) */
+            for (i = 0; i < MAX_OUTCONN; i++)
+            {
+                if (outconn[i].status == ocUsed)
+                    FD_SET(outconn[i].socket, &writefds);
+            }
 #ifdef ERQ_DEMON
             if (erq_demon >= 0)
             {
@@ -2296,7 +2374,12 @@ get_message (char *buff, size_t *bufflength)
             pg_setfds(&readfds, &writefds, &nfds);
 #endif
 #ifdef USE_PYTHON
-           python_set_fds(&readfds, &writefds, &pexceptfds, &nfds);
+            python_set_fds(&readfds, &writefds, &pexceptfds, &nfds);
+#endif
+#ifdef USE_ANL
+            i = ares_fds(anl_channel, &readfds, &writefds);
+            if (i > nfds)
+                nfds = i;
 #endif
 
             /* select() until time is up or there is data */
@@ -2381,6 +2464,9 @@ get_message (char *buff, size_t *bufflength)
 #endif
 #ifdef USE_PYTHON
             python_handle_fds(&readfds, &writefds, &exceptfds, nfds);
+#endif
+#ifdef USE_ANL
+            ares_process(anl_channel, &readfds, &writefds);
 #endif
 
             /* Initialise the user scan */
@@ -2630,6 +2716,8 @@ get_message (char *buff, size_t *bufflength)
             } /* if (erq socket ready) */
 
 #endif /* ERQ_DEMON */
+
+            check_for_out_connections();
 
             /* --- Try to get a new player --- */
             for (i = 0; i < numports; i++)
@@ -3696,7 +3784,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
     {
         new_interactive->snoop_on->snoop_by = ob;
     }
-#ifdef ERQ_DEMON
+#ifdef LOOKUP_IP_ADRESS
     (void) lookup_ip_entry(new_interactive->addr.sin4or6_addr, MY_TRUE);
     /* TODO: We could pass the retrieved hostname right to login */
 #endif
@@ -6201,16 +6289,41 @@ update_ip_entry (const char *oldname, const char *newname)
 } /* update_ip_entry() */
 
 /*-------------------------------------------------------------------------*/
-
 #endif /* USE_IPV6 */
-    
+#endif /* ERQ_DEMON */
+
+#ifdef LOOKUP_IP_ADRESS
+/*-------------------------------------------------------------------------*/
+
+#ifdef USE_ANL
+static void
+lookup_ip_callback (void *arg, int status, int timeouts, char *node, char *service)
+
+/* Callback from C-Ares with a reverse lookup result.
+ * If successful, we just enter it into the IP table.
+ */
+
+{
+    struct ipentry* entry = (struct ipentry*) arg;
+    if (node != NULL)
+    {
+         free_mstring(entry->name);
+         entry->name = new_tabled(node, STRING_ASCII);
+    }
+    else if (d_flag > 1)
+    {
+        debug_message("%s Host lookup failed for %s.\n", time_stamp(), get_txt(entry->name));
+    }
+} /* lookup_ip_callback() */
+#endif
 /*-------------------------------------------------------------------------*/
 static string_t *
-lookup_ip_entry (in4or6_addr addr, Bool useErq)
+lookup_ip_entry (in4or6_addr addr, Bool use_async_lookup)
 
 /* Lookup the IP address <addr> and return an uncounted pointer to
  * a shared string with the hostname. The function looks first in the
- * iptable[], then, if not found there and <useErq> is true, asks the ERQ.
+ * iptable[], then, if not found there and <use_async_lookup> is true,
+ * an asynchronous name lookup (either C-Ares or ERQ) is initiated.
  * If the hostname can not be found, NULL is returned.
  */
 
@@ -6252,20 +6365,48 @@ lookup_ip_entry (in4or6_addr addr, Bool useErq)
     ipcur = (ipcur+1) % IPSIZE;
 
     /* If we have the erq and may use it, lookup the real hostname */
-    if (erq_demon >= 0 && useErq)
+    if (use_async_lookup)
     {
-#ifndef USE_IPV6
-        send_erq(ERQ_HANDLE_RLOOKUP, ERQ_RLOOKUP, (char *)&addr.s_addr, sizeof(addr.s_addr));
-#else
-        send_erq(ERQ_HANDLE_RLOOKUPV6, ERQ_RLOOKUPV6, get_txt(ipname)
-                , mstrsize(ipname));
+#ifdef USE_ANL
+        sockaddr_in4or6 saddr;
+        struct sockaddr* paddr = (struct sockaddr*) &saddr;
+        size_t paddrlen = sizeof(saddr);
+
+#  ifdef USE_IPV6
+        struct sockaddr_in mapped_addr;
+        if (IN6_IS_ADDR_V4MAPPED(&addr))
+        {
+            mapped_addr.sin_family = AF_INET;
+            mapped_addr.sin_addr.s_addr = ((uint32_t*)&addr)[3];
+
+            paddr = (struct sockaddr*) &mapped_addr;
+            paddrlen = sizeof(mapped_addr);
+        }
+        else
+#  endif
+        {
+            memset(&saddr, 0, sizeof(saddr));
+            saddr.sin4or6_family = AF_INET4OR6;
+            saddr.sin4or6_addr = addr;
+        }
+
+        ares_getnameinfo(anl_channel, paddr, paddrlen, ARES_NI_LOOKUPHOST|ARES_NI_NAMEREQD, lookup_ip_callback, iptable + i);
+#else /* ERQ_DEMON */
+        if (erq_demon >= 0)
+        {
+#  ifndef USE_IPV6
+            send_erq(ERQ_HANDLE_RLOOKUP, ERQ_RLOOKUP, (char *)&addr.s_addr, sizeof(addr.s_addr));
+#  else
+            send_erq(ERQ_HANDLE_RLOOKUPV6, ERQ_RLOOKUPV6, get_txt(ipname), mstrsize(ipname));
+#  endif
+        }
 #endif
     }
 
-    return iptable[ipcur].name;
+    return iptable[i].name;
 }
 
-#endif /* ERQ_DEMON */
+#endif /* LOOKUP_IP_ADRESS */
 
 /* End of ERQ Support */
 /*=========================================================================*/
@@ -6444,12 +6585,14 @@ count_comm_refs (void)
         }
     }
 
-#ifdef ERQ_DEMON
+#ifdef LOOKUP_IP_ADRESS
     for(i = 0; i < IPSIZE; i++) {
         if (iptable[i].name)
             count_ref_from_string(iptable[i].name);
     }
+#endif /* LOOKUP_IP_ADRESS*/
 
+#ifdef ERQ_DEMON
     for (i = sizeof (pending_erq) / sizeof (*pending_erq); --i >= 0;)
     {
         count_ref_in_vector(&pending_erq[i].fun, 1);
@@ -8078,8 +8221,16 @@ check_for_out_connections (void)
 
     for (i = 0; i < MAX_OUTCONN; i++)
     {
-        if (outconn[i].status == ocNotUsed)
+        if (outconn[i].status == ocNotUsed
+         || outconn[i].status == ocNameResolutionOutsideThread)
             continue;
+
+        if (outconn[i].status == ocFailure /* shouldn't happen */
+         || outconn[i].status == ocNameResolutionInThread)
+        {
+            outconn[i].status = ocNotUsed;
+            continue;
+        }
 
         if (!outconn[i].curr_obj) /* shouldn't happen */
         {
@@ -8175,6 +8326,201 @@ check_for_out_connections (void)
 } /* check_for_out_connections() */
 
 /*-------------------------------------------------------------------------*/
+static void
+net_connect_error (struct OutConn* conn, int error)
+
+/* Report an error either to the caller of net_connect() or via logon().
+ */
+
+{
+    if (conn->status == ocNameResolutionInThread)
+    {
+        conn->status = ocFailure;
+        conn->error = error;
+    }
+    else
+    {
+        conn->status = ocLoggingOn;
+        logon_object(conn->curr_obj, -1);
+
+        conn->status = ocNotUsed;
+        free_object(conn->curr_obj, "net_connect");
+    }
+} /* net_connect_error() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef USE_ANL
+#define FREEADDRINFO ares_freeaddrinfo
+static void
+net_connect_callback (void *arg, int status, int timeouts, struct ares_addrinfo *result)
+
+/* This function is called when a name lookup completed.
+ */
+{
+    struct OutConn* conn = (struct OutConn*)arg;
+    struct ares_addrinfo_node *entry;
+
+    if (status)
+    {
+        ares_freeaddrinfo(result);
+        net_connect_error(conn, NC_EUNKNOWNHOST);
+        return;
+    }
+
+    if (!conn->curr_obj || (conn->curr_obj->flags & O_DESTRUCTED))
+    {
+        free_object(conn->curr_obj, "net_connect");
+        conn->status = ocNotUsed;
+        return;
+    }
+
+    entry = result->nodes;
+
+#else
+#define FREEADDRINFO freeaddrinfo
+static void
+net_connect_continue (struct OutConn* conn, struct addrinfo *result)
+
+/* Called from f_net_connect() after name resolution to continue connection.
+ */
+{
+    // try each address until we successfully connect or run out of
+    // addresses. In case of errors, close the socket.
+    struct addrinfo *entry = result;
+#endif
+
+    int last_error = NC_EUNKNOWNHOST;
+    for (; entry != NULL; entry = entry->ai_next)
+    {
+        object_t *user;
+        int ret, sfd;
+
+#if defined(USE_ANL) && defined(USE_IPV6)
+#  define target_addrlen sizeof(target_mapped_addr)
+#  define target_family  AF_INET6
+#  define target_addr    &target_mapped_addr
+        struct sockaddr_in6 target_mapped_addr;
+        if (entry->ai_family == AF_INET)
+        {
+            struct sockaddr_in *addr4 = (struct sockaddr_in*)entry->ai_addr;
+
+            memset(&target_mapped_addr, 0, sizeof(target_mapped_addr));
+            target_mapped_addr.sin6_family = AF_INET6;
+            target_mapped_addr.sin6_port = addr4->sin_port;
+            CREATE_IPV6_MAPPED(&target_mapped_addr.sin6_addr, addr4->sin_addr.s_addr);
+        }
+        else if (entry->ai_family == AF_INET6)
+            target_mapped_addr = *(struct sockaddr_in6*)entry->ai_addr;
+        else
+            continue;
+#else
+#  define target_addr    entry->ai_addr
+#  define target_addrlen entry->ai_addrlen
+#  define target_family  entry->ai_family
+#endif
+
+        sfd = socket(target_family, entry->ai_socktype, entry->ai_protocol);
+        if (sfd==-1)
+        {
+            if (errno == EMFILE || errno == ENFILE
+             || errno == ENOBUFS || errno == ENOMEM)
+            {
+                // insufficient system ressources, probably transient error,
+                // but it is unlikely to be different for the next address.
+                // We exit here, the caller should try again.
+                FREEADDRINFO(result);
+                net_connect_error(conn, NC_ENORESSOURCES);
+                return;
+            }
+
+            last_error = NC_ENOSOCKET;
+            continue; // try next address
+        }
+
+        set_socket_nonblocking(sfd);
+        set_socket_nosigpipe(sfd);
+
+        /* On multihomed machines it is important to bind the socket to
+         * the proper IP address.
+         */
+        ret = bind(sfd, (struct sockaddr *) &host_ip_addr_template, sizeof(host_ip_addr_template));
+        if (ret==-1)
+        {
+            if (errno==ENOBUFS)
+            {
+                // insufficient system ressources, probably transient error,
+                // but unlikely to be different for the next address. Caller
+                // should try again later.
+                FREEADDRINFO(result);
+                socket_close(sfd);
+                net_connect_error(conn, NC_ENORESSOURCES);
+                return;
+            }
+
+            socket_close(sfd);
+            last_error = NC_ENOBIND;
+            continue;
+        }
+
+        ret = connect(sfd, target_addr, target_addrlen);
+        if (ret == -1 && errno != EINPROGRESS)
+        {
+            // no succes connecting. :-( Store last error in rc.
+            if (errno==ECONNREFUSED)
+            {
+                // no one listening at remote end... happens, no real error...
+                last_error = NC_ECONNREFUSED;
+            }
+            else
+            {
+                last_error = NC_ENOCONNECT;
+            }
+            socket_close(sfd);
+            continue;
+        }
+
+        last_error = NC_SUCCESS;
+
+        /* Store the connection in the outconn[] table even if
+         * we can complete it immediately. For the reason see below.
+         */
+        conn->socket = sfd;
+        conn->target = *((sockaddr_in4or6 *)target_addr);
+
+        // no longer need the results from getaddrinfo()
+        FREEADDRINFO(result);
+
+        if (errno == EINPROGRESS)
+        {
+            /* Can't complete right now */
+            conn->status = ocUsed;
+            return;
+        }
+
+        /* Attempt the logon. By setting the outconn[].status to
+         * ocLoggingOn, any subsequent call to check_for_out_connections()
+         * will clean up for us.
+         */
+        conn->status = ocLoggingOn;
+
+        user = command_giver;
+        new_player(conn->curr_obj, sfd, &(conn->target), sizeof(conn->target), 0);
+        command_giver = user;
+
+        /* All done - clean up */
+        conn->status = ocNotUsed;
+        free_object(conn->curr_obj, "net_connect");
+        return;
+    }
+
+    FREEADDRINFO(result);
+    net_connect_error(conn, last_error);
+#undef target_addr
+#undef target_addrlen
+#undef target_family
+} /* net_connect_callback/net_connect_continue() */
+
+/*-------------------------------------------------------------------------*/
 svalue_t *
 f_net_connect (svalue_t *sp)
 
@@ -8221,10 +8567,14 @@ f_net_connect (svalue_t *sp)
     /* Try the connection */
     rc = 0;
     do {
-        int sfd, n, ret;
-        object_t *user;
+        int n;
+#ifdef USE_ANL
+        struct ares_addrinfo_hints hints;
+#else
         struct addrinfo hints;
-        struct addrinfo *result, *rp;
+        struct addrinfo *result;
+        int ret;
+#endif
         char port_string[6];
 
         // port is needed as a string
@@ -8249,8 +8599,33 @@ f_net_connect (svalue_t *sp)
             break;
         }
 
-        /* Attempt the connection */
-        
+        /* Reserve the connection entry. */
+        outconn[n].curr_obj = ref_object(ob, "net_conect");
+        outconn[n].status = ocNameResolutionInThread;
+
+        /* Lookup the address */
+#ifdef USE_ANL
+        memset(&hints, 0, sizeof(hints));
+#ifndef USE_IPV6
+        hints.ai_family = AF_INET;
+#else
+        // C-Ares does not (yet?) support V4 mapping, so we're doing it ourselves.
+        hints.ai_family = AF_UNSPEC;
+#endif
+        hints.ai_flags = ARES_AI_ADDRCONFIG|ARES_AI_NUMERICSERV;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = 0;
+
+#ifdef INSIDE_TRAVIS
+        // The Travis-CI environment only has loopback devices activated,
+        // the AI_ADDRCONFIG would therefore never find a name.
+        hints.ai_flags &= ~ARES_AI_ADDRCONFIG;
+#endif
+
+        ares_getaddrinfo(anl_channel, host, port_string, &hints, net_connect_callback, &(outconn[n]));
+        if (outconn[n].status == ocNameResolutionInThread)
+            outconn[n].status = ocNameResolutionOutsideThread;
+#else
         memset(&hints, 0, sizeof(struct addrinfo));
         hints.ai_family = AF_INET4OR6;
 #ifndef USE_IPV6
@@ -8271,128 +8646,29 @@ f_net_connect (svalue_t *sp)
         hints.ai_flags &= ~AI_ADDRCONFIG;
 #endif
 
-        /* TODO: Uh-oh, blocking DNS in the execution thread.
-         * TODO:: Better would be to start an ERQ lookup and fill in the
-         * TODO:: data in the background.
+        /* Uh-oh, blocking DNS in the execution thread.
          */
         ret = getaddrinfo(host, port_string, &hints, &result);
         if (ret != 0)
         {
             rc = NC_EUNKNOWNHOST;
-            break;
-        }
-        // try each address until we successfully connect or run out of
-        // addresses. In case of errors, close the socket.
-        for (rp = result; rp != NULL; rp = rp->ai_next)
-        {
-            sfd = socket (rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-            if (sfd==-1)
-            {
-                if (errno == EMFILE || errno == ENFILE
-                    || errno == ENOBUFS || errno == ENOMEM)
-                {
-                    // insufficient system ressources, probably transient error,
-                    // but it is unlikely to be different for the next address.
-                    // We exit here, the caller should try again.
-                    rc = NC_ENORESSOURCES;
-                    rp = NULL;
-                    break;
-                }
-                else
-                {
-                    // store only last error
-                    rc = NC_ENOSOCKET;
-                }
-                continue; // try next address
-            }
-            
-            set_socket_nonblocking(sfd);
-            set_socket_nosigpipe(sfd);
-
-            /* On multihomed machines it is important to bind the socket to
-             * the proper IP address.
-             */
-            ret = bind(sfd, (struct sockaddr *) &host_ip_addr_template, sizeof(host_ip_addr_template));
-            if (ret==-1)
-            {
-                if (errno==ENOBUFS)
-                {
-                    // insufficient system ressources, probably transient error,
-                    // but unlikely to be different for the next address. Caller
-                    // should try again later.
-                    rc = NC_ENORESSOURCES;
-                    rp = NULL;
-                    socket_close(sfd);
-                    break;
-                }
-                else
-                {
-                    // store only last error.
-                    rc = NC_ENOBIND;
-                }
-                socket_close(sfd);
-                continue;
-            }
-            
-            ret = connect(sfd, rp->ai_addr, rp->ai_addrlen);
-            if (ret != -1 || errno == EINPROGRESS)
-                break;  // success! no need to try further
-
-            // no succes connecting. :-( Store last error in rc.
-            if (errno==ECONNREFUSED)
-            {
-                // no one listening at remote end... happens, no real error...
-                rc = NC_ECONNREFUSED;
-            }
-            else
-            {
-                rc = NC_ENOCONNECT;
-            }
-            socket_close(sfd);
-        }
-
-        if (rp == NULL)
-        {
-            // No address succeeded, rc contains the last 'error', we just
-            // exit here.
-            freeaddrinfo(result);
-            break;
-        }
-        // at this point we a connected socket
-
-        rc = NC_SUCCESS;
-
-        /* Store the connection in the outconn[] table even if
-         * we can complete it immediately. For the reason see below.
-         */
-        outconn[n].socket = sfd;
-        outconn[n].target = *((sockaddr_in4or6 *)rp->ai_addr);
-        outconn[n].curr_obj = ref_object(ob, "net_conect");
-
-        // no longer need the results from getaddrinfo()
-        freeaddrinfo(result);
-
-        if (errno == EINPROGRESS)
-        {
-            /* Can't complete right now */
-            outconn[n].status = ocUsed;
+            outconn[n].status = ocNotUsed;
+            free_object(outconn[n].curr_obj, "net_connect");
             break;
         }
 
-        /* Attempt the logon. By setting the outconn[].status to
-         * ocLoggingOn, any subsequent call to check_for_out_connections()
-         * will clean up for us.
-         */
-        outconn[n].status = ocLoggingOn;
+        /* Attempt the connection */
+        net_connect_continue(&(outconn[n]), result);
+#endif
 
-        user = command_giver;
-        inter_sp = sp;
-        new_player(ob, sfd, (sockaddr_in4or6 *)rp->ai_addr, sizeof(sockaddr_in4or6), 0);
-        command_giver = user;
-
-        /* All done - clean up */
-        outconn[n].status = ocNotUsed;
-        free_object(outconn[n].curr_obj, "net_connect");
+        if (outconn[n].status == ocFailure)
+        {
+            rc = outconn[n].error;
+            outconn[n].status = ocNotUsed;
+            free_object(outconn[n].curr_obj, "net_connect");
+        }
+        else
+            rc = 0;
     }while(0);
 
     /* Return the result */
@@ -8904,7 +9180,7 @@ f_interactive_info (svalue_t *sp)
 
     /* Connection information */
     case II_IP_NAME:
-#ifdef ERQ_DEMON
+#ifdef LOOKUP_IP_ADRESS
         {
             string_t * hname;
 
