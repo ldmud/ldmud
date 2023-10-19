@@ -354,7 +354,7 @@ static erq_callback_t *free_erq;
 #endif
 
 static struct ipentry {
-    struct in_addr  addr;  /* The address (only .s_addr is significant) */
+    in4or6_addr     addr;  /* The address (only .s_addr is significant) */
     string_t       *name;  /* tabled string with the hostname for <addr> */
 } iptable[IPSIZE];
   /* Cache of known names for given IP addresses.
@@ -390,12 +390,12 @@ static char host_name[MAXHOSTNAMELEN+1];
   /* This computer's hostname, used for query_host_name() efun.
    */
 
-static struct in_addr host_ip_number;
+static in4or6_addr host_ip_number;
   /* This computer's numeric IP address only, used for
    * the query_host_ip_number() efun.
    */
 
-static struct sockaddr_in host_ip_addr_template;
+static sockaddr_in4or6 host_ip_addr_template;
   /* The template address of this computer. It is copied locally
    * and augmented with varying port numbers to open the driver's ports.
    */
@@ -496,7 +496,7 @@ typedef enum {
 } OutConnStatus;
 
 struct OutConn {
-    struct sockaddr_in   target;   /* Address connected to (allocated) */
+    sockaddr_in4or6      target;   /* Address connected to (allocated) */
     object_t           * curr_obj; /* Associated object */
     int                  socket;   /* Socket on our side */
     OutConnStatus        status;   /* Status of this entry */
@@ -519,7 +519,7 @@ static void send_dont(int);
 static void add_flush_entry(interactive_t *ip);
 static void remove_flush_entry(interactive_t *ip);
 static void clear_message_buf(interactive_t *ip);
-static void new_player(object_t *receiver, SOCKET_T new_socket, struct sockaddr_in *addr, size_t len, int login_port);
+static void new_player(object_t *receiver, SOCKET_T new_socket, sockaddr_in4or6 *addr, size_t len, int login_port);
 
 #ifdef ERQ_DEMON
 
@@ -527,8 +527,8 @@ static long read_32(char *);
 static Bool send_erq(int handle, int request, const char *arg, size_t arglen);
 static void shutdown_erq_demon(void);
 static void stop_erq_demon(Bool);
-static string_t * lookup_ip_entry (struct in_addr addr, Bool useErq);
-static void add_ip_entry(struct in_addr addr, const char *name);
+static string_t * lookup_ip_entry (in4or6_addr addr, Bool useErq);
+static void add_ip_entry(in4or6_addr addr, const char *name);
 #ifdef USE_IPV6
 static void update_ip_entry(const char *oldname, const char *newname);
 #endif
@@ -559,78 +559,12 @@ static INLINE ssize_t comm_send_buf(char *msg, size_t size, interactive_t *ip);
 #  define s6_addr32 __u6_addr.__u6_addr32
 #endif
 
-static inline void CREATE_IPV6_MAPPED(struct in_addr *v6, uint32 v4) {
+static inline void CREATE_IPV6_MAPPED(struct in6_addr *v6, uint32 v4) {
   v6->s6_addr32[0] = 0;
   v6->s6_addr32[1] = 0;
   v6->s6_addr32[2] = htonl(0x0000ffff);
   v6->s6_addr32[3] = v4;
 }
-
-/* These are the typical IPv6 structures - we use them transparently.
- *
- * --- arpa/inet.h ---
- *
- * struct in6_addr {
- *         union {
- *                 u_int32_t u6_addr32[4];
- * #ifdef notyet
- *                 u_int64_t u6_addr64[2];
- * #endif
- *                 u_int16_t u6_addr16[8];
- *                 u_int8_t  u6_addr8[16];
- *         } u6_addr;
- * };
- * #define s6_addr32       u6_addr.u6_addr32
- * #ifdef notyet
- * #define s6_addr64       u6_addr.u6_addr64
- * #endif
- * #define s6_addr16       u6_addr.u6_addr16
- * #define s6_addr8        u6_addr.u6_addr8
- * #define s6_addr         u6_addr.u6_addr8
- *
- * --- netinet/in.h ---
- *
- * struct sockaddr_in6 {
- *    u_char                sin6_len;
- *    u_char                sin6_family;
- *    u_int16_t        sin6_port;
- *    u_int32_t        sin6_flowinfo;
- *    struct                 in6_addr        sin6_addr;
- * };
- *
- */
-
-/*-------------------------------------------------------------------------*/
-static char *
-inet6_ntoa (struct in6_addr in)
-
-/* Convert the ipv6 address <in> into a string and return it.
- * Note: the string is stored in a local buffer.
- */
-
-{
-    static char str[INET6_ADDRSTRLEN+1];
-
-    if (NULL == inet_ntop(AF_INET6, &in, str, INET6_ADDRSTRLEN))
-    {
-        perror("inet_ntop");
-    }
-    return str;
-} /* inet6_ntoa() */
-
-/*-------------------------------------------------------------------------*/
-static struct in6_addr
-inet6_addr (const char *to_host)
-
-/* Convert the name <to_host> into a ipv6 address and return it.
- */
-
-{
-    struct in6_addr addr;
-
-    inet_pton(AF_INET6, to_host, &addr);
-    return addr;
-} /* inet6_addr() */
 
 #endif /* USE_IPV6 */
 
@@ -973,27 +907,26 @@ add_listen_port (const char *port)
 
             port_numbers[numports] = (struct listen_port_s){ LISTEN_PORT_ADDR, port, p };
 
-#ifndef USE_IPV6
-            if (!inet_pton(AF_INET, addr, &(port_numbers[numports].addr)))
-            {
-                free(addr);
-                return false;
-            }
-            numports++;
-#else
             if (length == 0)
             {
-                port_numbers[numports].addr = in6addr_any;
+                port_numbers[numports].addr = IN4OR6ADDR_ANY;
             }
             else if (addr[0] == '[' && addr[length-1] == ']')
             {
                 addr[length-1] = 0;
-                if (!inet_pton(AF_INET6, addr+1, &(port_numbers[numports].addr)))
+                if (!inet_pton(AF_INET4OR6, addr+1, &(port_numbers[numports].addr)))
                 {
                     free(addr);
                     return false;
                 }
             }
+#ifndef USE_IPV6 // Only IPv4 allowed without []
+            else if (!inet_pton(AF_INET, addr, &(port_numbers[numports].addr)))
+            {
+                free(addr);
+                return false;
+            }
+#endif
             else
             {
                 free(addr);
@@ -1003,7 +936,6 @@ add_listen_port (const char *port)
             numports++;
             free(addr);
             return true;
-#endif
         }
     }
 
@@ -1111,112 +1043,101 @@ initialize_host_ip_number (const char *hname, const char * haddr)
     memset(&host_ip_addr_template, 0, sizeof host_ip_addr_template);
     if (haddr != NULL)
     {
-#ifndef USE_IPV6
-        host_ip_number.s_addr = inet_addr(haddr);
-        host_ip_addr_template.sin_family = AF_INET;
-        host_ip_addr_template.sin_addr = host_ip_number;
-#else
-        host_ip_number = inet6_addr(haddr);
-        host_ip_addr_template.sin_family = AF_INET6;
-        host_ip_addr_template.sin_addr = host_ip_number;
-#endif
-
-        /* Find the domain part of the hostname */
-        domain = strchr(host_name, '.');
+        inet_pton(AF_INET4OR6, haddr, &host_ip_number);
+        host_ip_addr_template.sin4or6_family = AF_INET4OR6;
+        host_ip_addr_template.sin4or6_addr = host_ip_number;
     }
     else
     {
-        struct hostent *hp;
+        struct addrinfo *addr, *current;
+        struct addrinfo hints = {
+            .ai_family = AF_INET4OR6,
+            .ai_socktype = SOCK_STREAM,
+            .ai_protocol = 0,
+            .ai_flags = AI_V4MAPPED | AI_ADDRCONFIG | AI_CANONNAME
+        };
+        int res;
 
-#ifndef USE_IPV6
-        hp = gethostbyname(host_name);
-        if (!hp) {
-            fprintf(stderr, "%s gethostbyname: unknown host '%s'.\n"
+        res = getaddrinfo(host_name, NULL, &hints, &addr);
+        if (res)
+        {
+            fprintf(stderr, "%s getaddrinfo: unknown host '%s': %s\n"
+                          , time_stamp(), host_name, gai_strerror(res));
+            exit(1);
+        }
+
+        for (current = addr; current != NULL; current = current->ai_next)
+            if (current->ai_family == AF_INET4OR6)
+                break;
+
+        if (!current)
+        {
+            freeaddrinfo(addr);
+            fprintf(stderr, "%s getaddrinfo: No suitable address for host '%s' found.\n"
                           , time_stamp(), host_name);
             exit(1);
         }
-        memcpy(&host_ip_addr_template.sin_addr, hp->h_addr, (size_t)hp->h_length);
-        host_ip_addr_template.sin_family = (unsigned short)hp->h_addrtype;
-#else
-        hp = gethostbyname2(host_name, AF_INET6);
-        if (!hp)
-            hp = gethostbyname2(host_name, AF_INET);
-        if (!hp)
+
+        if (current->ai_addrlen != sizeof(host_ip_addr_template))
         {
-            fprintf(stderr, "%s gethostbyname2: unknown host '%s'.\n"
+            freeaddrinfo(addr);
+            fprintf(stderr, "%s getaddrinfo: Wrong format for address of host '%s'.\n"
                           , time_stamp(), host_name);
             exit(1);
         }
-        memcpy(&host_ip_addr_template.sin_addr, hp->h_addr, (size_t)hp->h_length);
 
-        if (hp->h_addrtype == AF_INET)
-        {
-            CREATE_IPV6_MAPPED(&host_ip_addr_template.sin_addr, *(u_int32_t*)hp->h_addr_list[0]);
-        }
-        host_ip_addr_template.sin_family = AF_INET6;
-#endif
-
-        host_ip_number = host_ip_addr_template.sin_addr;
+        memcpy(&host_ip_addr_template, current->ai_addr, current->ai_addrlen);
+        host_ip_number = host_ip_addr_template.sin4or6_addr;
 
         /* Now set the template to the proper _ANY value */
-        memset(&host_ip_addr_template.sin_addr, 0, sizeof(host_ip_addr_template.sin_addr));
-#ifndef USE_IPV6
-        host_ip_addr_template.sin_addr.s_addr = INADDR_ANY;
-        host_ip_addr_template.sin_family = AF_INET;
-#else
-        host_ip_addr_template.sin_addr = in6addr_any;
-        host_ip_addr_template.sin_family = AF_INET6;
-#endif
+        memset(&host_ip_addr_template.sin4or6_addr, 0, sizeof(host_ip_addr_template.sin4or6_addr));
+        host_ip_addr_template.sin4or6_addr = IN4OR6ADDR_ANY;
+        host_ip_addr_template.sin4or6_family = AF_INET4OR6;
 
-        /* Find the domain part of the hostname */
-        if (hname == NULL)
-            domain = strchr(hp->h_name, '.');
-        else
-            domain = strchr(host_name, '.');
+        domain = strchr(addr->ai_canonname, '.');
+        if (domain)
+            domain_name = strdup(domain+1);
+
+        freeaddrinfo(addr);
     }
 
-#ifndef USE_IPV6
-    printf("%s Hostname '%s' address '%s'\n"
-          , time_stamp(), host_name, inet_ntoa(host_ip_number));
-    debug_message("%s Hostname '%s' address '%s'\n"
-                 , time_stamp(), host_name, inet_ntoa(host_ip_number));
-#else
-    printf("%s Hostname '%s' address '%s'\n"
-          , time_stamp(), host_name, inet6_ntoa(host_ip_number));
-    debug_message("%s Hostname '%s' address '%s'\n"
-                 , time_stamp(), host_name, inet6_ntoa(host_ip_number));
-#endif
+    {
+        char buf[INET4OR6_ADDRSTRLEN+1];
+
+        printf("%s Hostname '%s' address '%s'\n"
+            , time_stamp(), host_name, inet_ntop(AF_INET4OR6, &host_ip_number, buf, sizeof(buf)));
+    }
 
     /* Put the domain name part of the hostname into domain_name, then
      * strip it off the host_name[] (as only query_host_name() is going
      * to need it).
-     * Note that domain might not point into host_name[] here, so we
-     * can't just stomp '\0' in there.
      */
-    if (domain)
-    {
-        domain_name = strdup(domain+1);
-    }
-    else
-        domain_name = strdup("unknown");
-
     domain = strchr(host_name, '.');
     if (domain)
+    {
+        // Given argument has precedence over name lookup.
+        if (domain_name)
+            free(domain_name);
+
+        domain_name = strdup(domain+1);
         *domain = '\0';
+    }
+    else if (!domain_name)
+        domain_name = strdup("unknown");
 
     /* Initialize udp at an early stage so that the master object can use
      * it in inaugurate_master() , and the port number is known.
      */
     if (udp_port != -1)
     {
-        struct sockaddr_in host_ip_addr;
+        sockaddr_in4or6 host_ip_addr;
 
         memcpy(&host_ip_addr, &host_ip_addr_template, sizeof(host_ip_addr));
 
-        host_ip_addr.sin_port = htons((u_short)udp_port);
+        host_ip_addr.sin4or6_port = htons((u_short)udp_port);
         debug_message("%s UDP recv-socket requested for port: %d\n"
                      , time_stamp(), udp_port);
-        udp_s = socket(host_ip_addr.sin_family, SOCK_DGRAM, 0);
+        udp_s = socket(host_ip_addr.sin4or6_family, SOCK_DGRAM, 0);
         if (udp_s == -1)
         {
             perror("socket(udp_socket)");
@@ -1245,8 +1166,8 @@ initialize_host_ip_number (const char *hname, const char * haddr)
                                   , time_stamp(), udp_port);
                     debug_message("%s UDP port %d already bound!\n"
                                   , time_stamp(), udp_port);
-                    if (host_ip_addr.sin_port) {
-                        host_ip_addr.sin_port = 0;
+                    if (host_ip_addr.sin4or6_port) {
+                        host_ip_addr.sin4or6_port = 0;
                         continue;
                     }
                     close(udp_s);
@@ -1264,14 +1185,14 @@ initialize_host_ip_number (const char *hname, const char * haddr)
      * initialise it.
      */
     if (udp_s >= 0) {
-        struct sockaddr_in host_ip_addr;
+        sockaddr_in4or6 host_ip_addr;
 
         tmp = sizeof(host_ip_addr);
         if (!getsockname(udp_s, (struct sockaddr *)&host_ip_addr, &tmp))
         {
             int oldport = udp_port;
 
-            udp_port = ntohs(host_ip_addr.sin_port);
+            udp_port = ntohs(host_ip_addr.sin4or6_port);
             if (oldport != udp_port)
                 debug_message("%s UDP recv-socket on port: %d\n"
                              , time_stamp(), udp_port);
@@ -1332,7 +1253,7 @@ prepare_ipc(void)
      */
     for (i = 0; i < numports; i++)
     {
-        struct sockaddr_in host_ip_addr;
+        sockaddr_in4or6 host_ip_addr;
 
         memcpy(&host_ip_addr, &host_ip_addr_template, sizeof(host_ip_addr));
 
@@ -1340,15 +1261,11 @@ prepare_ipc(void)
         {
             /* Real port number */
 
-            host_ip_addr.sin_port = htons((u_short)port_numbers[i].port);
+            host_ip_addr.sin4or6_port = htons((u_short)port_numbers[i].port);
             if (port_numbers[i].type == LISTEN_PORT_ADDR)
-#ifndef USE_IPV6
-                host_ip_addr.sin_addr.s_addr = port_numbers[i].addr;
-#else
-                host_ip_addr.sin_addr = port_numbers[i].addr;
-#endif
+                host_ip_addr.sin4or6_addr = port_numbers[i].addr;
 
-            sos[i] = socket(host_ip_addr.sin_family, SOCK_STREAM, 0);
+            sos[i] = socket(host_ip_addr.sin4or6_family, SOCK_STREAM, 0);
             if ((int)sos[i] == -1) {
                 perror("socket");
                 exit(1);
@@ -1381,12 +1298,8 @@ prepare_ipc(void)
             if (!getsockname(sos[i], (struct sockaddr *)&host_ip_addr, &tmp))
             {
                 port_numbers[i].type = LISTEN_PORT_ADDR;
-                port_numbers[i].port = ntohs(host_ip_addr.sin_port);
-#ifndef USE_IPV6
-                port_numbers[i].addr = host_ip_addr.sin_addr.s_addr;
-#else
-                port_numbers[i].addr = host_ip_addr.sin_addr;
-#endif
+                port_numbers[i].port = ntohs(host_ip_addr.sin4or6_port);
+                port_numbers[i].addr = host_ip_addr.sin4or6_addr;
             }
         }
 
@@ -2298,7 +2211,7 @@ get_message (char *buff, size_t *bufflength)
 
     while(MY_TRUE)
     {
-        struct sockaddr_in addr;
+        sockaddr_in4or6 addr;
         length_t length; /* length of <addr> */
         struct timeval timeout;
 
@@ -2578,7 +2491,7 @@ get_message (char *buff, size_t *bufflength)
 #endif
                             } else {
                                 uint32 naddr;
-                                struct in_addr net_addr;
+                                in4or6_addr net_addr;
 
                                 memcpy((char*)&naddr, rp+8, sizeof(naddr));
 #ifndef USE_IPV6
@@ -2782,7 +2695,6 @@ get_message (char *buff, size_t *bufflength)
         if (udp_s >= 0 && FD_ISSET(udp_s, &readfds))
 #endif
         {
-            char *ipaddr_str;
             int cnt;
 
             length = sizeof addr;
@@ -2800,18 +2712,16 @@ get_message (char *buff, size_t *bufflength)
                 }
                 else
                 {
+                    char buf[INET4OR6_ADDRSTRLEN+1];
+
                     command_giver = NULL;
                     current_interactive = NULL;
                     clear_current_object();
                     trace_level = 0;
-#ifndef USE_IPV6
-                    ipaddr_str = inet_ntoa(addr.sin_addr);
-#else
-                    ipaddr_str = inet6_ntoa(addr.sin_addr);
-#endif
-                    push_c_string(inter_sp, ipaddr_str);
+
+                    push_c_string(inter_sp, inet_ntop(AF_INET4OR6, &addr.sin4or6_addr, buf, sizeof(buf)));
                     push_bytes(inter_sp, udp_data); /* adopts the ref */
-                    push_number(inter_sp, ntohs(addr.sin_port));
+                    push_number(inter_sp, ntohs(addr.sin4or6_port));
                     RESET_LIMITS;
                     callback_master(STR_RECEIVE_UDP, 3);
                     CLEAR_EVAL_COST;
@@ -3403,7 +3313,7 @@ remove_interactive (object_t *ob, Bool force)
 
 /*-------------------------------------------------------------------------*/
 void
-refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) )
+refresh_access_data(void (*add_entry)(sockaddr_in4or6 *, int, long*) )
 
 /* Called from access_check after the ACCESS_FILE has been (re)read, this
  * function has to call the passed callback function add_entry for every
@@ -3420,13 +3330,13 @@ refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) )
         this = *user;
         if (this)
         {
-            struct sockaddr_in addr;
+            sockaddr_in4or6 addr;
             int port;
             length_t length;
 
             length = sizeof(addr);
             getsockname(this->socket, (struct sockaddr *)&addr, &length);
-            port = ntohs(addr.sin_port);
+            port = ntohs(addr.sin4or6_port);
             (*add_entry)(&this->addr, port, &this->access_class);
         }
     }
@@ -3522,7 +3432,7 @@ set_encoding (interactive_t *ip, const char* encoding)
 /*-------------------------------------------------------------------------*/
 static void
 new_player ( object_t *ob, SOCKET_T new_socket
-           , struct sockaddr_in *addr, size_t addrlen
+           , sockaddr_in4or6 *addr, size_t addrlen
            , int login_port
            )
 
@@ -3570,15 +3480,14 @@ new_player ( object_t *ob, SOCKET_T new_socket
     {
         FILE *log_file = fopen (access_log, "a");
 
-        if (log_file) {
+        if (log_file)
+        {
+            char buf[INET4OR6_ADDRSTRLEN+1];
+
             FCOUNT_WRITE(log_file);
             fprintf(log_file, "%s %s: %s\n"
                    , time_stamp()
-#ifndef USE_IPV6
-                   , inet_ntoa(addr->sin_addr)
-#else
-                   , inet6_ntoa(addr->sin_addr)
-#endif
+                   , inet_ntop(AF_INET4OR6, &addr->sin4or6_addr, buf, sizeof(buf))
                    , message ? "denied" : "granted");
             fclose(log_file);
         }
@@ -3788,7 +3697,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
         new_interactive->snoop_on->snoop_by = ob;
     }
 #ifdef ERQ_DEMON
-    (void) lookup_ip_entry(new_interactive->addr.sin_addr, MY_TRUE);
+    (void) lookup_ip_entry(new_interactive->addr.sin4or6_addr, MY_TRUE);
     /* TODO: We could pass the retrieved hostname right to login */
 #endif
 #ifdef USE_TLS
@@ -6231,7 +6140,7 @@ read_32 (char *str)
 
 /*-------------------------------------------------------------------------*/
 static void
-add_ip_entry (struct in_addr addr, const char *name)
+add_ip_entry (in4or6_addr addr, const char *name)
 
 /* Add a new IP address <addr>/hostname <name> pair to the cache iptable[].
  * If the <addr> already exists in the table, replace the old tabled name
@@ -6246,7 +6155,7 @@ add_ip_entry (struct in_addr addr, const char *name)
     new_entry = MY_FALSE;
     for (i = 0; i < IPSIZE; i++)
     {
-        if (!memcmp(&(iptable[i].addr.s_addr), &addr.s_addr, sizeof(iptable[i].addr.s_addr)))
+        if (!memcmp(&(iptable[i].addr.s4or6_addr), &addr.s4or6_addr, sizeof(iptable[i].addr.s4or6_addr)))
         {
             ix = i;
             break;
@@ -6297,7 +6206,7 @@ update_ip_entry (const char *oldname, const char *newname)
     
 /*-------------------------------------------------------------------------*/
 static string_t *
-lookup_ip_entry (struct in_addr addr, Bool useErq)
+lookup_ip_entry (in4or6_addr addr, Bool useErq)
 
 /* Lookup the IP address <addr> and return an uncounted pointer to
  * a shared string with the hostname. The function looks first in the
@@ -6308,7 +6217,8 @@ lookup_ip_entry (struct in_addr addr, Bool useErq)
 {
     int i;
     string_t *ipname;
-    struct in_addr tmp;
+    in4or6_addr tmp;
+    char buf[INET4OR6_ADDRSTRLEN+1];
 
     /* Search for the address backwards from the last added entry,
      * hoping that its one of the more recently added ones.
@@ -6319,7 +6229,7 @@ lookup_ip_entry (struct in_addr addr, Bool useErq)
         if (i < 0)
             i += IPSIZE;
 
-        if (!memcmp(&(iptable[i].addr.s_addr), &addr.s_addr, sizeof(iptable[i].addr.s_addr))
+        if (!memcmp(&(iptable[i].addr.s4or6_addr), &addr.s4or6_addr, sizeof(iptable[i].addr.s4or6_addr))
          && iptable[i].name)
         {
             return iptable[i].name;
@@ -6337,14 +6247,8 @@ lookup_ip_entry (struct in_addr addr, Bool useErq)
         free_mstring(iptable[ipcur].name);
 
     memcpy(&tmp, &addr, sizeof(tmp));
-#ifndef USE_IPV6
-    ipname = new_tabled(inet_ntoa(tmp), STRING_ASCII);
-#else
-    ipname = new_tabled(inet6_ntoa(tmp), STRING_ASCII);
-#endif
-
+    ipname = new_tabled(inet_ntop(AF_INET4OR6, &tmp, buf, sizeof(buf)), STRING_ASCII);
     iptable[ipcur].name = ipname;
-
     ipcur = (ipcur+1) % IPSIZE;
 
     /* If we have the erq and may use it, lookup the real hostname */
@@ -6631,15 +6535,12 @@ get_host_ip_number (void)
  */
 
 {
-#ifndef USE_IPV6
-    char buf[INET_ADDRSTRLEN+3];
+    char buf[INET4OR6_ADDRSTRLEN+3];
 
-    sprintf(buf, "\"%s\"", inet_ntoa(host_ip_number));
-#else
-    char buf[INET6_ADDRSTRLEN+3];
+    buf[0] = '"';
+    inet_ntop(AF_INET4OR6, &host_ip_number, buf+1, sizeof(buf)-2);
+    strcat(buf, "\"");
 
-    sprintf(buf, "\"%s\"", inet6_ntoa(host_ip_number));
-#endif
     return string_copy(buf);
 } /* query_host_ip_number() */
 
@@ -6763,15 +6664,11 @@ f_send_udp (svalue_t *sp)
  */
 
 {
-    char *to_host = NULL;
+    const char *to_host;
     int to_port;
     char *msg;
     size_t msglen;
-#ifndef USE_IPV6
-    int ip1, ip2, ip3, ip4;
-#endif /* USE_IPV6 */
-    struct sockaddr_in name;
-    struct hostent *hp;
+    sockaddr_in4or6 name;
     int ret = 0;
     svalue_t *firstarg; /* store the first argument */
     
@@ -6828,57 +6725,33 @@ f_send_udp (svalue_t *sp)
             break;
 
         /* Determine the destination address */
-
-        {
-            size_t adrlen;
-
-            adrlen = mstrsize(firstarg->u.str);
-            /* as there are no runtime error raised below, we just xallocate
-             * and don't bother with an error handler. */
-            to_host = xalloc(adrlen+1);
-            if (!to_host)
-            {
-                errorf("Out of memory (%zu bytes) in send_udp() for host address\n"
-                     , (adrlen+1));
-                /* NOTREACHED */
-            }
-            memcpy(to_host, get_txt(firstarg->u.str), adrlen);
-            to_host[adrlen] = '\0';
-        }
+        to_host = get_txt(firstarg->u.str);
         to_port = (sp-1)->u.number;
 
-#ifndef USE_IPV6
-        if (sscanf(to_host, "%d.%d.%d.%d", &ip1, &ip2, &ip3, &ip4) == 4)
         {
-            name.sin_addr.s_addr = inet_addr(to_host);
-            name.sin_family = AF_INET;
+            struct addrinfo *addr;
+            struct addrinfo hints = {
+                .ai_family = AF_INET4OR6,
+                .ai_socktype = SOCK_STREAM,
+                .ai_protocol = 0,
+                .ai_flags = AI_V4MAPPED | AI_ADDRCONFIG
+            };
+            int res = getaddrinfo(to_host, NULL, &hints, &addr);
+
+            if (res)
+                break;
+            if (addr->ai_family != AF_INET4OR6
+             || addr->ai_addrlen != sizeof(name))
+            {
+                freeaddrinfo(addr);
+                break;
+            }
+
+            memcpy(&name, addr->ai_addr, sizeof(name));
+            name.sin4or6_port = htons(to_port);
+
+            freeaddrinfo(addr);
         }
-        else
-        {
-            /* TODO: Uh-oh, blocking DNS in the execution thread */
-            hp = gethostbyname(to_host);
-            if (hp == 0)
-                break;            
-            memcpy(&name.sin_addr, hp->h_addr, (size_t)hp->h_length);
-            name.sin_family = AF_INET;
-        }
-
-#else /* USE_IPV6 */
-
-        /* TODO: Uh-oh, blocking DNS in the execution thread */
-        hp = gethostbyname2(to_host, AF_INET6);
-        if (hp == 0) hp = gethostbyname2(to_host, AF_INET);
-        if (hp == 0) break;
-        memcpy(&name.sin_addr, hp->h_addr, (size_t)hp->h_length);
-
-        if (hp->h_addrtype == AF_INET)
-        {
-            CREATE_IPV6_MAPPED(&name.sin_addr, *(u_int32_t*)hp->h_addr_list[0]);
-        }
-        name.sin_family = AF_INET6;
-#endif /* USE_IPV6 */
-
-        name.sin_port = htons(to_port);
 
         /* Send the message. */
 #ifndef SENDTO_BROKEN
@@ -6893,8 +6766,7 @@ f_send_udp (svalue_t *sp)
      * (including) to sp.
      */
     sp = pop_n_elems((sp-firstarg)+1, sp);
-    xfree(to_host);
-    
+
     /*Return the result */
     sp++;
     put_number(sp, ret);
@@ -8380,13 +8252,12 @@ f_net_connect (svalue_t *sp)
         /* Attempt the connection */
         
         memset(&hints, 0, sizeof(struct addrinfo));
+        hints.ai_family = AF_INET4OR6;
 #ifndef USE_IPV6
-        hints.ai_family = AF_INET;      // Allow only IPv4
         // only IPv4 if at least one interface with IPv4 and
         // only IPv6 if at least one interface with IPv6
         hints.ai_flags = AI_ADDRCONFIG|AI_NUMERICSERV;
 #else
-        hints.ai_family = AF_INET6;      // Allow only IPv6
         // only IPv6 if at least one interface with IPv6.
         // And list IPv4 addresses as IPv4-mapped IPv6 addresses if no IPv6 addresses could be found.
         hints.ai_flags = AI_ADDRCONFIG|AI_V4MAPPED|AI_NUMERICSERV;
@@ -8495,7 +8366,7 @@ f_net_connect (svalue_t *sp)
          * we can complete it immediately. For the reason see below.
          */
         outconn[n].socket = sfd;
-        outconn[n].target = *((struct sockaddr_in *)rp->ai_addr);
+        outconn[n].target = *((sockaddr_in4or6 *)rp->ai_addr);
         outconn[n].curr_obj = ref_object(ob, "net_conect");
 
         // no longer need the results from getaddrinfo()
@@ -8516,7 +8387,7 @@ f_net_connect (svalue_t *sp)
 
         user = command_giver;
         inter_sp = sp;
-        new_player(ob, sfd, (struct sockaddr_in *)rp->ai_addr, sizeof(struct sockaddr_in), 0);
+        new_player(ob, sfd, (sockaddr_in4or6 *)rp->ai_addr, sizeof(sockaddr_in4or6), 0);
         command_giver = user;
 
         /* All done - clean up */
@@ -9037,7 +8908,7 @@ f_interactive_info (svalue_t *sp)
         {
             string_t * hname;
 
-            hname = lookup_ip_entry(ip->addr.sin_addr, MY_FALSE);
+            hname = lookup_ip_entry(ip->addr.sin4or6_addr, MY_FALSE);
             if (hname)
             {
                 put_ref_string(&result, hname);
@@ -9050,13 +8921,9 @@ f_interactive_info (svalue_t *sp)
     case II_IP_NUMBER:
         {
             string_t *haddr;
+            char buf[INET4OR6_ADDRSTRLEN+1];
 
-#ifndef USE_IPV6
-            haddr = new_mstring(inet_ntoa(ip->addr.sin_addr), STRING_ASCII);
-#else
-            haddr = new_mstring(inet6_ntoa(ip->addr.sin_addr), STRING_ASCII);
-#endif
-
+            haddr = new_mstring(inet_ntop(AF_INET4OR6, &(ip->addr.sin4or6_addr), buf, sizeof(buf)), STRING_ASCII);
             if (!haddr)
                 errorf("Out of memory for IP address\n");
 
@@ -9065,7 +8932,7 @@ f_interactive_info (svalue_t *sp)
         }
 
     case II_IP_PORT:
-        put_number(&result, ntohs(ip->addr.sin_port));
+        put_number(&result, ntohs(ip->addr.sin4or6_port));
         break;
 
     case II_IP_ADDRESS:
@@ -9094,11 +8961,11 @@ f_interactive_info (svalue_t *sp)
 
     case II_MUD_PORT:
         {
-            struct sockaddr_in addr;
+            sockaddr_in4or6 addr;
             length_t length = sizeof(addr);
 
             getsockname(ip->socket, (struct sockaddr *)&addr, &length);
-            put_number(&result, ntohs(addr.sin_port));
+            put_number(&result, ntohs(addr.sin4or6_port));
             break;
         }
 

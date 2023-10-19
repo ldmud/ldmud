@@ -142,7 +142,7 @@ static time_t last_read_time = 0;
 
 /*-------------------------------------------------------------------------*/
 static struct access_class *
-find_access_class (struct sockaddr_in *full_addr, int port)
+find_access_class (sockaddr_in4or6 *full_addr, int port)
 
 /* Find and return the class structure for the given IP <full_addr> at
  * the current time. Return NULL if no rule covers the IP at this time.
@@ -155,8 +155,10 @@ find_access_class (struct sockaddr_in *full_addr, int port)
     struct tm *tm_p;
 
 #ifdef DEBUG_ACCESS_CHECK
+    char buf[INET4OR6_ADDRSTRLEN];
+
     fprintf(stderr, "find_class for '%s':%d\n"
-                  , inet_ntoa(*(struct in_addr*)&full_addr->sin_addr)
+                  , inet_ntop(AF_INET4OR6, &(full_addr->sin4or6_addr), buf, sizeof(buf))
                   , port);
 #endif
 #ifndef USE_IPV6
@@ -165,7 +167,7 @@ find_access_class (struct sockaddr_in *full_addr, int port)
 #ifndef s6_addr32
 #   define s6_addr32 __u6_addr.__u6_addr32
 #endif
-    addr = full_addr->sin_addr.s6_addr32[3];
+    addr = full_addr->sin6_addr.s6_addr32[3];
     /* TODO: DANGER: The above assignment will not work for any real IPv6 addresses.
      * TODO::        The general format of the access file needs work for that.
      */
@@ -208,7 +210,7 @@ find_access_class (struct sockaddr_in *full_addr, int port)
 
 /*-------------------------------------------------------------------------*/
 static void
-add_access_entry (struct sockaddr_in *full_addr, int login_port, long *idp)
+add_access_entry (sockaddr_in4or6 *full_addr, int login_port, long *idp)
 
 /* Find the class structure for <full_addr> and increments its count
  * of users. The id of the class is put into *idp.
@@ -434,7 +436,7 @@ file_end: /* emergency exit from the loop */
 
 /*-------------------------------------------------------------------------*/
 char *
-allow_host_access (struct sockaddr_in *full_addr, int login_port, long *idp)
+allow_host_access (sockaddr_in4or6 *full_addr, int login_port, long *idp)
 
 /* Check if the IP address <full_addr> is allowed access at the current
  * time. Return NULL if access is granted, else an error message.
