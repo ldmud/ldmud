@@ -1,0 +1,17 @@
+NAME
+        to_type_options
+
+DEFINITION
+        struct to_type_options
+        {
+            string source_encoding;
+            string target_encoding;
+
+            int keep_zero;
+        };
+
+DESCRIPTION
+        This struct is used for passing options to the to_type() efun.
+
+SEE ALSO
+        to_type(E)

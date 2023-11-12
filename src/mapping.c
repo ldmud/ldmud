@@ -4460,8 +4460,8 @@ v_mkmapping (svalue_t *sp, int num_arg)
         st = sp->u.strct;
         length = struct_size(st);
 
-        if (max_mapping_size && length > (p_int)max_mapping_size)
-            errorf("Illegal mapping size: %ld elements\n", length);
+        if (max_mapping_size && 2*length > (p_int)max_mapping_size)
+            errorf("Illegal mapping size: %ld elements (%ld x 2)\n", 2*length, length);
         if (max_mapping_keys && length > (p_int)max_mapping_keys)
             errorf("Illegal mapping size: %ld entries\n", length);
 

@@ -377,6 +377,7 @@ mixed  *to_array(string|bytes|mixed*|symbol|quoted_array|struct|lpctype);
 mixed   to_struct(mapping|mixed*|struct, void|struct);
 object  to_object(null|object|string|closure);
 lpctype to_lpctype(string);
+mixed   to_type(mixed,lpctype,void|struct to_type_options);
 
 bytes   to_bytes(string|bytes|int*, void|string);
 string  to_text(string|bytes|int*, void|string);

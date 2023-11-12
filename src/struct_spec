@@ -24,3 +24,13 @@ struct compile_string_options
 
     int detect_end;
 };
+
+/* Argument for to_type() efun.
+ */
+struct to_type_options
+{
+    string source_encoding;
+    string target_encoding;
+
+    int keep_zero;
+};

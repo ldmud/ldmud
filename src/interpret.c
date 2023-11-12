@@ -8157,7 +8157,7 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
                     {
                         *svptype = get_array_type(svpelement ? svpelement : lpctype_mixed);
                         free_lpctype(svpelement);
-                }
+                    }
 
                     return MY_FALSE; // No valid type found.
                 }

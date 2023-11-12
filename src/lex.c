@@ -4645,8 +4645,8 @@ parse_numeric_escape (char * cp, p_int * p_char)
 } /* parse_numeric_escape() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE char *
-parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
+static INLINE const char *
+parse_number (const char* cp, const char* end, unsigned long* p_num, bool* p_overflow)
 
 /* Parse a positive integer number in one of the following formats:
  *   <decimal>
@@ -4656,6 +4656,7 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
  *   0b<binary>
  *
  * with <cp> pointing to the first character.
+ * If <end> is not NULL, it denotes the end of the string.
  *
  * The parsed number is stored in *<p_num>, the function returns the pointer
  * to the first character after the number. If the parsed number exceeded
@@ -4670,9 +4671,12 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
     unsigned long base = 10;
     unsigned long max_shiftable = ULONG_MAX / base;
 
-    *p_overflow = MY_FALSE;
-    c = *cp++;
+    *p_overflow = false;
+    *p_num = 0;
+    if (cp == end)
+        return cp;
 
+    c = *cp++;
     if ('0' == c)
     {
         /* '0' introduces decimal, octal, binary and sedecimal numbers, or it
@@ -4682,6 +4686,8 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
          * two possible prefixes.
          */
 
+        if (cp == end)
+            return cp;
         c = *cp++;
 
         switch (c)
@@ -4698,7 +4704,7 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
             l = 0;
             max_shiftable = ULONG_MAX / 2;
             --cp;
-            while('0' == (c = *++cp) || '1' == c)
+            while(cp != end && ('0' == (c = *++cp) || '1' == c))
             {
                 *p_overflow = *p_overflow || (l > max_shiftable);
                 l <<= 1;
@@ -4736,7 +4742,7 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
         max_shiftable = ULONG_MAX / 16;
         l = 0;
         --cp;
-        while(leXdigit(c = *++cp))
+        while(cp != end && leXdigit(c = *++cp))
         {
             *p_overflow = *p_overflow || (l > max_shiftable);
             if (c > '9')
@@ -4752,22 +4758,23 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
 
     max_shiftable = ULONG_MAX / base;
     l = c - '0';
-    while (lexdigit(c = *cp++) && c < (char)('0'+base))
+    while (cp != end && (lexdigit(c = *cp) && c < (char)('0'+base)))
     {
         *p_overflow = *p_overflow || (l > max_shiftable);
         c -= '0';
         l = l * base + c;
         *p_overflow = *p_overflow || (l < (unsigned long)c);
+        cp++;
     }
 
     *p_num = *p_overflow ? LONG_MAX : l;
-    return cp-1;
+    return cp;
 
 } /* parse_number() */
 
 /*-------------------------------------------------------------------------*/
-char *
-lex_parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
+const char *
+lex_parse_number (const char* cp, const char* end, unsigned long* p_num, bool* p_overflow)
 
 /* Parse a positive integer number in one of the following formats:
  *   <decimal>
@@ -4786,15 +4793,14 @@ lex_parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
  */
 
 {
-    char c = *cp;
-
     *p_overflow = MY_FALSE;
+    if (cp == end)
+        return cp;
 
-    if (isdigit(c))
-    {
-        cp = parse_number(cp, p_num, p_overflow);
-    }
-    return cp;
+    if (!isdigit(*cp))
+        return cp;
+
+    return parse_number(cp, end, p_num, p_overflow);
 } /* lex_parse_number() */
 
 /*-------------------------------------------------------------------------*/
@@ -6433,7 +6439,7 @@ yylex1 (void)
                 }
 
                 /* Nope, normal number */
-                yyp = parse_number(numstart, &l, &overflow);
+                yyp = (char*)parse_number(numstart, NULL, &l, &overflow);
                 if (overflow || (l > (unsigned long)LONG_MAX+1))
                 {
                     /* Don't warn on __INT_MAX__+1 because there

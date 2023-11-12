@@ -426,6 +426,15 @@ PYTHON TYPES
                 from __save__ as the only argument and will return the
                 restored object.
 
+            __convert__
+                Used by to_type() to convert the Python object into another
+                type. Gets the target type object as its first argument and
+                the to_type_options struct (which may be None) as a second
+                argument. If the conversion is not supported, can either
+                return None or an exception. Only if the function does not
+                exist, __int__, __float__, __str__ or __bytes__ are called
+                if appropriate.
+
 EXAMPLE
         import ldmud
 

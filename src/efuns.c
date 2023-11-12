@@ -127,6 +127,7 @@
 #include "random.h"
 #include "sha1.h"
 #include "stdstrings.h"
+#include "stdstructs.h"
 #include "simulate.h"
 #include "simul_efun.h"
 #include "strfuns.h"
@@ -165,6 +166,7 @@ static char* sscanf_format_str_end;
 
 /* Forward declarations */
 static void copy_svalue (svalue_t *dest, svalue_t *, struct pointer_table *, int);
+static void convert_to_type (svalue_t *dest, svalue_t *src, lpctype_t *type, struct_t *opts, bool keep_zero);
 
 /* Macros */
 
@@ -6162,7 +6164,7 @@ f_to_int (svalue_t *sp)
     case T_STRING:
       {
         unsigned long num = 0;
-        char * end;
+        const char * end;
         char * cp = get_txt(sp->u.str);
         Bool hasMinus = MY_FALSE;
         Bool overflow;
@@ -6175,7 +6177,7 @@ f_to_int (svalue_t *sp)
             cp++;
         }
 
-        end = lex_parse_number(cp, &num, &overflow);
+        end = lex_parse_number(cp, NULL, &num, &overflow);
         if (end != cp)
         {
             if (overflow || ((p_int)num)<0)
@@ -6400,6 +6402,102 @@ f_to_string (svalue_t *sp)
 } /* f_to_string() */
 
 /*-------------------------------------------------------------------------*/
+vector_t *
+convert_string_to_array (const char* s, size_t len, enum unicode_type unicode, const char* efun_name)
+
+/* Create an array of the chars from <s> (byte lengths <len>).
+ */
+
+{
+    vector_t *v;
+    svalue_t *svp;
+    unsigned char ch;
+
+    if (unicode == STRING_UTF8)
+    {
+        bool error;
+        size_t left = len;
+        const char* cur = s;
+        size_t chars = byte_to_char_index(s, len, &error);
+
+        if (error)
+            errorf("%s(): Invalid character in string at index %zd.\n", efun_name, chars);
+
+        v = allocate_uninit_array((mp_int)chars);
+        svp = v->item;
+
+        /* This is a UTF8 string, let's decode it. */
+        while (left)
+        {
+            p_int code;
+            size_t codelen = utf8_to_unicode(cur, left, &code);
+
+            if (!codelen)
+                errorf("%s(): Invalid character in string at index %zd.\n", efun_name,
+                    byte_to_char_index(s, len - left, NULL));
+
+            left -= codelen;
+            cur += codelen;
+
+            put_number(svp, code);
+            svp++;
+        }
+
+        /* We should be at the end, otherwise utf8_to_unicode()
+         * or byte_to_char_index() did something wrong.
+         */
+        assert(svp == v->item + chars);
+    }
+    else
+    {
+        v = allocate_uninit_array((mp_int)len);
+        svp = v->item;
+
+        while (len-- > 0)
+        {
+            ch = (unsigned char)*s++;
+            put_number(svp, ch);
+            svp++;
+        }
+    }
+
+    return v;
+} /* convert_string_to_array() */
+
+/*-------------------------------------------------------------------------*/
+vector_t *
+convert_lpctype_to_array (lpctype_t *t)
+
+/* Create an array of element types from a (possibly) union type <t>.
+ */
+
+{
+    vector_t *vec;
+    size_t pos = 0, len = 1;
+
+    for (lpctype_t *cur = t; cur->t_class == TCLASS_UNION; cur = cur->t_union.head)
+        len++;
+
+    vec = allocate_array(len);
+    while (true)
+    {
+        if (t->t_class == TCLASS_UNION)
+        {
+            put_ref_lpctype(vec->item + pos, t->t_union.member);
+            t = t->t_union.head;
+        }
+        else
+        {
+            put_ref_lpctype(vec->item + pos, t);
+            break;
+        }
+        pos++;
+    }
+
+    return vec;
+} /* convert_lpctype_to_array() */
+
+/*-------------------------------------------------------------------------*/
 svalue_t *
 f_to_array (svalue_t *sp)
 
@@ -6421,12 +6519,6 @@ f_to_array (svalue_t *sp)
  */
 
 {
-    vector_t *v;
-    char *s;
-    unsigned char ch;
-    svalue_t *svp;
-    p_int len;
-
     switch (sp->type)
     {
     default:
@@ -6435,59 +6527,14 @@ f_to_array (svalue_t *sp)
     case T_STRING:
     case T_BYTES:
     case T_SYMBOL:
+      {
         /* Split the string into an array of ints */
-
-        len = (p_int)mstrsize(sp->u.str);
-        s = get_txt(sp->u.str);
-
-        if (sp->type == T_STRING && sp->u.str->info.unicode == STRING_UTF8)
-        {
-            bool error;
-            size_t chars = byte_to_char_index(s, len, &error);
-            if (error)
-                errorf("to_array(): Invalid character in string at index %zd.\n", chars);
-
-            v = allocate_uninit_array((mp_int)chars);
-            svp = v->item;
-
-            /* This is a UTF8 string, let's decode it. */
-            while (len)
-            {
-                p_int code;
-                size_t codelen = utf8_to_unicode(s, len, &code);
-
-                if (!codelen)
-                    errorf("to_array(): Invalid character in string at index %zd.\n",
-                        byte_to_char_index(get_txt(sp->u.str), mstrsize(sp->u.str) - len, NULL));
-
-                len -= codelen;
-                s += codelen;
-
-                put_number(svp, code);
-                svp++;
-            }
-
-            /* We should be at the end, otherwise utf8_to_unicode()
-             * or byte_to_char_index() did something wrong.
-             */
-            assert(svp == v->item + chars);
-        }
-        else
-        {
-            v = allocate_uninit_array((mp_int)len);
-            svp = v->item;
-
-            while (len-- > 0)
-            {
-                ch = (unsigned char)*s++;
-                put_number(svp, ch);
-                svp++;
-            }
-        }
+        vector_t *v = convert_string_to_array(get_txt(sp->u.str), mstrsize(sp->u.str), sp->u.str->info.unicode, "to_array");
 
         free_svalue(sp);
         put_array(sp, v);
         break;
+      }
     case T_STRUCT:
       {
         vector_t *vec;
@@ -6510,29 +6557,8 @@ f_to_array (svalue_t *sp)
         break;
     case T_LPCTYPE:
       {
-        lpctype_t *t = sp->u.lpctype;
-        vector_t *vec;
-        size_t pos = 0;
+        vector_t *vec = convert_lpctype_to_array(sp->u.lpctype);
 
-        len = 1;
-        for (lpctype_t *cur = t; cur->t_class == TCLASS_UNION; cur = cur->t_union.head)
-            len++;
-
-        vec = allocate_array(len);
-        while (true)
-        {
-            if (t->t_class == TCLASS_UNION)
-            {
-                put_ref_lpctype(vec->item + pos, t->t_union.member);
-                t = t->t_union.head;
-            }
-            else
-            {
-                put_ref_lpctype(vec->item + pos, t);
-                break;
-            }
-            pos++;
-        }
         free_lpctype(sp->u.lpctype);
         put_array(sp, vec);
         break;
@@ -6597,6 +6623,7 @@ struct mtos_data_s
     struct mtos_member_s * first;  /* List of found members */
     struct mtos_member_s * last;
     int                    num;    /* Number of members */
+    bool                   has_non_string_key;
 };
 
 static void
@@ -6629,7 +6656,101 @@ map_to_struct_filter (svalue_t *key, svalue_t *data, void *extra)
             pData->num++;
         }
     }
+    else
+        pData->has_non_string_key = true;
 } /* map_to_struct_filter() */
+
+struct_t *
+convert_mapping_to_anonymous_struct (mapping_t *map, bool ignore_non_string_keys)
+
+/* Creates an anonymous struct with members according to <map>'s entries with
+ * string keys. If <ignore_non_string_keys> is false, returns NULL if the
+ * mapping has keys of different type than string.
+ */
+
+{
+    struct mtos_data_s     data;
+    struct mtos_member_s * member;
+    struct_t *             st;
+    int                    i;
+
+    /* Gather the data from the mapping */
+    data.pool = new_mempool(size_mempool(sizeof(struct mtos_member_s)));
+    if (data.pool == NULL)
+    {
+        outofmemory("memory pool");
+        /* NOTREACHED */
+    }
+    data.num = 0;
+    data.first = data.last = NULL;
+    data.has_non_string_key = false;
+
+    walk_mapping(map, map_to_struct_filter, &data);
+
+    if (data.has_non_string_key && !ignore_non_string_keys)
+    {
+        mempool_delete(data.pool);
+        return NULL;
+    }
+
+    /* Get the result struct */
+    st = struct_new_anonymous(data.num);
+    if (st == NULL)
+    {
+        mempool_delete(data.pool);
+        outofmemory("result");
+        /* NOTREACHED */
+    }
+
+    /* Copy the data into the result struct, and also update
+     * the member names.
+     */
+    for ( i = 0, member = data.first
+        ; member != NULL && i < data.num
+        ; i++, member = member->next
+        )
+    {
+        /* Update the member name */
+        free_mstring(st->type->member[i].name);
+        st->type->member[i].name = ref_mstring(member->name);
+
+        /* Copy the data */
+        if (map->num_values == 0)
+            put_number(&st->member[i], 1);
+        else if (map->num_values == 1)
+        {
+            assign_rvalue_no_free(&st->member[i], member->data);
+        }
+        else
+        {
+            vector_t * vec;
+            svalue_t * src, * dest;
+            int        j;
+
+            vec = allocate_uninit_array(map->num_values);
+            if (vec == NULL)
+            {
+                mempool_delete(data.pool);
+                struct_free(st);
+                outofmemory("result data");
+                /* NOTREACHED */
+            }
+            dest = vec->item;
+            src = member->data;
+            for (j = 0; j < map->num_values; j++)
+            {
+                assign_rvalue_no_free(dest++, src++);
+            }
+
+            put_array(&st->member[i], vec);
+        } /* if (num_values) */
+    } /* for (all data) */
+
+    /* Deallocate helper structures */
+    mempool_delete(data.pool);
+
+    return st;
+} /* convert_mapping_to_anonymous_struct() */
 
 svalue_t *
 v_to_struct (svalue_t *sp, int num_arg)
@@ -6812,77 +6933,7 @@ v_to_struct (svalue_t *sp, int num_arg)
         }
         else
         {
-            struct mtos_data_s     data;
-            struct mtos_member_s * member;
-            int                    i;
-
-            /* Gather the data from the mapping */
-            data.pool = new_mempool(size_mempool(sizeof(struct mtos_member_s)));
-            if (data.pool == NULL)
-            {
-                outofmemory("memory pool");
-                /* NOTREACHED */
-            }
-            data.num = 0;
-            data.first = data.last = NULL;
-
-            walk_mapping(argp->u.map, map_to_struct_filter, &data);
-
-            /* Get the result struct */
-            st = struct_new_anonymous(data.num);
-            if (st == NULL)
-            {
-                mempool_delete(data.pool);
-                outofmemory("result");
-                /* NOTREACHED */
-            }
-
-            /* Copy the data into the result struct, and also update
-             * the member names.
-             */
-            for ( i = 0, member = data.first
-                ; member != NULL && i < data.num
-                ; i++, member = member->next
-                )
-            {
-                /* Update the member name */
-                free_mstring(st->type->member[i].name);
-                st->type->member[i].name = ref_mstring(member->name);
-
-                /* Copy the data */
-                if (num_values == 0)
-                    put_number(&st->member[i], 1);
-                else if (num_values == 1)
-                {
-                    assign_rvalue_no_free(&st->member[i], member->data);
-                }
-                else
-                {
-                    vector_t * vec;
-                    svalue_t * src, * dest;
-                    int        j;
-
-                    vec = allocate_uninit_array(num_values);
-                    if (vec == NULL)
-                    {
-                        mempool_delete(data.pool);
-                        struct_free(st);
-                        outofmemory("result data");
-                        /* NOTREACHED */
-                    }
-                    dest = vec->item;
-                    src = member->data;
-                    for (j = 0; j < num_values; j++)
-                    {
-                        assign_rvalue_no_free(dest++, src++);
-                    }
-
-                    put_array(&st->member[i], vec);
-                } /* if (num_values) */
-            } /* for (all data) */
-
-            /* Deallocate helper structures */
-            mempool_delete(data.pool);
+            st = convert_mapping_to_anonymous_struct(argp->u.map, true);
         }
 
         free_mapping(argp->u.map);
@@ -7089,6 +7140,1174 @@ f_to_object (svalue_t *sp)
 
     return sp;
 } /* f_to_object() */
+
+/*-------------------------------------------------------------------------*/
+static bool
+convert_string (svalue_t *dest, string_t *str, const char* text, size_t len, enum unicode_type unicode, lpctype_t *type, struct_t *opts)
+
+/* Convert <text> to <type> and put the result into <dest>.
+ * If <str> is not NULL, it points to the same string.
+ * Return true on success.
+ */
+
+{
+    lpctype_t *object_types;
+
+    if (lpctype_contains(lpctype_string, type))
+    {
+        if (str)
+            put_ref_string(dest, str);
+        else
+            put_c_n_string(dest, text, len);
+        return true;
+    }
+
+    if (lpctype_contains(lpctype_symbol, type))
+    {
+        if (str)
+            put_ref_string(dest, str);
+        else
+            put_c_n_string(dest, text, len);
+        dest->type = T_SYMBOL;
+        dest->x.quotes = 1;
+        return true;
+    }
+
+    if (lpctype_contains(lpctype_int, type))
+    {
+        const char* p = text, *end;
+        bool negative = false;
+        unsigned long num;
+        bool overflow;
+
+        if (len && (*p == '-' || *p == '+'))
+        {
+            negative = (*p == '-');
+            p++;
+        }
+
+        end = lex_parse_number(p, text + len, &num, &overflow);
+        if (end == text + len)
+        {
+            if (negative)
+            {
+                if (overflow || num > ((unsigned long)PINT_MAX)+1UL)
+                    errorf("Number exceeds numeric limits.\n");
+
+                if (num == ((unsigned long)PINT_MAX)+1UL)
+                    put_number(dest, PINT_MIN);
+                else
+                    put_number(dest, -(p_int)num);
+            }
+            else
+            {
+                if (overflow || num > PINT_MAX)
+                    errorf("Number exceeds numeric limits.\n");
+                put_number(dest, (p_int)num);
+            }
+            return true;
+        }
+    }
+    if (lpctype_contains(lpctype_float, type))
+    {
+        if (len < 32)
+        {
+            double d;
+            char *end;
+            char buf[32];
+
+            memcpy(buf, text, len);
+            buf[len] = 0;
+
+            d = strtod(buf, &end);
+            if (end == buf+len)
+            {
+                put_float(dest, d);
+                return true;
+            }
+        }
+        else
+        {
+            double d;
+            char *buf;
+            char *end;
+
+            memsafe(buf = xalloc(len), len, "string conversion");
+            memcpy(buf, text, len);
+            buf[len] = 0;
+
+            d = strtod(buf, &end);
+            xfree(buf);
+
+            if (end == buf+len)
+            {
+                put_float(dest, d);
+                return true;
+            }
+        }
+    }
+
+    if (lpctype_contains(lpctype_lpctype, type))
+    {
+        const char* cur = text;
+        lpctype_t *result = parse_lpctype(&cur, text + len);
+
+        if (result && cur == text + len)
+        {
+            put_lpctype(dest, result);
+            return true;
+        }
+    }
+
+    object_types = get_common_type(lpctype_any_object, type);
+    if (object_types)
+    {
+        string_t *name = NULL;
+        object_t *obj;
+
+        push_lpctype(inter_sp, object_types);
+        if (!str)
+            memsafe(name = new_n_unicode_mstring(text, len), len, "object name");
+
+        obj = find_object(str ? str : name);
+        if (name)
+            free_mstring(name);
+
+        if (obj && is_compatible_object(obj, object_types))
+        {
+            free_lpctype(object_types);
+            inter_sp--;
+
+            put_ref_object(dest, obj, "to_type");
+            return true;
+        }
+        free_lpctype(object_types);
+        inter_sp--;
+    }
+
+    if (lpctype_contains(lpctype_bytes, type) &&
+        opts != NULL &&
+        opts->member[STRUCT_TO_TYPE_OPTIONS_TARGET_ENCODING].type == T_STRING)
+    {
+        string_t *result = utf8_string_to_bytes(text, len,
+            get_txt(opts->member[STRUCT_TO_TYPE_OPTIONS_TARGET_ENCODING].u.str),
+            "to_type", 3);
+        put_bytes(dest, result);
+        return true;
+    }
+
+    if (lpctype_contains(lpctype_int_array, type))
+    {
+        put_array(dest, convert_string_to_array(text, len, unicode, "to_type"));
+        return true;
+    }
+
+    return false;
+}
+
+/*-------------------------------------------------------------------------*/
+static bool
+convert_bytes (svalue_t *dest, string_t *str, const char* text, size_t len, lpctype_t *type, struct_t *opts)
+
+/* Convert <text> to <type> and put the result into <dest>.
+ * If <str> is not NULL, it points to the same string.
+ * Return true on success.
+ */
+
+{
+    if (lpctype_contains(lpctype_bytes, type))
+    {
+        if (str)
+            put_ref_bytes(dest, str);
+        else
+        {
+            string_t *result;
+            memsafe(result = new_n_mstring(text, len, STRING_BYTES), len, "bytes");
+            put_bytes(dest, result);
+        }
+        return true;
+    }
+
+    if (lpctype_contains(lpctype_string, type) &&
+        opts != NULL &&
+        opts->member[STRUCT_TO_TYPE_OPTIONS_SOURCE_ENCODING].type == T_STRING)
+    {
+        string_t *result = bytes_to_utf8_string(text, len,
+            opts->member[STRUCT_TO_TYPE_OPTIONS_SOURCE_ENCODING].u.str,
+            "to_type", 3);
+        put_string(dest, result);
+        return true;
+    }
+
+    if (lpctype_contains(lpctype_int_array, type))
+    {
+        put_array(dest, convert_string_to_array(text, len, STRING_BYTES,"to_type"));
+        return true;
+    }
+
+    return false;
+}
+
+/*-------------------------------------------------------------------------*/
+static bool
+convert_array (svalue_t *dest, vector_t *vec, svalue_t *items, size_t len, lpctype_t *type, struct_t *opts, bool keep_zero)
+
+/* Convert the array of <len> <items> to <type> and put the result into <dest>.
+ * <items> could be NULL, then the input is a sequence of <len> zeroes.
+ * If <vec> is not NULL, it points to the same array.
+ * Return true on success.
+ */
+
+{
+    lpctype_t *struct_types, *array_types;
+    bool convert_to_string = false, convert_to_bytes = false;
+
+    array_types = get_common_type(lpctype_any_array, type);
+    if (array_types != NULL)
+    {
+        /* We just select to first array and convert to it. */
+        vector_t *result;
+        lpctype_t *single_array = array_types->t_class == TCLASS_UNION ? array_types->t_union.member : array_types;
+        assert(single_array->t_class == TCLASS_ARRAY);
+
+        push_lpctype(inter_sp, array_types);
+
+        memsafe(result = allocate_array(len), len, "converted array");
+        put_array(dest, result);
+
+        for (size_t i = 0; i < len; i++)
+            convert_to_type(result->item+i, items ? items+i : &const0, single_array->t_array.element, opts, keep_zero);
+
+        free_lpctype(array_types);
+        inter_sp--;
+        return true;
+    }
+
+    if ((convert_to_string=lpctype_contains(lpctype_string, type))
+     || (convert_to_bytes=lpctype_contains(lpctype_bytes, type)))
+    {
+        bool only_integers = true;
+        bool is_ascii = true;
+        size_t size = 0;
+
+        if (!items)
+        {
+            string_t *str;
+
+            if (len == 0 && convert_to_string)
+            {
+                put_ref_string(dest, STR_EMPTY);
+                return true;
+            }
+
+            memsafe(str = alloc_mstring(len), len, "converted string");
+            memset(get_txt(str), 0, len);
+
+            if (convert_to_string)
+            {
+                str->info.unicode = STRING_ASCII;
+                put_string(dest, str);
+            }
+            else
+            {
+                str->info.unicode = STRING_BYTES;
+                put_bytes(dest, str);
+            }
+            return true;
+        }
+
+        for (size_t i = 0; i < len; i++)
+            if (items[i].type != T_NUMBER)
+            {
+                only_integers = false;
+                break;
+            }
+            else if (convert_to_string)
+            {
+                size_t chsize = utf8_size(items[i].u.number);
+                size += chsize;
+                if (!chsize)
+                    convert_to_string = false;
+                else if (chsize > 1)
+                    is_ascii = false;
+            }
+
+        if (only_integers)
+        {
+            if (convert_to_string)
+            {
+                string_t *str;
+                char *pos;
+
+                if (len == 0)
+                {
+                    put_ref_string(dest, STR_EMPTY);
+                    return true;
+                }
+
+                memsafe(str = alloc_mstring(size), size, "converted string");
+                pos = get_txt(str);
+                for (size_t i = 0; i < len; i++)
+                {
+                    assert(items[i].type == T_NUMBER);
+                    pos += unicode_to_utf8(items[i].u.number, pos);
+                }
+
+                assert(pos == get_txt(str) + size);
+                str->info.unicode = is_ascii ? STRING_ASCII : STRING_UTF8;
+
+                put_string(dest, str);
+                return true;
+            }
+
+            if (convert_to_bytes)
+            {
+                string_t *str;
+                char *pos;
+
+                memsafe(str = alloc_mstring(len), len, "converted byte sequence");
+                pos = get_txt(str);
+                for (size_t i = 0; i < len; i++)
+                {
+                    assert(items[i].type == T_NUMBER);
+                    *pos = (char)items[i].u.number;
+                    pos++;
+                }
+
+                assert(pos == get_txt(str) + len);
+                str->info.unicode = STRING_BYTES;
+
+                put_bytes(dest, str);
+                return true;
+            }
+        }
+    }
+
+    if (lpctype_contains(lpctype_quoted_array, type))
+    {
+        if (vec != NULL)
+            put_ref_array(dest, vec);
+        else
+        {
+            vector_t *result;
+
+            memsafe(result = allocate_array(len), len, "quoted array");
+            put_array(dest, result);
+
+            for (size_t i = 0; i < len; i++)
+                assign_rvalue_no_free(result->item+i, items ? items+i : &const0);
+        }
+
+        dest->type = T_QUOTED_ARRAY;
+        dest->x.quotes = 1;
+        return true;
+    }
+
+    struct_types = get_common_type(lpctype_any_struct, type);
+    if (struct_types != NULL)
+    {
+        push_lpctype(inter_sp, struct_types); /* In case of errors. */
+
+        while (true)
+        {
+            lpctype_t *single_struct = struct_types->t_class == TCLASS_UNION ? struct_types->t_union.member : struct_types;
+            assert(single_struct->t_class == TCLASS_STRUCT);
+
+            if (single_struct->t_struct.name == NULL)
+            {
+                struct_t *st;
+
+                memsafe(st = struct_new_anonymous(len), len, "converted struct");
+                for (size_t i = 0; i < len; i++)
+                    assign_rvalue_no_free(st->member+i, items ? items+i : &const0);
+                put_struct(dest, st);
+
+                free_lpctype(struct_types);
+                inter_sp--;
+
+                return true;
+            }
+            else if (single_struct->t_struct.name->current == NULL)
+            {
+                errorf("Struct definition for '%s' (/%s) is not available.\n"
+                      , get_txt(single_struct->t_struct.name->name)
+                      , get_txt(single_struct->t_struct.name->prog_name));
+                return false; /* NOTREACHED */
+            }
+            else if(struct_t_size(single_struct->t_struct.name->current) >= len)
+            {
+                struct_type_t *stype = single_struct->t_struct.name->current;
+                struct_t *st;
+
+                memsafe(st = struct_new(stype), struct_t_size(stype), "converted struct");
+
+                put_struct(dest, st);
+
+                for (int i = 0; i < len; i++)
+                    convert_to_type(st->member+i, items ? items+i : &const0, stype->member[i].type, opts, keep_zero);
+
+                free_lpctype(struct_types);
+                inter_sp--;
+
+                return true;
+            }
+
+            if (single_struct->t_class == TCLASS_UNION)
+                single_struct = single_struct->t_union.head;
+            else
+                break;
+        }
+        free_lpctype(struct_types);
+        inter_sp--;
+    }
+
+    if (lpctype_contains(lpctype_mapping, type))
+    {
+        mapping_t *m;
+
+        /* Convert the array to a set (mapping of width 0). */
+        if (max_mapping_size && len > max_mapping_size)
+            errorf("Illegal mapping size: %zu elements\n", len);
+        if (max_mapping_keys && len > max_mapping_keys)
+            errorf("Illegal mapping size: %zu entries\n", len);
+
+        memsafe(m = allocate_mapping(len, 0), len, "converted mapping");
+        if (!items)
+            get_map_lvalue_unchecked(m, &const0);
+        else
+            for (size_t i = 0; i < len; i++)
+                get_map_lvalue_unchecked(m, items+i);
+
+        put_mapping(dest, m);
+        return true;
+    }
+
+    return false;
+}
+
+/*-------------------------------------------------------------------------*/
+struct convert_mapping_entry_s
+{
+    lpctype_t *type;      /* Target type (not refcounted) */
+    struct_t *opts;       /* Conversion options. */
+    svalue_t *dest;       /* Target item (to be increased after each call) */
+    size_t width;         /* Number of data elements in the mapping. */
+    bool keep_zero;       /* keep_zero conversion option. */
+    bool success;         /* To be set to false upon an error. */
+};
+
+static void
+convert_mapping_entry (svalue_t *key, svalue_t *data, void *extra)
+
+/* Converts a mapping entry according to <extra>.
+ * <inter_sp[0]> is free to be used as a cache.
+ */
+
+{
+    struct convert_mapping_entry_s* info = (struct convert_mapping_entry_s*)extra;
+    vector_t *vec;
+    if (!info->success)
+        return;
+
+    if (info->width == 0)
+    {
+        info->success = convert_array(info->dest, NULL, key, 1, info->type, info->opts, info->keep_zero);
+        info->dest++;
+        return;
+    }
+
+    /* We need to put key and data into a single array. */
+    if (inter_sp->type == T_POINTER)
+        vec = inter_sp->u.vec;
+    else
+    {
+        assert(inter_sp->type == T_NUMBER);
+
+        memsafe(vec = allocate_array(info->width + 1), info->width + 1, "converted array");
+        put_array(inter_sp, vec);
+    }
+
+    assign_svalue_no_free(vec->item, key);
+    for (size_t i = 0; i < info->width; i++)
+        assign_svalue_no_free(vec->item + 1 +i, data + i);
+
+    info->success = convert_array(info->dest, vec, vec->item, info->width + 1, info->type, info->opts, info->keep_zero);
+    info->dest++;
+
+    if (vec->ref > 1)
+    {
+        /* The array is used in the result. Cannot use it for subsequent calls. */
+        free_array(vec);
+        put_number(inter_sp, 0);
+    }
+} /* convert_mapping_entry() */
+
+/*-------------------------------------------------------------------------*/
+static void
+convert_to_type (svalue_t *dest, svalue_t *src, lpctype_t *type, struct_t *opts, bool keep_zero)
+
+/* Convert <src> to <type> and put the result into <dest>.
+ */
+
+{
+    svalue_t *rvalue = get_rvalue(src, NULL);
+
+    if (!rvalue)
+        rvalue = src;
+
+    switch (rvalue->type)
+    {
+        case T_LVALUE:
+            switch (rvalue->x.lvalue_type)
+            {
+                case LVALUE_PROTECTED_RANGE:
+                {
+                    struct protected_range_lvalue *r = rvalue->u.protected_range_lvalue;
+                    if (r->vec.type == T_POINTER)
+                    {
+                        if (convert_array(dest, NULL, r->vec.u.vec->item + r->index1, r->index2 - r->index1, type, opts, keep_zero))
+                            return;
+                    }
+                    else if (r->vec.type == T_BYTES)
+                    {
+                        if (convert_bytes(dest, NULL, get_txt(r->vec.u.str) + r->index1, r->index2 - r->index1, type, opts))
+                            return;
+                    }
+                    else
+                    {
+                        if (convert_string(dest, NULL, get_txt(r->vec.u.str) + r->index1, r->index2 - r->index1, r->vec.u.str->info.unicode, type, opts))
+                            return;
+                    }
+                    break;
+                }
+
+                case LVALUE_PROTECTED_MAP_RANGE:
+                {
+                    struct protected_map_range_lvalue *r = rvalue->u.protected_map_range_lvalue;
+                    svalue_t *items = get_map_value(r->map, &(r->key));
+
+                    if (items == &const0)
+                    {
+                        if (convert_array(dest, NULL, NULL, r->index2 - r->index1, type, opts, keep_zero))
+                            return;
+                    }
+                    else
+                    {
+                        if (convert_array(dest, NULL, items + r->index1, r->index2 - r->index1, type, opts, keep_zero))
+                            return;
+                    }
+
+                    break;
+                }
+
+                default:
+                    fatal("Illegal lvalue type %d\n", rvalue->x.lvalue_type);
+                    break; /* NOTREACHED */
+            }
+            break;
+
+        case T_NUMBER:
+            if (rvalue->u.number == 0 && keep_zero)
+                put_number(dest, 0);
+            else if (lpctype_contains(lpctype_int, type))
+                put_number(dest, rvalue->u.number);
+            else if (lpctype_contains(lpctype_float, type))
+                put_float(dest, (double)rvalue->u.number);
+            else if (lpctype_contains(lpctype_string, type))
+            {
+                string_t *res;
+                char buf[32];
+
+                snprintf(buf, sizeof(buf), "%"PRIdPINT, rvalue->u.number);
+                memsafe(res = new_mstring(buf, STRING_ASCII), strlen(buf), "converted number");
+                put_string(dest, res);
+            }
+            else if (rvalue->u.number == 0)
+                put_number(dest, 0);
+            else
+                break;
+            return;
+
+        case T_STRING:
+            if (convert_string(dest, rvalue->u.str, get_txt(rvalue->u.str), mstrsize(rvalue->u.str), rvalue->u.str->info.unicode, type, opts))
+                return;
+            break;
+
+        case T_POINTER:
+            if (check_rtt_compatibility(type, rvalue))
+            {
+                put_ref_array(dest, rvalue->u.vec);
+                return;
+            }
+
+            if (convert_array(dest, rvalue->u.vec, rvalue->u.vec->item, VEC_SIZE(rvalue->u.vec), type, opts, keep_zero))
+                return;
+            break;
+
+        case T_OBJECT:
+            if (is_compatible_object(rvalue->u.ob, type))
+                put_ref_object(dest, rvalue->u.ob, "to_type");
+            else if (lpctype_contains(lpctype_string, type))
+                put_string(dest, add_slash(rvalue->u.ob->name));
+            else
+                break;
+            return;
+
+        case T_MAPPING:
+        {
+            lpctype_t *struct_types = NULL, *array_types;
+
+            if (lpctype_contains(lpctype_mapping, type))
+            {
+                put_ref_mapping(dest, rvalue->u.map);
+                return;
+            }
+
+            /* We only convert when we have values for the struct member. */
+            if (rvalue->u.map->num_values > 0)
+                struct_types = get_common_type(lpctype_any_struct, type);
+            if (struct_types != NULL)
+            {
+                push_lpctype(inter_sp, struct_types);
+
+                /* We'll go through all structs until we find one,
+                 * that has all the members in the mapping.
+                 */
+                while (true)
+                {
+                    lpctype_t *single_struct = struct_types->t_class == TCLASS_UNION ? struct_types->t_union.member : struct_types;
+                    assert(single_struct->t_class == TCLASS_STRUCT);
+
+                    if (single_struct->t_struct.name == NULL)
+                    {
+                        struct_t *st = convert_mapping_to_anonymous_struct(rvalue->u.map, false);
+                        if (!st)
+                            break;
+
+                        free_lpctype(struct_types);
+                        inter_sp--;
+
+                        put_struct(dest, st);
+                        return;
+                    }
+                    else if (single_struct->t_struct.name->current == NULL)
+                    {
+                        errorf("Struct definition for '%s' (/%s) is not available.\n"
+                              , get_txt(single_struct->t_struct.name->name)
+                              , get_txt(single_struct->t_struct.name->prog_name));
+                        return; /* NOTREACHED */
+                    }
+                    else if(struct_t_size(single_struct->t_struct.name->current) >= rvalue->u.map->num_entries)
+                    {
+                        svalue_t *values[1024];
+                        int num_found_keys = 0;
+                        bool use_values = false;
+                        struct_type_t *stype = single_struct->t_struct.name->current;
+                        struct_t *st;
+
+                        /* For non-large structs we check beforehand whether it matches. */
+                        if (struct_t_size(stype) <= sizeof(values)/sizeof(values[0]))
+                        {
+
+                            for (int i = 0; i < struct_t_size(stype); i++)
+                            {
+                                svalue_t key = svalue_string(stype->member[i].name);
+                                svalue_t *value = get_map_value(rvalue->u.map, &key);
+                                if (value == &const0)
+                                    values[i] = NULL;
+                                else
+                                {
+                                    values[i] = value;
+                                    num_found_keys++;
+                                }
+                            }
+
+                            if (rvalue->u.map->num_entries > num_found_keys)
+                            {
+                                if (single_struct->t_class == TCLASS_UNION)
+                                {
+                                    single_struct = single_struct->t_union.head;
+                                    continue;
+                                }
+                                else
+                                    break;
+                            }
+
+                            use_values = true;
+                        }
+
+                        st = struct_new(stype);
+                        put_struct(dest, st);
+
+                        for (int i = 0; i < struct_t_size(stype); i++)
+                        {
+                            svalue_t *src_value;
+                            if (use_values)
+                            {
+                                src_value = values[i];
+                                if (src_value == NULL)
+                                    continue;
+                            }
+                            else
+                            {
+                                svalue_t key = svalue_string(stype->member[i].name);
+                                src_value = get_map_value(rvalue->u.map, &key);
+                                if (src_value == &const0)
+                                    continue;
+                                num_found_keys++;
+                            }
+
+                            if (rvalue->u.map->num_values > 1)
+                            {
+                                if (!convert_array(st->member+i, NULL, src_value, rvalue->u.map->num_values, stype->member[i].type, opts, keep_zero))
+                                {
+                                    put_number(dest, 0);
+                                    free_struct(st);
+                                    break;
+                                }
+                            }
+                            else
+                                convert_to_type(st->member+i, src_value, stype->member[i].type, opts, keep_zero);
+                        }
+
+                        if (rvalue->u.map->num_entries <= num_found_keys)
+                        {
+                            free_lpctype(struct_types);
+                            inter_sp--;
+
+                            return;
+                        }
+
+                        put_number(dest, 0);
+                        free_struct(st);
+                    }
+
+                    if (single_struct->t_class == TCLASS_UNION)
+                        single_struct = single_struct->t_union.head;
+                    else
+                        break;
+                }
+                free_lpctype(struct_types);
+                inter_sp--;
+            }
+
+            array_types = get_common_type(lpctype_any_array, type);
+            if (array_types != NULL)
+            {
+                mapping_t *map = rvalue->u.map;
+                vector_t *vec;
+                lpctype_t *single_array = array_types->t_class == TCLASS_UNION ? array_types->t_union.member : array_types;
+                struct convert_mapping_entry_s info;
+
+                assert(single_array->t_class == TCLASS_ARRAY);
+                push_lpctype(inter_sp, array_types);
+
+                memsafe(vec = allocate_array(MAP_SIZE(map)), MAP_SIZE(map), "converted array");
+                put_array(dest, vec);
+
+                info.type = single_array->t_array.element;
+                info.opts = opts;
+                info.dest = vec->item;
+                info.width = map->num_values;
+                info.keep_zero = keep_zero;
+                info.success = true;
+
+                push_number(inter_sp, 0);
+                walk_mapping(map, convert_mapping_entry, &info);
+                inter_sp = pop_n_elems(2, inter_sp);
+
+                if (info.success)
+                {
+                    assert(info.dest == vec->item + MAP_SIZE(map));
+                    return;
+                }
+            }
+
+            break;
+        }
+
+        case T_FLOAT:
+            if (lpctype_contains(lpctype_float, type))
+                *dest = *rvalue;
+            else if (lpctype_contains(lpctype_int, type))
+            {
+                double d = READ_DOUBLE(rvalue);
+                p_int result = (p_int)d;
+                /* The check against PINT_MAX is inaccurate, as double
+                 * has a lower precision, therefore we check also that
+                 * no overflow into the sign happens.
+                 */
+                if (d < (double)PINT_MIN || d > (double)PINT_MAX || (d < 0) != (result < 0))
+                    errorf("Number exceeds numeric limits.\n");
+
+                put_number(dest, result);
+            }
+            else if (lpctype_contains(lpctype_string, type))
+            {
+                string_t *res;
+                char buf[32];
+
+                snprintf(buf, sizeof(buf), "%g", READ_DOUBLE(rvalue));
+                memsafe(res = new_mstring(buf, STRING_ASCII), strlen(buf), "converted number");
+                put_string(dest, res);
+            }
+            else
+                break;
+            return;
+
+        case T_CLOSURE:
+        {
+            lpctype_t *object_types, *lwobject_types;
+            object_t *ob = NULL;
+            lwobject_t *lwob = NULL;
+
+            if (is_undef_closure(rvalue))
+            {
+                put_number(dest, 0);
+                return;
+            }
+
+            if (lpctype_contains(lpctype_closure, type))
+            {
+                assign_svalue_no_free(dest, rvalue);
+                return;
+            }
+
+            object_types = get_common_type(lpctype_any_object, type);
+            lwobject_types = get_common_type(lpctype_any_lwobject, type);
+            if (object_types != NULL || lwobject_types != NULL)
+            {
+                if (CLOSURE_MALLOCED(rvalue->x.closure_type))
+                {
+                    if (rvalue->u.closure->ob.type == T_OBJECT)
+                        ob = rvalue->u.closure->ob.u.ob;
+                    else if (rvalue->u.closure->ob.type == T_LWOBJECT)
+                        lwob =  rvalue->u.closure->ob.u.lwob;
+                }
+                else
+                {
+                    if (rvalue->x.closure_type < CLOSURE_LWO)
+                        lwob = rvalue->u.lwob;
+                    else
+                        ob = rvalue->u.ob;
+                }
+
+                if (ob && object_types && is_compatible_object(ob, object_types))
+                {
+                    free_lpctype(object_types);
+                    free_lpctype(lwobject_types);
+                    put_ref_object(dest, ob, "to_type");
+                    return;
+                }
+                else if (lwob && lwobject_types && is_compatible_lwobject(lwob, lwobject_types))
+                {
+                    free_lpctype(object_types);
+                    free_lpctype(lwobject_types);
+                    put_ref_lwobject(dest, lwob);
+                    return;
+                }
+
+                free_lpctype(object_types);
+                free_lpctype(lwobject_types);
+            }
+
+            if (lpctype_contains(lpctype_int, type))
+            {
+                if (rvalue->x.closure_type == CLOSURE_IDENTIFIER)
+                {
+                    put_number(dest, rvalue->u.identifier_closure->var_index);
+                    return;
+                }
+                else if (rvalue->x.closure_type == CLOSURE_LFUN)
+                {
+                    put_number(dest, rvalue->u.lfun_closure->fun_index);
+                    return;
+                }
+            }
+
+            if (lpctype_contains(lpctype_string, type))
+            {
+                put_string(dest, closure_to_string(rvalue, false));
+                return;
+            }
+            break;
+        }
+
+        case T_SYMBOL:
+            if (lpctype_contains(lpctype_symbol, type))
+                put_ref_symbol(dest, rvalue->u.str, 1);
+            else if (lpctype_contains(lpctype_string, type))
+                put_ref_string(dest, rvalue->u.str);
+            else if (lpctype_contains(lpctype_int_array, type))
+                put_array(dest, convert_string_to_array(get_txt(rvalue->u.str), mstrsize(rvalue->u.str), rvalue->u.str->info.unicode, "to_type"));
+            else
+                break;
+            return;
+
+        case T_QUOTED_ARRAY:
+        {
+            svalue_t sv;
+
+            if (lpctype_contains(lpctype_quoted_array, type))
+            {
+                assign_svalue_no_free(dest, rvalue);
+                return;
+            }
+
+            sv = svalue_array(rvalue->u.vec);
+            if (check_rtt_compatibility(type, &sv))
+            {
+                put_ref_array(dest, rvalue->u.vec);
+                return;
+            }
+
+            if (convert_array(dest, rvalue->u.vec, rvalue->u.vec->item, VEC_SIZE(rvalue->u.vec), type, opts, keep_zero))
+                return;
+            break;
+        }
+
+        case T_STRUCT:
+        {
+            struct_t *st = rvalue->u.strct;
+            lpctype_t *value_type = get_struct_type(st->type);
+            lpctype_t *derived_struct_types;
+            lpctype_t *array_types;
+
+            if (lpctype_contains(value_type, type))
+            {
+                free_lpctype(value_type);
+                assign_svalue_no_free(dest, rvalue);
+                return;
+            }
+
+            /* Search for any derived structs. */
+            derived_struct_types = get_common_type(value_type, type);
+            if (derived_struct_types != NULL)
+            {
+                lpctype_t *single_derived_struct = derived_struct_types->t_class == TCLASS_UNION ? derived_struct_types->t_union.member : derived_struct_types;
+                struct_type_t *stype;
+                struct_t *result;
+
+                assert(single_derived_struct->t_class == TCLASS_STRUCT);
+                assert(single_derived_struct->t_struct.name != NULL);
+
+                stype = single_derived_struct->t_struct.name->current;
+                free_lpctype(value_type);
+
+                if (stype == NULL)
+                {
+                    push_lpctype(inter_sp, derived_struct_types);
+                    errorf("Struct definition for '%s' (/%s) is not available.\n"
+                          , get_txt(single_derived_struct->t_struct.name->name)
+                          , get_txt(single_derived_struct->t_struct.name->prog_name));
+                    return; /* NOTREACHED */
+                }
+
+                assert(stype->num_members >= st->type->num_members);
+                result = struct_new(stype);
+                free_lpctype(derived_struct_types);
+
+                memsafe(result, struct_t_size(stype), "converted struct");
+
+                for (int i = 0; i < st->type->num_members; i++)
+                    assign_rvalue_no_free(result->member + i, st->member + i);
+                put_struct(dest, result);
+
+                return;
+            }
+            free_lpctype(value_type);
+
+            if (lpctype_contains(lpctype_mapping, type))
+            {
+                mapping_t *m;
+                int len = struct_size(st);
+
+                if (max_mapping_size && 2*len > max_mapping_size)
+                    errorf("Illegal mapping size: %d elements\n", 2*len);
+                if (max_mapping_keys && len > max_mapping_keys)
+                    errorf("Illegal mapping size: %d entries\n", len);
+
+                memsafe(m = allocate_mapping(len, 1), len, "converted mapping");
+
+                for (int i = 0; i < len; i++)
+                {
+                    svalue_t key = svalue_string(st->type->member[i].name);
+                    svalue_t *entry = get_map_lvalue_unchecked(m, &key);
+                    free_svalue(entry);
+                    assign_rvalue_no_free(entry, &st->member[i]);
+                }
+
+                put_mapping(dest, m);
+                return;
+            }
+
+            array_types = get_common_type(lpctype_any_array, type);
+            if (array_types != NULL)
+            {
+                /* We just choose one of the array types. */
+                int len = struct_size(st);
+                vector_t *vec;
+                lpctype_t *single_array = array_types->t_class == TCLASS_UNION ? array_types->t_union.member : array_types;
+                assert(single_array->t_class == TCLASS_ARRAY);
+
+                push_lpctype(inter_sp, array_types);
+
+                memsafe(vec = allocate_array(len), len, "converted array");
+                put_array(dest, vec);
+
+                for (int i = 0; i < len; i++)
+                    convert_to_type(vec->item + i, st->member + i, single_array->t_array.element, opts, keep_zero);
+
+                free_lpctype(array_types);
+                inter_sp--;
+                return;
+            }
+
+            if (lpctype_contains(lpctype_string, type))
+            {
+                string_t *str;
+                memsafe(str = extend_string("<struct ", struct_name(st), ">"), mstrsize(struct_name(st)), "converted lwobject name");
+                put_string(dest, str);
+                return;
+            }
+
+            break;
+        }
+
+        case T_BYTES:
+            if (convert_bytes(dest, rvalue->u.str, get_txt(rvalue->u.str), mstrsize(rvalue->u.str), type, opts))
+                return;
+            break;
+
+        case T_LWOBJECT:
+            if (is_compatible_lwobject(rvalue->u.lwob, type))
+                put_ref_lwobject(dest, rvalue->u.lwob);
+            else if (lpctype_contains(lpctype_string, type))
+            {
+                string_t *str;
+                memsafe(str = extend_string("<lightweight object /", rvalue->u.lwob->prog->name, ">"), mstrsize(rvalue->u.lwob->prog->name), "converted struct name");
+                put_string(dest, str);
+            }
+            else
+                break;
+            return;
+
+        case T_COROUTINE:
+            if (lpctype_contains(lpctype_coroutine, type))
+                put_ref_coroutine(dest, rvalue->u.coroutine);
+            else if (lpctype_contains(lpctype_string, type))
+                put_string(dest, coroutine_to_string(rvalue->u.coroutine));
+            else
+                break;
+            return;
+
+#ifdef USE_PYTHON
+        case T_PYTHON:
+            if (convert_python_ob(dest, rvalue, type, opts))
+                return;
+            break;
+#endif
+
+        case T_LPCTYPE:
+        {
+            lpctype_t *lpctype_array;
+
+            if (lpctype_contains(lpctype_lpctype, type))
+            {
+                put_ref_lpctype(dest, rvalue->u.lpctype);
+                return;
+            }
+
+            lpctype_array = get_array_type(lpctype_lpctype);
+            if (lpctype_contains(lpctype_array, type))
+            {
+                free_lpctype(lpctype_array);
+
+                put_array(dest, convert_lpctype_to_array(rvalue->u.lpctype));
+                return;
+            }
+            free_lpctype(lpctype_array);
+
+            if (lpctype_contains(lpctype_mapping, type))
+            {
+                mapping_t *m;
+                size_t len = 1;
+
+                for (lpctype_t *cur = rvalue->u.lpctype; cur->t_class == TCLASS_UNION; cur = cur->t_union.head)
+                    len++;
+
+                memsafe(m = allocate_mapping(len, 0), len, "converted mapping");
+                for (lpctype_t *cur = rvalue->u.lpctype;;)
+                {
+                    if (cur->t_class == TCLASS_UNION)
+                    {
+                        svalue_t key = svalue_lpctype(cur->t_union.member);
+                        get_map_lvalue_unchecked(m, &key);
+                        cur = cur->t_union.head;
+                    }
+                    else
+                    {
+                        svalue_t key = svalue_lpctype(cur);
+                        get_map_lvalue_unchecked(m, &key);
+                        break;
+                    }
+                }
+
+                put_mapping(dest, m);
+                return;
+            }
+
+            if (lpctype_contains(lpctype_string, type))
+            {
+                put_string(dest, new_unicode_mstring(get_lpctype_name(rvalue->u.lpctype)));
+                return;
+            }
+
+            break;
+        }
+
+        default:
+            fatal("(to_type) Illegal source type %d\n", rvalue->type);
+    }
+
+    errorf("Cannot convert %s to %s.\n", sv_typename(rvalue), get_lpctype_name(type));
+} /* convert_to_type() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+v_to_type (svalue_t *sp, int num_arg)
+
+/* EFUN to_type()
+ *
+ *   mixed to_type(mixed value, lpctype type)
+ *   mixed to_type(mixed value, lpctype type, struct to_type_options options)
+ *
+ * Converts <value> into <type> recursively.
+ */
+
+{
+    svalue_t *value = sp - num_arg + 1;
+    struct_t *opts = NULL;
+    bool keep_zero = false;
+
+    if (num_arg > 2)
+    {
+        opts = value[2].u.strct;
+        test_efun_arg_struct_type("to_type", 3, opts, STRUCT_TO_TYPE_OPTIONS);
+        keep_zero = opts->member[STRUCT_TO_TYPE_OPTIONS_KEEP_ZERO].u.number;
+    }
+
+    push_number(sp, 0);
+    inter_sp = sp;
+
+    convert_to_type(sp, value, value[1].u.lpctype, opts, keep_zero);
+
+    assert(inter_sp == sp);
+
+    pop_n_elems(num_arg, sp - 1);
+    transfer_svalue_no_free(value, sp);
+    return value;
+} /* v_to_type() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

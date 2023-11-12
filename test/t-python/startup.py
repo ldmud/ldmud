@@ -1216,6 +1216,9 @@ class box:
     def __save__(self):
         return self.value
 
+    def __convert__(self, target, opts):
+        return ldmud.efuns.to_type(self.value, target, *(o for o in (opts,) if o is not None))
+
     @staticmethod
     def __restore__(val):
         return box(val)

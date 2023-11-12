@@ -55,6 +55,7 @@ extern svalue_t *f_to_float (svalue_t *sp);
 extern svalue_t *f_to_string (svalue_t *sp);
 extern svalue_t *f_to_object (svalue_t *sp);
 extern svalue_t *f_to_lpctype(svalue_t *sp);
+extern svalue_t *v_to_type (svalue_t *sp, int num_arg);
 extern svalue_t *f_copy (svalue_t *sp);
 extern svalue_t *f_deep_copy (svalue_t *sp);
 extern svalue_t *v_filter (svalue_t *sp, int num_arg);

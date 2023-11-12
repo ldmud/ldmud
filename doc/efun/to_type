@@ -1,0 +1,58 @@
+SYNOPSIS
+        mixed to_type(mixed value, lpctype type)
+        mixed to_type(mixed value, lpctype type, struct to_type_options options)
+
+DESCRIPTION
+        Converts <value> to <type>. This efun will apply any type conversions
+        recursively to make <value> conform to <type>. The following
+        conversions are available:
+
+          source type       target types
+          -------------     ----------------------------------------
+          array (int)       string, bytes
+          array (mixed)     quoted array, struct, mapping
+          bytes             string, int*
+          closure           object, lwobject, int, string
+          coroutine         string
+          int               float, string
+          float             int, string
+          lpctype           lpctype*, mapping, string
+          lwobject          string
+          mapping           struct, mixed*
+          object            string
+          quoted array      mixed*
+          string            symbol, int, float, lpctype, object, bytes, int*
+          struct            struct, mapping, mixed*, string
+          symbol            string, int*
+
+        If multiple conversions are possible (e.g. to_type("10", <int|int*>)
+        the conversion will be selected in order as given in the table above.
+        If multiple array or struct types are given, the order is undefined.
+        Conversions, where elements (e.g. from an array, mapping or struct)
+        need to be discarded, are not considered.
+
+        Optionally the function accepts a struct with additional options.
+        All entries in this struct are optional. These are the members:
+
+          source_encoding:
+            The encoding (given as string) for conversion from bytes to
+            string. If not given, such a conversion will not be performed.
+
+          target_encoding:
+            The encoding (given as string) for conversion from string to
+            bytes. If not given, such a conversion will not be performed.
+
+          keep_zero:
+            If set (integer != 0) a zero will not be converted. If unset,
+            a zero will be converted to string or float if requested,
+            for all other types it will stay zero.
+
+EXAMPLES
+        to_type(({ "10", "20" }), [int*]) -> ({ 10, 20 })
+
+HISTORY
+        Introduced in LDMud 3.6.8.
+
+SEE ALSO
+        to_array(E), to_bytes(E), to_float(E), to_int(E), to_lpctype(E),
+        to_object(E), to_string(E), to_struct(E), to_text(E)

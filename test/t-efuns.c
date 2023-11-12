@@ -1,4 +1,4 @@
-#pragma save_types
+#pragma save_types, lightweight, clone
 
 #define OWN_PRIVILEGE_VIOLATION
 
@@ -31,6 +31,7 @@ struct derived_struct (test_struct)
 };
 
 struct cs_opts (compile_string_options) {};
+struct tt_opts (to_type_options) {};
 
 mapping json_testdata = ([ "test 1": 42, "test 2": 42.0,
                           "test 3": "hello world\n",
@@ -56,13 +57,13 @@ string dhe_testdata =
 mixed global_var;
 
 int f(int arg);
-object clone = clonep() ? 0 : clone_object(this_object());
+object clone = (this_object() == blueprint()) && clone_object(this_object());
 
 string last_privi_op;
 mixed last_privi_who;
 mixed* last_privi_args;
 
-mixed *tests =
+mixed *tests = (this_object() == blueprint()) &&
 // String compiler test boundary
 ({
     // TODO: Add cases for indexing at string end ("abc"[3])
@@ -1433,6 +1434,102 @@ mixed *tests =
     ({ "to_struct derived from base struct", 0, (: mixed b = (<test_struct> ({10,20})); return deep_eq(to_struct(b, (<derived_struct>)), (<derived_struct> ({10,20}), 0)); :) }),
     ({ "to_struct base from derived struct", 0, (: mixed d = (<derived_struct> ({10,20}), ({"A","B"})); return deep_eq(to_struct(d, (<test_struct>)), (<test_struct> ({10,20}))); :) }),
 
+    ({ "to_type int* to mixed*",                          0, (: deep_eq(to_type(({1,2,3}), [mixed*]), ({1,2,3})) :) }),
+    ({ "to_type int* to string",                          0, (: deep_eq(to_type(({76,68,77,117,100}), [string]), "LDMud") :) }),
+    ({ "to_type int* to bytes",                           0, (: deep_eq(to_type(({76,68,77,117,100}), [bytes]), b"LDMud") :) }),
+    ({ "to_type mixed* to int*",                          0, (: deep_eq(to_type(({1,2,3}), [int*]), ({1,2,3})) :) }),
+    ({ "to_type string* to int*",                         0, (: deep_eq(to_type(({"1", "-20", "0x30", "-0b100"}), [int*]), ({1, -20, 48, -4})) :) }),
+    ({ "to_type mixed* to string*",                       0, (: deep_eq(to_type(({"abc", 0, 1, 2.3}), [string*]), ({"abc", "0", "1", "2.3"})) :) }),
+    ({ "to_type mixed* to string* with keep_zero",        0, (: deep_eq(to_type(({"abc", 0, 1, 2.3}), [string*], (<tt_opts> keep_zero: 1)), ({"abc", 0, "1", "2.3"})) :) }),
+    ({ "to_type mixed* to struct mixed",                  0, (: deep_eq(to_type(({"abc", 3, #'abs}), [struct mixed]), to_struct(({"abc", 3, #'abs}))) :) }),
+    ({ "to_type mixed* to derived_struct",                0, (: deep_eq(to_type(({ ({1, "2", 3.3}), ({4, "5", 6.6}) }), [struct derived_struct]), (<derived_struct> arg: ({1, 2, 3}), values: ({"4", "5", "6.6"})) ) :) }),
+    ({ "to_type mixed* to string|mapping",                0, (: deep_eq(to_type(({"abc", 5, #'to_type}), [string|mapping]), (["abc", 5, #'to_type])) :) }),
+    ({ "to_type mixed* to quoted array",                  0, (: deep_eq(to_type(({"abc", 5, #'to_type}), decltype('({}))), '({"abc", 5, #'to_type})) :) }),
+    ({ "to_type bytes to bytes|int*",                     0, (: deep_eq(to_type(b"\x01\x02\x03", [bytes|int*]) , b"\x01\x02\x03") :) }),
+    ({ "to_type bytes to string without encoding", TF_ERROR, (: to_type(b"\xe2\x98\xba\xe2\x98\xb9", [string]) :) }),
+    ({ "to_type bytes to string with encoding",           0, (: deep_eq(to_type(b"\xe2\x98\xba\xe2\x98\xb9", [string], (<tt_opts> source_encoding: "utf-8")), "\u263a\u2639") :) }),
+    ({ "to_type bytes to int*",                           0, (: deep_eq(to_type(b"\x01\x02\x03", [int*]) , ({1,2,3})) :) }),
+    ({ "to_type efun closure to closure|object",          0, (: to_type(#'abs, [closure|object]) == #'abs :) }),
+    ({ "to_type efun closure to object",                  0, (: to_type(#'abs, [object]) == this_object() :) }),
+    ({ "to_type lfun closure to object",                  0, (: to_type(#'f, [object]) == this_object() :) }),
+    ({ "to_type variable closure to object",              0, (: to_type(#'b, [object]) == this_object() :) }),
+    ({ "to_type lambda closure to object",                0, (: to_type(lambda(0,0), [object]) == this_object() :) }),
+    ({ "to_type efun closure to lwobject",                0, (: lwobject lwo = new_lwobject(object_name()); return to_type(lwo.get_efun_closure(), [lwobject]) == lwo; :) }),
+    ({ "to_type lfun closure to lwobject",                0, (: lwobject lwo = new_lwobject(object_name()); return to_type(lwo.get_lfun_closure(), [lwobject]) == lwo; :) }),
+    ({ "to_type var closure to lwobject",                 0, (: lwobject lwo = new_lwobject(object_name()); return to_type(lwo.get_var_closure(), [lwobject]) == lwo; :) }),
+    ({ "to_type lambda closure to lwobject",              0, (: lwobject lwo = new_lwobject(object_name()); return to_type(bind_lambda(unbound_lambda(0,0), lwo), [lwobject]) == lwo; :) }),
+    ({ "to_type variable closure to int",                 0, (: to_type(#'b, [int]) == 3 :) }),
+    ({ "to_type efun closure to string",                  0, (: "abs" in to_type(#'abs, [string]) :) }),
+    ({ "to_type lfun closure to string",                  0, (: "msg" in to_type(#'msg, [string]) :) }),
+    ({ "to_type variable closure to string",              0, (: "global_var" in to_type(#'global_var, [string]) :) }),
+    ({ "to_type lambda closure to string",                0, (: "lambda" in to_type(lambda(0,0), [string]) :) }),
+    ({ "to_type coroutine to coroutine|string",           0, (: coroutine cr = async function void() {}; return to_type(cr, [coroutine|string]) == cr; :) }),
+    ({ "to_type coroutine to string",                     0, (: object_name() in to_type(async function void() {}, [string]) :) }),
+    ({ "to_type int to int|string",                       0, (: to_type(11, [int|string]) == 11 :) }),
+    ({ "to_type int to float|string",                     0, (: floatp(to_type(11, [float|string])) && to_type(11, [float|string]) == 11.0  :) }),
+    ({ "to_type int to string|object",                    0, (: to_type(11, [string|object]) == "11" :) }),
+    ({ "to_type float to float|int",                      0, (: to_type(11.235, [int|float]) == 11.235 :) }),
+    ({ "to_type float to int|string",                     0, (: to_type(11.235, [int|string]) == 11 :) }),
+    ({ "to_type float to string|object",                  0, (: to_type(11.235, [string|object]) == "11.235" :) }),
+    ({ "to_type lpctype to lpctype*",                     0, (: deep_eq(mkmapping(to_type([int|float|string], [lpctype*])), ([ [int], [float], [string] ])) :) }),
+    ({ "to_type lpctype to mixed*",                       0, (: deep_eq(mkmapping(to_type([mixed*|object], [mixed*|object])), ([ [mixed*], [object] ])) :) }),
+    ({ "to_type lpctype to mapping",                      0, (: deep_eq(to_type([int|float|string], [mapping]), ([ [int], [float], [string] ])) :) }),
+    ({ "to_type lwobject to lwobject|string",             0, (: lwobject lwo = new_lwobject(object_name()); return to_type(lwo, [lwobject|string]) == lwo; :) }),
+    ({ "to_type lwobject to string",                      0, (: lwobject lwo = new_lwobject(object_name()); return object_name() in to_type(lwo, [string]); :) }),
+    ({ "to_type mapping to mapping|mixed*",               0, (: mapping m = (["a", "b", "c"]); return to_type(m, [mapping|mixed*]) == m; :) }),
+    ({ "to_type mapping to derived_struct",               0, (: deep_eq(to_type((["values":({"1","2",3}), "arg":({"4","5",6})]), [struct derived_struct]), (<derived_struct> arg: ({4, 5, 6}), values: ({"1", "2", "3"})) ) :) }),
+    ({ "to_type wide mapping to derived_struct",          0, (: deep_eq(to_type((["values":"1";"2";3, "arg":"4";"5";6]), [struct derived_struct]), (<derived_struct> arg: ({4, 5, 6}), values: ({"1", "2", "3"})) ) :) }),
+    ({ "to_type empty mapping to derived_struct",         0, (: deep_eq(to_type(([]), [struct derived_struct]), (<derived_struct>) ) :) }),
+    ({ "to_type mapping to struct mixed",                 0, (: deep_eq(to_type((["field1": "abc", "field2": 3, "field3": #'abs]), [struct mixed]), to_struct((["field1": "abc", "field2": 3, "field3": #'abs]))) :) }),
+    ({ "to_type mapping to <string**>",                   0, (: deep_eq(sort_array(to_type((["a":"x";"y";"z", "b":"1";"2";3]), [string**]), (: $1[0] > $2[0] :)), ({ ({ "a", "x", "y", "z" }), ({"b", "1", "2", "3"}) })) :) }),
+    ({ "to_type mapping to <string*>",                    0, (: deep_eq(sort_array(to_type(([65, 66, 67]), [string*]), #'>), ({ "A", "B", "C"})) :) }),
+    ({ "to_type mapping to <mapping*>",                   0, (: deep_eq(to_type((["a":"b";"c";"d"]), [mapping*]), ({ ([ "a", "b", "c", "d" ]) })) :) }),
+    ({ "to_type object to object|string",                 0, (: to_type(this_object(), [object|string]) == this_object() :) }),
+    ({ "to_type object to string",                        0, (: object_name() in to_type(this_object(), [string]) :) }),
+    ({ "to_type quoted_array to quoted_array|array",      0, (: mixed arr = '({'L', 'D'}); return to_type(arr, decltype('({}))|[mixed*]) == arr; :) }),
+    ({ "to_type quoted_array to array",                   0, (: deep_eq(to_type('({'L', 'D'}), [mixed*]), ({'L', 'D'})) :) }),
+    ({ "to_type quoted_array to string",                  0, (: to_type('({'L', 'D'}), [string]) == "LD" :) }),
+    ({ "to_type string to string|int",                    0, (: to_type("123", [string|int]) == "123" :) }),
+    ({ "to_type string to symbol",                        0, (: to_type("abc", [symbol]) == 'abc :) }),
+    ({ "to_type string to int",                           0, (: to_type("0x123", [int]) == 0x123 :) }),
+    ({ "to_type string(__INT_MAX__) to int",              0, (: to_type(to_string(__INT_MAX__), [int]) == __INT_MAX__ :) }),
+    ({ "to_type string(__INT_MIN__) to int",              0, (: to_type(to_string(__INT_MIN__), [int]) == __INT_MIN__ :) }),
+    ({ "to_type string to int",                           0, (: to_type("0x123", [int]) == 0x123 :) }),
+    ({ "to_type string to float",                         0, (: to_type("3.25", [float]) == 3.25 :) }),
+    ({ "to_type long string to float",                    0, (: to_type("0.00000000000000000000000000000000000000001", [float]) == 0.00000000000000000000000000000000000000001 :) }),
+    ({ "to_type string to lpctype",                       0, (: to_type("string|lpctype", [lpctype]) == [string|lpctype] :) }),
+    ({ "to_type string to object",                        0, (: to_type(object_name(), [object]) == this_object() :) }),
+    ({ "to_type string to bytes without encoding", TF_ERROR, (: to_type("\u263a\u2639", [bytes]) :) }),
+    ({ "to_type string to bytes with encoding",           0, (: to_type("\u263a\u2639", [bytes], (<tt_opts> target_encoding: "utf-8")) == b"\xe2\x98\xba\xe2\x98\xb9" :) }),
+    ({ "to_type string to int*",                          0, (: deep_eq(to_type("\u263a\u2639", [int*]) , ({0x263a, 0x2639})) :) }),
+    ({ "to_type derived_struct to test_struct",           0, (: struct derived_struct s = (<derived_struct> values: ({"A", "B"}), arg: ({1, 2})); return to_type(s, [struct test_struct]) == s; :) }),
+    ({ "to_type test_struct to derived_struct",           0, (: deep_eq(to_type((<test_struct> arg: ({1, 2})), [struct derived_struct]), (<derived_struct> arg: ({1,2}))) :) }),
+    ({ "to_type derived_struct to mapping",               0, (: deep_eq(to_type((<derived_struct> values: ({"A", "B"}), arg: ({1, 2})), [mapping]), (["values": ({"A","B"}), "arg": ({1,2})])) :) }),
+    ({ "to_type derived_struct to string",                0, (: "derived_struct" in to_type((<derived_struct> values: ({"A", "B"}), arg: ({1, 2})), [string]) :) }),
+    ({ "to_type symbol to symbol|string",                 0, (: to_type('LDMud, [symbol|string]) == 'LDMud :) }),
+    ({ "to_type symbol to string",                        0, (: to_type('LDMud, [string]) == "LDMud" :) }),
+    ({ "to_type symbol to int*",                          0, (: deep_eq(to_type('abc, [int*]), ({'a', 'b', 'c'})) :) }),
+    ({ "to_type array range to quoted array",             0, (: mixed* arr = ({ 1, 2, 3, 4, 5 }), *range = ({ &(arr[2..3]) }); return deep_eq(to_type(range, decltype(({'({}) }))), ({ '({3,4}) })); :) }),
+    ({ "to_type string range to int",                     0, (: string s = "12345", *range = ({ &(s[2..3]) }); return deep_eq(to_type(range, [int*]), ({ 34 })); :) }),
+    ({ "to_type string range to string",                  0, (: string s = "12345", *range = ({ &(s[2..3]) }); return deep_eq(to_type(range, [string*]), ({ "34" })); :) }),
+    ({ "to_type string range to symbol",                  0, (: string s = "LDMud", *range = ({ &(s[2..3]) }); return deep_eq(to_type(range, [symbol*]), ({ 'Mu })); :) }),
+    ({ "to_type string range to object",                  0, (: string s = "__" + object_name() + "__", *range = ({ &(s[2..<3]) }); return deep_eq(to_type(range, [object*]), ({ this_object()})); :) }),
+    ({ "to_type string range to lpctype",                 0, (: string s = "int|string|object", *range = ({ &(s[4..9]) }); return deep_eq(to_type(range, [lpctype*]), ({ [string] })); :) }),
+    ({ "to_type bytes range to bytes",                    0, (: bytes b = b"LDMud", *range = ({ &(b[2..3]) }); return deep_eq(to_type(range, [bytes*]), ({ b"Mu" })); :) }),
+    ({ "to_type bytes range to string",                   0, (: bytes b = b"LDMud", *range = ({ &(b[2..3]) }); return deep_eq(to_type(range, [string*], (<tt_opts> source_encoding: "utf-8")), ({ "Mu" })); :) }),
+    ({ "to_type existing map range to string",            0, (: mapping m = ([ "A": 1;2;3;4;5 ]); int** range = ({ &(m["A",2..3]) }); return deep_eq(to_type(range, [string*]), ({ "\x03\x04" })); :) }),
+    ({ "to_type existing map range to byte",              0, (: mapping m = ([ "A": 1;2;3;4;5 ]); int** range = ({ &(m["A",2..3]) }); return deep_eq(to_type(range, [bytes*]), ({ b"\x03\x04" })); :) }),
+    ({ "to_type existing map range to int*"    ,          0, (: mapping m = ([ "A": 1;2;3;4;5 ]); int** range = ({ &(m["A",2..3]) }); return deep_eq(to_type(range, [int**]), ({ ({3,4}) })); :) }),
+    ({ "to_type existing map range to mapping",           0, (: mapping m = ([ "A": 1;2;3;4;5 ]); int** range = ({ &(m["A",2..3]) }); return deep_eq(to_type(range, [mapping*]), ({ ([3,4]) })); :) }),
+    ({ "to_type existing map range to struct mixed",      0, (: mapping m = ([ "A": 1;2;3;4;5 ]); int** range = ({ &(m["A",2..3]) }); return deep_eq(to_type(range, [struct mixed*]), ({ to_struct(({3,4})) })); :) }),
+    ({ "to_type existing map range to derived_struct",    0, (: mapping m = ([ "A": 1;2;({3});({4});5 ]); int** range = ({ &(m["A",2..3]) }); return deep_eq(to_type(range, [struct derived_struct*]), ({ (<derived_struct> arg: ({3}), values: ({"4"})) })); :) }),
+    ({ "to_type non-existing map range to string",        0, (: mapping m = ([ "A": 1;2;3;4;5 ]); int** range = ({ &(m["B",2..3]) }); return deep_eq(to_type(range, [string*]), ({ "\x00\x00" })); :) }),
+    ({ "to_type non-existing map range to byte",          0, (: mapping m = ([ "A": 1;2;3;4;5 ]); int** range = ({ &(m["B",2..3]) }); return deep_eq(to_type(range, [bytes*]), ({ b"\x00\x00" })); :) }),
+    ({ "to_type non-existing map range to int*",          0, (: mapping m = ([ "A": 1;2;3;4;5 ]); int** range = ({ &(m["B",2..3]) }); return deep_eq(to_type(range, [int**]), ({ ({0,0}) })); :) }),
+    ({ "to_type non-existing map range to mapping",       0, (: mapping m = ([ "A": 1;2;3;4;5 ]); int** range = ({ &(m["B",2..3]) }); return deep_eq(to_type(range, [mapping*]), ({ ([0]) })); :) }),
+    ({ "to_type non-existing map range to struct mixed",  0, (: mapping m = ([ "A": 1;2;3;4;5 ]); int** range = ({ &(m["B",2..3]) }); return deep_eq(to_type(range, [struct mixed*]), ({ to_struct(({0,0})) })); :) }),
+    ({ "to_type non-existing map range to derived_struct",0, (: mapping m = ([ "A": 1;2;3;4;5 ]); int** range = ({ &(m["B",2..3]) }); return deep_eq(to_type(range, [struct derived_struct*]), ({ (<derived_struct>) })); :) }),
+
     ({ "get_type_info with temporary anonymous struct 1", 0, (: deep_eq(get_type_info(to_struct((["A": 10]))), ({ T_STRUCT, "anonymous" })) :) }),
     ({ "get_type_info with temporary anonymous struct 2", 0, (: !strstr(get_type_info(to_struct((["A": 10])), 2), "anonymous ") :) }),
     ({ "struct_info of regular struct 1", 0, (: mixed info = struct_info((<test_struct> ({10,20})), SINFO_FLAT);
@@ -1771,6 +1868,10 @@ int get_args()
 {
     return args;
 }
+
+closure get_lfun_closure() { return #'f; }
+closure get_var_closure() { return #'b; }
+closure get_efun_closure() { return #'abs; }
 
 struct derived_struct get_struct()
 {

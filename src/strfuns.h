@@ -38,6 +38,7 @@ extern size_t get_escaped_character(p_int c, char* buf, size_t buflen);
 extern bool string_needs_escape(const char * text, size_t len, bool allow_unicode);
 extern size_t escape_string(const char * text, size_t len, char * buf, size_t buflen, bool allow_unicode);
 extern size_t unescape_string(const char * text, size_t len, char * buf, size_t buflen);
+extern string_t * extend_string (const char *prefix, string_t *txt, const char *suffix);
 
 extern size_t parse_input_encoding(string_t* encoding, bool* ignore, bool* replace);
 
@@ -55,6 +56,9 @@ extern char* get_illegal_sequence(char* buf, size_t len, iconv_t cd);
 extern size_t next_grapheme_break(const char* str, size_t len, int* width) __attribute__((nonnull(1,3)));
 extern int get_string_width(const char* str, size_t len, bool* error) __attribute__((nonnull(1)));
 extern size_t get_string_up_to_width(const char* str, size_t len, int width, bool* error) __attribute__((nonnull(1)));
+
+extern string_t * utf8_string_to_bytes(const char* src, size_t len, const char* encoding, const char* efun_name, int efun_encoding_arg_pos);
+extern string_t * bytes_to_utf8_string(const char* src, size_t len, string_t* encoding, const char* efun_name, int efun_encoding_arg_pos);
 
 extern svalue_t * v_to_bytes(svalue_t *sp, int num_arg);
 extern svalue_t * v_to_text(svalue_t *sp, int num_arg);

@@ -649,6 +649,36 @@ unescape_string (const char * text, size_t len, char * buf, size_t buflen)
     return dest - buf;
 } /* unescape_string() */
 
+/*--------------------------------------------------------------------*/
+
+string_t *
+extend_string (const char *prefix, string_t *txt, const char *suffix)
+
+/* Returns a string consisting of <prefix>, <txt>, and <suffix>.
+ * <prefix> and <suffix> are considered pure ASCII text.
+ * Returns NULL when out of memory.
+ */
+
+{
+    size_t prefix_len = strlen(prefix);
+    size_t suffix_len = strlen(suffix);
+    size_t len = prefix_len + mstrsize(txt) + suffix_len;
+
+    string_t *result = alloc_mstring(len);
+    char *buf;
+
+    if (!result)
+        return NULL;
+
+    buf = get_txt(result);
+    memcpy(buf, prefix, prefix_len);
+    memcpy(buf + prefix_len, get_txt(txt), mstrsize(txt));
+    memcpy(buf + prefix_len + mstrsize(txt), suffix, suffix_len);
+
+    result->info.unicode = txt->info.unicode;
+    return result;
+} /* extend_string() */
+
 /*====================================================================*/
 
 /*                          ENCODING                                  */
@@ -1522,6 +1552,338 @@ get_string_up_to_width (const char* str, size_t len, int width, bool* error)
 
 /*--------------------------------------------------------------------*/
 
+string_t *
+utf8_string_to_bytes (const char* src, size_t len, const char* encoding, const char* efun_name, int efun_encoding_arg_pos)
+
+/* Convert a UTF-8 string <src> into byte string with <encoding>.
+ */
+
+{
+    iconv_t cd;
+    string_t *result;
+
+    char*  in_buf_ptr = (char*) src;
+    size_t in_buf_left = len;
+
+    char*  out_buf_ptr;
+    char*  out_buf_start;
+    size_t out_buf_size;
+    size_t out_buf_left;
+
+    cd = iconv_open(encoding, "UTF-8");
+    if (!iconv_valid(cd))
+    {
+        if (errno == EINVAL)
+            errorf("Bad arg %d to %s(): Unsupported encoding '%s'.\n", efun_encoding_arg_pos, efun_name, encoding);
+        else
+            errorf("%s(): %s\n", efun_name, strerror(errno));
+        return NULL; /* NOTREACHED */
+    }
+
+    if (len == 0)
+    {
+        iconv_close(cd);
+
+        /* We can't use STR_EMPTY, because that one is a unicode string. */
+        memsafe(result = alloc_mstring(0), 0, "converted array");
+        result->info.unicode = STRING_BYTES;
+        return result;
+    }
+
+    /* For small texts, we reserve twice the space. */
+    out_buf_left = out_buf_size = len > 32768 ? (len + 2048) : (2 * len);
+    xallocate(out_buf_start, out_buf_size, "conversion buffer");
+    out_buf_ptr = out_buf_start;
+
+    /* Convert the string, reallocating the output buffer where necessary */
+    while (true)
+    {
+        size_t rc;
+        bool at_end = (in_buf_left == 0);
+
+        /* At the end we need one final call. */
+        if (at_end)
+            rc = iconv(cd, NULL, NULL, &out_buf_ptr, &out_buf_left);
+        else
+            rc = iconv(cd, &in_buf_ptr, &in_buf_left, &out_buf_ptr, &out_buf_left);
+
+        if (rc == (size_t)-1)
+        {
+            size_t idx;
+            if (errno == E2BIG)
+            {
+                /* Reallocate output buffer */
+                size_t new_size = out_buf_size + (len > 128 ? len : 128);
+                char* new_buf = rexalloc(out_buf_start, new_size);
+
+                if (!new_buf)
+                {
+                    iconv_close(cd);
+
+                    xfree(out_buf_start);
+                    outofmem(new_size, "conversion buffer");
+                    return NULL; /* NOTREACHED */
+                }
+
+                out_buf_ptr   = new_buf + (out_buf_ptr - out_buf_start);
+                out_buf_start = new_buf;
+                out_buf_left  = out_buf_left + new_size - out_buf_size;
+                out_buf_size  = new_size;
+                continue;
+            }
+
+            /* Ignore EILSEQ at the end, they come from //IGNORE. */
+            if (errno == EILSEQ && !in_buf_left)
+                continue;
+
+            /* Other error: clean up */
+            iconv_close(cd);
+            xfree(out_buf_start);
+
+            idx = byte_to_char_index(src, len - in_buf_left, NULL);
+            if (errno == EILSEQ)
+                errorf("%s(): Invalid character sequence at index %zd.\n", efun_name, idx);
+
+            if (errno == EINVAL)
+                errorf("%s(): Incomplete character sequence at index %zd.\n", efun_name, idx);
+
+            errorf("%s(): %s\n", efun_name, strerror(errno));
+            return NULL; /* NOTREACHED */
+        }
+
+        if (at_end)
+            break;
+    }
+
+    iconv_close(cd);
+
+    result = new_n_mstring(out_buf_start, out_buf_ptr - out_buf_start, STRING_BYTES);
+    result->info.unicode = STRING_BYTES;
+    xfree(out_buf_start);
+    if (!result)
+    {
+        outofmem(out_buf_ptr - out_buf_start, "converted string");
+        return NULL; /* NOTREACHED */
+    }
+
+    return result;
+} /* string_to_bytes() */
+
+/*--------------------------------------------------------------------*/
+
+string_t *
+bytes_to_utf8_string (const char* src, size_t len, string_t* encoding, const char* efun_name, int efun_encoding_arg_pos)
+
+/* Convert the byte sequence <src> to an UTF-8 string with <encoding>.
+ */
+
+{
+    string_t* result;
+
+    char*  encoding_name;
+    size_t encoding_len;
+
+    iconv_t cd;
+    bool    ignore;
+    bool    replace;
+
+    char*  in_buf_ptr = (char*)src;
+    size_t in_buf_left = len;
+
+    char*  out_buf_ptr;
+    char*  out_buf_start;
+    size_t out_buf_size;
+    size_t out_buf_left;
+
+    encoding_len = parse_input_encoding(encoding, &ignore, &replace);
+    encoding_name = get_txt(encoding);
+
+    if (encoding_len < mstrsize(encoding))
+    {
+        char save = encoding_name[encoding_len];
+
+        encoding_name[encoding_len] = 0;
+        cd = iconv_open("UTF-8", encoding_name);
+        encoding_name[encoding_len] = save;
+    }
+    else
+        cd = iconv_open("UTF-8", encoding_name);
+
+    if (!iconv_valid(cd))
+    {
+        if (errno == EINVAL)
+            errorf("Bad arg %d to %s(): Unsupported encoding '%s'.\n", efun_encoding_arg_pos, efun_name, get_txt(encoding));
+        else
+            errorf("%s(): %s\n", efun_name, strerror(errno));
+        return NULL; /* NOTREACHED */
+    }
+
+    if (len == 0)
+    {
+        iconv_close(cd);
+        return ref_mstring(STR_EMPTY);
+    }
+
+    /* For small texts, we reserve twice the space. */
+    out_buf_left = out_buf_size = len > 32768 ? (len + 2048) : (2 * len);
+    xallocate(out_buf_start, out_buf_size, "conversion buffer");
+    out_buf_ptr = out_buf_start;
+
+    /* Convert the string, reallocating the output buffer where necessary */
+    while (true)
+    {
+        size_t rc;
+        bool at_end = (in_buf_left == 0);
+
+        /* At the end we need one final call. */
+        if (at_end)
+            rc = iconv(cd, NULL, NULL, &out_buf_ptr, &out_buf_left);
+        else
+            rc = iconv(cd, &in_buf_ptr, &in_buf_left, &out_buf_ptr, &out_buf_left);
+
+        if (rc == (size_t)-1)
+        {
+            size_t idx;
+            if ((errno == EILSEQ || errno == EINVAL) && (ignore || replace))
+            {
+                /* Handle encoding errors ourselves. */
+                if (ignore)
+                {
+                    if (at_end)
+                        break;
+
+                    in_buf_ptr++;
+                    in_buf_left--;
+                    continue;
+                }
+
+                if (replace)
+                {
+                    /* Add the (3 bytes) replacement char. */
+                    if (out_buf_left < 3)
+                        errno = E2BIG;
+                    else
+                    {
+                        memcpy(out_buf_ptr, "\xef\xbf\xbd", 3);
+                        out_buf_ptr += 3;
+                        out_buf_left -= 3;
+
+                        if (at_end)
+                            break;
+
+                        in_buf_ptr++;
+                        in_buf_left--;
+                        continue;
+                    }
+                }
+            }
+
+            if (errno == E2BIG)
+            {
+                /* Reallocate output buffer */
+                size_t new_size = out_buf_size + (len > 128 ? len : 128);
+                char* new_buf = rexalloc(out_buf_start, new_size);
+
+                if (!new_buf)
+                {
+                    iconv_close(cd);
+
+                    xfree(out_buf_start);
+                    outofmem(new_size, "conversion buffer");
+                    return NULL; /* NOTREACHED */
+                }
+
+                out_buf_ptr   = new_buf + (out_buf_ptr - out_buf_start);
+                out_buf_start = new_buf;
+                out_buf_left  = out_buf_left + new_size - out_buf_size;
+                out_buf_size  = new_size;
+                continue;
+            }
+
+            idx = len - in_buf_left;
+            if (errno == EILSEQ)
+            {
+                if (at_end)
+                {
+                    iconv_close(cd);
+                    xfree(out_buf_start);
+                    errorf("to_text(): Invalid character sequence at byte %zd.\n", idx);
+                }
+                else
+                {
+                    char* errseq = get_illegal_sequence(in_buf_ptr, in_buf_left, cd);
+                    char context[128];
+                    size_t pos = sizeof(context);
+
+                    context[--pos] = 0;
+                    context[--pos] = '"';
+
+                    for (int contextlen = 0; contextlen < 10 && out_buf_ptr > out_buf_start; )
+                    {
+                        char escbuf[16];
+                        char *prev = utf8_prev(out_buf_ptr, out_buf_ptr - out_buf_start);
+                        p_int c;
+                        size_t clen = utf8_to_unicode(prev, out_buf_ptr - prev, &c);
+                        size_t esclen;
+
+                        if (!clen)
+                            c = *(unsigned char*)prev;
+
+                        out_buf_ptr = prev;
+                        contextlen++;
+
+                        esclen = get_escaped_character(c, escbuf, sizeof(escbuf));
+                        if (esclen && esclen < pos)
+                        {
+                            pos -= esclen;
+                            memcpy(context + pos, escbuf, esclen);
+                        }
+                    }
+
+                    context[--pos] = '"';
+
+                    iconv_close(cd);
+                    xfree(out_buf_start);
+
+                    errorf("to_text(): Invalid character sequence at byte %zd after %s: %s.\n"
+                          , idx
+                          , context + pos
+                          , errseq);
+                    return NULL; /* NOTREACHED */
+                }
+            }
+
+            /* Other error: clean up */
+            iconv_close(cd);
+            xfree(out_buf_start);
+
+            if (errno == EINVAL)
+                errorf("to_text(): Incomplete character sequence at byte %zd.\n", idx);
+
+            errorf("to_text(): %s\n", strerror(errno));
+            return NULL; /* NOTREACHED */
+        }
+
+        if (at_end)
+            break;
+    }
+
+    iconv_close(cd);
+
+    result = new_n_unicode_mstring(out_buf_start, out_buf_ptr - out_buf_start);
+    xfree(out_buf_start);
+
+    if (!result)
+    {
+        outofmem(out_buf_ptr - out_buf_start, "converted string");
+        return NULL; /* NOTREACHED */
+    }
+
+    return result;
+} /* bytes_to_utf8_string() */
+
+/*--------------------------------------------------------------------*/
+
 svalue_t *
 v_to_bytes (svalue_t *sp, int num_arg)
 
@@ -1691,125 +2053,15 @@ v_to_bytes (svalue_t *sp, int num_arg)
                 outofmem(out_buf_ptr - out_buf_start, "converted array");
                 return sp; /* NOTREACHED */
             }
+            result->info.unicode = STRING_BYTES;
         }
         else if (text->type == T_STRING)
         {
-            iconv_t cd;
-
-            char*  in_buf_ptr;
-            size_t in_buf_size;
-            size_t in_buf_left;
-
-            char*  out_buf_ptr;
-            char*  out_buf_start;
-            size_t out_buf_size;
-            size_t out_buf_left;
-
-            cd = iconv_open(get_txt(sp->u.str), "UTF-8");
-            if (!iconv_valid(cd))
-            {
-                if (errno == EINVAL)
-                    errorf("Bad arg 2 to to_bytes(): Unsupported encoding '%s'.\n", get_txt(sp->u.str));
-                else
-                    errorf("to_bytes(): %s\n", strerror(errno));
-                return sp; /* NOTREACHED */
-            }
-
-            in_buf_ptr = get_txt(text->u.str);
-            in_buf_left = in_buf_size = mstrsize(text->u.str);
-
-            if (in_buf_size == 0)
-            {
-                iconv_close(cd);
-
-                /* We can't use STR_EMPTY, because that one is a unicode string. */
-                memsafe(result = alloc_mstring(0), 0, "converted array");
-                result->info.unicode = STRING_BYTES;
-
-                sp = pop_n_elems(2, sp);
-                push_bytes(sp, result);
-                return sp;
-            }
-
-            /* For small texts, we reserve twice the space. */
-            out_buf_left = out_buf_size = in_buf_size > 32768 ? (in_buf_size + 2048) : (2 * in_buf_size);
-            xallocate(out_buf_start, out_buf_size, "conversion buffer");
-            out_buf_ptr = out_buf_start;
-
-            /* Convert the string, reallocating the output buffer where necessary */
-            while (true)
-            {
-                size_t rc;
-                bool at_end = (in_buf_left == 0);
-
-                /* At the end we need one final call. */
-                if (at_end)
-                    rc = iconv(cd, NULL, NULL, &out_buf_ptr, &out_buf_left);
-                else
-                    rc = iconv(cd, &in_buf_ptr, &in_buf_left, &out_buf_ptr, &out_buf_left);
-
-                if (rc == (size_t)-1)
-                {
-                    size_t idx;
-                    if (errno == E2BIG)
-                    {
-                        /* Reallocate output buffer */
-                        size_t new_size = out_buf_size + (in_buf_size > 128 ? in_buf_size : 128);
-                        char* new_buf = rexalloc(out_buf_start, new_size);
-
-                        if (!new_buf)
-                        {
-                            iconv_close(cd);
-
-                            xfree(out_buf_start);
-                            outofmem(new_size, "conversion buffer");
-                            return sp; /* NOTREACHED */
-                        }
-
-                        out_buf_ptr   = new_buf + (out_buf_ptr - out_buf_start);
-                        out_buf_start = new_buf;
-                        out_buf_left  = out_buf_left + new_size - out_buf_size;
-                        out_buf_size  = new_size;
-                        continue;
-                    }
-
-                    /* Ignore EILSEQ at the end, they come from //IGNORE. */
-                    if (errno == EILSEQ && !in_buf_left)
-                        continue;
-
-                    /* Other error: clean up */
-                    iconv_close(cd);
-                    xfree(out_buf_start);
-
-                    idx = byte_to_char_index(get_txt(text->u.str), in_buf_size - in_buf_left, NULL);
-                    if (errno == EILSEQ)
-                        errorf("to_bytes(): Invalid character sequence at index %zd.\n", idx);
-
-                    if (errno == EINVAL)
-                        errorf("to_bytes(): Incomplete character sequence at index %zd.\n", idx);
-
-                    errorf("to_bytes(): %s\n", strerror(errno));
-                    return sp; /* NOTREACHED */
-                }
-
-                if (at_end)
-                    break;
-            }
-
-            iconv_close(cd);
-
-            result = new_n_mstring(out_buf_start, out_buf_ptr - out_buf_start, STRING_BYTES);
-            xfree(out_buf_start);
-            if (!result)
-            {
-                outofmem(out_buf_ptr - out_buf_start, "converted string");
-                return sp; /* NOTREACHED */
-            }
+            result = utf8_string_to_bytes(get_txt(text->u.str), mstrsize(text->u.str), get_txt(sp->u.str), "to_bytes", 2);
         }
         else
             errorf("Bad arg 1 to to_bytes(): byte string and encoding given.\n");
 
-        result->info.unicode = STRING_BYTES;
         sp = pop_n_elems(2, sp);
         push_bytes(sp, result);
         return sp;
@@ -1890,37 +2142,22 @@ v_to_text (svalue_t *sp, int num_arg)
         svalue_t* text = sp-1;
         string_t* result;
 
-        char*  encoding_name;
-        size_t encoding_len;
-
-        iconv_t cd;
-        bool    ignore;
-        bool    replace;
-
-        char*  in_buf_start;
-        char*  in_buf_ptr;
-        size_t in_buf_size;
-        size_t in_buf_left;
-
-        char*  out_buf_ptr;
-        char*  out_buf_start;
-        size_t out_buf_size;
-        size_t out_buf_left;
-
         if (text->type == T_POINTER)
         {
             /* We need to put these bytes into a byte sequence for iconv. */
-            in_buf_size = VEC_SIZE(text->u.vec);
-            if (in_buf_size == 0)
-                in_buf_start = NULL;
+            size_t len = VEC_SIZE(text->u.vec);
+            char* buf;
+
+            if (len == 0)
+                buf = NULL;
             else
             {
                 svalue_t *elem = text->u.vec->item;
-                svalue_t *end = elem + in_buf_size;
+                svalue_t *end = elem + len;
                 char *ch;
 
-                xallocate(in_buf_start, in_buf_size, "conversion buffer");
-                ch = in_buf_start;
+                memsafe(buf = xalloc_with_error_handler(len), len, "conversion buffer");
+                ch = buf;
 
                 for (; elem != end; elem++, ch++)
                 {
@@ -1928,223 +2165,21 @@ v_to_text (svalue_t *sp, int num_arg)
                     if (item == NULL || item->type != T_NUMBER)
                     {
                         /* We stop here. */
-                        in_buf_size = ch - in_buf_start;
+                        len = ch - buf;
                         break;
                     }
 
                     *ch = (char)item->u.number;
                 }
             }
+
+            result = bytes_to_utf8_string(buf, len, sp->u.str, "to_text", 2);
+            pop_stack(); /* frees buf. */
         }
         else if (text->type == T_BYTES)
-        {
-            in_buf_start = get_txt(text->u.str);
-            in_buf_size = mstrsize(text->u.str);
-        }
+            result = bytes_to_utf8_string(get_txt(text->u.str), mstrsize(text->u.str), sp->u.str, "to_text", 2);
         else
             errorf("Bad arg 1 to to_text(): unicode string and encoding given.\n");
-
-        encoding_len = parse_input_encoding(sp->u.str, &ignore, &replace);
-        encoding_name = get_txt(sp->u.str);
-        if (encoding_len < mstrsize(sp->u.str))
-        {
-            char save = encoding_name[encoding_len];
-
-            encoding_name[encoding_len] = 0;
-            cd = iconv_open("UTF-8", encoding_name);
-            encoding_name[encoding_len] = save;
-        }
-        else
-            cd = iconv_open("UTF-8", encoding_name);
-
-        if (!iconv_valid(cd))
-        {
-            if (text->type == T_POINTER)
-                xfree(in_buf_start);
-            if (errno == EINVAL)
-                errorf("Bad arg 2 to to_text(): Unsupported encoding '%s'.\n", get_txt(sp->u.str));
-            else
-                errorf("to_text(): %s\n", strerror(errno));
-            return sp; /* NOTREACHED */
-        }
-
-        in_buf_ptr = in_buf_start;
-        in_buf_left = in_buf_size;
-
-        if (in_buf_size == 0)
-        {
-            iconv_close(cd);
-            if (text->type == T_POINTER)
-                xfree(in_buf_start);
-
-            sp = pop_n_elems(2, sp);
-            push_ref_string(sp, STR_EMPTY);
-            return sp;
-        }
-
-        /* For small texts, we reserve twice the space. */
-        out_buf_left = out_buf_size = in_buf_size > 32768 ? (in_buf_size + 2048) : (2 * in_buf_size);
-        xallocate(out_buf_start, out_buf_size, "conversion buffer");
-        out_buf_ptr = out_buf_start;
-
-        /* Convert the string, reallocating the output buffer where necessary */
-        while (true)
-        {
-            size_t rc;
-            bool at_end = (in_buf_left == 0);
-
-            /* At the end we need one final call. */
-            if (at_end)
-                rc = iconv(cd, NULL, NULL, &out_buf_ptr, &out_buf_left);
-            else
-                rc = iconv(cd, &in_buf_ptr, &in_buf_left, &out_buf_ptr, &out_buf_left);
-
-            if (rc == (size_t)-1)
-            {
-                size_t idx;
-                if ((errno == EILSEQ || errno == EINVAL) && (ignore || replace))
-                {
-                    /* Handle encoding errors ourselves. */
-                    if (ignore)
-                    {
-                        if (at_end)
-                            break;
-
-                        in_buf_ptr++;
-                        in_buf_left--;
-                        continue;
-                    }
-
-                    if (replace)
-                    {
-                        /* Add the (3 bytes) replacement char. */
-                        if (out_buf_left < 3)
-                            errno = E2BIG;
-                        else
-                        {
-                            memcpy(out_buf_ptr, "\xef\xbf\xbd", 3);
-                            out_buf_ptr += 3;
-                            out_buf_left -= 3;
-
-                            if (at_end)
-                                break;
-
-                            in_buf_ptr++;
-                            in_buf_left--;
-                            continue;
-                        }
-                    }
-                }
-
-                if (errno == E2BIG)
-                {
-                    /* Reallocate output buffer */
-                    size_t new_size = out_buf_size + (in_buf_size > 128 ? in_buf_size : 128);
-                    char* new_buf = rexalloc(out_buf_start, new_size);
-
-                    if (!new_buf)
-                    {
-                        iconv_close(cd);
-
-                        xfree(out_buf_start);
-                        if (text->type == T_POINTER)
-                            xfree(in_buf_start);
-                        outofmem(new_size, "conversion buffer");
-                        return sp; /* NOTREACHED */
-                    }
-
-                    out_buf_ptr   = new_buf + (out_buf_ptr - out_buf_start);
-                    out_buf_start = new_buf;
-                    out_buf_left  = out_buf_left + new_size - out_buf_size;
-                    out_buf_size  = new_size;
-                    continue;
-                }
-
-                idx = in_buf_size - in_buf_left;
-                if (errno == EILSEQ)
-                {
-                    if (at_end)
-                    {
-                        iconv_close(cd);
-                        xfree(out_buf_start);
-                        if (text->type == T_POINTER)
-                            xfree(in_buf_start);
-                        errorf("to_text(): Invalid character sequence at byte %zd.\n", idx);
-                    }
-                    else
-                    {
-                        char* errseq = get_illegal_sequence(in_buf_ptr, in_buf_left, cd);
-                        char context[128];
-                        size_t pos = sizeof(context);
-
-                        context[--pos] = 0;
-                        context[--pos] = '"';
-
-                        for (int contextlen = 0; contextlen < 10 && out_buf_ptr > out_buf_start; )
-                        {
-                            char escbuf[16];
-                            char *prev = utf8_prev(out_buf_ptr, out_buf_ptr - out_buf_start);
-                            p_int c;
-                            size_t clen = utf8_to_unicode(prev, out_buf_ptr - prev, &c);
-                            size_t esclen;
-
-                            if (!clen)
-                                c = *(unsigned char*)prev;
-
-                            out_buf_ptr = prev;
-                            contextlen++;
-
-                            esclen = get_escaped_character(c, escbuf, sizeof(escbuf));
-                            if (esclen && esclen < pos)
-                            {
-                                pos -= esclen;
-                                memcpy(context + pos, escbuf, esclen);
-                            }
-                        }
-
-                        context[--pos] = '"';
-
-                        iconv_close(cd);
-                        xfree(out_buf_start);
-                        if (text->type == T_POINTER)
-                            xfree(in_buf_start);
-
-                        errorf("to_text(): Invalid character sequence at byte %zd after %s: %s.\n"
-                              , idx
-                              , context + pos
-                              , errseq);
-                    }
-                }
-
-                /* Other error: clean up */
-                iconv_close(cd);
-                xfree(out_buf_start);
-                if (text->type == T_POINTER)
-                    xfree(in_buf_start);
-
-                if (errno == EINVAL)
-                    errorf("to_text(): Incomplete character sequence at byte %zd.\n", idx);
-
-                errorf("to_text(): %s\n", strerror(errno));
-                return sp; /* NOTREACHED */
-            }
-
-            if (at_end)
-                break;
-        }
-
-        iconv_close(cd);
-
-        result = new_n_unicode_mstring(out_buf_start, out_buf_ptr - out_buf_start);
-        xfree(out_buf_start);
-        if (text->type == T_POINTER)
-            xfree(in_buf_start);
-
-        if (!result)
-        {
-            outofmem(out_buf_ptr - out_buf_start, "converted string");
-            return sp; /* NOTREACHED */
-        }
 
         sp = pop_n_elems(2, sp);
         push_string(sp, result);

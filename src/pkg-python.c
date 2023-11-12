@@ -8405,6 +8405,22 @@ static ldmud_lpctype_t ldmud_struct_type =
 },  ldmud_struct_get_lpctype            /* get_lpctype */
 };
 
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_struct_create (struct_t* st)
+
+/* Creates a new Python struct from an LPC struct.
+ */
+
+{
+    PyObject* val = ldmud_struct_new(&ldmud_struct_type.type_base, NULL, NULL);
+    if (val != NULL)
+        ((ldmud_struct_t*)val)->lpc_struct = ref_struct(st);
+
+    return val;
+} /* ldmud_struct_create() */
+
+/*-------------------------------------------------------------------------*/
 static PyObject*
 ldmud_concrete_struct_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
 
@@ -12897,13 +12913,7 @@ svalue_to_python (svalue_t *svp)
             return ldmud_quoted_array_create(svp);
 
         case T_STRUCT:
-        {
-            PyObject* val = ldmud_struct_new(&ldmud_struct_type.type_base, NULL, NULL);
-            if (val != NULL)
-                ((ldmud_struct_t*)val)->lpc_struct = ref_struct(svp->u.strct);
-
-            return val;
-        }
+            return ldmud_struct_create(svp->u.strct);
 
         case T_LVALUE:
             return ldmud_lvalue_create(svp);
@@ -14933,6 +14943,162 @@ restore_python_ob (svalue_t *dest, string_t *name, svalue_t *value)
 
     return true;
 } /* restore_python_ob() */
+
+/*-------------------------------------------------------------------------*/
+bool
+convert_python_ob (svalue_t *dest, svalue_t *ob,  lpctype_t *type, struct_t *opts)
+
+/* Convert a Python object to <type> of possible. Return true on success.
+ */
+
+{
+    PyObject *fun, *pyob;
+    bool started = python_start_thread();
+
+    assert(ob->type == T_PYTHON);
+    assert(python_type_table[ob->x.python_type] != NULL);
+
+    pyob = (PyObject*)ob->u.generic;
+    fun = PyObject_GetAttrString(pyob, "__convert__");
+    if (fun != NULL)
+    {
+        PyObject *args = PyTuple_New(2);
+        PyObject *result, *pytype, *pyopts;
+        bool was_external = python_is_external;
+
+        if (args == NULL)
+        {
+            Py_DECREF(fun);
+            raise_python_error("to_type", started);
+        }
+
+        pytype = lpctype_to_pythontype(type);
+        if (pytype == NULL)
+        {
+            Py_DECREF(fun);
+            Py_DECREF(args);
+            raise_python_error("to_type", started);
+        }
+        PyTuple_SET_ITEM(args, 0, pytype);
+
+        if (opts)
+            pyopts = ldmud_struct_create(opts);
+        else
+        {
+            Py_INCREF(Py_None);
+            pyopts = Py_None;
+        }
+        if (pyopts == NULL)
+        {
+            Py_DECREF(fun);
+            Py_DECREF(args);
+            raise_python_error("to_type", started);
+        }
+        PyTuple_SET_ITEM(args, 1, pyopts);
+
+        python_is_external = false;
+        python_save_context();
+
+        result = PyObject_CallObject(fun, args);
+
+        python_clear_context();
+        python_is_external = was_external;
+        Py_DECREF(fun);
+        Py_DECREF(args);
+
+        if (result == NULL)
+            raise_python_error("to_type", started);
+        else if (result == Py_NotImplemented)
+        {
+            Py_DECREF(result);
+            python_finish_thread(started);
+            return false;
+        }
+        else
+        {
+            const char* err = python_to_svalue(dest, result);
+            Py_DECREF(result);
+            python_finish_thread(started);
+
+            if (err != NULL)
+                errorf("Bad return value from __convert__: %s\n", err);
+
+            return true;
+        }
+    }
+    PyErr_Clear();
+
+    /* Convert doesn't exist. Let's try native magic functions. */
+    if (lpctype_contains(lpctype_int, type))
+    {
+        PyObject* result = PyNumber_Long(pyob);
+        if (result != NULL)
+        {
+            const char* err = python_to_svalue(dest, result);
+            Py_DECREF(result);
+            python_finish_thread(started);
+
+            if (err != NULL)
+                errorf("Bad return value from __int__: %s\n", err);
+
+            return true;
+        }
+        PyErr_Clear();
+    }
+
+    if (lpctype_contains(lpctype_float, type))
+    {
+        PyObject* result = PyNumber_Float(pyob);
+        if (result != NULL)
+        {
+            const char* err = python_to_svalue(dest, result);
+            Py_DECREF(result);
+            python_finish_thread(started);
+
+            if (err != NULL)
+                errorf("Bad return value from __float__: %s\n", err);
+
+            return true;
+        }
+        PyErr_Clear();
+    }
+
+    if (lpctype_contains(lpctype_string, type))
+    {
+        PyObject* result = PyObject_Str(pyob);
+        if (result != NULL)
+        {
+            const char* err = python_to_svalue(dest, result);
+            Py_DECREF(result);
+            python_finish_thread(started);
+
+            if (err != NULL)
+                errorf("Bad return value from __str__: %s\n", err);
+
+            return true;
+        }
+        PyErr_Clear();
+    }
+
+    if (lpctype_contains(lpctype_bytes, type))
+    {
+        PyObject* result = PyObject_Bytes(pyob);
+        if (result != NULL)
+        {
+            const char* err = python_to_svalue(dest, result);
+            Py_DECREF(result);
+            python_finish_thread(started);
+
+            if (err != NULL)
+                errorf("Bad return value from __bytes__: %s\n", err);
+
+            return true;
+        }
+        PyErr_Clear();
+    }
+
+    return false;
+} /* convert_python_ob() */
 
 /*-------------------------------------------------------------------------*/
 string_t*

@@ -144,6 +144,7 @@ extern void free_python_ob(svalue_t *pval);
 extern void copy_python_ob(svalue_t *dest, svalue_t *src);
 extern bool save_python_ob(svalue_t *dest, string_t **name, svalue_t *ob);
 extern bool restore_python_ob(svalue_t *dest, string_t *name, svalue_t *value);
+extern bool convert_python_ob(svalue_t *dest, svalue_t *ob,  lpctype_t *type, struct_t *opts);
 extern string_t* python_ob_to_string(svalue_t *pval);
 extern svalue_t* do_python_unary_operation(svalue_t *sp, enum python_operation op, const char* op_name);
 extern svalue_t* do_python_binary_operation(svalue_t *sp, enum python_operation op, enum python_operation rop, const char* op_name);
