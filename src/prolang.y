@@ -17549,6 +17549,10 @@ function_call:
                           program_t *prog = get_current_object_program();
 
                           inherited_function.flags = prog->functions[f];
+                          if (inherited_function.flags & NAME_INHERITED)
+                            inherited_function.flags &= ~INHERIT_MASK;
+                          else
+                            inherited_function.flags &= ~FUNSTART_MASK;
                           get_function_information(&inherited_function, prog, f);
                           arg_types = prog->argument_types;
                           types = prog->types;
