@@ -3735,7 +3735,7 @@ ldmud_program_lfun_call (ldmud_program_and_index_t *lfun, PyObject *arg, PyObjec
             if (err != NULL)
             {
                 PyErr_SetString(PyExc_ValueError, err);
-                pop_n_elems(i, sp);
+                pop_n_elems(i, sp-1);
                 return NULL;
             }
         }
@@ -8804,7 +8804,7 @@ ldmud_closure_call (ldmud_closure_t *cl, PyObject *arg, PyObject *kw)
             if (err != NULL)
             {
                 PyErr_SetString(PyExc_ValueError, err);
-                pop_n_elems(i, sp);
+                pop_n_elems(i, sp-1);
                 return NULL;
             }
         }
@@ -11660,7 +11660,7 @@ ldmud_efun_call (ldmud_efun_t *func, PyObject *arg, PyObject *kw)
             if (err != NULL)
             {
                 PyErr_SetString(PyExc_ValueError, err);
-                pop_n_elems(i, sp);
+                pop_n_elems(i, sp-1);
                 return NULL;
             }
         }

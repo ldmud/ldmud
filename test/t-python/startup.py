@@ -85,6 +85,8 @@ class TestObject(unittest.TestCase):
         self.assertEqual(args[1].type, ldmud.Array[ldmud.String])
 
         self.assertEqual(fun(10, "A", "B", "C"), 3)
+        with self.assertRaises(ValueError):
+            fun(ldmud.Array([1]), ldmud)
 
     def testVariableInfo(self):
         ob = ldmud.Object("/testob")
@@ -576,6 +578,8 @@ class TestClosure(unittest.TestCase):
         s2 = ldmud.Closure(self.master, "this_object")
         self.assertEqual(s2, s)
         self.assertIn(s2, set((s,)))
+        with self.assertRaises(ValueError):
+            s(ldmud.Array([1]), ldmud)
 
     def testLWOEfun(self):
         lwob = ldmud.LWObject("/testob")
@@ -602,6 +606,8 @@ class TestClosure(unittest.TestCase):
         s2 = ldmud.Closure(self.master, "master_fun", self.master)
         self.assertEqual(s2, s)
         self.assertIn(s2, set((s,)))
+        with self.assertRaises(ValueError):
+            s(ldmud.Array([1]), ldmud)
 
     def testDestructedLfun(self):
         ob = ldmud.Object("/testob")
@@ -1010,6 +1016,10 @@ class TestEfuns(unittest.TestCase):
         master = ldmud.efuns.find_object("/master")
         self.assertEqual(ldmud.efuns.call_other(master, "master_fun"), 54321)
         self.assertEqual(ldmud.efuns.object_name(master), "/master")
+
+    def testCallWithInvalidArg(self):
+        with self.assertRaises(ValueError):
+            ldmud.efuns.call_other(ldmud.get_master(), "fun", ldmud.Array([1]), ldmud)
 
 class TestRegisteredEfuns(unittest.TestCase):
     def testDir(self):
