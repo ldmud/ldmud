@@ -1829,6 +1829,8 @@ ldmud_lpctype_type_dealloc (ldmud_gc_lpctype_type_t* self)
 
     remove_gc_lpctype_object(self);
 
+    if (Py_TYPE(self)->tp_flags & Py_TPFLAGS_HAVE_GC)
+        PyObject_GC_UnTrack(self);
     Py_XDECREF(self->ldmud_lpctype.type_base.tp_base);
     Py_XDECREF(self->ldmud_lpctype.type_base.tp_dict);
     Py_XDECREF(self->ldmud_lpctype.type_base.tp_bases);
@@ -2128,6 +2130,8 @@ ldmud_concrete_array_type_dealloc (ldmud_concrete_array_type_t* self)
  */
 
 {
+    if (Py_TYPE(self)->tp_flags & Py_TPFLAGS_HAVE_GC)
+        PyObject_GC_UnTrack(self);
     Py_XDECREF(self->element_type);
     Py_XDECREF(self->ldmud_lpctype.type_base.tp_base);
     Py_XDECREF(self->ldmud_lpctype.type_base.tp_dict);
@@ -2400,6 +2404,8 @@ ldmud_concrete_struct_type_dealloc (ldmud_concrete_struct_type_t* self)
     free_struct_name(self->name);
     REMOVE_GC_OBJECT(gc_struct_type_list, self);
 
+    if (Py_TYPE(self)->tp_flags & Py_TPFLAGS_HAVE_GC)
+        PyObject_GC_UnTrack(self);
     Py_XDECREF(self->ldmud_lpctype.type_base.tp_base);
     Py_XDECREF(self->ldmud_lpctype.type_base.tp_dict);
     Py_XDECREF(self->ldmud_lpctype.type_base.tp_bases);
