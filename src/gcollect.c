@@ -1977,6 +1977,7 @@ gc_count_ref_in_malloced_closure (svalue_t *csvp)
             else
             {
                 put_number(csvp, 0);
+                return;
             }
         }
         else
