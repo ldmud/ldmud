@@ -15267,10 +15267,11 @@ expr4:
                       i = LAMBDA_VARIABLE(i).object_index;
                       varp = prog->variables+i;
 
-                      if (i < prog->num_virtual_variables)
-                          i |= VIRTUAL_VAR_TAG;
-                      else
-                          i -= prog->num_virtual_variables;
+                      /* No special handling for virtual variables required
+                       * here, as lambdas will always be executed with
+                       * variable_index_offset = 0, thus F_IDENTIFIER will
+                       * also serve virtual variables.
+                       */
                   }
                   else
                   {
@@ -15635,10 +15636,6 @@ name_lvalue:
 
                       i = LAMBDA_VARIABLE(i).object_index;
                       varp = prog->variables+i;
-                      if (i < prog->num_virtual_variables)
-                          i |= VIRTUAL_VAR_TAG;
-                      else
-                          i -= prog->num_virtual_variables;
                   }
                   else
                   {
