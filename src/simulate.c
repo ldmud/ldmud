@@ -2134,7 +2134,7 @@ load_object (const char *lname, Bool create_super, int depth
 
             if (strcmp(pInherited, name) == 0)
             {
-                errorf("Illegal to inherit self.\n");
+                load_object_error("Illegal to inherit self", name, chain);
             }
 
             if (depth >= MAX_LOAD_DEPTH)
