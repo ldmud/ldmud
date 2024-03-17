@@ -15,8 +15,6 @@
    which offers much better performance for some operations.
  */
 
-#pragma rtt_checks
-
 #ifndef __ALISTS__
 /*
    Helper function used by insert_alist()
@@ -49,7 +47,7 @@ private varargs void
 assert_alist(mixed * alist, string context = "")
 {
     if (!efun::sizeof(alist) || !efun::pointerp(alist[0]))
-        efun::raise_error(context + "Not an alist.\n");
+        efun::raise_error(context + "Missing key array.\n");
 
     int keynum = efun::sizeof(alist[0]);
     for (int i = efun::sizeof(alist); i-->1;)
@@ -70,6 +68,9 @@ assert_alist(mixed * alist, string context = "")
 varargs mixed
 assoc(mixed key, mixed * keys_or_alist, mixed data_or_fail, mixed fail)
 {
+    if (!efun::pointerp(keys_or_alist))
+        raise_error("Bad argument 2 to assoc().\n");
+
     // case 3: mixed assoc(mixed key, mixed *keys, mixed *data [, mixed fail])
     if (efun::pointerp(data_or_fail))
     {
@@ -164,6 +165,9 @@ insert_alist(mixed key, varargs mixed * args)
 mixed *
 order_alist(mixed * keys, varargs mixed * data)
 {
+    if (!efun::pointerp(keys))
+        raise_error("Bad argument 1 to order_alist().\n");
+
     // whole alist given -> split into components
     if (!efun::sizeof(data))
     {
