@@ -98,7 +98,8 @@ insert_alist(mixed key, varargs mixed * args)
         if (idx >= 0) return idx; // existing key
 
         // add new key, if key array was given by reference
-        args[0] += ({ key });
+        if (referencep(&(args[0])))
+            args[0] += ({ key });
         return efun::sizeof(args[0]) - 1;
     }
 
@@ -128,6 +129,11 @@ insert_alist(mixed key, varargs mixed * args)
         }
     }
 
+    /*
+    // update arg if it was given by reference
+    if (referencep(&(args[<1])))
+        args[<1] = alist;
+     */
     return alist;
 }
 

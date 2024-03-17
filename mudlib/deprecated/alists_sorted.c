@@ -125,7 +125,8 @@ insert_alist(mixed key, varargs mixed * args)
         // new key
         idx = -idx - 1;
         // update arg if given by reference
-        args[0][idx..idx-1] = ({ key });
+        if (referencep(&(args[0])))
+            args[0][idx..idx-1] = ({ key });
         return idx;
     }
 
@@ -156,6 +157,11 @@ insert_alist(mixed key, varargs mixed * args)
         }
     }
 
+    /*
+    // update arg if it was given by reference
+    if (referencep(&(args[<1])))
+        args[<1] = alist;
+     */
     return alist;
 }
 
