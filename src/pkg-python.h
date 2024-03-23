@@ -99,6 +99,7 @@ enum python_hooks
     PYTHON_HOOK_ON_SIGHUP,
     PYTHON_HOOK_ON_SIGUSR1,
     PYTHON_HOOK_ON_SIGUSR2,
+    PYTHON_HOOK_BEFORE_INSTRUCTION,
 
     PYTHON_HOOK_COUNT,
 };
@@ -156,6 +157,7 @@ extern void python_handle_fds(fd_set *readfds, fd_set *writefds, fd_set *exceptf
 
 extern void python_call_hook(int hook, bool is_external);
 extern void python_call_hook_object(int hook, bool is_external, object_t *ob);
+extern void python_call_instruction_hook(int instruction);
 
 extern void python_interrupt();
 extern void python_handle_sigchld();

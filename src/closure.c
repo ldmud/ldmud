@@ -6045,6 +6045,7 @@ closure_location (closure_base_t *cl)
             lineno = get_line_number( cl->prog_ob->prog->program + cl->prog_pc
                                     , cl->prog_ob->prog
                                     , &name
+                                    , NULL
                                     );
 
             sprintf(buf, "%d", lineno);

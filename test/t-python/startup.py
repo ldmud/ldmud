@@ -1028,12 +1028,12 @@ class TestEfuns(unittest.TestCase):
 class TestRegisteredEfuns(unittest.TestCase):
     def testDir(self):
         self.assertIn("python_test", dir(ldmud.registered_efuns))
-        self.assertGreater(len(dir(ldmud.registered_efuns)), 16)
+        self.assertGreater(len(dir(ldmud.registered_efuns)), 19)
 
     def testDict(self):
         self.assertIn("python_test", ldmud.registered_efuns.__dict__)
         self.assertEqual(ldmud.registered_efuns.__dict__["python_test"], python_test)
-        self.assertEqual(len(ldmud.registered_efuns.__dict__), 16)
+        self.assertEqual(len(ldmud.registered_efuns.__dict__), 20)
 
     def testAttribute(self):
         self.assertTrue(hasattr(ldmud.registered_efuns, 'python_test'))
@@ -1060,6 +1060,93 @@ class TestRegisteredTypes(unittest.TestCase):
         with self.assertRaises(AttributeError):
             ldmud.registered_types.doesnt_exist
 
+class TestCallStack(unittest.TestCase):
+    # The current call stack is:
+    # [0]: CALL_FRAME_TYPE_LFUN /master.c->epilog()
+    # [1]: CALL_FRAME_TYPE_LFUN /master.c->run_test()
+    # [2]: CALL_FRAME_TYPE_LFUN /master.c->run_array()
+    # [3]: CALL_FRAME_TYPE_LFUN /master.c->run_array_without_callback()
+    # [4]: CALL_FRAME_TYPE_LFUN Test case inline closure
+    # [5]: CALL_FRAME_TYPE_CATCH
+    # [6]: CALL_FRAME_TYPE_EFUN_CLOSURE (#'funcall)
+    # [7]: CALL_FRAME_TYPE_PYTHON_EFUN_CLOSURE (#'python_test)
+
+    def testLen(self):
+        self.assertEqual(len(ldmud.call_stack), 8)
+
+    def testFrame0(self):
+        frame = ldmud.call_stack[0]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
+        self.assertEqual(frame.name, "epilog")
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertEqual(frame.program_name, "/master.c")
+        self.assertEqual(frame.file_name, "/master.c")
+        self.assertGreater(frame.line_number, 500)
+        self.assertGreater(frame.eval_cost, 0)
+
+    def testFrame1(self):
+        frame = ldmud.call_stack[1]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
+        self.assertEqual(frame.name, "run_test")
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertEqual(frame.program_name, "/master.c")
+        self.assertEqual(frame.file_name, "/master.c")
+        self.assertLess(frame.line_number, ldmud.call_stack[0].line_number)
+        self.assertGreater(frame.eval_cost, ldmud.call_stack[0].eval_cost)
+
+    def testFrame2(self):
+        frame = ldmud.call_stack[2]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
+        self.assertEqual(frame.name, "run_array")
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertEqual(frame.program_name, "/master.c")
+        self.assertEqual(frame.file_name, "/inc/testarray.inc")
+        self.assertGreater(frame.line_number, 0)
+        self.assertGreater(frame.eval_cost, ldmud.call_stack[1].eval_cost)
+
+    def testFrame3(self):
+        frame = ldmud.call_stack[3]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
+        self.assertEqual(frame.name, "run_array_without_callback")
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertEqual(frame.program_name, "/master.c")
+        self.assertEqual(frame.file_name, "/inc/testarray.inc")
+        self.assertLess(frame.line_number, ldmud.call_stack[2].line_number)
+        self.assertGreater(frame.eval_cost, ldmud.call_stack[2].eval_cost)
+
+    def testFrame4(self):
+        frame = ldmud.call_stack[4]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertEqual(frame.program_name, "/master.c")
+        self.assertEqual(frame.file_name, "/master.c")
+        self.assertLess(frame.line_number, ldmud.call_stack[1].line_number)
+        self.assertGreater(frame.eval_cost, ldmud.call_stack[3].eval_cost)
+
+    def testFrame5(self):
+        frame = ldmud.call_stack[5]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_CATCH)
+        self.assertEqual(frame.name, "catch")
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertEqual(frame.program_name, "/master.c")
+        self.assertEqual(frame.file_name, "/master.c")
+        self.assertEqual(frame.line_number, ldmud.call_stack[4].line_number)
+        self.assertGreater(frame.eval_cost, ldmud.call_stack[4].eval_cost)
+
+    def testFrame6(self):
+        frame = ldmud.call_stack[6]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_EFUN_CLOSURE)
+        self.assertEqual(frame.name, "funcall")
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertGreater(frame.eval_cost, ldmud.call_stack[5].eval_cost)
+
+    def testFrame7(self):
+        frame = ldmud.call_stack[7]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_PYTHON_EFUN_CLOSURE)
+        self.assertEqual(frame.name, "python_test")
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertGreater(frame.eval_cost, ldmud.call_stack[6].eval_cost)
+
 def python_test():
     """Run the python test cases."""
 
@@ -1068,6 +1155,20 @@ def python_test():
     result = runner.run(suite)
 
     return result.wasSuccessful()
+
+def python_test_call_stack():
+    """Run a single test on the call stack."""
+
+    # The current call stack is:
+    # [0]: CALL_FRAME_TYPE_LFUN /master->epilog()
+    # [1]: CALL_FRAME_TYPE_LFUN /master->run_test()
+    # [2]: CALL_FRAME_TYPE_LFUN /master->run_array()
+    # [3]: CALL_FRAME_TYPE_LFUN /master->run_array_without_callback()
+    # [4]: CALL_FRAME_TYPE_LFUN Test case inline closure
+    # [5]: CALL_FRAME_TYPE_LFUN /testob#->callback()
+    # [6]: CALL_FRAME_TYPE_LFUN Test case inline closure
+    return [ frame.object.name for frame in ldmud.call_stack] == [ "/master", "/master", "/master", "/master", "/master", "/testob#1", "/master" ] and \
+           [ bool(frame.object) for frame in ldmud.call_stack] == [ True, True, True, True, True, False, True ]
 
 def python_return(val):
     """Return the given value to check the
@@ -1116,6 +1217,7 @@ def python_check_testob() -> bool:
     return True
 
 ldmud.register_efun("python_test", python_test)
+ldmud.register_efun("python_test_call_stack", python_test_call_stack)
 ldmud.register_efun("python_return", python_return)
 ldmud.register_efun("python_get", python_get)
 ldmud.register_efun("python_set", python_set)
@@ -1143,6 +1245,24 @@ def ob_destroyed(ob):
 
 def get_hook_info():
     return ldmud.Array((num_hb, ldmud.Array(ob_list),))
+
+last_progname = None
+last_filename = None
+last_linenumber = None
+def before_instruction(ob, instr):
+    global last_progname, last_filename, last_linenumber
+    last_progname = ldmud.call_stack[-1].program_name
+    last_filename = ldmud.call_stack[-1].file_name
+    last_linenumber = ldmud.call_stack[-1].line_number
+
+def get_last_program_name() -> str:
+    return last_progname
+
+def get_last_file_name() -> str:
+    return last_filename
+
+def get_last_line_number() -> int:
+    return last_linenumber
 
 # Create a distinct class for use in LPC
 class bigint(int):
@@ -1252,8 +1372,12 @@ def has_gil_log_message() -> bool:
 ldmud.register_hook(ldmud.ON_HEARTBEAT, hb_hook)
 ldmud.register_hook(ldmud.ON_OBJECT_CREATED, ob_created)
 ldmud.register_hook(ldmud.ON_OBJECT_DESTRUCTED, ob_destroyed)
+ldmud.register_hook(ldmud.BEFORE_INSTRUCTION, before_instruction)
 
 ldmud.register_efun("python_get_hook_info", get_hook_info)
+ldmud.register_efun("python_get_last_program_name", get_last_program_name)
+ldmud.register_efun("python_get_last_file_name", get_last_file_name)
+ldmud.register_efun("python_get_last_line_number", get_last_line_number)
 ldmud.register_type("bigint", bigint)
 ldmud.register_type("bigint", int)
 ldmud.register_type("bigint", bigint)

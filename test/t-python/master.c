@@ -408,6 +408,14 @@ void run_test()
                 return sizeof(oblist) == 1 && oblist[0] == this_object();
             :)
         }),
+        ({
+            "Python BEFORE_INSTRUCTION hook", 0,
+            (:
+                return python_get_last_program_name() == __FILE__ &&
+                       python_get_last_file_name() == __FILE__ &&
+                       python_get_last_line_number() == __LINE__;
+            :)
+        }),
         ({ "Python GC", 0,
             (:
                 /* We just start it and see, that it doesn't crash. */
@@ -417,8 +425,28 @@ void run_test()
         }),
         ({ "Python test suite", 0,
             (:
+                string err;
+                int result;
+
                 msg("\n");
-                return python_test();
+                /* For the call_stack test create additional frames. */
+                err = catch(result = funcall(#'funcall, #'python_test));
+                if (err)
+                {
+                    msg("Got error: %s", err);
+                    return 0;
+                }
+                return result;
+            :)
+        }),
+        ({ "Python call frame with destructed objects", 0,
+            (:
+                object ob = clone_object("/testob");
+                return ob.callback(function int()
+                {
+                    destruct(ob);
+                    return python_test_call_stack();
+                });
             :)
         }),
         ({
@@ -447,7 +475,7 @@ void run_test()
             :)
         })
 
-    }), //#'shutdown);
+    }),
     (:
         if($1)
             shutdown(1);

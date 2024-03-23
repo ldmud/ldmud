@@ -786,7 +786,7 @@ function_exists (string_t *fun, program_t *progp, funflag_t inacceptable_flags
     }
 
     if(prog_line && prog_name)
-      *prog_line = get_line_number(funstart, progp, prog_name);
+      *prog_line = get_line_number(funstart, progp, prog_name, NULL);
 
     /* We got it. */
     return progp->name;

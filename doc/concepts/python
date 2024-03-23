@@ -121,6 +121,15 @@ LDMUD MODULE
                     was received. (This is just informative, the driver
                     will execute the DC_SIGACTION_SIGUSR2 action also.)
 
+                  BEFORE_INSTRUCTION
+                    Called before a single VM instruction will be executed.
+                    The first argument is the current object, the second
+                    argument is an instruction object that provides the
+                    following properties:
+
+                    name
+                        The name of the instruction.
+
           - unregister_hook(hook, function) -> None
                 Removes a hook function.
 
@@ -365,6 +374,41 @@ LDMUD MODULE
           - registered_types
                 Contains all registered Python types.
 
+        This module contains the following properties:
+
+          - call_stack
+                Contains a list of all call frames with index 0 being the
+                top-level frame. Each entry has the following members:
+
+                type
+                    The type of the frame:
+                      * CALL_FRAME_TYPE_LFUN
+                      * CALL_FRAME_TYPE_ALIEN_LFUN_CLOSURE
+                      * CALL_FRAME_TYPE_EFUN_CLOSURE
+                      * CALL_FRAME_TYPE_PYTHON_EFUN_CLOSURE
+                      * CALL_FRAME_TYPE_SIMUL_EFUN_CLOSURE
+                      * CALL_FRAME_TYPE_CATCH
+                      * CALL_FRAME_TYPE_LAMBDA
+
+                name
+                    The name of the lfun, efun, Python efun or simul-efun.
+                    (None for catch or lambda frames.)
+
+                object
+                    The current object of this frame (ignoring any changes
+                    by set_this_object()).
+
+                program_name
+                    For lfun frames the corresponding program.
+
+                file_name
+                    For lfun frames the file the LPC code was compiled from.
+
+                line_number
+                    For lfun frames the current line.
+
+                eval_cost
+                    The current evaluation cost counter.
 
         There is mapping of LPC values to Python values for the following types:
             int    <-> int(, bool)

@@ -1204,7 +1204,7 @@ write_lpc_trace (int d, word_t *p, int oneline)
         {
             string_t *file;
 
-            line = get_line_number(pc, prog, &file);
+            line = get_line_number(pc, prog, &file, NULL);
             if (!oneline)
             {
                 dprintf2(d, "  By program: %s line:%d\n", (p_int)get_txt(file), line);
