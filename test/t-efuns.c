@@ -1124,6 +1124,13 @@ mixed *tests = (this_object() == blueprint()) &&
     ({ "filter mapping with operator closure",   TF_ERROR, (: filter(([1,2,3]), #'switch, ([4,5,6])) :) }),
     ({ "filter mapping with unbound lambda",     TF_ERROR, (: filter(([1,2,3]), unbound_lambda(0,0), ([4,5,6])) :) }),
     ({ "filter mapping with identifier closure", 0,        (: global_var = 1; return deep_eq(filter(([1,2,3]), #'global_var, ([4,5,6])), ([1,2,3])); :) }),
+    ({ "filter array with closure return lvalues", 0,
+       (:
+            mixed arr = ({ ({1}), ({2}), ({3})});
+            return deep_eq(filter(arr, function mixed(mixed val): { return &(val[0]); }), ({ ({1}), ({2}), ({3})}))
+                && deep_eq(arr, ({ ({1}), ({2}), ({3})}));
+       :)
+    }),
 
     ({ "map string 1", 0, (: map("abc", (['a':'x'])) == "xbc" :) }),
     ({ "map string 2", 0, (: map("abc", (['a':'x';'y']), 1) == "ybc" :) }),
@@ -1153,6 +1160,13 @@ mixed *tests = (this_object() == blueprint()) &&
     ({ "map mapping with operator closure", TF_ERROR, (: map(([1,2,3]), #'switch) :) }),
     ({ "map mapping with unbound lambda",   TF_ERROR, (: map(([1,2,3]), unbound_lambda(0,0)) :) }),
     ({ "map mapping with identifier closure", 0,      (: global_var = "X"; return deep_eq(map(([1,2,3]), #'global_var), ([1:"X",2:"X",3:"X"])); :) }),
+    ({ "map array with closure return lvalues", 0,
+       (:
+            mixed arr = ({ ({1}), ({2}), ({3})});
+            return deep_eq(map(arr, function mixed(mixed val): { return &(val[0]); }), ({ 1, 2, 3 }))
+                && deep_eq(arr, ({ ({1}), ({2}), ({3})}));
+       :)
+    }),
 
     ({ "lambda with many values", 0,
       (:

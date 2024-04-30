@@ -1546,8 +1546,7 @@ f_regreplace (svalue_t *sp)
             push_string(inter_sp, matched_text); /* Gives up the ref */
             push_number(inter_sp, match->start);
             call_lambda(subclosure, 2);
-            transfer_svalue(&apply_return_value, inter_sp);
-            inter_sp--;
+            pop_apply_value();
 
             if (apply_return_value.type != T_STRING)
             {

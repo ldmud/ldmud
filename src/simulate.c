@@ -4414,8 +4414,7 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
         }
 
         call_lambda(&(cb->function.closure), num_arg + nargs);
-        transfer_svalue(&apply_return_value, inter_sp);
-        inter_sp--;
+        pop_apply_value();
 
         if (toplevel)
             current_prog = NULL;
@@ -4428,7 +4427,10 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
         if (ob.type == T_OBJECT
          ? !sapply(cb->function.named.name, ob.u.ob, num_arg + nargs)
          : !sapply_lwob(cb->function.named.name, ob.u.lwob, num_arg + nargs))
-            transfer_svalue(&apply_return_value, &const0);
+        {
+            free_svalue(&apply_return_value);
+            apply_return_value = const0;
+        }
     }
 
     if (!keep)

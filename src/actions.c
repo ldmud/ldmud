@@ -554,7 +554,8 @@ call_modify_command (char *buff)
             push_c_string(inter_sp, buff);
             push_ref_object(inter_sp, command_giver, "call_modify_command");
             call_lambda_ob(&driver_hook[H_MODIFY_COMMAND], 2, inter_sp);
-            transfer_svalue(svp = &apply_return_value, inter_sp--);
+            pop_apply_value();
+            svp = &apply_return_value;
             if (!command_giver)
                 return MY_TRUE;
         }
@@ -582,7 +583,8 @@ call_modify_command (char *buff)
                     push_ref_string(inter_sp, sv.u.str);
                     push_ref_object(inter_sp, command_giver, "call_modify_command");
                     call_lambda_ob(svp, 2, inter_sp);
-                    transfer_svalue(svp = &apply_return_value, inter_sp--);
+                    pop_apply_value();
+                    svp = &apply_return_value;
                     if (!command_giver)
                         return MY_TRUE;
                 }
