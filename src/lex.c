@@ -2120,6 +2120,7 @@ init_global_identifier (ident_t * ident, bool bProgram)
     ident->u.global.std_struct_id = I_GLOBAL_STD_STRUCT_NONE;
 #ifdef USE_PYTHON
     ident->u.global.python_efun = I_GLOBAL_PYTHON_EFUN_OTHER;
+    ident->u.global.python_struct_id = I_GLOBAL_PYTHON_STRUCT_OTHER;
 #endif
 
 } /* init_global_identifier() */

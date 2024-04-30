@@ -793,8 +793,17 @@ struct_new_name (string_t *name, string_t *prog_name)
  */
 
 {
-    const char* sane_prog_name = make_name_sane(get_txt(prog_name), false, true);
+    const char* sane_prog_name;
     string_t *prog_str;
+
+    if (mstreq(prog_name, STR_GLOBAL)
+#ifdef USE_PYTHON
+     || mstreq(prog_name, STR_PYTHON)
+#endif
+    )
+        sane_prog_name = NULL;
+    else
+        sane_prog_name = make_name_sane(get_txt(prog_name), false, true);
 
     if (sane_prog_name)
     {

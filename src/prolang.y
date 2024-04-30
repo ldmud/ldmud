@@ -1390,6 +1390,13 @@ lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_catch_msg_arg = &_lpctype_catch_msg_arg,
           *lpctype_mapping_or_closure = &_lpctype_mapping_or_closure;
 
+#ifdef USE_PYTHON
+  /* For any Python defined struct, stores the index+1 into the current
+   * program's struct definitions (STRUCT_DEF / LAMBDA_STRUCT). This is
+   * one-based, so we can easily zero out the table for initialization.
+   */
+unsigned short python_struct_index[PYTHON_STRUCT_TABLE_SIZE];
+#endif
 
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
@@ -6636,6 +6643,89 @@ define_struct (bool proto, ident_t *p, const char * prog_name, funflag_t flags, 
 
 /*-------------------------------------------------------------------------*/
 static int
+add_struct_type (struct_type_t *stype, lpctype_t *lpctype)
+
+/* Adds an existing struct type to the program and returns its index.
+ * If it already exists, returns its current index.
+ * The reference for <lpctype> is adopted.
+ */
+
+{
+    unsigned short id;
+
+    if (string_context)
+    {
+        struct_t *s;
+
+        for (unsigned short i = 0; i < LAMBDA_STRUCTS_COUNT; i++)
+        {
+            if (LAMBDA_STRUCT(i).type == stype)
+            {
+                free_lpctype(lpctype);
+                return i;
+            }
+        }
+
+        /* Add this as a lambda value. */
+        id = LAMBDA_STRUCTS_COUNT;
+        if (id >= STD_STRUCT_OFFSET)
+        {
+            /* Not enough space to do so. */
+            free_lpctype(lpctype);
+            return -1;
+        }
+
+        s = struct_new(stype);
+        if (!s)
+        {
+            free_lpctype(lpctype);
+            return -1;
+        }
+
+        ADD_LAMBDA_STRUCT((lambda_struct_ident_t){
+            .index = {.kind = LAMBDA_IDENT_VALUE, .value = svalue_struct(s)},
+            .type = ref_struct_type(stype)});
+        /* lpctype is freed by epiolog_closure(). */
+    }
+    else
+    {
+        struct_def_t sdef;
+
+        for (unsigned short i = 0; i < STRUCT_COUNT; i++)
+        {
+            if (STRUCT_DEF(i).type == stype)
+            {
+                free_lpctype(lpctype);
+                return i;
+            }
+        }
+
+        /* Add this as a hidden struct to our program. */
+        id = STRUCT_COUNT;
+        if (id >= STD_STRUCT_OFFSET)
+        {
+            /* Not enough space to do so. */
+            free_lpctype(lpctype);
+            return -1;
+        }
+
+        sdef.type = ref_struct_type(stype);
+        sdef.flags = NAME_HIDDEN;
+        sdef.inh = STRUCT_INH_SEFUN;
+
+        ADD_STRUCT_DEF(&sdef);
+    }
+
+    lpctype->t_struct.def_idx = id;
+    /* Note we keep the reference of lpctype
+     * for epilog() to free it.
+     */
+
+    return id;
+} /* add_struct_type() */
+
+/*-------------------------------------------------------------------------*/
+static int
 find_struct ( ident_t * ident, efun_override_t override )
 
 /* Find the struct <name> and return its index. Return -1 if not found.
@@ -6748,8 +6838,9 @@ find_struct ( ident_t * ident, efun_override_t override )
                 {
                     struct_type_t *stype;
                     lpctype_t *lpctype;
-                    struct_def_t sdef;
+                    int new_id;
                     unsigned short count = SEFUN_STRUCT_DEF_COUNT;
+
                     if (sefun_id >= count)
                     {
                         /* Fill up the A_SEFUN_STRUCT_DEFS block. */
@@ -6771,75 +6862,10 @@ find_struct ( ident_t * ident, efun_override_t override )
                         return id;
                     }
 
-                    if (string_context)
-                    {
-                        struct_t *s;
-
-                        for (unsigned short i = 0; i < LAMBDA_STRUCTS_COUNT; i++)
-                        {
-                            if (LAMBDA_STRUCT(i).type == stype)
-                            {
-                                free_lpctype(lpctype);
-                                SEFUN_STRUCT_DEF(sefun_id) = id;
-                                return id;
-                            }
-                        }
-
-                        /* Add this as a lambda value. */
-                        id = LAMBDA_STRUCTS_COUNT;
-                        if (id >= STD_STRUCT_OFFSET)
-                        {
-                            /* Not enough space to do so. */
-                            free_lpctype(lpctype);
-                            return -1;
-                        }
-
-                        s = struct_new(stype);
-                        if (!s)
-                        {
-                            free_lpctype(lpctype);
-                            return -1;
-                        }
-
-                        ADD_LAMBDA_STRUCT((lambda_struct_ident_t){
-                            .index = {.kind = LAMBDA_IDENT_VALUE, .value = svalue_struct(s)},
-                            .type = ref_struct_type(stype)});
-                        SEFUN_STRUCT_DEF(sefun_id) = id;
-                        /* lpctype is freed by epiolog_closure(). */
-                    }
-                    else
-                    {
-                        for (unsigned short i = 0; i < STRUCT_COUNT; i++)
-                        {
-                            if (STRUCT_DEF(i).type == stype)
-                            {
-                                free_lpctype(lpctype);
-                                SEFUN_STRUCT_DEF(sefun_id) = id;
-                                return id;
-                            }
-                        }
-
-                        /* Add this as a hidden struct to our program. */
-                        id = STRUCT_COUNT;
-                        if (id >= STD_STRUCT_OFFSET)
-                        {
-                            /* Not enough space to do so. */
-                            free_lpctype(lpctype);
-                            return -1;
-                        }
-
-                        sdef.type = ref_struct_type(stype);
-                        sdef.flags = NAME_HIDDEN;
-                        sdef.inh = STRUCT_INH_SEFUN;
-
-                        ADD_STRUCT_DEF(&sdef);
-                        SEFUN_STRUCT_DEF(sefun_id) = id;
-                    }
-
-                    lpctype->t_struct.def_idx = id;
-                    /* Note we keep the reference of lpctype
-                     * for epilog() to free it.
-                     */
+                    new_id = add_struct_type(stype, lpctype);
+                    if (new_id >= 0)
+                        SEFUN_STRUCT_DEF(sefun_id) = new_id;
+                    return new_id;
                 }
 
                 return id;
@@ -6850,6 +6876,38 @@ find_struct ( ident_t * ident, efun_override_t override )
             /* else FALLTHROUGH */
 
         case OVERRIDE_EFUN:
+#ifdef USE_PYTHON
+            if (name->u.global.python_struct_id != I_GLOBAL_PYTHON_STRUCT_OTHER)
+            {
+                unsigned short python_id = name->u.global.python_struct_id;
+                unsigned short id = python_struct_index[python_id];
+                struct_type_t *stype;
+
+                if (id != 0)
+                    return id-1;
+
+                stype = get_python_struct_type(python_id);
+                if (stype != NULL)
+                {
+                    /* Let's see if we already got this struct somehow. */
+                    lpctype_t *lpctype = get_struct_type(stype);
+                    int new_id;
+
+                    id = lpctype->t_struct.def_idx;
+                    if (id != USHRT_MAX
+                     && (string_context ? LAMBDA_STRUCT(id).type : STRUCT_DEF(id).type) == stype)
+                    {
+                        free_lpctype(lpctype);
+                        python_struct_index[python_id] = id+1;
+                        return id;
+                    }
+
+                    new_id = add_struct_type(stype, lpctype);
+                    python_struct_index[python_id] = new_id+1;
+                    return new_id;
+                }
+            }
+#endif
             if (name->u.global.std_struct_id != I_GLOBAL_STD_STRUCT_NONE)
                 return STD_STRUCT_OFFSET + name->u.global.std_struct_id;
             break;
@@ -22065,6 +22123,10 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", local_variables, context_variables 
     max_number_of_init_locals = 0;
     num_lwo_calls = 0;
     uses_non_lightweight_efuns = false;
+
+#ifdef USE_PYTHON
+    memset(python_struct_index, 0, sizeof(python_struct_index));
+#endif
 
     /* Check if call_other() has been replaced by a sefun.
      */

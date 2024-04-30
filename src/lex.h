@@ -193,8 +193,12 @@ struct ident_s
                */
 #ifdef USE_PYTHON
             unsigned short python_efun;
-              /* python-efun: Index into python_efun_table, negative else
-               * == I_GLOBAL_PYTHON_EFUN_OTHER: efun/sefun/gvar
+              /* python-efun: Index into python_efun_table.
+               * == I_GLOBAL_PYTHON_EFUN_OTHER: undefined
+               */
+            unsigned short python_struct_id;
+              /* python-struct: Index into python_struct_table.
+               * == I_GLOBAL_PYTHON_STRUCT_OTHER: undefined
                */
 #endif
         } global;
@@ -239,6 +243,7 @@ struct ident_s
 #define I_GLOBAL_STD_STRUCT_NONE        (USHRT_MAX)
 #ifdef USE_PYTHON
 #  define I_GLOBAL_PYTHON_EFUN_OTHER    (USHRT_MAX)
+#  define I_GLOBAL_PYTHON_STRUCT_OTHER  (USHRT_MAX)
 #endif
 
 

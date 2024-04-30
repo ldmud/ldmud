@@ -154,7 +154,7 @@ invalidate_simul_efuns (void)
     /* Remove all sefun shadows for efuns and python efuns. */
     remove_efun_shadows(all_efuns);
 #ifdef USE_PYTHON
-    remove_efun_shadows(all_python_efuns);
+    remove_efun_shadows(all_python_idents);
 #endif
 
     /* Mark all simulefun identifier entries as non-existing

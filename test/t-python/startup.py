@@ -1028,12 +1028,12 @@ class TestEfuns(unittest.TestCase):
 class TestRegisteredEfuns(unittest.TestCase):
     def testDir(self):
         self.assertIn("python_test", dir(ldmud.registered_efuns))
-        self.assertGreater(len(dir(ldmud.registered_efuns)), 19)
+        self.assertGreater(len(dir(ldmud.registered_efuns)), 21)
 
     def testDict(self):
         self.assertIn("python_test", ldmud.registered_efuns.__dict__)
         self.assertEqual(ldmud.registered_efuns.__dict__["python_test"], python_test)
-        self.assertEqual(len(ldmud.registered_efuns.__dict__), 20)
+        self.assertEqual(len(ldmud.registered_efuns.__dict__), 21)
 
     def testAttribute(self):
         self.assertTrue(hasattr(ldmud.registered_efuns, 'python_test'))
@@ -1043,6 +1043,38 @@ class TestRegisteredEfuns(unittest.TestCase):
         with self.assertRaises(AttributeError):
             # Unregistered Efun
             ldmud.registered_efuns.abc
+
+class TestRegisteredStructs(unittest.TestCase):
+    def setUp(self):
+        ldmud.register_struct("testregisteredstructs_struct1", None, (("value", int),))
+        ldmud.register_struct("testregisteredstructs_struct2", None, (("value", ldmud.Object),))
+        ldmud.unregister_struct("testregisteredstructs_struct2")
+
+    def tearDown(self):
+        ldmud.unregister_struct("testregisteredstructs_struct1")
+
+    def testDir(self):
+        self.assertIn("testregisteredstructs_struct1", dir(ldmud.registered_structs))
+        self.assertNotIn("testregisteredstructs_struct2", dir(ldmud.registered_structs))
+        self.assertNotIn("testregisteredstructs_struct3", dir(ldmud.registered_structs))
+        self.assertGreater(len(dir(ldmud.registered_structs)), 0)
+
+    def testDict(self):
+        self.assertIn("testregisteredstructs_struct1", ldmud.registered_structs.__dict__)
+        self.assertNotIn("testregisteredstructs_struct2", ldmud.registered_structs.__dict__)
+        self.assertNotIn("testregisteredstructs_struct3", ldmud.registered_structs.__dict__)
+        self.assertEqual(ldmud.registered_structs.__dict__["testregisteredstructs_struct1"], ldmud.Struct["python","testregisteredstructs_struct1"])
+        self.assertEqual(len(ldmud.registered_structs.__dict__), 2)
+
+    def testAttribute(self):
+        self.assertTrue(hasattr(ldmud.registered_structs, 'testregisteredstructs_struct1'))
+        self.assertFalse(hasattr(ldmud.registered_structs, 'testregisteredstructs_struct2'))
+        self.assertFalse(hasattr(ldmud.registered_structs, 'testregisteredstructs_struct3'))
+        self.assertEqual(ldmud.registered_structs.testregisteredstructs_struct1, ldmud.Struct["python","testregisteredstructs_struct1"])
+        with self.assertRaises(AttributeError):
+            ldmud.registered_structs.testregisteredstructs_struct2
+        with self.assertRaises(AttributeError):
+            ldmud.registered_structs.testregisteredstructs_struct3
 
 class TestRegisteredTypes(unittest.TestCase):
     def testDir(self):
@@ -1387,6 +1419,11 @@ ldmud.register_efun("create_random_generator", create_random_generator)
 ldmud.register_type("box", box)
 ldmud.register_efun("create_box", create_box)
 ldmud.register_efun("has_gil_log_message", has_gil_log_message)
+
+PythonStruct = ldmud.register_struct("python_struct", None, (("value1", int), ("value2", int)))
+def sum_struct(s: PythonStruct) -> int:
+    return s.members.value1.value + s.members.value2.value
+ldmud.register_efun("python_sum_struct", sum_struct)
 
 # Test loading objects at startup
 early_ob = ldmud.Object("/testob")

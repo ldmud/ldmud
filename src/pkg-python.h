@@ -20,6 +20,12 @@
    * .x.closure_type entry in svalue_s, which gives us 11 bits.
    */
 
+#define PYTHON_STRUCT_TABLE_SIZE (2048UL)
+  /* The number of entries in the python struct table.
+   * This number is restricted by the ident_s definition,
+   * which provides a short for the efun index.
+   */
+
 #define PYTHON_TYPE_TABLE_SIZE (2048UL)
   /* The number of entries in the python type table.
    * This number is restricted by the ident_s and svalue_s
@@ -111,9 +117,9 @@ extern char * python_startup_script;
 extern int num_python_efun;
   /* Next available ID for python efuns. */
 
-extern ident_t *all_python_efuns;
-  /* Start of the linked list of all non-shadowing python efuns.
-   * (All shadowed efuns are in the all_efuns list.)
+extern ident_t *all_python_idents;
+  /* Start of the linked list of all non-shadowing python efuns and structs.
+   * (All shadowed entries are in the all_efuns list.)
    */
 
 extern long num_lpc_python_references;
@@ -129,6 +135,7 @@ extern bool is_python_efun(ident_t *p);
 extern lpctype_t* check_python_efun_args(ident_t *p, int num_arg, bool has_ellipsis, fulltype_t *args);
 extern void call_python_efun(int idx, int num_arg);
 extern const char* closure_python_efun_to_string(int type);
+extern struct_type_t* get_python_struct_type(int idx);
 
 extern ident_t* get_python_type_name(int python_type_id);
 extern lpctype_t* lookup_python_type(int python_type_id);

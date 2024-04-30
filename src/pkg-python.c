@@ -242,6 +242,13 @@ struct python_replace_program_protector
     struct python_replace_program_protector* next;
 };
 
+/* Arguments for ldmud_object_init_getobject(). */
+struct ldmud_object_init_closure_s
+{
+    string_t* filename;
+    object_t* ob;
+};
+
 /* --- Variables --- */
 char * python_startup_script = NULL;
 
@@ -260,12 +267,18 @@ static bool python_is_external = true;
   * true otherwise (upon external events)
   */
 
-int num_python_efun = 0;
+ident_t *all_python_idents = NULL;
 
-ident_t *all_python_efuns = NULL;
+int num_python_efun = 0;
 
 static python_efun_t python_efun_table[PYTHON_EFUN_TABLE_SIZE];
   /* Information about all defined efuns.
+   */
+
+int num_python_structs = 0;
+
+static struct_type_t* python_struct_table[PYTHON_STRUCT_TABLE_SIZE];
+  /* All Python-registered structs.
    */
 
 int num_python_type = 0;
@@ -392,11 +405,16 @@ static PyObject * python_contextvar_command_giver = NULL;
 #endif
 
 /* -- Function prototypes --- */
+static bool ldmud_concrete_struct_type_check(PyObject *ob);
+static struct_type_t* ldmud_concrete_struct_type_get_struct_type(ldmud_concrete_struct_type_t *type);
+static PyObject* ldmud_concrete_struct_type_create(struct_name_t* name);
+static void ldmud_object_init_getobject(int num_arg UNUSED, struct ldmud_object_init_closure_s* data);
 static bool ldmud_object_check(PyObject *ob);
 static PyObject* lpctype_to_pythontype(lpctype_t *type);
 static lpctype_t* pythontype_to_lpctype(PyObject* ptype);
 static PyObject* adapt_pythontype(PyObject *ptype);
 static string_t* python_string_to_string(PyObject* pstr);
+static string_t* python_string_to_tabled_string(PyObject* pstr);
 static const char* python_to_svalue(svalue_t *dest, PyObject* val);
 static PyObject* svalue_to_python(svalue_t *svp);
 static PyObject* rvalue_to_python(svalue_t *svp);
@@ -544,6 +562,63 @@ update_efun_info (python_efun_info_t *info, PyObject *fun)
 } /* update_efun_info() */
 
 /*-------------------------------------------------------------------------*/
+static ident_t *
+make_python_identifier (const char* name)
+
+/* Creates a global identifier for <name>.
+ * On error returns NULL and sets a Python exception accordingly.
+ */
+
+{
+    ident_t *ident = make_shared_identifier(name, I_TYPE_GLOBAL, 0);
+    if (!ident)
+    {
+        PyErr_SetString(PyExc_MemoryError, "out of memory");
+        return NULL;
+    }
+
+    if (ident->type == I_TYPE_UNKNOWN)
+    {
+        init_global_identifier(ident, MY_FALSE);
+        ident->next_all = all_python_idents;
+        all_python_idents = ident;
+    }
+    else if (ident->type == I_TYPE_GLOBAL)
+    {
+        /* If this is a simul-efun, we need to remove it from
+         * the all_simul_efuns list, otherwise the simul-efun
+         * won't hesitate to unregister this efun.
+         */
+        if (ident->u.global.efun == I_GLOBAL_EFUN_OTHER &&
+            ident->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER)
+        {
+            for (ident_t** id = &all_simul_efuns; *id; id = &((*id)->next_all))
+                if (*id == ident)
+                {
+                    /* Remove it from the list. */
+                    *id = ident->next_all;
+
+                    /* And add it to our list. */
+                    ident->next_all = all_python_idents;
+                    all_python_idents = ident;
+
+                    break;
+                }
+        }
+    }
+    else
+    {
+        /* There is higher level identifier?
+         * Should only happen during compile time, and that we forbid.
+         */
+        PyErr_SetString(PyExc_RuntimeError, "couldn't create efun entry");
+        return NULL;
+    }
+
+    return ident;
+} /* make_python_identifier() */
+
+/*-------------------------------------------------------------------------*/
 static PyObject*
 python_register_efun (PyObject *module, PyObject *args, PyObject *kwds)
 
@@ -570,50 +645,9 @@ python_register_efun (PyObject *module, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    ident = make_shared_identifier(name, I_TYPE_GLOBAL, 0);
+    ident = make_python_identifier(name);
     if (!ident)
-    {
-        PyErr_SetString(PyExc_MemoryError, "out of memory");
         return NULL;
-    }
-
-    if (ident->type == I_TYPE_UNKNOWN)
-    {
-        init_global_identifier(ident, MY_FALSE);
-        ident->next_all = all_python_efuns;
-        all_python_efuns = ident;
-    }
-    else if (ident->type == I_TYPE_GLOBAL)
-    {
-        /* If this is a simul-efun, we need to remove it from
-         * the all_simul_efuns list, otherwise the simul-efun
-         * won't hesitate to unregister this efun.
-         */
-        if (ident->u.global.efun == I_GLOBAL_EFUN_OTHER &&
-            ident->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER)
-        {
-            for (ident_t** id = &all_simul_efuns; *id; id = &((*id)->next_all))
-                if (*id == ident)
-                {
-                    /* Remove it from the list. */
-                    *id = ident->next_all;
-
-                    /* And add it to our list. */
-                    ident->next_all = all_python_efuns;
-                    all_python_efuns = ident;
-
-                    break;
-                }
-        }
-    }
-    else
-    {
-        /* There is higher level identifier?
-         * Should only happen during compile time, and that we forbid.
-         */
-        PyErr_SetString(PyExc_RuntimeError, "couldn't create efun entry");
-        return NULL;
-    }
 
     /* This is or once was a python efun? */
     if (ident->u.global.python_efun != I_GLOBAL_PYTHON_EFUN_OTHER)
@@ -697,6 +731,236 @@ python_unregister_efun (PyObject *module, PyObject *args, PyObject *kwds)
         xfree(python_efun_table[idx].info.types);
         python_efun_table[idx].callable = NULL;
         python_efun_table[idx].info.types = NULL;
+    }
+
+    Py_INCREF(Py_None);
+    return Py_None;
+} /* python_unregister_efun() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+python_register_struct (PyObject *module, PyObject *args, PyObject *kwds)
+
+/* Python function to register a global struct definition.
+ * The struct definition is entered into the python_struct_table
+ * and its table index is saved as an identifier in the lexer
+ * (perhaps overriding a driver definition).
+ */
+
+{
+#   define STRUCT_MEMBER_CHUNK_SIZE 16
+    struct struct_member_chunk
+    {
+        struct_member_t member[STRUCT_MEMBER_CHUNK_SIZE];
+        struct struct_member_chunk *next;
+    };
+
+    static char *kwlist[] = { "name", "base", "fields", NULL};
+
+    char *name;
+    PyObject *base, *fields, *field, *iterator;
+    ident_t *ident;
+    struct struct_member_chunk *first = NULL, *current = NULL;
+    struct_type_t *basetype = NULL, *stype;
+    int num_members = 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "sOO:register_struct", kwlist, &name, &base, &fields))
+        return NULL;
+
+    if (base != Py_None)
+    {
+        if (!ldmud_concrete_struct_type_check(base))
+        {
+            PyErr_SetString(PyExc_TypeError, "base parameter must be a concrete ldmud.Struct");
+            return NULL;
+        }
+
+        basetype = ldmud_concrete_struct_type_get_struct_type((ldmud_concrete_struct_type_t*)base);
+        if (basetype == NULL)
+            return NULL;
+    }
+
+    iterator = PyObject_GetIter(fields);
+    if (!iterator)
+        return NULL;
+
+    while ((field = PyIter_Next(iterator)))
+    {
+        struct_member_t *entry;
+
+        if ((num_members % STRUCT_MEMBER_CHUNK_SIZE) == 0)
+        {
+             struct struct_member_chunk *next = xalloc(sizeof(*next));
+             if (next == NULL)
+             {
+                PyErr_SetString(PyExc_MemoryError, "out of memory");
+                Py_DECREF(field);
+                break;
+            }
+
+            if (first == NULL)
+                first = current = next;
+            else
+            {
+                current->next = next;
+                current = next;
+            }
+
+            current->next = NULL;
+        }
+
+        if (!PyTuple_Check(field) || PyTuple_Size(field) != 2)
+        {
+            PyErr_SetString(PyExc_TypeError, "field entries must be 2-tuples");
+            Py_DECREF(field);
+            break;
+        }
+
+        entry = current->member + (num_members % STRUCT_MEMBER_CHUNK_SIZE);
+
+        entry->name = python_string_to_tabled_string(PyTuple_GetItem(field, 0));
+        entry->type = pythontype_to_lpctype(PyTuple_GetItem(field, 1));
+
+        if (entry->name == NULL)
+        {
+            PyErr_Format(PyExc_TypeError, "member name must be string, not '%.200s'",
+                         PyTuple_GetItem(field, 0)->ob_type->tp_name);
+            if (entry->type != NULL)
+                free_lpctype(entry->type);
+            break;
+        }
+
+        if (entry->type == NULL)
+        {
+            PyErr_Format(PyExc_TypeError, "invalid member type '%R'",
+                         PyTuple_GetItem(field, 1));
+            free_mstring(entry->name);
+            break;
+        }
+
+        num_members++;
+    }
+
+    if (!PyErr_Occurred())
+    {
+        stype = struct_new_type(new_unicode_tabled(name), ref_mstring(STR_PYTHON), 0,
+                                basetype, num_members, NULL);
+        if (stype == NULL)
+            PyErr_SetString(PyExc_MemoryError, "out of memory");
+        else
+        {
+            current = first;
+            for (int pos = 0; pos < num_members; pos++)
+            {
+                if (pos != 0 && (pos % STRUCT_MEMBER_CHUNK_SIZE) == 0)
+                    current = current->next;
+
+                stype->member[pos] = current->member[pos % STRUCT_MEMBER_CHUNK_SIZE];
+            }
+            num_members = 0;
+        }
+    }
+
+    current = first;
+    for (int pos = 0; pos < num_members; pos++)
+    {
+        if (pos != 0 && (pos % STRUCT_MEMBER_CHUNK_SIZE) == 0)
+            current = current->next;
+
+        free_mstring(current->member[pos % STRUCT_MEMBER_CHUNK_SIZE].name);
+        free_lpctype(current->member[pos % STRUCT_MEMBER_CHUNK_SIZE].type);
+    }
+
+    current = first;
+    while (current != NULL)
+    {
+        struct struct_member_chunk *del = current;
+        current = current->next;
+        xfree(del);
+    }
+
+    if (PyErr_Occurred())
+        return NULL;
+
+    assert(stype != NULL);
+
+    ident = make_python_identifier(name);
+    if (!ident)
+        return NULL;
+
+    /* This is or once was a python struct? */
+    if (ident->u.global.python_struct_id != I_GLOBAL_PYTHON_STRUCT_OTHER)
+    {
+        int idx = ident->u.global.python_struct_id;
+
+        if (python_struct_table[idx])
+            free_struct_type(python_struct_table[idx]);
+        python_struct_table[idx] = stype;
+    }
+    else if(num_python_structs == PYTHON_STRUCT_TABLE_SIZE)
+    {
+        free_struct_type(stype);
+
+        PyErr_SetString(PyExc_RuntimeError, "too many structs registered");
+        return NULL;
+    }
+    else
+    {
+        python_struct_table[num_python_structs] = stype;
+        ident->u.global.python_struct_id = (short)num_python_structs;
+
+        num_python_structs++;
+    }
+
+    return ldmud_concrete_struct_type_create(ref_struct_name(stype->name));
+} /* python_register_struct() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+python_unregister_struct (PyObject *module, PyObject *args, PyObject *kwds)
+
+/* Python function to remove a struct registration.
+ * We just set the entry in the python_struct_table to NULL.
+ * The identifier stays, because we want to reuse its index,
+ * when this struct will be re-registered.
+ */
+
+{
+    static char *kwlist[] = { "name", NULL};
+
+    char *name;
+    ident_t *ident;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s:unregister_struct", kwlist, &name))
+        return NULL;
+
+    ident = find_shared_identifier(name, I_TYPE_GLOBAL, 0);
+    if (!ident || ident->type == I_TYPE_UNKNOWN)
+    {
+        /* No identifier there, we're done. */
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    /* There is higher level identifier?
+     * Should only happen during compile time, and that we forbid.
+     */
+    if (ident->type != I_TYPE_GLOBAL)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "couldn't remove struct entry");
+        return NULL;
+    }
+
+    /* This is a Python-defined struct? */
+    if (ident->u.global.python_struct_id != I_GLOBAL_PYTHON_STRUCT_OTHER)
+    {
+        int idx = ident->u.global.python_struct_id;
+
+        if (python_struct_table[idx])
+        {
+            free_struct_type(python_struct_table[idx]);
+            python_struct_table[idx] = NULL;
+        }
     }
 
     Py_INCREF(Py_None);
@@ -2437,7 +2701,6 @@ static PyTypeObject ldmud_any_array_type_type =
 /*-------------------------------------------------------------------------*/
 /* LPC struct type. */
 
-static bool ldmud_concrete_struct_type_check(PyObject *ob);
 static PyObject* ldmud_concrete_struct_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 
 /*-------------------------------------------------------------------------*/
@@ -2580,6 +2843,45 @@ ldmud_concrete_struct_type_check (PyObject *ob)
 {
     return Py_TYPE(ob) == &ldmud_concrete_struct_type_type;
 } /* ldmud_concrete_struct_type_check() */
+
+/*-------------------------------------------------------------------------*/
+static struct_type_t *
+ldmud_concrete_struct_type_get_struct_type (ldmud_concrete_struct_type_t *type)
+
+/* Returns the struct type for this instance. Loads the object if required.
+ * If the object cannot be loaded or the struct definition is not found,
+ * returns NULL and raises an appropriate Python exception.
+ */
+
+{
+    struct_name_t *name = type->name;
+    struct_type_t *stype;
+
+    if (name->current)
+        return name->current;
+
+    /* We don't have a current struct definition.
+     * So we need to load the program to get that definition.
+     */
+    struct ldmud_object_init_closure_s data = { name->prog_name, NULL };
+    if (!call_lpc_secure((CClosureFun)ldmud_object_init_getobject, 0, &data))
+        return NULL;
+
+    if (!data.ob)
+    {
+        PyErr_Format(PyExc_ValueError, "could not load '%s'", get_txt(name->prog_name));
+        return NULL;
+    }
+
+    stype = struct_find(name->name, data.ob->prog);
+    if (!stype)
+    {
+        PyErr_Format(PyExc_ValueError, "unknown struct '%s'", get_txt(name->name));
+        return NULL;
+    }
+
+    return stype;
+} /* ldmud_concrete_struct_type_get_struct_type() */
 
 /*-------------------------------------------------------------------------*/
 static PyMethodDef ldmud_concrete_struct_type_new_method =
@@ -5048,12 +5350,6 @@ ldmud_object_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
 } /* ldmud_object_new() */
 
 /*-------------------------------------------------------------------------*/
-struct ldmud_object_init_closure_s
-{
-    string_t* filename;
-    object_t* ob;
-};
-
 static void
 ldmud_object_init_getobject (int num_arg UNUSED, struct ldmud_object_init_closure_s* data)
 
@@ -8487,36 +8783,15 @@ ldmud_concrete_struct_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 {
     static char *kwlist[] = { "values", NULL};
-
-    struct_name_t *name = ((ldmud_concrete_struct_type_t*)type)->name;
-    struct_type_t *stype = name->current;
+    struct_type_t *stype;
     PyObject *values = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "|O", kwlist, &values))
         return NULL;
 
-    if (!name->current)
-    {
-        /* We don't have a current struct definition.
-         * So we need to load the program to get that definition.
-         */
-        struct ldmud_object_init_closure_s data = { name->prog_name, NULL };
-        if (!call_lpc_secure((CClosureFun)ldmud_object_init_getobject, 0, &data))
-            return NULL;
-
-        if (!data.ob)
-        {
-            PyErr_Format(PyExc_ValueError, "could not load '%s'", get_txt(name->prog_name));
-            return NULL;
-        }
-
-        stype = struct_find(name->name, data.ob->prog);
-        if (!stype)
-        {
-            PyErr_Format(PyExc_ValueError, "unknown struct '%s'", get_txt(name->name));
-            return NULL;
-        }
-    }
+    stype = ldmud_concrete_struct_type_get_struct_type((ldmud_concrete_struct_type_t*)type);
+    if (!stype)
+        return NULL;
 
     PyObject *result = ldmud_struct_new(&ldmud_struct_type.type_base, args, kwds);
     if (!result)
@@ -12274,9 +12549,10 @@ ldmud_registered_efuns_dir (PyObject *self)
         return NULL;
 
     /* Now add all registered efuns. */
-    for (ident_t *ident = all_python_efuns; ident; ident = ident->next_all)
+    for (ident_t *ident = all_python_idents; ident; ident = ident->next_all)
     {
-        if (python_efun_table[ident->u.global.python_efun].callable != NULL)
+        if (ident->u.global.python_efun != I_GLOBAL_PYTHON_EFUN_OTHER
+         && python_efun_table[ident->u.global.python_efun].callable != NULL)
         {
             PyObject *efunname = PyUnicode_FromStringAndSize(get_txt(ident->name), mstrsize(ident->name));
 
@@ -12310,9 +12586,14 @@ ldmud_registered_efuns_dict (ldmud_program_t *self, void *closure)
     if (!dict)
         return NULL;
 
-    for (ident_t *ident = all_python_efuns; ident; ident = ident->next_all)
+    for (ident_t *ident = all_python_idents; ident; ident = ident->next_all)
     {
-        PyObject * callable = python_efun_table[ident->u.global.python_efun].callable;
+        PyObject * callable;
+
+        if (ident->u.global.python_efun == I_GLOBAL_PYTHON_EFUN_OTHER)
+            continue;
+
+        callable = python_efun_table[ident->u.global.python_efun].callable;
         if (callable != NULL)
         {
             PyObject *efunname = PyUnicode_FromStringAndSize(get_txt(ident->name), mstrsize(ident->name));
@@ -12384,6 +12665,182 @@ static PyTypeObject ldmud_registered_efuns_type =
     ldmud_registered_efuns_methods,     /* tp_methods */
     0,                                  /* tp_members */
     ldmud_registered_efuns_getset,      /* tp_getset */
+};
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_registered_structs_getattro (PyObject *val, PyObject *name)
+
+/* Return the struct type for a defined struct.
+ */
+
+{
+    PyObject *result;
+    bool error;
+    string_t* sname;
+
+    /* First check real attributes... */
+    result = PyObject_GenericGetAttr(val, name);
+    if (result || !PyErr_ExceptionMatches(PyExc_AttributeError))
+        return result;
+
+    PyErr_Clear();
+
+    /* And now look up registered structs. */
+    sname = find_tabled_python_string(name, "struct name", &error);
+    if (error)
+        return NULL;
+
+    if (sname)
+    {
+        ident_t *ident = find_shared_identifier_mstr(sname, I_TYPE_GLOBAL, 0);
+        while (ident && ident->type != I_TYPE_GLOBAL)
+            ident = ident->inferior;
+
+        if (ident && ident->type == I_TYPE_GLOBAL
+         && ident->u.global.python_struct_id != I_GLOBAL_PYTHON_STRUCT_OTHER
+         && python_struct_table[ident->u.global.python_struct_id] != NULL)
+        {
+            return ldmud_concrete_struct_type_create(
+                    ref_struct_name(python_struct_table[ident->u.global.python_struct_id]->name));
+        }
+    }
+
+    PyErr_Format(PyExc_AttributeError, "No such registered struct: '%U'", name);
+    return NULL;
+} /* ldmud_registered_structs_getattro() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_registered_structs_dir (PyObject *self)
+
+/* Returns a list of all attributes, this includes all registered struct names.
+ */
+
+{
+    PyObject *result;
+    PyObject *attrs = get_class_dir(self);
+
+    if (attrs == NULL)
+        return NULL;
+
+    /* Now add all registered structs. */
+    for (ident_t *ident = all_python_idents; ident; ident = ident->next_all)
+    {
+        if (ident->u.global.python_struct_id != I_GLOBAL_PYTHON_STRUCT_OTHER
+         && python_struct_table[ident->u.global.python_struct_id] != NULL)
+        {
+            PyObject *sname = PyUnicode_FromStringAndSize(get_txt(ident->name), mstrsize(ident->name));
+
+            if (sname == NULL)
+            {
+                PyErr_Clear();
+                continue;
+            }
+
+            if (PySet_Add(attrs, sname) < 0)
+                PyErr_Clear();
+            Py_DECREF(sname);
+        }
+    }
+
+    /* And return the keys of our dict. */
+    result = PySequence_List(attrs);
+    Py_DECREF(attrs);
+    return result;
+} /* ldmud_registered_structs_dir() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_registered_structs_dict (ldmud_program_t *self, void *closure)
+
+/* Returns a list of all registered structs.
+ */
+
+{
+    PyObject *result, *dict = PyDict_New();
+    if (!dict)
+        return NULL;
+
+    for (ident_t *ident = all_python_idents; ident; ident = ident->next_all)
+    {
+        struct_type_t *stype;
+        PyObject *sname;
+
+        if (ident->u.global.python_struct_id == I_GLOBAL_PYTHON_STRUCT_OTHER)
+            continue;
+
+        stype = python_struct_table[ident->u.global.python_struct_id];
+        if (stype == NULL)
+            continue;
+
+        sname = PyUnicode_FromStringAndSize(get_txt(ident->name), mstrsize(ident->name));
+        if (sname == NULL)
+        {
+            PyErr_Clear();
+            continue;
+        }
+
+        if (PyDict_SetItem(dict, sname, ldmud_concrete_struct_type_create(ref_struct_name(stype->name))) < 0)
+            PyErr_Clear();
+        Py_DECREF(sname);
+    }
+
+    result = PyDictProxy_New(dict);
+    Py_DECREF(dict);
+    return result;
+} /* ldmud_registered_structs_dict() */
+
+/*-------------------------------------------------------------------------*/
+static PyMethodDef ldmud_registered_structs_methods[] =
+{
+    {
+        "__dir__",
+        (PyCFunction)ldmud_registered_structs_dir, METH_NOARGS,
+        "__dir__() -> List\n\n"
+        "Returns a list of all attributes."
+    },
+
+    {NULL}
+};
+
+static PyGetSetDef ldmud_registered_structs_getset [] = {
+    {"__dict__", (getter)ldmud_registered_structs_dict, NULL, NULL},
+    {NULL}
+};
+
+static PyTypeObject ldmud_registered_structs_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.registered_structs",         /* tp_name */
+    0,                                  /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    0,                                  /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    ldmud_registered_structs_getattro,  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "Registered Python structs",        /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_registered_structs_methods,   /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_registered_structs_getset,    /* tp_getset */
 };
 
 /*-------------------------------------------------------------------------*/
@@ -12828,6 +13285,23 @@ static PyMethodDef ldmud_methods[] =
     },
 
     {
+        "register_struct",
+        (PyCFunction) python_register_struct, METH_VARARGS | METH_KEYWORDS,
+        "register_struct(name, base, fields) -> None\n\n"
+        "Defines a new global struct. This is not allowed during\n"
+        "compilation of an LPC object and must not be a permanent\n"
+        "define or reserved word."
+    },
+
+    {
+        "unregister_struct",
+        (PyCFunction) python_unregister_struct, METH_VARARGS | METH_KEYWORDS,
+        "unregister_struct(name) -> None\n\n"
+        "Removes a Python-defined struct from registration. This is not\n"
+        "allowed during compilation of an LPC object."
+    },
+
+    {
         "register_type",
         (PyCFunction) python_register_type, METH_VARARGS | METH_KEYWORDS,
         "register_type(name, type) -> None\n\n"
@@ -13080,6 +13554,8 @@ init_ldmud_module ()
         return NULL;
     if (PyType_Ready(&ldmud_registered_efuns_type) < 0)
         return NULL;
+    if (PyType_Ready(&ldmud_registered_structs_type) < 0)
+        return NULL;
     if (PyType_Ready(&ldmud_registered_types_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_call_stack_type) < 0)
@@ -13125,6 +13601,7 @@ init_ldmud_module ()
         return NULL;
     PyModule_AddObject(module, "efuns", efuns);
     PyModule_AddObject(module, "registered_efuns", ldmud_registered_efuns_type.tp_alloc(&ldmud_registered_efuns_type, 0));
+    PyModule_AddObject(module, "registered_structs", ldmud_registered_structs_type.tp_alloc(&ldmud_registered_structs_type, 0));
     PyModule_AddObject(module, "registered_types", ldmud_registered_types_type.tp_alloc(&ldmud_registered_types_type, 0));
     PyModule_AddObject(module, "call_stack", ldmud_call_stack_type.tp_alloc(&ldmud_call_stack_type, 0));
 
@@ -13521,7 +13998,7 @@ rvalue_to_python (svalue_t *svp)
 /*-------------------------------------------------------------------------*/
 
 static string_t*
-python_string_to_string (PyObject* pstr)
+python_string_to_mstring (PyObject* pstr, bool tabled)
 
 /* Convert a Python string to an LPC string.
  * If it's not a Python string or not decodable to UTF-8 return NULL.
@@ -13549,11 +14026,39 @@ python_string_to_string (PyObject* pstr)
         return NULL;
     }
 
-    str = new_n_unicode_mstring(buf, length);
+    if (tabled)
+        str = new_n_unicode_tabled(buf, length);
+    else
+        str = new_n_unicode_mstring(buf, length);
     Py_DECREF(utf8);
 
     return str;
+} /* python_string_to_mstring() */
+/*-------------------------------------------------------------------------*/
+
+static string_t*
+python_string_to_string (PyObject* pstr)
+
+/* Convert a Python string to an untabled LPC string.
+ * If it's not a Python string or not decodable to UTF-8 return NULL.
+ */
+
+{
+    return python_string_to_mstring(pstr, false);
 } /* python_string_to_string() */
+
+/*-------------------------------------------------------------------------*/
+
+static string_t*
+python_string_to_tabled_string (PyObject* pstr)
+
+/* Convert a Python string to a tabled LPC string.
+ * If it's not a Python string or not decodable to UTF-8 return NULL.
+ */
+
+{
+    return python_string_to_mstring(pstr, true);
+} /* python_string_to_tabled_string() */
 
 /*-------------------------------------------------------------------------*/
 
@@ -14590,6 +15095,18 @@ call_python_efun (int idx, int num_arg)
     }
 } /* call_python_efun() */
 
+
+/*-------------------------------------------------------------------------*/
+struct_type_t*
+get_python_struct_type (int idx)
+
+/* Returns the Python-defined struct with this index or NULL if it doesn't
+ * exist.
+ */
+
+{
+    return (idx < PYTHON_STRUCT_TABLE_SIZE) ? python_struct_table[idx] : NULL;
+} /* get_python_struct_type() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -16353,6 +16870,12 @@ python_clear_refs ()
                 clear_lpctype_ref(python_efun_table[idx].info.types[pos]);
     }
 
+    for (int idx = 0; idx < num_python_structs; idx++)
+    {
+        if (python_struct_table[idx])
+            clear_struct_type_ref(python_struct_table[idx]);
+    }
+
     for (int idx = 0; idx < PYTHON_TYPE_TABLE_SIZE; idx++)
     {
         if (python_type_table[idx] != NULL)
@@ -16495,6 +17018,13 @@ python_count_refs ()
             for (int pos = 0; pos < 1 + python_efun_table[idx].info.maxarg + (python_efun_table[idx].info.varargs ? 1 : 0); pos++)
                 count_lpctype_ref(python_efun_table[idx].info.types[pos]);
         }
+    }
+
+    /* The struct table */
+    for (int idx = 0; idx < num_python_structs; idx++)
+    {
+        if (python_struct_table[idx])
+            count_struct_type_ref(python_struct_table[idx]);
     }
 
     /* The type table */

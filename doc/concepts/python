@@ -44,6 +44,15 @@ LDMUD MODULE
                 already compiled code will produce errors when
                 calling this efun.
 
+          - register_struct(name, base, fields) -> Struct Type
+                Defines a global struct. The base should be an
+                ldmud.Struct type or None. The fields argument should
+                be a list of (field name, field type) pairs.
+
+          - unregister_struct(name) -> None
+                Removes a previously defined struct from registration.
+                The removal will only affect newly compiled code.
+
           - register_type(name, class) -> None
                 Registers a type for use in LPC. This is not allowed
                 during compilation of an LPC object.
@@ -133,11 +142,11 @@ LDMUD MODULE
           - unregister_hook(hook, function) -> None
                 Removes a hook function.
 
-          - get_master() - > Object
+          - get_master() -> Object
                 Returns the current master object.
                 Returns None, if there is no master object (yet).
 
-          - get_simul_efun() - > Object
+          - get_simul_efun() -> Object
                 Returns the current simul-efun object
                 (or None if there is none).
 
@@ -373,6 +382,10 @@ LDMUD MODULE
 
           - registered_types
                 Contains all registered Python types.
+
+          - registered_structs
+                Contains all Python registered struct definitions.
+
 
         This module contains the following properties:
 

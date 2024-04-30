@@ -249,4 +249,8 @@ SQLITE_OPEN     "sl_open"
 SQLITE_PRAGMA   "sqlite_pragma"
 #endif
 
+#ifdef USE_PYTHON
+PYTHON          "python"
+#endif
+
 /***************************************************************************/

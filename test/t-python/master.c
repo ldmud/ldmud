@@ -40,10 +40,11 @@ void run_test()
             function int()
             {
                 clean_early_ob();
-                /* There should only be one reference:
-                 * The master object startup.ob_list.
+                /* There should only be the following references:
+                 *  - The master object startup.ob_list.
+                 *  - The struct type startup.PythonStruct
                  */
-                return driver_info(DI_NUM_PYTHON_LPC_REFS) == 1;
+                return driver_info(DI_NUM_PYTHON_LPC_REFS) == 2;
             }
         }),
         ({ "passing int", 0,
@@ -221,6 +222,12 @@ void run_test()
             :)
         }),
         ({
+            "Using Python-defined struct", 0,
+            (:
+                return python_sum_struct((<python_struct> value1: 10, value2: 32)) == 42;
+            :)
+        }),
+        ({
             "using python type 1 (bigint)", 0,
             (:
                 bigint val = to_bigint(1000);
@@ -384,7 +391,7 @@ void run_test()
         ({ "driver_info(DI_NUM_PYTHON_LPC_REFS) after some tests", 0,
             function int()
             {
-                return driver_info(DI_NUM_PYTHON_LPC_REFS) == 1;
+                return driver_info(DI_NUM_PYTHON_LPC_REFS) == 2;
             }
         }),
         ({ "driver_info(DI_NUM_LPC_PYTHON_REFS) with a Python object", 0,
@@ -398,7 +405,7 @@ void run_test()
             function int()
             {
                 box b = create_box(({100}));
-                return driver_info(DI_NUM_PYTHON_LPC_REFS) == 2;
+                return driver_info(DI_NUM_PYTHON_LPC_REFS) == 3;
             }
         }),
         ({
