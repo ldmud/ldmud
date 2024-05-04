@@ -338,7 +338,7 @@ struct lambda_ident_s
     union
     {
         unsigned short object_index; /* kind == LAMBDA_IDENT_OBJECT     */
-        unsigned short value_index;  /* kind == LAMBDA_IDENT_VALUE      */
+        svalue_t value;              /* kind == LAMBDA_IDENT_VALUE      */
     };
 };
 
@@ -6672,7 +6672,7 @@ find_struct ( ident_t * ident, efun_override_t override )
                     if (str)
                     {
                         svalue_t ref_str;
-                        int idx;
+
                         struct_type_t *st = str->u.strct->type;
                         lpctype_t *lt = get_struct_type(st); /* Freed by epilog_closure() */
 
@@ -6680,11 +6680,9 @@ find_struct ( ident_t * ident, efun_override_t override )
                         lt->t_struct.def_idx = LAMBDA_STRUCTS_COUNT;
 
                         assign_svalue_no_free(&ref_str, str); /* Add a reference. */
-                        idx = store_lambda_value(&ref_str);
-
                         name->u.global.struct_id = LAMBDA_STRUCTS_COUNT;
                         ADD_LAMBDA_STRUCT((lambda_struct_ident_t){
-                            .index = {.kind = LAMBDA_IDENT_VALUE, .value_index = idx},
+                            .index = {.kind = LAMBDA_IDENT_VALUE, .value = ref_str},
                             .type = ref_struct_type(st)});
                     }
                 }
@@ -6775,8 +6773,6 @@ find_struct ( ident_t * ident, efun_override_t override )
 
                     if (string_context)
                     {
-                        int idx;
-                        svalue_t str;
                         struct_t *s;
 
                         for (unsigned short i = 0; i < LAMBDA_STRUCTS_COUNT; i++)
@@ -6805,11 +6801,8 @@ find_struct ( ident_t * ident, efun_override_t override )
                             return -1;
                         }
 
-                        put_struct(&str, s);
-                        idx = store_lambda_value(&str);
-
                         ADD_LAMBDA_STRUCT((lambda_struct_ident_t){
-                            .index = {.kind = LAMBDA_IDENT_VALUE, .value_index = idx},
+                            .index = {.kind = LAMBDA_IDENT_VALUE, .value = svalue_struct(s)},
                             .type = ref_struct_type(stype)});
                         SEFUN_STRUCT_DEF(sefun_id) = id;
                         /* lpctype is freed by epiolog_closure(). */
@@ -8656,13 +8649,10 @@ lookup_function (ident_t *ident, char* super, efun_override_t override)
             if (fun)
             {
                 svalue_t ref_fun;
-                int idx;
 
                 assign_svalue_no_free(&ref_fun, fun); /* Add a reference. */
-                idx = store_lambda_value(&ref_fun);
-
                 ident->u.global.function = LAMBDA_FUNCTIONS_COUNT;
-                ADD_LAMBDA_FUNCTION((lambda_ident_t){.kind = LAMBDA_IDENT_VALUE, .value_index = idx});
+                ADD_LAMBDA_FUNCTION((lambda_ident_t){.kind = LAMBDA_IDENT_VALUE, .value = ref_fun});
             }
         }
 
@@ -8728,6 +8718,8 @@ get_function_closure (ident_t *ident)
  */
 
 {
+    svalue_t fun;
+
     assert(ident->type == I_TYPE_GLOBAL);
 
     if (!string_context
@@ -8735,7 +8727,8 @@ get_function_closure (ident_t *ident)
      || LAMBDA_FUNCTION(ident->u.global.function).kind != LAMBDA_IDENT_VALUE)
         return -1;
 
-    return LAMBDA_FUNCTION(ident->u.global.function).value_index;
+    assign_svalue_no_free(&fun, &(LAMBDA_FUNCTION(ident->u.global.function).value));
+    return store_lambda_value(&fun);
 } /* get_function_closure() */
 
 /*-------------------------------------------------------------------------*/
@@ -8766,14 +8759,9 @@ lookup_global_variable (ident_t *ident)
             svalue_t *var = lookup_entity(string_context->var_lookup, ident, T_LVALUE);
             if (var)
             {
-                svalue_t ref_var;
-                int idx;
-
-                assign_svalue_no_free(&ref_var, var); /* Add a reference. */
-                idx = store_lambda_value(&ref_var);
-
                 ident->u.global.variable = LAMBDA_VARIABLES_COUNT;
-                ADD_LAMBDA_VARIABLE((lambda_ident_t){.kind = LAMBDA_IDENT_VALUE, .value_index = idx});
+                ADD_LAMBDA_VARIABLE((lambda_ident_t){.kind = LAMBDA_IDENT_VALUE});
+                assign_svalue_no_free(&(LAMBDA_VARIABLE(LAMBDA_VARIABLES_COUNT-1).value), var);
 
                 found = true;
             }
@@ -8860,6 +8848,8 @@ get_global_variable_lvalue (ident_t *ident)
  */
 
 {
+    svalue_t value;
+
     assert(ident->type == I_TYPE_GLOBAL);
 
     if (!string_context
@@ -8868,7 +8858,8 @@ get_global_variable_lvalue (ident_t *ident)
      || LAMBDA_FUNCTION(ident->u.global.variable).kind != LAMBDA_IDENT_VALUE)
         return -1;
 
-    return LAMBDA_VARIABLE(ident->u.global.variable).value_index;
+    assign_svalue_no_free(&value, &(LAMBDA_VARIABLE(ident->u.global.variable).value));
+    return store_lambda_value(&value);
 } /* get_global_variable_lvalue() */
 
 /*=========================================================================*/
@@ -15126,7 +15117,11 @@ expr4:
           if (string_context && num < STD_STRUCT_OFFSET && LAMBDA_STRUCT(num).index.kind == LAMBDA_IDENT_VALUE)
           {
               // Need to put the lambda value as a struct template on the stack.
-              int idx = LAMBDA_STRUCT(num).index.value_index;
+              svalue_t str;
+              int idx;
+
+              assign_svalue_no_free(&str, &(LAMBDA_STRUCT(num).index.value));
+              idx = store_lambda_value(&str);
               if (idx < 0x100)
               {
                   ins_f_code(F_LAMBDA_CCONSTANT);
@@ -15277,7 +15272,11 @@ expr4:
                   {
                       /* This is a lvalue stored in a lambda value. */
                       bytecode_p q;
-                      int idx = LAMBDA_VARIABLE(i).value_index;
+                      svalue_t lvalue;
+                      int idx;
+
+                      assign_svalue_no_free(&lvalue, &(LAMBDA_VARIABLE(i).value));
+                      idx = store_lambda_value(&lvalue);
 
                       if (idx < 0x100)
                       {
@@ -15641,7 +15640,11 @@ name_lvalue:
                   {
                       /* This is a lvalue stored in a lambda value. */
                       bytecode_p q;
-                      int idx = LAMBDA_VARIABLE(i).value_index;
+                      svalue_t lvalue;
+                      int idx;
+
+                      assign_svalue_no_free(&lvalue, &(LAMBDA_VARIABLE(i).value));
+                      idx = store_lambda_value(&lvalue);
 
                       if (idx < 0x100)
                       {
@@ -22216,6 +22219,18 @@ epilog_free_all (void)
 
     for (int i = 0; i < LAMBDA_VALUES_COUNT; i++)
         free_svalue(&LAMBDA_VALUE(i));
+
+    for (size_t i = 0; i < LAMBDA_VARIABLES_COUNT; i++)
+        if (LAMBDA_VARIABLE(i).kind == LAMBDA_IDENT_VALUE)
+            free_svalue(&(LAMBDA_VARIABLE(i).value));
+
+    for (size_t i = 0; i < LAMBDA_FUNCTIONS_COUNT; i++)
+        if (LAMBDA_FUNCTION(i).kind == LAMBDA_IDENT_VALUE)
+            free_svalue(&(LAMBDA_FUNCTION(i).value));
+
+    for (size_t i = 0; i < LAMBDA_STRUCTS_COUNT; i++)
+        if (LAMBDA_STRUCT(i).index.kind == LAMBDA_IDENT_VALUE)
+            free_svalue(&(LAMBDA_STRUCT(i).index.value));
 
     compiled_prog = NULL;
 

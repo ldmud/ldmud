@@ -492,6 +492,21 @@ mixed *tests = (this_object() == blueprint()) &&
                     }))) == "ABCZ";
        :)
     }),
+    ({ "compile_string (function from function within inline closure)", 0,
+       (:
+            return funcall(compile_string(0, "fun1() + fun2(\"Z\") + funcall(function string() { return fun2(\"Z\") + fun1(); }) + fun1() + fun2(\"Z\")", (<cs_opts>
+                functions: function closure(symbol name)
+                    {
+                        switch (to_string(name))
+                        {
+                            case "fun1":
+                                return function string() { return "ABC"; };
+                            case "fun2":
+                                return #'capitalize;
+                        }
+                    }))) == "ABCZZABCABCZ";
+       :)
+    }),
     ({ "compile_string (same function multiple times from function)", 0,
        (:
             return funcall(compile_string(0, "fun1() + fun2() + fun3()", (<cs_opts>
@@ -579,6 +594,20 @@ mixed *tests = (this_object() == blueprint()) &&
                     }))) == "ABCX" && v2 == "X";
        :)
     }),
+    ({ "compile_string (variable from function within inline closure)", 0,
+       (:
+            string v1 = "ABC", v2 = "123";
+            return funcall(compile_string(0, "var1 + var2 + funcall(function string() { var2 = \"X\"; return var1 + var2; }) + var1 + var2", (<cs_opts>
+                variables: function mixed(symbol name) : string v2 = &v2
+                    {
+                        switch (to_string(name))
+                        {
+                            case "var1": return &v1;
+                            case "var2": return &v2;
+                        }
+                    }))) == "ABC123ABCXABCX" && v2 == "X";
+       :)
+    }),
     ({ "compile_string (same value multiple times from function)", 0,
        (:
             return funcall(compile_string(0, "a+b+c", (<cs_opts>
@@ -659,6 +688,17 @@ mixed *tests = (this_object() == blueprint()) &&
     ({ "compile_string (struct from function)", 0,
        (:
             return deep_eq(funcall(compile_string(0, "(<my_struct> ({10}))", (<cs_opts>
+                structs: function struct mixed(symbol name)
+                    {
+                        if (name == 'my_struct)
+                            return (<test_struct> ({-1}));
+                    }))), (<test_struct> ({10})));
+       :)
+    }),
+    ({ "compile_string (struct from function within inline closure)", 0,
+       (:
+            return deep_eq(funcall(compile_string(0,
+                "funcall(function struct my_struct() { return (<my_struct> ({10})); })", (<cs_opts>
                 structs: function struct mixed(symbol name)
                     {
                         if (name == 'my_struct)
