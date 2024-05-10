@@ -10,7 +10,7 @@ object dragon;
 	dragon->set_name("dragon");\
 	dragon->set_level(17);\
 	dragon->set_al(-900);\
-	dragon->set_shorti("The cave dragon");\
+	dragon->set_short("The cave dragon");\
 	dragon->set_wc(25);\
 	dragon->set_ac(4);\
 	treas = clone_object("obj/treasure");\
