@@ -2134,7 +2134,11 @@ load_object (const char *lname, Bool create_super, int depth
 
             if (strcmp(pInherited, name) == 0)
             {
-                errorf("Illegal to inherit self.\n");
+                /* In situations where files are deeply inherited, it
+                 * is useful to see which file is trying to inherit
+                 * itself.
+                 */
+                errorf("[%s]: Illegal to inherit self.\n", name);
             }
 
             if (depth >= MAX_LOAD_DEPTH)
