@@ -1,12 +1,15 @@
 SYNOPSIS
         varargs string terminal_colour(string str,
                                        null | mapping | closure map,
-                                       int wrap, int indent)
+                                       [int wrap, int indent,]
+                                       [string delimiter, int code_length])
 BESCHREIBUNG
         Ist <map> ein Wert ungleich 0, ersetzt diese Efun alle Farb-
-        Definitionen der Form "%^KEY%^" (siehe unten fuer Details) im
-        String <str> und ersetzt sie durch die entsprechenden Werte aus dem
-        unter <map> angegebenen Farbschluessel.
+        Definitionen der Form "%^KEY%^" im String <str> und ersetzt sie
+        durch die entsprechenden Werte aus dem unter <map> angegebenen
+        Farbschluessel.
+        Dieses Verhalten kann modifiziert werden indem delimiter und
+        code_length uebergeben werden (siehe unten).
 
         Ist <map> ein Mapping, muessen die Eintraege das Format
         "KEY" : "wert" haben; Eintraege, die keine Strings enthalten,
@@ -20,9 +23,6 @@ BESCHREIBUNG
         Ist <map> eine Closure, wird diese mit den Farbdefinitionen <KEY>
         als Argument aufgerufen und muss einen String zurueck liefern, der
         die <KEY>s ersetzt.
-
-        Die speziellen Schluessel "%^%^" und "%%^^" werden immer durch das
-        Literal "%^" ersetzt.
 
         Die Parameter <wrap> und <indent> sind optional. Ist nur <wrap>
         angegeben, wird <str> in der Spalte <wrap> umgebrochen. Ist
@@ -40,11 +40,15 @@ BESCHREIBUNG
         wirkt als einfache Zeilenumbruch Funktion.
 
 
-        ERKENNEN VON FARBDEFINITIONEN
+        STANDARDSTRATEGIE ZUM ERKENNEN VON FARBDEFINITIONEN
 
-        Wie bereits erwaehnt, werden die speziellen Schluessel "%^%^" und
-        "%%^^" durch das Literal "%^" ersetzt und spielen im Weiteren
-        keine Rolle.
+        Standardmaessig sucht terminal_colour() nach Farb-Definitionen, die
+        von zwei Trennern der Form "%^" umschlossen sind. Dieses Verhalten
+        kann jedoch modifiziert werden indem alternative Werte fuer 
+        delimiter und code_length uebergeben werden (siehe unten).
+
+        Der spezielle Schluessel "%^%^" wird durch das Literal "%^" ersetzt
+        und spielt im Weiteren keine Rolle.
 
         Fuer den Eingabestring wird das folgende Format vorausgesetzt:
 
@@ -70,7 +74,21 @@ BESCHREIBUNG
           }
 
 
-BEISPIELE
+        MODIFIZIEREN DER ERSETZUNGSSTRATEGIE
+
+        Die Ersetzungsstrategie kann mittels alternativer Werte fuer
+        delimiter udn code_length veraendert werden.
+
+        'delimiter' ist der Trenner (Standard "%^") und 'code_length'
+        bestimmt die Laenge der Farb-Codes. Der Standardwert 0 bedeutet
+        dabei "variable Laenge, von Trennern umschlossen". Jede andere Zahl
+        behandelt entsprechend viele Zeichen nach dem Trenner als Farbcode;
+        in diesem Fall ist _kein_ abschliessender Trenner noetig.
+
+        Doppelte Trenner werden dabei wieder durch eine Kopie des Trenners
+        selbst ersetzt.
+
+BEISPIELE (STANDARDVERHALTEN)
         mapping trans;
         string str;
 
@@ -112,6 +130,14 @@ BEISPIELE
 
             "dies ist die erste Zeile\n   und dies ist die zweite Zeile"
 
+BEISPIELE (MODIFIZIERTE KONFIGURATION)
+        trans = ([ "g" : "ansi-green", "b" : "ansi-blue" ]);
+
+        str = terminal_colour( "^g and ^r^^ and ^b", trans, "^", 1 );
+
+        Dies fuehrt zu str == "ansi-green and ^ and ansi-blue"
+
+
 GESCHICHTE
         Die Idee fuer diese Efun und die erste Implementierung stammen
         aus MudOS; die Strategie fuer das Erkennen von Schluesseln
@@ -121,6 +147,9 @@ GESCHICHTE
         von Farbschluesseln hinzu. Es erklaerte zudem offiziell das
         Verhalten betreffen "%%^^" aus Gruenden besserer Kompatibilitaet
         mit MudOS.
+        LDMud 3.7.0 fuegte die Konfigurierbarkeit von Trennern hinzu und
+        entfernte die Unterstuetzung von "%%^^" (verwende die mit dem
+        Source bereitgestellte sefun falls noetig).
 
 SIEHE AUCH
         sprintf(E)
