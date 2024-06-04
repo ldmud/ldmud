@@ -507,6 +507,16 @@ f_xml_generate (svalue_t *sp)
     return sp;
 }
 
+#if LIBXML_VERSION >= 21200
+static void
+xml_pkg_error_handler(void * userData, const xmlError *error)
+{
+    if (error)
+    {
+        errorf("Bad arg 1 to xml_parse(): %s", error->message);
+    }
+}
+#else
 static void
 xml_pkg_error_handler(void * userData, xmlErrorPtr error)
 {
@@ -515,6 +525,7 @@ xml_pkg_error_handler(void * userData, xmlErrorPtr error)
         errorf("Bad arg 1 to xml_parse(): %s", error->message);
     }
 }
+#endif
 
 svalue_t *
 f_xml_parse(svalue_t * sp)
