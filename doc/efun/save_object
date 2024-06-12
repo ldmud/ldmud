@@ -22,11 +22,13 @@ DESCRIPTION
             0: original format, used by Amylaar LPMud and LDMud <= 3.2.8 .
             1: LDMud >= 3.2.9: non-lambda closures, symbols, quoted arrays
                  can be saved.
-            2: LDMUd >= 3.5.0: floats are stored in a different way, which is
-                 more compact and can store the new floats losslessly.                 
+            2: LDMud >= 3.5.0: floats are stored in a different way, which is
+                 more compact and can store the new float losslessly.
+	    3: LDMud >= 3.5.0: can also save lvalues references (without it,
+	         the plain rvalue will be saved).
 
-        It is recommended to use version 2 or higher.
-        
+        It is recommended to use version 3 or higher.
+
         A variable is considered 'saveable' if it is not declared
         as 'nosave' or 'static'.
 
@@ -39,7 +41,7 @@ HISTORY
         LDMud 3.2.9 added the saving of non-lambda closures, symbols,
           and quoted arrays, using the new savefile format version 1.
         LDMud 3.2.10 added the <format> argument.
-        LDMud 3.5.0 added savefile format version 2.
+        LDMud 3.5.0 added savefile format version 2 and 3.
 
 SEE ALSO
         restore_object(E), save_value(E)

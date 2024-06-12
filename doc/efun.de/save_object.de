@@ -27,7 +27,9 @@ BESCHREIBUNG
              2: LDMUd >= 3.5.0: Gleitkommazahlen werden in einem neuen Format
                 geschrieben, welches kompakter ist die Gleitkommazahlen aus
                 3.5.x verlustfrei speichern kann.
-        
+	     3: LDMud >= 3.5.0: kann zusaetzlich lvalue-Referenzen speichern
+	        (ohne werden stattdessen einfache rvalues gespeichert)
+
         Es wird empfohlen, die Angabe des Formats wegzulassen oder in Version
         2 (oder hoeher) zu speichern.
 
@@ -43,7 +45,7 @@ GESCHICHTE
             Closures, Symbolen und gequoteten Arrays. Dazu wurde ein neues
             Format fuer die Speicherdatei eingefuehrt.
         LDMud 3.2.10 fuehrte das Argument <format> ein.
-        LDMud 3.5.0 fuehrte Formatversion 2 ein.
+        LDMud 3.5.0 fuehrte Formatversionen 2 und 3 ein.
 
 SIEHE AUCH
         restore_object(E), save_value(E)

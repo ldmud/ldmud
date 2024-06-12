@@ -39,7 +39,7 @@ HISTORY
         LDMud 3.2.9 added the restoring of non-lambda closures, symbols,
         and quoted arrays, using a new savefile format version.
         LDMud 3.5.0 added the possibility to restore version 2 with its higher
-        float precision.
-        
+        float precision and version 3 with lvalue references.
+
 SEE ALSO
         save_object(E), restore_value(E), valid_read(M)
