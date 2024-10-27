@@ -8,6 +8,7 @@
 #include "/inc/deep_eq.inc"
 // String compiler header boundary
 #include "/sys/tls.h"
+#include "/sys/commands.h"
 #include "/sys/configuration.h"
 #include "/sys/driver_hook.h"
 #include "/sys/functionlist.h"
@@ -1206,6 +1207,66 @@ mixed *tests = (this_object() == blueprint()) &&
             return deep_eq(map(arr, function mixed(mixed val): { return &(val[0]); }), ({ 1, 2, 3 }))
                 && deep_eq(arr, ({ ({1}), ({2}), ({3})}));
        :)
+    }),
+
+    ({ "match_command without matches", 0,
+      (:
+          return match_command("no_matching_action", this_object()) == ({});
+      :)
+    }),
+    ({ "match_command with a match", 0,
+      (:
+          closure cl = (: 1 :);
+          add_action(cl, "match_command_test1_action");
+          return deep_eq(match_command("match_command_test1_action", this_object()), ({ ({ "match_command_test1_action", 0, this_object(), cl }) }));
+      :)
+    }),
+    ({ "match_command with a match and arguments", 0,
+      (:
+          closure cl = (: 2 :);
+          add_action(cl, "match_command_test2_action");
+          return deep_eq(match_command("match_command_test2_action A B C", this_object()), ({ ({ "match_command_test2_action", "A B C", this_object(), cl }) }));
+      :)
+    }),
+    ({ "match_command with two matches", 0,
+      (:
+          closure cl1 = (: 3 :), cl2 = (: -3 :);
+          add_action(cl1, "match_command_test3_action");
+          add_action(cl2, "match_command_test3_action");
+          return deep_eq(match_command("match_command_test3_action X", this_object()),
+                         ({
+                            ({ "match_command_test3_action", "X", this_object(), cl2 }),
+                            ({ "match_command_test3_action", "X", this_object(), cl1 })
+                        }));
+      :)
+    }),
+    ({ "match_command with an AA_SHORT action", 0,
+      (:
+          closure cl = (: 4 :);
+          add_action(cl, "match_command_test4_action", AA_SHORT);
+          return deep_eq(match_command("match_command_test4_action_something X", this_object()), ({ ({ "match_command_test4_action_something", "X", this_object(), cl }) }));
+      :)
+    }),
+    ({ "match_command with an AA_NOSPACE action", 0,
+      (:
+          closure cl = (: 5 :);
+          add_action(cl, "match_command_test5_action", AA_NOSPACE);
+          return deep_eq(match_command("match_command_test5_action_something X", this_object()), ({ ({ "match_command_test5_action_something", "_something X", this_object(), cl }) }));
+      :)
+    }),
+    ({ "match_command with an AA_IMM_ARGS action", 0,
+      (:
+          closure cl = (: 6 :);
+          add_action(cl, "match_command_test6_action", AA_IMM_ARGS);
+          return deep_eq(match_command("match_command_test6_action_something X", this_object()), ({ ({ "match_command_test6_action", "_something X", this_object(), cl }) }));
+      :)
+    }),
+    ({ "match_command with a leading match", 0,
+      (:
+          closure cl = (: 7 :);
+          add_action(cl, "match_command_test7_action", -20);
+          return deep_eq(match_command("match_command_test7_act X", this_object()), ({ ({ "match_command_test7_act", "X", this_object(), cl }) }));
+      :)
     }),
 
     ({ "lambda with many values", 0,
