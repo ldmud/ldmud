@@ -127,6 +127,10 @@ class TestObject(unittest.TestCase):
         ldmud.efuns.destruct(ob)
         self.assertFalse(lfun)
         self.assertFalse(var)
+        with self.assertRaises(ValueError):
+            lfun(42)
+        with self.assertRaises(ValueError):
+            var.value
 
     def testDict(self):
         ob = ldmud.Object("/testob")

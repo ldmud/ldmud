@@ -3444,6 +3444,11 @@ ldmud_program_check_available (ldmud_program_t* self)
 
         case T_OBJECT:
             /* Make the program resident */
+            if (!check_object(self->lpc_object.u.ob))
+            {
+                PyErr_Format(PyExc_ValueError, "object is destructed");
+                return false;
+            }
             if (O_PROG_SWAPPED(self->lpc_object.u.ob))
             {
                 self->lpc_object.u.ob->time_of_ref = current_time;
