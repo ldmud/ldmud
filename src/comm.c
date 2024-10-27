@@ -2463,7 +2463,7 @@ get_message (char *buff, size_t *bufflength)
             pg_process_all();
 #endif
 #ifdef USE_PYTHON
-            python_handle_fds(&readfds, &writefds, &exceptfds, nfds);
+            python_handle_fds(&readfds, &writefds, &pexceptfds, nfds);
 #endif
 #ifdef USE_ANL
             ares_process(anl_channel, &readfds, &writefds);
