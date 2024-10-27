@@ -1505,7 +1505,7 @@ f_execute_command (svalue_t *sp)
         errorf("Command too long (size: %zu): '%.200s...'\n", 
                len, get_txt(argp->u.str));
     strncpy(buf, get_txt(argp->u.str), len);
-    buf[len+1] = '\0';
+    buf[len] = '\0';
 
     origin = check_object(argp[1].u.ob);
     if (!origin)
@@ -1524,9 +1524,20 @@ f_execute_command (svalue_t *sp)
     /* Test if we are allowed to use this function */
     if (privilege_violation4(STR_EXECUTE_COMMAND, svalue_object(origin), argp->u.str, 0, sp))
     {
+        struct command_context_s context;
+
+        /* Save the current context, as it also contains command parsing information. */
+        save_command_context(&context);
+        context.rt.last = rt_context;
+        rt_context = (rt_context_t *)&context.rt;
+
         marked_command_giver = origin;
         command_giver = player;
         res = parse_command(buf, MY_TRUE);
+
+        /* Restore the previous context */
+        rt_context = context.rt.last;
+        restore_command_context(&context);
     }
 
     /* Clean up the stack and push the result. */

@@ -993,6 +993,40 @@ mixed *tests = (this_object() == blueprint()) &&
             return interactive_info(0, IC_ENCODING) == "ASCII";
         :)
     }),
+
+    ({ "execute_command", 0,
+       (:
+            string called_args;
+
+            efun::configure_object(this_object(), OC_COMMANDS_ENABLED, 1);
+            add_action(function int(string str) : string called_args = &called_args { called_args = str; return 1; }, "execute_command_test1");
+
+            if (!execute_command("execute_command_test1 ARGS", this_object(), this_object()))
+                return 0;
+            if (called_args != "ARGS")
+                return 0;
+            return 1;
+      :)
+    }),
+    ({ "execute_command with two consecutive calls", 0,
+       (:
+            string called_args;
+
+            efun::configure_object(this_object(), OC_COMMANDS_ENABLED, 1);
+            add_action(function int(string str) : string called_args = &called_args { called_args = str; return 1; }, "execute_command_test2");
+
+            if (!execute_command("execute_command_test2 ARGS", this_object(), this_object()))
+                return 0;
+            if (called_args != "ARGS")
+                return 0;
+            if (!execute_command("execute_command_test2 A", this_object(), this_object()))
+                return 0;
+            if (called_args != "A")
+                return 0;
+            return 1;
+      :)
+    }),
+
     ({ "get_type_info(int,0)", 0, (: get_type_info(10,              0) == T_NUMBER       :) }),
     ({ "get_type_info(str,0)", 0, (: get_type_info("10",            0) == T_STRING       :) }),
     ({ "get_type_info(str,1)", 0, (: get_type_info("10",            1) == 0              :) }), /* Shared string */
