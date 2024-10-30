@@ -1632,6 +1632,7 @@ mixed *tests = (this_object() == blueprint()) &&
     ({ "to_type mixed* to string* with keep_zero",        0, (: deep_eq(to_type(({"abc", 0, 1, 2.3}), [string*], (<tt_opts> keep_zero: 1)), ({"abc", 0, "1", "2.3"})) :) }),
     ({ "to_type mixed* to struct mixed",                  0, (: deep_eq(to_type(({"abc", 3, #'abs}), [struct mixed]), to_struct(({"abc", 3, #'abs}))) :) }),
     ({ "to_type mixed* to derived_struct",                0, (: deep_eq(to_type(({ ({1, "2", 3.3}), ({4, "5", 6.6}) }), [struct derived_struct]), (<derived_struct> arg: ({1, 2, 3}), values: ({"4", "5", "6.6"})) ) :) }),
+    ({ "to_type mixed* to standard struct",               0, (: deep_eq(to_type(({ "ascii" }), [struct to_type_options]), (<to_type_options> "ascii")) :) }),
     ({ "to_type mixed* to string|mapping",                0, (: deep_eq(to_type(({"abc", 5, #'to_type}), [string|mapping]), (["abc", 5, #'to_type])) :) }),
     ({ "to_type mixed* to quoted array",                  0, (: deep_eq(to_type(({"abc", 5, #'to_type}), decltype('({}))), '({"abc", 5, #'to_type})) :) }),
     ({ "to_type bytes to bytes|int*",                     0, (: deep_eq(to_type(b"\x01\x02\x03", [bytes|int*]) , b"\x01\x02\x03") :) }),

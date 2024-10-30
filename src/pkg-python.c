@@ -883,6 +883,7 @@ python_register_struct (PyObject *module, PyObject *args, PyObject *kwds)
         return NULL;
 
     assert(stype != NULL);
+    struct_publish_global_type(stype);
 
     ident = make_python_identifier(name);
     if (!ident)

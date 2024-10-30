@@ -1049,32 +1049,44 @@ class TestRegisteredStructs(unittest.TestCase):
         ldmud.register_struct("testregisteredstructs_struct1", None, (("value", int),))
         ldmud.register_struct("testregisteredstructs_struct2", None, (("value", ldmud.Object),))
         ldmud.unregister_struct("testregisteredstructs_struct2")
+        ldmud.register_struct("testregisteredstructs_struct3", None, (("value", int),))
+        ldmud.register_struct("testregisteredstructs_struct3", None, (("value", str),))
 
     def tearDown(self):
         ldmud.unregister_struct("testregisteredstructs_struct1")
+        ldmud.unregister_struct("testregisteredstructs_struct3")
 
     def testDir(self):
         self.assertIn("testregisteredstructs_struct1", dir(ldmud.registered_structs))
         self.assertNotIn("testregisteredstructs_struct2", dir(ldmud.registered_structs))
-        self.assertNotIn("testregisteredstructs_struct3", dir(ldmud.registered_structs))
+        self.assertIn("testregisteredstructs_struct3", dir(ldmud.registered_structs))
+        self.assertNotIn("testregisteredstructs_struct4", dir(ldmud.registered_structs))
         self.assertGreater(len(dir(ldmud.registered_structs)), 0)
 
     def testDict(self):
         self.assertIn("testregisteredstructs_struct1", ldmud.registered_structs.__dict__)
         self.assertNotIn("testregisteredstructs_struct2", ldmud.registered_structs.__dict__)
-        self.assertNotIn("testregisteredstructs_struct3", ldmud.registered_structs.__dict__)
+        self.assertIn("testregisteredstructs_struct3", ldmud.registered_structs.__dict__)
+        self.assertNotIn("testregisteredstructs_struct4", ldmud.registered_structs.__dict__)
         self.assertEqual(ldmud.registered_structs.__dict__["testregisteredstructs_struct1"], ldmud.Struct["python","testregisteredstructs_struct1"])
-        self.assertEqual(len(ldmud.registered_structs.__dict__), 2)
+        self.assertEqual(ldmud.registered_structs.__dict__["testregisteredstructs_struct3"], ldmud.Struct["python","testregisteredstructs_struct3"])
+        self.assertEqual(len(ldmud.registered_structs.__dict__), 3)
 
     def testAttribute(self):
         self.assertTrue(hasattr(ldmud.registered_structs, 'testregisteredstructs_struct1'))
         self.assertFalse(hasattr(ldmud.registered_structs, 'testregisteredstructs_struct2'))
-        self.assertFalse(hasattr(ldmud.registered_structs, 'testregisteredstructs_struct3'))
+        self.assertTrue(hasattr(ldmud.registered_structs, 'testregisteredstructs_struct3'))
+        self.assertFalse(hasattr(ldmud.registered_structs, 'testregisteredstructs_struct4'))
         self.assertEqual(ldmud.registered_structs.testregisteredstructs_struct1, ldmud.Struct["python","testregisteredstructs_struct1"])
+        self.assertEqual(ldmud.registered_structs.testregisteredstructs_struct3, ldmud.Struct["python","testregisteredstructs_struct3"])
         with self.assertRaises(AttributeError):
             ldmud.registered_structs.testregisteredstructs_struct2
         with self.assertRaises(AttributeError):
-            ldmud.registered_structs.testregisteredstructs_struct3
+            ldmud.registered_structs.testregisteredstructs_struct4
+
+    def testUsage(self):
+        instance1 = ldmud.registered_structs.testregisteredstructs_struct1({ "value": 10 })
+        instance3 = ldmud.registered_structs.testregisteredstructs_struct3({ "value": "10" })
 
 class TestRegisteredTypes(unittest.TestCase):
     def testDir(self):
