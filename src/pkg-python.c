@@ -968,7 +968,8 @@ python_register_type (PyObject *module, PyObject *args, PyObject *kwds)
         }
 
         for (int i = 0; i < REAL_EFUN_COUNT; i++)
-            xfree(python_type_entry->efun[i].types);
+            if (python_type_entry->efun[i].exists)
+                xfree(python_type_entry->efun[i].types);
     }
     else
     {

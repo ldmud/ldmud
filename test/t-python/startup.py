@@ -1255,6 +1255,8 @@ ldmud.register_hook(ldmud.ON_OBJECT_DESTRUCTED, ob_destroyed)
 
 ldmud.register_efun("python_get_hook_info", get_hook_info)
 ldmud.register_type("bigint", bigint)
+ldmud.register_type("bigint", int)
+ldmud.register_type("bigint", bigint)
 ldmud.register_efun("to_bigint", to_bigint)
 ldmud.register_type("random_generator", random_generator)
 ldmud.register_efun("create_random_generator", create_random_generator)
