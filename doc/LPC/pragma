@@ -129,8 +129,8 @@ DESCRIPTION
         no_warn_lightweight: Turn off warn_lightweight.
 
         save_local_names: When activated the name of local variables
-                are saved for coroutines for debugging purposes.
-                This increases size of the program.
+                are saved for debugging purposes. This increases the
+                size of the program.
         no_save_local_names: Turn off save_local_names (the default).
 
         When an object is compiled with type testing (#pragma

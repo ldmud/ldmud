@@ -383,6 +383,21 @@ struct variable_s
 };
 
 
+/* --- struct local_variable_dbg_s: information of a local variable
+ *
+ * This structure is only used during runtime for debugging.
+ */
+
+struct local_variable_dbg_s
+{
+    string_t  *name;    /* Name of the variable. */
+    lpctype_t *type;    /* Type of the variable. */
+    uint32_t   code_start, code_end;
+                        /* The code block where this variable occurs. */
+    uint8_t   idx;      /* Index on the stack relative to fp. */
+};
+
+
 /* Constants for inherit_type in inherit_s */
 enum inherit_types {
     INHERIT_TYPE_NORMAL    = 0x0000,  /* Type: Normal inherit */
@@ -634,6 +649,11 @@ struct program_s
       /* Array [.num_variables] with the flags, types and names of all
        * variables.
        */
+    local_variable_dbg_t *local_variables;
+      /* Array [.num_local_variables] with information for all local variables.
+       * This can be NULL when not enabled. The entries are sorted by
+       * .code_start and .code_end.
+       */
     call_cache_t *lwo_call_cache;
       /* The cache for lightweight object calls. The index is given
        * with the F_CALL_OTHER/STRICT_CACHED opcode.
@@ -718,6 +738,8 @@ struct program_s
       /* Number of listed struct definitions */
     unsigned int   num_types;
       /* Number of types in .types */
+    uint32_t       num_local_variables;
+      /* Number of entries in .local_variables. */
 };
 
 /* Constants for flags in program_s. */

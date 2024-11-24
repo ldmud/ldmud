@@ -1133,7 +1133,14 @@ clear_program_ref (program_t *p, Bool clear_ref)
     /* Variables */
     for (i = p->num_variables; --i >= 0;)
     {
+        clear_string_ref(p->variables[i].name);
         clear_fulltype_ref(p->variables[i].type);
+    }
+
+    for (i = p->num_local_variables; --i >= 0;)
+    {
+        clear_string_ref(p->local_variables[i].name);
+        clear_lpctype_ref(p->local_variables[i].type);
     }
 
     /* Non-inherited functions */
@@ -1277,6 +1284,12 @@ gc_mark_program_ref (program_t *p)
         {
             MARK_MSTRING_REF(variables->name);
             count_fulltype_ref(variables->type);
+        }
+
+        for (i = p->num_local_variables; --i >= 0;)
+        {
+            MARK_MSTRING_REF(p->local_variables[i].name);
+            count_lpctype_ref(p->local_variables[i].type);
         }
 
         /* Inherited programs */

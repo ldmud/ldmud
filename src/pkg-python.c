@@ -289,6 +289,16 @@ long num_lpc_python_references = 0;
 
 long num_python_lpc_references = 0;
 
+static long frame_counter = 0;
+static long frame_current_index[MAX_TRACE];
+  /* Whenever we create a call_frame object, we remember a unique number
+   * (created by incrementing <frame_counter>) for the given stack level
+   * in <frame_current_index> and in the call_frame object. When we leave
+   * the frame this entry will marked invalid (by setting to 0). And thus
+   * the call_frame object can detect, whether it represents a valid (i.e.
+   * still active) frame.
+   */
+
 static python_type_entry_t* python_type_table[PYTHON_TYPE_TABLE_SIZE];
   /* Information about all defined Python types.
    *
@@ -390,7 +400,8 @@ static ldmud_gc_var_t *gc_object_list = NULL,
                       *gc_symbol_list = NULL,
                       *gc_quoted_array_list = NULL,
                       *gc_lvalue_list = NULL,
-                      *gc_call_frame_list = NULL;
+                      *gc_call_frame_list = NULL,
+                      *gc_call_frame_ref_list = NULL;
 static ldmud_gc_lpctype_type_t *gc_lpctype_list = NULL;
 static ldmud_concrete_struct_type_t *gc_struct_type_list = NULL;
 
@@ -1694,9 +1705,37 @@ struct ldmud_call_frame_s
     svalue_t ob;
     program_t *prog;
     bytecode_t *pc;
+    svalue_t *fp;
     const char* name;
+    long frame_serial;
+    int frame_level;
     enum call_frame_type type;
+#ifdef EVAL_COST_TRACE
     int32 eval_cost;
+#endif
+};
+
+struct ldmud_call_frame_ref_s
+{
+    PyGCObject_HEAD
+
+    program_t *prog;
+    long frame_serial;
+    int frame_level;
+};
+
+struct ldmud_local_variables_s
+{
+    struct ldmud_call_frame_ref_s frame_ref_head;
+    bytecode_t *pc;
+    svalue_t *fp;
+};
+
+struct ldmud_local_variable_s
+{
+    struct ldmud_call_frame_ref_s frame_ref_head;
+    local_variable_dbg_t *var;
+    svalue_t *varp;
 };
 
 typedef struct ldmud_lpctype_s ldmud_lpctype_t;
@@ -1717,6 +1756,9 @@ typedef struct ldmud_quoted_array_s ldmud_quoted_array_t;
 typedef struct ldmud_lvalue_s ldmud_lvalue_t;
 typedef struct ldmud_instruction_s ldmud_instruction_t;
 typedef struct ldmud_call_frame_s ldmud_call_frame_t;
+typedef struct ldmud_call_frame_ref_s ldmud_call_frame_ref_t;
+typedef struct ldmud_local_variables_s ldmud_local_variables_t;
+typedef struct ldmud_local_variable_s ldmud_local_variable_t;
 
 /*-------------------------------------------------------------------------*/
 /* GC Support */
@@ -4938,7 +4980,7 @@ ldmud_program_variable_get_type (ldmud_program_and_index_t *varob, void *closure
     var = varob->ob_base.lpc_program->variables + varob->index;
     result = lpctype_to_pythontype(var->type.t_type);
     if (!result)
-        PyErr_Format(PyExc_AttributeError, "Variable '%s' has no type information or mixed type", var->name);
+        PyErr_Format(PyExc_AttributeError, "Variable '%s' has no type information or mixed type", get_txt(var->name));
 
     return result;
 
@@ -5100,7 +5142,7 @@ ldmud_program_variables_getattro (ldmud_program_t *val, PyObject *name)
 
     PyErr_Clear();
 
-    /* And now search for a function. */
+    /* And now search for a variable. */
     varname = find_tabled_python_string(name, "variable name", &error);
     if (error)
         return NULL;
@@ -8060,7 +8102,7 @@ ldmud_struct_member_get_type (ldmud_struct_and_index_t *self, void *closure)
     mem = self->struct_base.lpc_struct->type->member + self->index;
     result = lpctype_to_pythontype(mem->type);
     if (!result)
-        PyErr_Format(PyExc_AttributeError, "Struct member '%s' has no type information or mixed type", mem->name);
+        PyErr_Format(PyExc_AttributeError, "Struct member '%s' has no type information or mixed type", get_txt(mem->name));
 
     return result;
 
@@ -11935,6 +11977,461 @@ ldmud_instruction_create (int instruction)
 } /* ldmud_instruction_create() */
 
 /*-------------------------------------------------------------------------*/
+/* Local Variables */
+
+/*-------------------------------------------------------------------------*/
+
+static void
+ldmud_call_frame_ref_dealloc (ldmud_call_frame_ref_t* self)
+
+/* Destroy the ldmud_call_frame_ref_t object.
+ */
+
+{
+    free_prog(self->prog, true);
+
+    remove_gc_object(&gc_call_frame_ref_list, (ldmud_gc_var_t*)self);
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+} /* ldmud_call_frame_ref_dealloc() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_call_frame_ref_bool (ldmud_call_frame_ref_t* self)
+
+/* Return 1 (true) if this references a valid (still active) frame.
+ */
+
+{
+    return self->frame_serial == frame_current_index[self->frame_level];
+} /* ldmud_call_frame_ref_bool() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_local_variable_repr (ldmud_local_variable_t *varob)
+
+/* Return a string representation of this variable.
+ */
+
+{
+    return PyUnicode_FromFormat("<LPC local variable %s>", get_txt(varob->var->name));
+} /* ldmud_local_variable_repr() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_local_variable_richcompare (ldmud_local_variable_t* self, PyObject *other, int op)
+
+/* Compare <self> to <other> with the comparison operation <op>.
+ */
+
+{
+    ldmud_local_variable_t *other_var;
+    PyObject* resultval;
+    bool result;
+
+    if (Py_TYPE(self) != Py_TYPE(other))
+    {
+        Py_INCREF(Py_NotImplemented);
+        return Py_NotImplemented;
+    }
+
+    other_var = (ldmud_local_variable_t*) other;
+
+// frame_level, frame_serial,  local_variable_dbg_t *var;
+
+
+    if (!ldmud_call_frame_ref_bool(&self->frame_ref_head)
+     || !ldmud_call_frame_ref_bool(&other_var->frame_ref_head))
+        result = false;
+    else if (self->frame_ref_head.frame_level < other_var->frame_ref_head.frame_level)
+        result = op == Py_LT || op == Py_LE || op == Py_NE;
+    else if (self->frame_ref_head.frame_level > other_var->frame_ref_head.frame_level)
+        result = op == Py_GT || op == Py_GE || op == Py_NE;
+    else if (self->var->idx < other_var->var->idx)
+        result = op == Py_LT || op == Py_LE || op == Py_NE;
+    else if (self->var->idx > other_var->var->idx)
+        result = op == Py_GT || op == Py_GE || op == Py_NE;
+    else
+        result = op == Py_LE || op == Py_EQ || op == Py_GE;
+
+    resultval = result ? Py_True : Py_False;
+    Py_INCREF(resultval);
+    return resultval;
+} /* ldmud_local_variable_richcompare() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_local_variable_get_name (ldmud_local_variable_t *varob, void *closure)
+
+/* Return the name for the variable.
+ */
+
+{
+    return PyUnicode_FromStringAndSize(get_txt(varob->var->name), mstrsize(varob->var->name));
+} /* ldmud_local_variable_get_name() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_local_variable_get_value (ldmud_local_variable_t *varob, void *closure)
+
+/* Return the value of the variable.
+ */
+
+{
+    if (!ldmud_call_frame_ref_bool(&varob->frame_ref_head))
+    {
+        PyErr_Format(PyExc_ValueError, "expired local variable");
+        return NULL;
+    }
+
+    return rvalue_to_python(varob->varp);
+} /* ldmud_local_variable_get_value() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_local_variable_set_value (ldmud_local_variable_t *varob, PyObject *newval, void *closure)
+
+/* Sets the value for the variable.
+ * Returns 0 on success, -1 on failure.
+ */
+
+{
+    const char* err;
+    svalue_t lpcval;
+
+    if (!ldmud_call_frame_ref_bool(&varob->frame_ref_head))
+    {
+        PyErr_Format(PyExc_ValueError, "expired local variable");
+        return -1;
+    }
+
+    if (newval == NULL)
+        newval = Py_None;
+
+    err = python_to_svalue(&lpcval, newval);
+    if (err)
+    {
+        PyErr_SetString(PyExc_ValueError, err);
+        return -1;
+    }
+
+    if (varob->frame_ref_head.prog->flags & P_RTT_CHECKS)
+    {
+        if (!check_rtt_compatibility(varob->var->type, &lpcval))
+        {
+            static char realtypebuf[512];
+            lpctype_t *realtype = get_rtt_type(varob->var->type, &lpcval);
+
+            get_lpctype_name_buf(realtype, realtypebuf, sizeof(realtypebuf));
+            free_lpctype(realtype);
+
+            free_svalue(&lpcval);
+
+            PyErr_Format(PyExc_TypeError, "bad type for variable assignment to '%s': expected %s, got %s",
+                get_txt(varob->var->name), get_lpctype_name(varob->var->type), realtypebuf);
+            return -1;
+        }
+    }
+
+    transfer_svalue(varob->varp, &lpcval);
+
+    return 0;
+} /* ldmud_local_variable_set_value() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_local_variable_get_type (ldmud_local_variable_t *varob, void *closure)
+
+/* Return the type for the variable.
+ */
+
+{
+    PyObject* result = lpctype_to_pythontype(varob->var->type);
+    if (!result)
+        PyErr_Format(PyExc_AttributeError, "Variable '%s' has no type information or mixed type", get_txt(varob->var->name));
+
+    return result;
+
+} /* ldmud_local_variable_get_type() */
+
+/*-------------------------------------------------------------------------*/
+static PyNumberMethods ldmud_local_variable_as_number =
+{
+    0,                                  /* nb_add */
+    0,                                  /* nb_subtract */
+    0,                                  /* nb_multiply */
+    0,                                  /* nb_remainder */
+    0,                                  /* nb_divmod */
+    0,                                  /* nb_power */
+    0,                                  /* nb_negative */
+    0,                                  /* nb_positive */
+    0,                                  /* nb_absolute */
+    (inquiry)ldmud_call_frame_ref_bool, /* nb_bool */
+};
+
+static PyGetSetDef ldmud_local_variable_getset [] = {
+    {"name",       (getter)ldmud_local_variable_get_name,       NULL,                                     NULL},
+    {"value",      (getter)ldmud_local_variable_get_value,      (setter)ldmud_local_variable_set_value, NULL},
+    {"type",       (getter)ldmud_local_variable_get_type,       NULL,                                     NULL},
+    {NULL}
+};
+
+static PyTypeObject ldmud_local_variable_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.LocalVariable",              /* tp_name */
+    sizeof(ldmud_local_variable_t),     /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_call_frame_ref_dealloc, /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    (reprfunc)ldmud_local_variable_repr, /* tp_repr */
+    &ldmud_local_variable_as_number,    /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC local variable",               /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    (richcmpfunc)ldmud_local_variable_richcompare, /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    0,                                  /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_local_variable_getset,        /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    0,                                  /* tp_init */
+    0,                                  /* tp_alloc */
+    0,                                  /* tp_new */
+};
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_local_variables_getattro (ldmud_local_variables_t *vars, PyObject *name)
+
+/* Return a variable of the variable list.
+ */
+
+{
+    PyObject *result;
+    bool error;
+    string_t* varname;
+
+    /* First check real attributes... */
+    result = PyObject_GenericGetAttr((PyObject *)vars, name);
+    if (result || !PyErr_ExceptionMatches(PyExc_AttributeError))
+        return result;
+
+    if (!ldmud_call_frame_ref_bool(&vars->frame_ref_head))
+        return NULL;
+
+    PyErr_Clear();
+
+    /* And now search for a local variable. */
+    varname = find_tabled_python_string(name, "local variable name", &error);
+    if (error)
+        return NULL;
+
+    if (varname)
+    {
+        for (local_variable_dbg_t *var = get_first_local_variable(vars->frame_ref_head.prog, vars->pc); var != NULL; var = get_next_local_variable(vars->frame_ref_head.prog, vars->pc, var))
+            if (var->name == varname)
+            {
+                ldmud_local_variable_t* varob = (ldmud_local_variable_t*)ldmud_local_variable_type.tp_alloc(&ldmud_local_variable_type, 0);
+                if (varob == NULL)
+                    return NULL;
+
+                reference_prog(vars->frame_ref_head.prog, "ldmud_local_variables_getattro");
+
+                varob->frame_ref_head.prog = vars->frame_ref_head.prog;
+                varob->frame_ref_head.frame_serial = vars->frame_ref_head.frame_serial;
+                varob->frame_ref_head.frame_level = vars->frame_ref_head.frame_level;
+                varob->var = var;
+                varob->varp = vars->fp + var->idx;
+
+                add_gc_object(&gc_call_frame_ref_list, (ldmud_gc_var_t*)varob);
+                return (PyObject*) varob;
+            }
+    }
+
+    PyErr_Format(PyExc_AttributeError, "local variable '%U' not found", name);
+    return NULL;
+} /* ldmud_local_variables_getattro() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_local_variables_dir (ldmud_local_variables_t *vars)
+
+/* Returns a list of all attributes, this includes all variable names.
+ */
+
+{
+    PyObject *result;
+    PyObject *attrs = get_class_dir((PyObject*)vars);
+
+    if (attrs == NULL)
+        return NULL;
+
+    /* Now add all the variables. */
+    if (ldmud_call_frame_ref_bool(&vars->frame_ref_head))
+    {
+        for (local_variable_dbg_t *var = get_first_local_variable(vars->frame_ref_head.prog, vars->pc); var != NULL; var = get_next_local_variable(vars->frame_ref_head.prog, vars->pc, var))
+        {
+            PyObject *varname = PyUnicode_FromStringAndSize(get_txt(var->name), mstrsize(var->name));
+
+            if (varname == NULL)
+            {
+                PyErr_Clear();
+                continue;
+            }
+
+            if (PySet_Add(attrs, varname) < 0)
+                PyErr_Clear();
+            Py_DECREF(varname);
+        }
+    }
+
+    /* And return the keys of our dict. */
+    result = PySequence_List(attrs);
+    Py_DECREF(attrs);
+    return result;
+} /* ldmud_local_variables_dir() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_local_variables_dict (ldmud_local_variables_t *vars, void *closure)
+
+/* Returns a list of all variables.
+ */
+
+{
+    PyObject *result, *dict = PyDict_New();
+    if (!dict)
+        return NULL;
+
+    if (ldmud_call_frame_ref_bool(&vars->frame_ref_head))
+    {
+        for (local_variable_dbg_t *var = get_first_local_variable(vars->frame_ref_head.prog, vars->pc); var != NULL; var = get_next_local_variable(vars->frame_ref_head.prog, vars->pc, var))
+        {
+            PyObject *varname = PyUnicode_FromStringAndSize(get_txt(var->name), mstrsize(var->name));
+            ldmud_local_variable_t* varob;
+
+            if (varname == NULL)
+            {
+                PyErr_Clear();
+                continue;
+            }
+
+            varob = (ldmud_local_variable_t*)ldmud_local_variable_type.tp_alloc(&ldmud_local_variable_type, 0);
+            if (varob == NULL)
+            {
+                PyErr_Clear();
+                Py_DECREF(varname);
+                continue;
+            }
+
+            reference_prog(vars->frame_ref_head.prog, "ldmud_local_variables_getattro");
+
+            varob->frame_ref_head.prog = vars->frame_ref_head.prog;
+            varob->frame_ref_head.frame_serial = vars->frame_ref_head.frame_serial;
+            varob->frame_ref_head.frame_level = vars->frame_ref_head.frame_level;
+            varob->var = var;
+            varob->varp = vars->fp + var->idx;
+
+            add_gc_object(&gc_call_frame_ref_list, (ldmud_gc_var_t*)varob);
+
+            if (PyDict_SetItem(dict, varname, (PyObject*)varob) < 0)
+                PyErr_Clear();
+            Py_DECREF(varname);
+            Py_DECREF(varob);
+        }
+    }
+
+    result = PyDictProxy_New(dict);
+    Py_DECREF(dict);
+    return result;
+} /* ldmud_local_variables_dict() */
+
+/*-------------------------------------------------------------------------*/
+static PyNumberMethods ldmud_local_variables_as_number =
+{
+    0,                                  /* nb_add */
+    0,                                  /* nb_subtract */
+    0,                                  /* nb_multiply */
+    0,                                  /* nb_remainder */
+    0,                                  /* nb_divmod */
+    0,                                  /* nb_power */
+    0,                                  /* nb_negative */
+    0,                                  /* nb_positive */
+    0,                                  /* nb_absolute */
+    (inquiry)ldmud_call_frame_ref_bool, /* nb_bool */
+};
+
+static PyMethodDef ldmud_local_variables_methods[] =
+{
+    {
+        "__dir__",
+        (PyCFunction)ldmud_local_variables_dir, METH_NOARGS,
+        "__dir__() -> List\n\n"
+        "Returns a list of all attributes."
+    },
+
+    {NULL}
+};
+
+static PyGetSetDef ldmud_local_variables_getset [] = {
+    {"__dict__", (getter)ldmud_local_variables_dict, NULL, NULL},
+    {NULL}
+};
+
+static PyTypeObject ldmud_local_variables_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.Variables",                  /* tp_name */
+    sizeof(ldmud_local_variables_t),    /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_call_frame_ref_dealloc, /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    &ldmud_local_variables_as_number,   /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    (getattrofunc)ldmud_local_variables_getattro, /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC local variable list",          /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    ldmud_local_variables_methods,      /* tp_methods */
+    0,                                  /* tp_members */
+    ldmud_local_variables_getset,       /* tp_getset */
+};
+
+/*-------------------------------------------------------------------------*/
 /* Call Stack Frame */
 
 /*-------------------------------------------------------------------------*/
@@ -11953,6 +12450,17 @@ ldmud_call_frame_dealloc (ldmud_call_frame_t* self)
 
     Py_TYPE(self)->tp_free((PyObject*)self);
 } /* ldmud_call_frame_dealloc() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ldmud_call_frame_bool (ldmud_call_frame_t* self)
+
+/* Return 1 (true) if this is a valid (still active) call frame.
+ */
+
+{
+    return self->frame_serial == frame_current_index[self->frame_level];
+} /* ldmud_call_frame_bool() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
@@ -12075,6 +12583,7 @@ ldmud_call_frame_get_line_number (ldmud_call_frame_t *frame, void *closure)
 } /* ldmud_call_frame_get_line_number() */
 
 /*-------------------------------------------------------------------------*/
+#ifdef EVAL_COST_TRACE
 static PyObject *
 ldmud_call_frame_get_eval_cost (ldmud_call_frame_t *frame, void *closure)
 
@@ -12084,8 +12593,49 @@ ldmud_call_frame_get_eval_cost (ldmud_call_frame_t *frame, void *closure)
 {
     return PyLong_FromLong(frame->eval_cost);
 } /* ldmud_call_frame_get_eval_cost() */
+#endif
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_call_frame_get_variables (ldmud_call_frame_t *frame, void *closure)
+
+/* Returns an object that represents the local variables of this frame.
+ */
+
+{
+    ldmud_local_variables_t *result;
+
+    result = (ldmud_local_variables_t*) ldmud_local_variables_type.tp_alloc(&ldmud_local_variables_type, 0);
+    if (result == NULL)
+        return NULL;
+
+    reference_prog(frame->prog, "ldmud_call_frame_get_variables");
+
+    result->frame_ref_head.prog = frame->prog;
+    result->frame_ref_head.frame_serial = frame->frame_serial;
+    result->frame_ref_head.frame_level = frame->frame_level;
+    result->pc = frame->pc;
+    result->fp = frame->fp;
+
+    add_gc_object(&gc_call_frame_ref_list, (ldmud_gc_var_t*)result);
+
+    return (PyObject*)result;
+} /* ldmud_call_frame_get_variables() */
 
 /*-------------------------------------------------------------------------*/
+static PyNumberMethods ldmud_call_frame_as_number =
+{
+    0,                                  /* nb_add */
+    0,                                  /* nb_subtract */
+    0,                                  /* nb_multiply */
+    0,                                  /* nb_remainder */
+    0,                                  /* nb_divmod */
+    0,                                  /* nb_power */
+    0,                                  /* nb_negative */
+    0,                                  /* nb_positive */
+    0,                                  /* nb_absolute */
+    (inquiry)ldmud_call_frame_bool,     /* nb_bool */
+};
+
 static PyGetSetDef ldmud_call_frame_getset[] =
 {
     {"type",             (getter)ldmud_call_frame_get_type,         NULL, NULL},
@@ -12094,7 +12644,10 @@ static PyGetSetDef ldmud_call_frame_getset[] =
     {"program_name",     (getter)ldmud_call_frame_get_program_name, NULL, NULL},
     {"file_name",        (getter)ldmud_call_frame_get_file_name,    NULL, NULL},
     {"line_number",      (getter)ldmud_call_frame_get_line_number,  NULL, NULL},
+#ifdef EVAL_COST_TRACE
     {"eval_cost",        (getter)ldmud_call_frame_get_eval_cost,    NULL, NULL},
+#endif
+    {"variables",        (getter)ldmud_call_frame_get_variables,    NULL, NULL},
     {NULL}
 };
 
@@ -12110,7 +12663,7 @@ static PyTypeObject ldmud_call_frame_type =
     0,                                  /* tp_setattr */
     0,                                  /* tp_reserved */
     0,                                  /* tp_repr */
-    0,                                  /* tp_as_number */
+    &ldmud_call_frame_as_number,        /* tp_as_number */
     0,                                  /* tp_as_sequence */
     0,                                  /* tp_as_mapping */
     0,                                  /* tp_hash  */
@@ -12143,7 +12696,11 @@ static PyTypeObject ldmud_call_frame_type =
 /*-------------------------------------------------------------------------*/
 
 static PyObject*
-ldmud_call_frame_create (enum call_frame_type type, svalue_t ob, program_t *prog, bytecode_t *pc, const char* name, int32 frame_eval_cost)
+ldmud_call_frame_create (int level, enum call_frame_type type, svalue_t ob, program_t *prog, bytecode_t *pc, svalue_t *fp, const char* name
+#ifdef EVAL_COST_TRACE
+                        , int32 frame_eval_cost
+#endif
+                        )
 
 /* Create Python object that represents an instruction.
  */
@@ -12160,8 +12717,15 @@ ldmud_call_frame_create (enum call_frame_type type, svalue_t ob, program_t *prog
     result->type = type;
     result->prog = prog;
     result->pc = pc;
+    result->fp = fp;
     result->name = name;
+#ifdef EVAL_COST_TRACE
     result->eval_cost = frame_eval_cost;
+#endif
+    result->frame_level = level;
+    if (!frame_current_index[level])
+        frame_current_index[level] = ++frame_counter;
+    result->frame_serial = frame_current_index[level];
 
     add_gc_object(&gc_call_frame_list, (ldmud_gc_var_t*)result);
 
@@ -13040,6 +13604,7 @@ ldmud_call_stack_item (PyObject *stack, Py_ssize_t idx)
     bytecode_p            frame_pc;
     program_t            *frame_prog;
     svalue_t              frame_ob;
+    svalue_t             *frame_fp;
     const char           *frame_name;
     enum call_frame_type  frame_type;
 #ifdef EVAL_COST_TRACE
@@ -13065,11 +13630,13 @@ ldmud_call_stack_item (PyObject *stack, Py_ssize_t idx)
         frame_eval_cost = eval_cost;
 #endif
         frame_ob = current_object;
+        frame_fp = inter_fp;
     }
     else
     {
         struct control_stack *next = frame + 1;
         frame_pc = next->pc;
+        frame_fp = next->fp;
         frame_prog = next->prog;
 #ifdef EVAL_COST_TRACE
         frame_eval_cost = next->eval_cost;
@@ -13129,7 +13696,11 @@ ldmud_call_stack_item (PyObject *stack, Py_ssize_t idx)
         frame_name = get_txt(frame_prog->function_headers[FUNCTION_HEADER_INDEX(frame->funstart)].name);
     }
 
-    return ldmud_call_frame_create(frame_type, frame_ob, frame_prog, frame_pc, frame_name, frame_eval_cost);
+    return ldmud_call_frame_create(idx, frame_type, frame_ob, frame_prog, frame_pc, frame_fp, frame_name
+#ifdef EVAL_COST_TRACE
+                                  , frame_eval_cost
+#endif
+                                  );
 } /* ldmud_call_stack_item() */
 
 /*-------------------------------------------------------------------------*/
@@ -13550,6 +14121,10 @@ init_ldmud_module ()
     if (PyType_Ready(&ldmud_lvalue_struct_members_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_instruction_type) < 0)
+        return NULL;
+    if (PyType_Ready(&ldmud_local_variables_type) < 0)
+        return NULL;
+    if (PyType_Ready(&ldmud_local_variable_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_call_frame_type) < 0)
         return NULL;
@@ -15390,6 +15965,10 @@ python_call_instruction_hook (int instruction)
     bool was_external = python_is_external;
     PyObject *args, *arg;
     python_hook_t *hooks;
+    int stack_depth = control_stack_depth();
+
+    if (stack_depth >= 0)
+        frame_current_index[stack_depth] = 0;
 
     hooks = python_hooks[PYTHON_HOOK_BEFORE_INSTRUCTION];
     if (hooks == NULL)
@@ -16986,6 +17565,11 @@ python_clear_refs ()
         clear_program_ref(((ldmud_call_frame_t*)var)->prog, true);
     }
 
+    for(ldmud_gc_var_t* var = gc_call_frame_ref_list; var != NULL; var = var->gcnext)
+    {
+        clear_program_ref(((ldmud_call_frame_ref_t*)var)->prog, true);
+    }
+
     for(ldmud_gc_lpctype_type_t* var = gc_lpctype_list; var != NULL; var = var->gcnext)
     {
         clear_lpctype_ref(var->type);
@@ -17181,6 +17765,11 @@ python_count_refs ()
     {
         count_ref_in_vector(&((ldmud_call_frame_t*)var)->ob, 1);
         mark_program_ref(((ldmud_call_frame_t*)var)->prog);
+    }
+
+    for(ldmud_gc_var_t* var = gc_call_frame_ref_list; var != NULL; var = var->gcnext)
+    {
+        mark_program_ref(((ldmud_call_frame_ref_t*)var)->prog);
     }
 
     for(ldmud_gc_lpctype_type_t* var = gc_lpctype_list; var != NULL; var = var->gcnext)

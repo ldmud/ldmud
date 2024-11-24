@@ -1,3 +1,5 @@
+#pragma save_local_names, rtt_checks
+
 #include "/sys/driver_info.h"
 #include "/inc/base.inc"
 #include "/inc/deep_eq.inc"

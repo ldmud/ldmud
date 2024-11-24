@@ -464,7 +464,7 @@ bytecode_p inter_pc;
   /* Next bytecode to interpret.
    */
 
-static svalue_t *inter_fp;
+svalue_t *inter_fp;
   /* Framepointer: pointer to first argument.
    */
 
@@ -22936,6 +22936,52 @@ dump_trace (Bool how, vector_t ** rvec, string_t ** rstr)
 
     return hb_obj_name;
 } /* dump_trace() */
+
+/*-------------------------------------------------------------------------*/
+local_variable_dbg_t*
+get_first_local_variable (program_t *progp, bytecode_p pc)
+
+/* For the given code position return the debugging information for the first
+ * local variable. Return NULL if there is no local variable or no debugging
+ * information.
+ */
+
+{
+    if (pc < progp->program || pc >= PROGRAM_END(*progp))
+        return NULL;
+
+    if (!progp->num_local_variables)
+        return NULL;
+
+    return get_next_local_variable(progp, pc, progp->local_variables-1);
+} /* get_first_local_variable() */
+
+/*-------------------------------------------------------------------------*/
+local_variable_dbg_t*
+get_next_local_variable (program_t *progp, bytecode_p pc, local_variable_dbg_t *prev)
+
+/* For the given code position return the debugging information for the next
+ * local variable after <prev>. <prev> should be the result of a call to
+ * get_first_local_variable() or get_next_local_variable() with the same
+ * <progp> and <pc>. Return NULL if there is no further local variable.
+ */
+
+{
+    local_variable_dbg_t *end = progp->local_variables + progp->num_local_variables;
+    uint32_t pos = pc - progp->program;
+
+    assert(prev != NULL);
+
+    for (local_variable_dbg_t* cur = prev+1; cur < end; cur++)
+    {
+        if (cur->code_start > pos)
+            return NULL;
+        if (cur->code_end > pos)
+            return cur;
+    }
+
+    return NULL;
+} /* get_next_local_variable() */
 
 /*-------------------------------------------------------------------------*/
 void

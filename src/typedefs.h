@@ -37,6 +37,7 @@ typedef struct instr_s            instr_t;            /* exec.h */
 typedef struct lambda_s           lambda_t;           /* closure.h */
 typedef struct lfun_closure_s     lfun_closure_t;     /* closure.h */
 typedef struct linenumbers_s      linenumbers_t;      /* exec.h */
+typedef struct local_variable_dbg_s local_variable_dbg_t; /* exec.h */
 typedef struct lpctype_s          lpctype_t;          /* types.h */
 typedef struct lwobject_s         lwobject_t;         /* lwobject.h */
 typedef struct mapping_s          mapping_t;          /* mapping.h */

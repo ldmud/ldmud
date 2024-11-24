@@ -423,6 +423,22 @@ LDMUD MODULE
                 eval_cost
                     The current evaluation cost counter.
 
+                variables
+                    Contains all local variables of this frame as attributes.
+                    This is only available when the code was compiled with
+                    pragma save_local_names. They contain the following
+                    attributes:
+
+                    name
+                        The name of the variable
+
+                    value
+                        The value of the variable. This attribute is writable
+                        to assign a new value.
+
+                    type
+                        The type as a Python object.
+
         There is mapping of LPC values to Python values for the following types:
             int    <-> int(, bool)
             float  <-> float

@@ -1128,6 +1128,22 @@ class TestCallStack(unittest.TestCase):
         self.assertGreater(frame.line_number, 500)
         self.assertGreater(frame.eval_cost, 0)
 
+        self.assertTrue('eflag' in dir(frame.variables))
+        self.assertTrue('eflag' in frame.variables.__dict__)
+        var = frame.variables.eflag
+        self.assertIsNotNone(var)
+        self.assertTrue(var)
+        self.assertEqual(var.name, "eflag")
+        self.assertEqual(var.type, ldmud.Integer)
+        self.assertEqual(var.value, 1)
+        self.assertTrue("eflag" in repr(var))
+        self.assertEqual(var, frame.variables.eflag)
+        var.value = 10
+        self.assertEqual(var.value, 10)
+        with self.assertRaises(TypeError):
+            var.value = "20"
+        self.assertEqual(var.value, 10)
+
     def testFrame1(self):
         frame = ldmud.call_stack[1]
         self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
@@ -1137,6 +1153,7 @@ class TestCallStack(unittest.TestCase):
         self.assertEqual(frame.file_name, "/master.c")
         self.assertLess(frame.line_number, ldmud.call_stack[0].line_number)
         self.assertGreater(frame.eval_cost, ldmud.call_stack[0].eval_cost)
+        self.assertEqual(frame.variables.__dict__, {})
 
     def testFrame2(self):
         frame = ldmud.call_stack[2]
@@ -1147,6 +1164,23 @@ class TestCallStack(unittest.TestCase):
         self.assertEqual(frame.file_name, "/inc/testarray.inc")
         self.assertGreater(frame.line_number, 0)
         self.assertGreater(frame.eval_cost, ldmud.call_stack[1].eval_cost)
+
+        self.assertTrue('testarray' in dir(frame.variables))
+        self.assertTrue('callback' in dir(frame.variables))
+        self.assertTrue('errors' in dir(frame.variables))
+        self.assertTrue('testarray' in frame.variables.__dict__)
+        self.assertTrue('callback' in frame.variables.__dict__)
+        self.assertTrue('errors' in frame.variables.__dict__)
+        self.assertIsNotNone(frame.variables.testarray)
+        self.assertIsNotNone(frame.variables.callback)
+        self.assertIsNotNone(frame.variables.errors)
+        self.assertEqual(frame.variables.testarray.name, "testarray")
+        self.assertEqual(frame.variables.callback.name, "callback")
+        self.assertEqual(frame.variables.errors.name, "errors")
+        self.assertEqual(frame.variables.testarray.type, ldmud.Array)
+        self.assertEqual(frame.variables.callback.type, ldmud.Closure)
+        self.assertEqual(frame.variables.errors.type, ldmud.Integer)
+        self.assertEqual(frame.variables.errors.value, 0)
 
     def testFrame3(self):
         frame = ldmud.call_stack[3]
@@ -1167,6 +1201,23 @@ class TestCallStack(unittest.TestCase):
         self.assertLess(frame.line_number, ldmud.call_stack[1].line_number)
         self.assertGreater(frame.eval_cost, ldmud.call_stack[3].eval_cost)
 
+        self.assertTrue('$1' in dir(frame.variables))
+        self.assertTrue('$9' in dir(frame.variables))
+        self.assertTrue('err' in dir(frame.variables))
+        self.assertTrue('result' in dir(frame.variables))
+        self.assertTrue('$1' in frame.variables.__dict__)
+        self.assertTrue('$8' in frame.variables.__dict__)
+        self.assertTrue('err' in frame.variables.__dict__)
+        self.assertTrue('result' in frame.variables.__dict__)
+        self.assertIsNotNone(frame.variables.err)
+        self.assertIsNotNone(frame.variables.result)
+        self.assertEqual(frame.variables.err.name, "err")
+        self.assertEqual(frame.variables.result.name, "result")
+        self.assertEqual(frame.variables.err.type, ldmud.String)
+        self.assertEqual(frame.variables.result.type, ldmud.Integer)
+        self.assertEqual(frame.variables.err.value, 0)
+        self.assertEqual(frame.variables.result.value, 0)
+
     def testFrame5(self):
         frame = ldmud.call_stack[5]
         self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_CATCH)
@@ -1183,6 +1234,7 @@ class TestCallStack(unittest.TestCase):
         self.assertEqual(frame.name, "funcall")
         self.assertEqual(frame.object, ldmud.get_master())
         self.assertGreater(frame.eval_cost, ldmud.call_stack[5].eval_cost)
+        self.assertEqual(frame.variables.__dict__, {})
 
     def testFrame7(self):
         frame = ldmud.call_stack[7]
@@ -1190,6 +1242,7 @@ class TestCallStack(unittest.TestCase):
         self.assertEqual(frame.name, "python_test")
         self.assertEqual(frame.object, ldmud.get_master())
         self.assertGreater(frame.eval_cost, ldmud.call_stack[6].eval_cost)
+        self.assertEqual(frame.variables.__dict__, {})
 
 def python_test():
     """Run the python test cases."""
