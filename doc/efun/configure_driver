@@ -149,6 +149,12 @@ DESCRIPTION
            Settings this option will force closing and reopening
            the log file (even if the name didn't change).
 
+         <what> == DC_FILESYSTEM_ENCODING
+           Sets the character encoding used in the filesystem.
+           If not set, the default encoding is derived from the LC_CTYPE
+           environment setting. If LC_CTYPE is not defined, or it is set to
+           the "C" locale, then "UTF-8" is used as a default.
+
          <what> == DC_SIGACTION_SIGHUP
          <what> == DC_SIGACTION_SIGINT
          <what> == DC_SIGACTION_SIGUSR1
