@@ -1216,6 +1216,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
 
     /* Allocate and initialise a new sentence */
     p = new_action_sent();
+    p->sent.type = SENT_PLAIN;
 
     if (func->type == T_STRING)
     {
@@ -1273,7 +1274,6 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
 
     /* Set ->verb to the command verb, made tabled */
     p->verb = make_tabled(cmd->u.str); cmd->type = T_NUMBER;
-    p->sent.type = SENT_PLAIN;
     p->short_verb = p->short_verb_bytes = 0;
 
     if (flag)
