@@ -7231,7 +7231,7 @@ convert_string (svalue_t *dest, string_t *str, const char* text, size_t len, enu
             char *buf;
             char *end;
 
-            memsafe(buf = xalloc(len), len, "string conversion");
+            memsafe(buf = xalloc(len+1), len, "string conversion");
             memcpy(buf, text, len);
             buf[len] = 0;
 
