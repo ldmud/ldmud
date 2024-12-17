@@ -8212,6 +8212,26 @@ static PyTypeObject ldmud_struct_member_type =
 };
 
 /*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_struct_member_create (struct_t* st, int ix)
+
+/* Creates a new Python struct member object for member with index <ix> of <st>.
+ */
+
+{
+    ldmud_struct_and_index_t *result = (ldmud_struct_and_index_t*)ldmud_struct_member_type.tp_alloc(&ldmud_struct_member_type, 0);
+    if (result == NULL)
+        return NULL;
+
+    result->struct_base.lpc_struct = ref_struct(st);
+    result->index = ix;
+    add_gc_object(&gc_struct_list, (ldmud_gc_var_t*)result);
+
+    return (PyObject*)result;
+} /* ldmud_struct_member_create() */
+
+
+/*-------------------------------------------------------------------------*/
 static PyObject*
 ldmud_struct_members_repr (ldmud_struct_t *self)
 
@@ -8281,6 +8301,46 @@ ldmud_struct_members_getattro (ldmud_struct_t *self, PyObject *name)
 } /* ldmud_struct_members_getattro() */
 
 /*-------------------------------------------------------------------------*/
+static Py_ssize_t
+ldmud_struct_members_length (ldmud_struct_t *self)
+
+/* Implement len() for struct members.
+ */
+
+{
+    if (self->lpc_struct)
+        return self->lpc_struct->type->num_members;
+    return 0;
+} /* ldmud_struct_members_length() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_struct_members_item (ldmud_struct_t *self, Py_ssize_t idx)
+
+/* Implement item access for struct members.
+ */
+
+{
+    if (!self->lpc_struct)
+    {
+        PyErr_SetString(PyExc_IndexError, "uninitialized struct");
+        return NULL;
+    }
+    else
+    {
+        struct_type_t *st = self->lpc_struct->type;
+
+        if (idx < 0 || idx >= st->num_members)
+        {
+            PyErr_SetString(PyExc_IndexError, "index out of range");
+            return NULL;
+        }
+
+        return ldmud_struct_member_create(self->lpc_struct, idx);
+    }
+} /* ldmud_struct_members_item() */
+
+/*-------------------------------------------------------------------------*/
 static PyObject *
 ldmud_struct_members_dir (ldmud_struct_t *self)
 
@@ -8340,7 +8400,7 @@ ldmud_struct_members_dict (ldmud_struct_t *self, void *closure)
         {
             string_t *mem = st->member[ix].name;
             PyObject *memname = PyUnicode_FromStringAndSize(get_txt(mem), mstrsize(mem));
-            ldmud_struct_and_index_t* memob;
+            PyObject* memob;
 
             if (memname == NULL)
             {
@@ -8348,7 +8408,7 @@ ldmud_struct_members_dict (ldmud_struct_t *self, void *closure)
                 continue;
             }
 
-            memob = (ldmud_struct_and_index_t*)ldmud_struct_member_type.tp_alloc(&ldmud_struct_member_type, 0);
+            memob = ldmud_struct_member_create(self->lpc_struct, ix);
             if (memob == NULL)
             {
                 PyErr_Clear();
@@ -8356,11 +8416,7 @@ ldmud_struct_members_dict (ldmud_struct_t *self, void *closure)
                 continue;
             }
 
-            memob->struct_base.lpc_struct = ref_struct(self->lpc_struct);
-            memob->index = ix;
-            add_gc_object(&gc_struct_list, (ldmud_gc_var_t*)memob);
-
-            if (PyDict_SetItem(dict, memname, (PyObject*)memob) < 0)
+            if (PyDict_SetItem(dict, memname, memob) < 0)
                 PyErr_Clear();
             Py_DECREF(memname);
             Py_DECREF(memob);
@@ -8373,6 +8429,19 @@ ldmud_struct_members_dict (ldmud_struct_t *self, void *closure)
 } /* ldmud_struct_members_dict() */
 
 /*-------------------------------------------------------------------------*/
+static PySequenceMethods ldmud_struct_members_as_sequence = {
+    (lenfunc)ldmud_struct_members_length,       /* sq_length */
+    0,                                          /* sq_concat */
+    0,                                          /* sq_repeat */
+    (ssizeargfunc)ldmud_struct_members_item,    /* sq_item */
+    0,                                          /* sq_slice */
+    0,                                          /* sq_ass_item */
+    0,                                          /* sq_ass_slice */
+    0,                                          /* sq_contains */
+    0,                                          /* sq_inplace_concat */
+    0,                                          /* sq_inplace_repeat */
+};
+
 static PyMethodDef ldmud_struct_members_methods[] =
 {
     {
@@ -8403,7 +8472,7 @@ static PyTypeObject ldmud_struct_members_type =
     0,                                  /* tp_reserved */
     (reprfunc)ldmud_struct_members_repr,/* tp_repr */
     0,                                  /* tp_as_number */
-    0,                                  /* tp_as_sequence */
+    &ldmud_struct_members_as_sequence,  /* tp_as_sequence */
     0,                                  /* tp_as_mapping */
     0,                                  /* tp_hash  */
     0,                                  /* tp_call */

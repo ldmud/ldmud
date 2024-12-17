@@ -570,6 +570,9 @@ class TestStruct(unittest.TestCase):
         self.assertEqual(mem.name, "t_int")
         self.assertEqual(mem.type, ldmud.Integer)
 
+        names = [m.name for m in s.members]
+        self.assertEqual(names, ["t_int", "t_float", "t_string", "t_object", "t_lwobject", "t_array", "t_mapping", "t_symbol", "t_quoted_array", "t_coroutine" ])
+
     def testInitValueTuple(self):
         s = ldmud.Struct(self.master, "test_struct", (42, 1.5, 'Hi',))
         self.assertIsNotNone(s)
