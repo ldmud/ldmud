@@ -163,6 +163,9 @@ LDMUD MODULE
                   name
                       The object name
 
+                  program_name
+                      The program name (file name it was created from)
+
                   functions
                       Contains all the visible functions (private functions
                       are excluded) as attributes. They support the call

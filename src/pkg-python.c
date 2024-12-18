@@ -5587,6 +5587,38 @@ ldmud_object_get_name (ldmud_object_t *val, void *closure)
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
+ldmud_object_get_program_name (ldmud_object_t *val, void *closure)
+
+/* Return the value for the program_name member.
+ */
+
+{
+    if(!val->lpc_object)
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    if (!check_object(val->lpc_object))
+    {
+        PyErr_Format(PyExc_ValueError, "object is destructed");
+        return NULL;
+    }
+    if (O_PROG_SWAPPED(val->lpc_object))
+    {
+        val->lpc_object->time_of_ref = current_time;
+        if (load_ob_from_swap(val->lpc_object) < 0)
+        {
+            PyErr_Format(PyExc_MemoryError, "out of memory when unswapping object '%s'", get_txt(val->lpc_object->name));
+            return NULL;
+        }
+    }
+
+    return PyUnicode_FromFormat("/%s", get_txt(val->lpc_object->prog->name));
+} /* ldmud_object_get_name() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
 ldmud_object_get_list (ldmud_object_t *val, PyTypeObject *type)
 
 /* Return the value for the functions or variables member.
@@ -5645,9 +5677,10 @@ static PyMethodDef ldmud_object_methods[] =
 
 static PyGetSetDef ldmud_object_getset[] =
 {
-    {"name",      (getter)ldmud_object_get_name, NULL, NULL, NULL},
-    {"functions", (getter)ldmud_object_get_list, NULL, NULL, &ldmud_program_functions_type},
-    {"variables", (getter)ldmud_object_get_list, NULL, NULL, &ldmud_program_variables_type},
+    {"name",         (getter)ldmud_object_get_name, NULL, NULL, NULL},
+    {"program_name", (getter)ldmud_object_get_program_name, NULL, NULL, NULL},
+    {"functions",    (getter)ldmud_object_get_list, NULL, NULL, &ldmud_program_functions_type},
+    {"variables",    (getter)ldmud_object_get_list, NULL, NULL, &ldmud_program_variables_type},
     {NULL}
 };
 

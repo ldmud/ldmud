@@ -58,6 +58,7 @@ class TestObject(unittest.TestCase):
         ob = ldmud.Object("/testob")
         self.assertIsNotNone(ob)
         self.assertEqual(ob.name, "/testob")
+        self.assertEqual(ob.program_name, "/testob.c")
         self.assertIn("testob", repr(ob))
 
     def testInitNonExisting(self):
@@ -163,6 +164,8 @@ class TestObject(unittest.TestCase):
         swap = getattr(ldmud.efuns, 'swap', None)
         if swap:
             ob = ldmud.Object("/testob")
+            swap(ob)
+            self.assertEqual(ob.program_name, "/testob.c")
             swap(ob)
 
             fun = ob.functions.testfun
