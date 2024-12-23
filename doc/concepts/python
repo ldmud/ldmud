@@ -174,6 +174,9 @@ LDMUD MODULE
                       name
                           The name of the function
 
+                      program_name
+                        The program that contains the function
+
                       file_name
                           The file that contains the function's definition
 
@@ -297,12 +300,141 @@ LDMUD MODULE
                 program can be given as a file name or object. When using this
                 for creating a struct, only values need to be passed.
 
-          - Closure(object [,name [, lfun_object]])
+          - Closure(object, name [, lfun_object])
                 Corresponds to an LPC closure.
                 On initialization a closure bound to <object> will be created,
                 like a call to symbol_function(<name> [, <lfun_object>]).
 
                 Supports function calls.
+
+                This class has several sub-classes depending on the type:
+
+                  - LfunClosure(object, name [, bound_object])
+
+                        Has the following members:
+
+                            object
+                                The object of the lfun
+
+                            lfun
+                                The function to call. This is similar to
+                                elements of the <functions> member of the
+                                Object class.
+
+                            bound_object
+                                The object this closure is bound to. If this
+                                is different from the lfun object, calling
+                                this closure would be regarded as a call from
+                                bound_object.
+
+                            inherited
+                                True, if this closure is pointing to a specific
+                                inherited function.
+
+                  - IdentifierClosure(object, name)
+
+                        Has the following members:
+
+                            object
+                                The object of the variable
+
+                            variable
+                                The variable this closure relates to. This is
+                                similar to elements of the <variables> member
+                                of the Object class.
+
+                            bound_object
+                                The object this closure is bound to. It is
+                                always the same as <object>.
+
+                  - LambdaClosure
+
+                        Has the following members:
+
+                            object
+                                The object that created this lambda closure.
+
+                            bound_object
+                                The object this closure is bound to. It is
+                                always the same as <object>.
+
+                  - UnboundLambdaClosure
+
+                        Has the following members:
+
+                            object
+                                This will always be None.
+
+                            bound_object
+                                This will always be None.
+
+                  - BoundLambdaClosure(object, lambda)
+
+                        Has the following members:
+
+                            object
+                                The object that bound this lambda closure.
+
+                            bound_object
+                                The object this closure is bound to. It is
+                                always the same as <object>.
+
+                            unbound_lambda
+                                The original unbound lambda.
+
+                  - EfunClosure(object, name)
+
+                        Has the following members:
+
+                            object
+                                The object this closure is bound to.
+
+                            efun
+                                An Efun or PythonEfun object (similar to the
+                                the ones in the ldmud.efuns namespace), that
+                                is callable and has the following members
+
+                                    name
+                                        The name of the efun.
+
+                                    function
+                                        For Python-defined efuns only,
+                                        the Python function that was
+                                        registered.
+
+                            bound_object
+                                The object this closure is bound to. It is
+                                always the same as <object>.
+
+                  - SimulEfunClosure(object, name)
+
+                        Has the following members:
+
+                            object
+                                The object this closure is bound to.
+
+                            simul_efun
+                                The simul-efun function to call. This is
+                                similar to elements of the <functions> member
+                                of the Object class.
+
+                            bound_object
+                                The object this closure is bound to. It is
+                                always the same as <object>.
+
+                  - OperatorClosure(object, name)
+
+                        Has the following members:
+
+                            object
+                                The object this closure is bound to.
+
+                            operator_name
+                                The name of the operator.
+
+                            bound_object
+                                The object this closure is bound to. It is
+                                always the same as <object>.
 
           - Coroutine()
                 Corresponds to an LPC coroutine.

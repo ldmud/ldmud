@@ -1808,8 +1808,11 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, efun_override_t is_
         ident_t *p;
 
         /* Take care of an leading efun override */
-
-        if ( len >= 6 && !strncmp(str, "efun::", 6) )
+        if (efun_override != OVERRIDE_NONE)
+        {
+            /* Don't allow two overrides. */
+        }
+        else if (len >= 6 && !strncmp(str, "efun::", 6) )
         {
             str += 6;
             len -= 6;
