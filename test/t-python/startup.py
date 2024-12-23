@@ -1496,22 +1496,26 @@ class TestLPCType(unittest.TestCase):
     def testPythonType(self):
         lpctype = ldmud.LPCType
         self.assertEqual(lpctype, lpctype.__class__)
+        self.assertEqual(str(lpctype), "lpctype")
         self.assertEqual({lpctype: 42,
                           ldmud.Mixed: 52}[ldmud.LPCType], 42)
 
     def testAnyArrayType(self):
+        self.assertEqual(str(ldmud.Array), "mixed*")
         self.assertEqual({ldmud.Array: 42,
                           ldmud.Mixed: 52}[ldmud.Array], 42)
 
     def testConcreteArrayType(self):
         obarray = ldmud.Array[ldmud.Object]
         self.assertIn("Object", repr(obarray))
+        self.assertEqual(str(obarray), "object*")
         self.assertNotEqual(ldmud.efuns.check_type(obarray((ldmud.get_master(),)), obarray), 0)
         self.assertEqual(ldmud.efuns.check_type(ldmud.Array((10,)), obarray), 0)
         self.assertIn(obarray, ldmud.Array)
 
         intarray = ldmud.Array[int]
         self.assertIn("Integer", repr(intarray))
+        self.assertEqual(str(intarray), "int*")
         self.assertEqual(ldmud.efuns.check_type(obarray((ldmud.get_master(),)), intarray), 0)
         self.assertNotEqual(ldmud.efuns.check_type(intarray((10,)), intarray), 0)
         self.assertIn(intarray, ldmud.Array)
@@ -1521,6 +1525,7 @@ class TestLPCType(unittest.TestCase):
                           ldmud.Array: 52}[ldmud.Array[ldmud.Object]], 42)
 
     def testAnyStructType(self):
+        self.assertEqual(str(ldmud.Struct), "struct mixed")
         self.assertEqual({ldmud.Struct: 42,
                           ldmud.Mixed: 52}[ldmud.Struct], 42)
 
@@ -1564,6 +1569,7 @@ class TestLPCType(unittest.TestCase):
         ldmud.efuns.destruct(ob)
 
     def testAnyObjectType(self):
+        self.assertEqual(str(ldmud.Object), "object")
         self.assertEqual({ldmud.Object: 42,
                           ldmud.Mixed: 52}[ldmud.Object], 42)
 
@@ -1573,6 +1579,7 @@ class TestLPCType(unittest.TestCase):
         obt3 = ldmud.Object["/testob"]
         self.assertIn("Object", repr(obt1))
         self.assertIn("testob", repr(obt3))
+        self.assertEqual(str(obt1), 'object "/master.c"')
         self.assertEqual(obt1, obt2)
         self.assertNotEqual(obt1, obt3)
         self.assertNotEqual(ldmud.efuns.check_type(ldmud.Object("/master"), obt1), 0)
@@ -1584,6 +1591,7 @@ class TestLPCType(unittest.TestCase):
                           ldmud.Object: 52}[obt2], 42)
 
     def testAnyLWObjectType(self):
+        self.assertEqual(str(ldmud.LWObject), 'lwobject')
         self.assertEqual({ldmud.LWObject: 42,
                           ldmud.Mixed: 52}[ldmud.LWObject], 42)
 
@@ -1593,6 +1601,7 @@ class TestLPCType(unittest.TestCase):
         obt3 = ldmud.LWObject["/testob"]
         self.assertIn("LWObject", repr(obt1))
         self.assertIn("testob", repr(obt3))
+        self.assertEqual(str(obt1), 'lwobject "/master.c"')
         self.assertEqual(obt1, obt2)
         self.assertNotEqual(obt1, obt3)
         self.assertEqual(ldmud.efuns.check_type(ldmud.LWObject("/testob"), obt1), 0)
@@ -1609,47 +1618,58 @@ class TestLPCType(unittest.TestCase):
         self.assertEqual(ldmud.LPCType(int), ldmud.Integer)
 
     def testInteger(self):
+        self.assertEqual(str(ldmud.Integer), "int")
         self.assertEqual({ldmud.Integer: 42,
                           ldmud.Mixed: 52}[ldmud.Integer], 42)
 
     def testFloat(self):
+        self.assertEqual(str(ldmud.Float), "float")
         self.assertEqual({ldmud.Float: 42,
                           ldmud.Mixed: 52}[ldmud.Float], 42)
 
     def testString(self):
+        self.assertEqual(str(ldmud.String), "string")
         self.assertEqual({ldmud.String: 42,
                           ldmud.Mixed: 52}[ldmud.String], 42)
 
     def testBytes(self):
+        self.assertEqual(str(ldmud.Bytes), "bytes")
         self.assertEqual({ldmud.Bytes: 42,
                           ldmud.Mixed: 52}[ldmud.Bytes], 42)
 
     def testMapping(self):
+        self.assertEqual(str(ldmud.Mapping), "mapping")
         self.assertEqual({ldmud.Mapping: 42,
                           ldmud.Mixed: 52}[ldmud.Mapping], 42)
 
     def testClosure(self):
+        self.assertEqual(str(ldmud.Closure), "closure")
         self.assertEqual({ldmud.Closure: 42,
                           ldmud.Mixed: 52}[ldmud.Closure], 42)
 
     def testCoroutine(self):
+        self.assertEqual(str(ldmud.Coroutine), "coroutine")
         self.assertEqual({ldmud.Coroutine: 42,
                           ldmud.Mixed: 52}[ldmud.Coroutine], 42)
 
     def testSymbol(self):
+        self.assertEqual(str(ldmud.Symbol), "symbol")
         self.assertEqual({ldmud.Symbol: 42,
                           ldmud.Mixed: 52}[ldmud.Symbol], 42)
 
     def testQuotedArray(self):
+        self.assertEqual(str(ldmud.QuotedArray), "quoted_array")
         self.assertEqual({ldmud.QuotedArray: 42,
                           ldmud.Mixed: 52}[ldmud.QuotedArray], 42)
 
     def testMixed(self):
+        self.assertEqual(str(ldmud.Mixed), "mixed")
         self.assertIn(ldmud.Integer, ldmud.Mixed)
         self.assertNotIn(ldmud.Mixed, ldmud.Integer)
 
     def testVoid(self):
         self.assertIn("Void", repr(ldmud.Void))
+        self.assertEqual(str(ldmud.Void), "void")
         self.assertEqual(ldmud.Void | ldmud.Integer, ldmud.Integer)
         self.assertEqual(ldmud.Integer | ldmud.Void, ldmud.Integer)
 
@@ -1666,6 +1686,7 @@ class TestLPCType(unittest.TestCase):
 
         self.assertEqual({ldmud.Integer | ldmud.String: 42,
                           ldmud.Mixed: 52}[ldmud.String | ldmud.Integer], 42)
+        self.assertIn(str(ldmud.Integer | ldmud.String), ("int|string", "string|int"))
 
 class TestEfuns(unittest.TestCase):
     def testDir(self):

@@ -2069,6 +2069,22 @@ ldmud_lpctype_new (PyTypeObject *type, PyObject *args, PyObject *kwds)
 } /* ldmud_lpctype_new() */
 
 /*-------------------------------------------------------------------------*/
+static PyObject*
+ldmud_lpctype_str (ldmud_lpctype_t* self)
+
+/* Return the LPC string for the given type.
+ */
+
+{
+    lpctype_t *me = (*self->get_lpctype)(self);
+    const char *str = get_lpctype_name(me);
+
+    free_lpctype(me);
+
+    return PyUnicode_FromString(str);
+} /* ldmud_lpctype_str() */
+
+/*-------------------------------------------------------------------------*/
 static lpctype_t*
 ldmud_lpctype_get_lpctype (ldmud_lpctype_t* type)
 
@@ -2130,7 +2146,7 @@ static ldmud_lpctype_t ldmud_lpctype_type =
     0,                                  /* tp_as_mapping */
     0,                                  /* tp_hash  */
     0,                                  /* tp_call */
-    0,                                  /* tp_str */
+    (reprfunc)ldmud_lpctype_str,        /* tp_str */
     0,                                  /* tp_getattro */
     0,                                  /* tp_setattro */
     0,                                  /* tp_as_buffer */
