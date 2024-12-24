@@ -3,7 +3,6 @@ on: [push, pull_request]
 
 jobs:
     build:
-        runs-on: ubuntu-latest
         strategy:
             matrix:
                 cc: [gcc, clang]
@@ -12,6 +11,7 @@ jobs:
                 exclude:
                     - machine: i386
                       coverage: true
+        runs-on: ${{ matrix.machine == 'i386' && 'ubuntu-22.04' || 'ubuntu-latest' }}
         continue-on-error: ${{ matrix.coverage }}
         steps:
             - name: Install dependencies
