@@ -1,4 +1,4 @@
-#pragma save_types, strong_types, rtt_checks
+#pragma save_types, strong_types, rtt_checks, save_local_names
 
 #include "/sys/driver_info.h"
 #include "/sys/lpctypes.h"
@@ -30,6 +30,17 @@ async void data_cr(mixed arg, mixed val = ({ 'me }))
 async mixed return_value(mixed arg)
 {
     return arg;
+}
+
+async void dont_save_out_of_scope_variable()
+{
+    // Checking whether #pragma save_local_names has a problem with
+    // a former local variable.
+    {
+        int i = 10;
+    }
+
+    yield();
 }
 
 coroutine* global_crs;

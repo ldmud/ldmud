@@ -5052,7 +5052,7 @@ ins_local_names ()
         CURRENT_PROGRAM_SIZE += 2*current_number_of_locals;
         p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE;
         var = all_locals;
-        for (int i = 0; i < max_number_of_locals; i++)
+        for (int i = 0; i < current_number_of_locals; i++)
         {
             if (!var) /* This shouldn't happen. */
             {
