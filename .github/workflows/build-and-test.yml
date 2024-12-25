@@ -63,7 +63,7 @@ jobs:
                 llvm-cov show ../src/ldmud -instr-profile=coverage.profdata -format=html -output-dir=html -show-instantiations=false
             - name: Upload coverage report
               if: matrix.coverage
-              uses: actions/upload-artifact@v3
+              uses: actions/upload-artifact@v4
               with:
                 name: coverage ${{ matrix.cc }}
                 path: test/html
