@@ -927,9 +927,9 @@ static INLINE intptr_t CROSSDEF_NAME_OFFSET(const funflag_t flags)
    * the real functions index from the flags.
    */
 {
-    // flags is unsigned, but the offset _must_ be signed
+    // flags and INHERIT_MASK is unsigned, but the offset _must_ be signed.
     return ((sfunflag_t)(flags & INHERIT_MASK)) - 
-                          ((INHERIT_MASK + 1) >> 1);
+            (sfunflag_t)((INHERIT_MASK + 1) >> 1);
 }
 
 static INLINE intptr_t GET_CROSSDEF_OFFSET(const funflag_t value)
@@ -940,8 +940,9 @@ static INLINE intptr_t GET_CROSSDEF_OFFSET(const funflag_t value)
    * is supposed to be the plain number, not a real function flags word.
    */
 {
-    // value is unsigned, but the offset _must_ be signed
-    return ((sfunflag_t)(value)) - ((INHERIT_MASK + 1) >> 1);
+    // value and INHERIT_MASK is unsigned, but the offset _must_ be signed.
+    return ((sfunflag_t)(value)) -
+            (sfunflag_t)((INHERIT_MASK + 1) >> 1);
 }
 
 static INLINE funflag_t MAKE_CROSSDEF_OFFSET(const intptr_t value)
@@ -951,7 +952,6 @@ static INLINE funflag_t MAKE_CROSSDEF_OFFSET(const intptr_t value)
    * in the function flags.
    */
 {
-    // flags is unsigned, but the offset _must_ be signed
     return ((value) + ((INHERIT_MASK + 1) >> 1));
 }
 
@@ -963,7 +963,6 @@ static INLINE funflag_t MAKE_CROSSDEF_ROFFSET(const intptr_t value)
    * TODO: What is this exactly?
    */
 {
-    // flags is unsigned, but the offset _must_ be signed
     return ((value) - ((INHERIT_MASK + 1) >> 1));
 }
 
