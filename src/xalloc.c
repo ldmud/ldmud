@@ -1423,7 +1423,10 @@ get_stack_direction (void)
 
     if (initial_stack == NULL)  /* initial call */
     {
+DIAGWARN_PUSH
+DIAG_IGNORE_DANGLING_POINTER // This is intended.
         initial_stack = &local;
+DIAGWARN_POP
         get_stack_direction ();  /* recurse once */
     }
     else  /* recursive call */

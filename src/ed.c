@@ -2614,8 +2614,8 @@ indent_code (int from, int to)
  */
 
 {
-    char s[STACKSZ];
-    int i[STACKSZ];
+    static char s[STACKSZ];
+    static int i[STACKSZ];
 
     /* setup stacks */
     stackbot = s;

@@ -846,11 +846,9 @@ set_socket_nonblocking (SOCKET_T new_socket)
  */
 
 {
-    int tmp;
-
-    tmp = 1;
-
 # ifdef USE_IOCTL_FIONBIO
+    int tmp = 1;
+
     if (socket_ioctl(new_socket, FIONBIO, &tmp) == -1) {
         perror("ioctl socket FIONBIO");
         abort();

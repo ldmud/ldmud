@@ -161,14 +161,24 @@ extern int errno;
 # define DIAGWARN_PUSH _Pragma("clang diagnostic push")
 # define DIAGWARN_POP  _Pragma("clang diagnostic pop")
 # define DIAG_IGNORE_TAUTOLOGICAL_CONST_OOR_CMP _Pragma("clang diagnostic ignored \"-Wtautological-constant-out-of-range-compare\"")
+# define DIAG_IGNORE_STRINGOP_OVERFLOW
+# define DIAG_IGNORE_DANGLING_POINTER
 #elif __GNUC__ * 100 + __GNUC_MINOR__ >= 406
 # define DIAGWARN_PUSH _Pragma("GCC diagnostic push")
 # define DIAGWARN_POP  _Pragma("GCC diagnostic pop")
 # define DIAG_IGNORE_TAUTOLOGICAL_CONST_OOR_CMP _Pragma("GCC diagnostic ignored \"-Wtype-limits\"")
+# define DIAG_IGNORE_STRINGOP_OVERFLOW _Pragma("GCC diagnostic ignored \"-Wstringop-overflow\"")
+# if __GNUC__ >= 12
+#  define DIAG_IGNORE_DANGLING_POINTER _Pragma("GCC diagnostic ignored \"-Wdangling-pointer\"")
+# else
+#  define DIAG_IGNORE_DANGLING_POINTER
+# endif
 #else
 # define DIAGWARN_PUSH
 # define DIAGWARN_POP
 # define DIAG_IGNORE_TAUTOLOGICAL_CONST_OOR_CMP
+# define DIAG_IGNORE_STRINGOP_OVERFLOW
+# define DIAG_IGNORE_DANGLING_POINTER
 #endif
 
 #define VARPROT(proto,like,form,var) proto FORMATDEBUG(like,form,var)
