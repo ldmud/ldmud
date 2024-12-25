@@ -1339,6 +1339,26 @@ mixed *tests = (this_object() == blueprint()) &&
     ({ "load_object 3", 0, (: load_object("./" __FILE__) == this_object() :) }),
     ({ "load_object 4", 0, (: load_object("/./" __FILE__) == this_object() :) }),
 
+    ({ "m_contains 1", 0, (: return m_contains((["A", "B"]), "A"); :) }),
+    ({ "m_contains 2", 0, (: return m_contains((["A", "B"]), "C") == 0; :) }),
+    ({ "m_contains 3", 0, (: mixed a, b, c; return m_contains(&a, &b, &c, (["A": 1; 2; 3, "B": 4; 5; 6]), "A") && a == 1 && b == 2 && c == 3; :) }),
+    ({ "m_contains 4", 0, (: mixed a = 10, b = 11, c = 12; return m_contains(&a, &b, &c, (["A": 1; 2; 3, "B": 4; 5; 6]), "C") == 0 && a == 10 && b == 11 && c == 12; :) }),
+    ({ "m_contains 5", TF_ERROR, (: return m_contains((["A": 1, "B": 2]), "A"); :) }),
+    ({ "m_contains 6", TF_ERROR, (: int a, b; return m_contains(&a, &b, (["A": 1, "B": 2]), "A"); :) }),
+    ({ "m_contains 7", 0,
+       (:
+            mixed a;
+            mapping m = (["A": 1, "B": 2]);
+
+            walk_mapping(m, (: 0 :));
+            if (!m_contains(&a, m, "A"))
+                return 0;
+
+            a += 10; // Shouldn't change m.
+            return deep_eq(m, (["A": 1, "B": 2]));
+         :)
+    }),
+
     ({ "regmatch 1", 0, (: regmatch("abcd", "abc") == "abc" :) }),
     ({ "regmatch 2", 0, (: regmatch("abcd", "abcdef") == 0 :) }),
     ({ "regmatch 3", 0, (: regmatch("abcd", "^$") == 0 :) }),

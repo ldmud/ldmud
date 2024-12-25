@@ -4318,7 +4318,7 @@ v_m_contains (svalue_t *sp, int num_arg)
         }
         else
             /* mapping must not have been freed yet */
-            assign_svalue(sp+i, item++);
+            assign_rvalue(sp+i, item++);
         free_svalue(&sp[i]);
     }
 

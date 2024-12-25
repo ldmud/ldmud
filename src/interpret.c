@@ -3062,6 +3062,36 @@ assign_svalue (svalue_t *dest, svalue_t *v)
 } /* assign_svalue() */
 
 /*-------------------------------------------------------------------------*/
+void
+assign_rvalue (svalue_t *dest, svalue_t *v)
+
+/* Put a duplicate of svalue <v> into svalue <dest>, meaning that the
+ * original value is either copied when appropriate, or its refcount is
+ * increased.
+ *
+ * If <v> is a protected lvalue, it will be dereferenced to get the real
+ * value. (It is not allowed to be an unprotected lvalue.)
+ *
+ * <dest> is considered a valid svalue and therefore freed before the
+ * assignment. If <dest> is a lvalue, <v> will be assigned to the svalue
+ * referenced to by <dest>.
+ */
+
+{
+    svalue_t *rv = get_rvalue(v, NULL);
+    if (rv == NULL)
+    {
+        svalue_t tmp;
+        assign_rvalue_no_free(&tmp, v);
+        transfer_svalue(v, &tmp);
+    }
+    else
+    {
+        assign_svalue(dest, rv);
+    }
+} /* assign_rvalue() */
+
+/*-------------------------------------------------------------------------*/
 static INLINE void
 inl_transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
 
