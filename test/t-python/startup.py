@@ -75,8 +75,9 @@ class TestObject(unittest.TestCase):
         ob = ldmud.Object("/testob")
         self.assertIsNotNone(ob)
 
-        self.assertTrue('testfun' in dir(ob.functions))
-        self.assertTrue('testfun' in ob.functions.__dict__)
+        self.assertIn('testfun', dir(ob.functions))
+        self.assertIn('testfun', ob.functions.__dict__)
+        self.assertIn('testfun', [ fun.name for fun in ob.functions ])
 
         fun = ob.functions.testfun
         self.assertIsNotNone(fun)
@@ -107,8 +108,9 @@ class TestObject(unittest.TestCase):
         ob = ldmud.Object("/testob")
         self.assertIsNotNone(ob)
 
-        self.assertTrue('testvar' in dir(ob.variables))
-        self.assertTrue('testvar' in ob.variables.__dict__)
+        self.assertIn('testvar', dir(ob.variables))
+        self.assertIn('testvar', ob.variables.__dict__)
+        self.assertIn('testvar', [ var.name for var in ob.variables ])
 
         var = ob.variables.testvar
         self.assertIsNotNone(var)
@@ -1812,8 +1814,9 @@ class TestCallStack(unittest.TestCase):
         self.assertGreater(frame.line_number, 500)
         self.assertGreater(frame.eval_cost, 0)
 
-        self.assertTrue('eflag' in dir(frame.variables))
-        self.assertTrue('eflag' in frame.variables.__dict__)
+        self.assertIn('eflag', dir(frame.variables))
+        self.assertIn('eflag', frame.variables.__dict__)
+        self.assertEqual([ 'eflag' ], [ var.name for var in frame.variables ])
         var = frame.variables.eflag
         self.assertIsNotNone(var)
         self.assertTrue(var)
@@ -1838,6 +1841,7 @@ class TestCallStack(unittest.TestCase):
         self.assertLess(frame.line_number, ldmud.call_stack[0].line_number)
         self.assertGreater(frame.eval_cost, ldmud.call_stack[0].eval_cost)
         self.assertEqual(frame.variables.__dict__, {})
+        self.assertEqual([], list(frame.variables))
 
     def testFrame2(self):
         frame = ldmud.call_stack[2]
@@ -1849,12 +1853,13 @@ class TestCallStack(unittest.TestCase):
         self.assertGreater(frame.line_number, 0)
         self.assertGreater(frame.eval_cost, ldmud.call_stack[1].eval_cost)
 
-        self.assertTrue('testarray' in dir(frame.variables))
-        self.assertTrue('callback' in dir(frame.variables))
-        self.assertTrue('errors' in dir(frame.variables))
-        self.assertTrue('testarray' in frame.variables.__dict__)
-        self.assertTrue('callback' in frame.variables.__dict__)
-        self.assertTrue('errors' in frame.variables.__dict__)
+        self.assertIn('testarray', dir(frame.variables))
+        self.assertIn('callback', dir(frame.variables))
+        self.assertIn('errors', dir(frame.variables))
+        self.assertIn('testarray', frame.variables.__dict__)
+        self.assertIn('callback', frame.variables.__dict__)
+        self.assertIn('errors', frame.variables.__dict__)
+        self.assertEqual(['testarray', 'callback', 'errors'], [ var.name for var in frame.variables ])
         self.assertIsNotNone(frame.variables.testarray)
         self.assertIsNotNone(frame.variables.callback)
         self.assertIsNotNone(frame.variables.errors)
@@ -1885,14 +1890,15 @@ class TestCallStack(unittest.TestCase):
         self.assertLess(frame.line_number, ldmud.call_stack[1].line_number)
         self.assertGreater(frame.eval_cost, ldmud.call_stack[3].eval_cost)
 
-        self.assertTrue('$1' in dir(frame.variables))
-        self.assertTrue('$9' in dir(frame.variables))
-        self.assertTrue('err' in dir(frame.variables))
-        self.assertTrue('result' in dir(frame.variables))
-        self.assertTrue('$1' in frame.variables.__dict__)
-        self.assertTrue('$8' in frame.variables.__dict__)
-        self.assertTrue('err' in frame.variables.__dict__)
-        self.assertTrue('result' in frame.variables.__dict__)
+        self.assertIn('$1', dir(frame.variables))
+        self.assertIn('$9', dir(frame.variables))
+        self.assertIn('err', dir(frame.variables))
+        self.assertIn('result', dir(frame.variables))
+        self.assertIn('$1', frame.variables.__dict__)
+        self.assertIn('$8', frame.variables.__dict__)
+        self.assertIn('err', frame.variables.__dict__)
+        self.assertIn('result', frame.variables.__dict__)
+        self.assertEqual(['$1', '$2', '$3', '$4', '$5', '$6', '$7', '$8', '$9', 'err', 'result'], [ var.name for var in frame.variables ])
         self.assertIsNotNone(frame.variables.err)
         self.assertIsNotNone(frame.variables.result)
         self.assertEqual(frame.variables.err.name, "err")
@@ -1919,6 +1925,7 @@ class TestCallStack(unittest.TestCase):
         self.assertEqual(frame.object, ldmud.get_master())
         self.assertGreater(frame.eval_cost, ldmud.call_stack[5].eval_cost)
         self.assertEqual(frame.variables.__dict__, {})
+        self.assertEqual([], list(frame.variables))
 
     def testFrame7(self):
         frame = ldmud.call_stack[7]
@@ -1927,6 +1934,7 @@ class TestCallStack(unittest.TestCase):
         self.assertEqual(frame.object, ldmud.get_master())
         self.assertGreater(frame.eval_cost, ldmud.call_stack[6].eval_cost)
         self.assertEqual(frame.variables.__dict__, {})
+        self.assertEqual([], list(frame.variables))
 
 def python_test():
     """Run the python test cases."""

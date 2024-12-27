@@ -1648,7 +1648,7 @@ struct ldmud_program_and_index_s
     struct ldmud_program_s ob_base;
                                 /* Object can never by NULL. */
 
-    unsigned short index;       /* Function or variable index. */
+    int index;                  /* Function or variable index. */
 };
 
 struct ldmud_program_lfun_argument_s
@@ -4656,6 +4656,70 @@ ldmud_program_lfun_create (svalue_t ob, program_t *prog, unsigned short index)
 } /* ldmud_program_lfun_create() */
 
 /*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_program_functions_iter_next (ldmud_program_and_index_t *self)
+
+/* Returns the next lfun for this iterator and update the iterator.
+ */
+
+{
+    int idx;
+
+    if (!ldmud_program_check_available(&self->ob_base))
+        return NULL;
+
+    idx = self->index+1;
+    if (idx >= self->ob_base.lpc_program->num_function_names)
+        return NULL;
+
+    self->index = idx;
+    return ldmud_program_lfun_create(self->ob_base.lpc_object, self->ob_base.lpc_program, idx);
+} /* ldmud_program_functions_iter_next() */
+
+/*-------------------------------------------------------------------------*/
+static PyTypeObject ldmud_program_functions_iter_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.FunctionsIter",              /* tp_name */
+    sizeof(ldmud_program_and_index_t),  /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_program_dealloc,  /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC functions iterator",           /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    PyObject_SelfIter,                  /* tp_iter */
+    (iternextfunc)ldmud_program_functions_iter_next, /* tp_iternext */
+    0,                                  /* tp_methods */
+    0,                                  /* tp_members */
+    0,                                  /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    0,                                  /* tp_init */
+    0,                                  /* tp_alloc */
+    0,                                  /* tp_new */
+};
+
+/*-------------------------------------------------------------------------*/
 static PyObject*
 ldmud_program_functions_repr (ldmud_program_t *val)
 
@@ -4717,6 +4781,40 @@ ldmud_program_functions_getattro (ldmud_program_t *val, PyObject *name)
     PyErr_Format(PyExc_AttributeError, "Function '%U' does not exist", name);
     return NULL;
 } /* ldmud_program_functions_getattro() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_program_functions_iter (ldmud_program_t *self)
+
+/* Creates an iterator over all functions.
+ */
+
+{
+    ldmud_program_and_index_t* iter;
+
+    if (!ldmud_program_check_available(self))
+        return NULL;
+
+    iter = (ldmud_program_and_index_t*)ldmud_program_functions_iter_type.tp_alloc(&ldmud_program_functions_iter_type, 0);
+    if (iter == NULL)
+        return NULL;
+
+    iter->ob_base.lpc_program = self->lpc_program;
+    iter->ob_base.lpc_object = self->lpc_object;
+    if (self->lpc_object.type == T_OBJECT)
+        ref_object(self->lpc_object.u.ob, "ldmud_program_functions_iter");
+    else
+        ref_lwobject(self->lpc_object.u.lwob);
+    iter->index = -1;
+
+    add_gc_object(&gc_program_list, (ldmud_gc_var_t*)iter);
+    if (!ldmud_program_register_replace_program_protector(iter))
+    {
+        Py_DECREF(iter);
+        return NULL;
+    }
+    return (PyObject*) iter;
+} /* ldmud_program_functions_iter() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
@@ -4866,7 +4964,7 @@ static PyTypeObject ldmud_program_functions_type =
     0,                                  /* tp_clear */
     0,                                  /* tp_richcompare */
     0,                                  /* tp_weaklistoffset */
-    0,                                  /* tp_iter */
+    (getiterfunc)ldmud_program_functions_iter, /* tp_iter */
     0,                                  /* tp_iternext */
     ldmud_program_functions_methods,    /* tp_methods */
     0,                                  /* tp_members */
@@ -5169,6 +5267,70 @@ ldmud_program_variable_create (svalue_t ob, program_t *prog, unsigned short inde
 } /* ldmud_program_variable_create() */
 
 /*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_program_variables_iter_next (ldmud_program_and_index_t *self)
+
+/* Returns the next lfun for this iterator and update the iterator.
+ */
+
+{
+    int idx;
+
+    if (!ldmud_program_check_available(&self->ob_base))
+        return NULL;
+
+    idx = self->index+1;
+    if (idx >= self->ob_base.lpc_program->num_variables)
+        return NULL;
+
+    self->index = idx;
+    return ldmud_program_variable_create(self->ob_base.lpc_object, self->ob_base.lpc_program, idx);
+} /* ldmud_program_variables_iter_next() */
+
+/*-------------------------------------------------------------------------*/
+static PyTypeObject ldmud_program_variables_iter_type =
+{
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "ldmud.VariablesIter",              /* tp_name */
+    sizeof(ldmud_program_and_index_t),  /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)ldmud_program_dealloc,  /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    "LPC variables iterator",           /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    PyObject_SelfIter,                  /* tp_iter */
+    (iternextfunc)ldmud_program_variables_iter_next, /* tp_iternext */
+    0,                                  /* tp_methods */
+    0,                                  /* tp_members */
+    0,                                  /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    0,                                  /* tp_init */
+    0,                                  /* tp_alloc */
+    0,                                  /* tp_new */
+};
+
+/*-------------------------------------------------------------------------*/
 static PyObject*
 ldmud_program_variables_repr (ldmud_program_t *val)
 
@@ -5232,6 +5394,40 @@ ldmud_program_variables_getattro (ldmud_program_t *val, PyObject *name)
     PyErr_Format(PyExc_AttributeError, "Variable '%U' does not exist", name);
     return NULL;
 } /* ldmud_program_variables_getattro() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_program_variables_iter (ldmud_program_t *self)
+
+/* Creates an iterator over all global variables.
+ */
+
+{
+    ldmud_program_and_index_t* iter;
+
+    if (!ldmud_program_check_available(self))
+        return NULL;
+
+    iter = (ldmud_program_and_index_t*)ldmud_program_variables_iter_type.tp_alloc(&ldmud_program_variables_iter_type, 0);
+    if (iter == NULL)
+        return NULL;
+
+    iter->ob_base.lpc_program = self->lpc_program;
+    iter->ob_base.lpc_object = self->lpc_object;
+    if (self->lpc_object.type == T_OBJECT)
+        ref_object(self->lpc_object.u.ob, "ldmud_program_variables_iter");
+    else
+        ref_lwobject(self->lpc_object.u.lwob);
+    iter->index = -1;
+
+    add_gc_object(&gc_program_list, (ldmud_gc_var_t*)iter);
+    if (!ldmud_program_register_replace_program_protector(iter))
+    {
+        Py_DECREF(iter);
+        return NULL;
+    }
+    return (PyObject*) iter;
+} /* ldmud_program_variables_iter() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
@@ -5381,7 +5577,7 @@ static PyTypeObject ldmud_program_variables_type =
     0,                                  /* tp_clear */
     0,                                  /* tp_richcompare */
     0,                                  /* tp_weaklistoffset */
-    0,                                  /* tp_iter */
+    (getiterfunc)ldmud_program_variables_iter, /* tp_iter */
     0,                                  /* tp_iternext */
     ldmud_program_variables_methods,    /* tp_methods */
     0,                                  /* tp_members */
@@ -13836,6 +14032,31 @@ static PyTypeObject ldmud_local_variable_type =
 };
 
 /*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_local_variable_create (ldmud_local_variables_t * vars, local_variable_dbg_t* var)
+
+/* Creates a ldmud.LocalVariable object.for <var>.
+ */
+
+{
+    ldmud_local_variable_t *varob = (ldmud_local_variable_t*)ldmud_local_variable_type.tp_alloc(&ldmud_local_variable_type, 0);
+    if (varob == NULL)
+        return NULL;
+
+    reference_prog(vars->frame_ref_head.prog, "ldmud_local_variable_create");
+
+    varob->frame_ref_head.prog = vars->frame_ref_head.prog;
+    varob->frame_ref_head.frame_serial = vars->frame_ref_head.frame_serial;
+    varob->frame_ref_head.frame_level = vars->frame_ref_head.frame_level;
+    varob->var = var;
+    varob->varp = vars->fp + var->idx;
+
+    add_gc_object(&gc_call_frame_ref_list, (ldmud_gc_var_t*)varob);
+
+    return (PyObject*)varob;
+} /* ldmud_local_variable_create() */
+
+/*-------------------------------------------------------------------------*/
 static PyObject*
 ldmud_local_variables_getattro (ldmud_local_variables_t *vars, PyObject *name)
 
@@ -13866,27 +14087,60 @@ ldmud_local_variables_getattro (ldmud_local_variables_t *vars, PyObject *name)
     {
         for (local_variable_dbg_t *var = get_first_local_variable(vars->frame_ref_head.prog, vars->pc); var != NULL; var = get_next_local_variable(vars->frame_ref_head.prog, vars->pc, var))
             if (var->name == varname)
-            {
-                ldmud_local_variable_t* varob = (ldmud_local_variable_t*)ldmud_local_variable_type.tp_alloc(&ldmud_local_variable_type, 0);
-                if (varob == NULL)
-                    return NULL;
-
-                reference_prog(vars->frame_ref_head.prog, "ldmud_local_variables_getattro");
-
-                varob->frame_ref_head.prog = vars->frame_ref_head.prog;
-                varob->frame_ref_head.frame_serial = vars->frame_ref_head.frame_serial;
-                varob->frame_ref_head.frame_level = vars->frame_ref_head.frame_level;
-                varob->var = var;
-                varob->varp = vars->fp + var->idx;
-
-                add_gc_object(&gc_call_frame_ref_list, (ldmud_gc_var_t*)varob);
-                return (PyObject*) varob;
-            }
+                return ldmud_local_variable_create(vars, var);
     }
 
     PyErr_Format(PyExc_AttributeError, "local variable '%U' not found", name);
     return NULL;
 } /* ldmud_local_variables_getattro() */
+
+/*-------------------------------------------------------------------------*/
+static PyObject *
+ldmud_local_variables_iter (ldmud_local_variables_t *vars)
+
+/* Creates an iterator over all local variables.
+ */
+
+{
+    PyObject *variables, *iter;
+
+    if (ldmud_call_frame_ref_bool(&vars->frame_ref_head))
+    {
+        /* To avoid any further validity issues we collect all variables here
+         * and return an iterator to that sequence.
+         */
+        local_variable_dbg_t *first = get_first_local_variable(vars->frame_ref_head.prog, vars->pc);
+        int num = 0, idx = 0;
+
+        for (local_variable_dbg_t* var = first; var != NULL; var = get_next_local_variable(vars->frame_ref_head.prog, vars->pc, var))
+            num++;
+
+        variables = PyTuple_New(num);
+        if (!variables)
+            return NULL;
+
+        for (local_variable_dbg_t* var = first; var != NULL; var = get_next_local_variable(vars->frame_ref_head.prog, vars->pc, var))
+        {
+            PyObject *varob = ldmud_local_variable_create(vars, var);
+            if (!varob)
+            {
+                Py_DECREF(variables);
+                return NULL;
+            }
+            PyTuple_SET_ITEM(variables, idx++, varob);
+        }
+    }
+    else
+    {
+        variables = PyTuple_New(0);
+        if (!variables)
+            return NULL;
+    }
+
+    iter = PyObject_GetIter(variables);
+    Py_DECREF(variables);
+    return iter;
+} /* ldmud_local_variables_iter() */
 
 /*-------------------------------------------------------------------------*/
 static PyObject *
@@ -13944,7 +14198,7 @@ ldmud_local_variables_dict (ldmud_local_variables_t *vars, void *closure)
         for (local_variable_dbg_t *var = get_first_local_variable(vars->frame_ref_head.prog, vars->pc); var != NULL; var = get_next_local_variable(vars->frame_ref_head.prog, vars->pc, var))
         {
             PyObject *varname = PyUnicode_FromStringAndSize(get_txt(var->name), mstrsize(var->name));
-            ldmud_local_variable_t* varob;
+            PyObject* varob;
 
             if (varname == NULL)
             {
@@ -13952,23 +14206,13 @@ ldmud_local_variables_dict (ldmud_local_variables_t *vars, void *closure)
                 continue;
             }
 
-            varob = (ldmud_local_variable_t*)ldmud_local_variable_type.tp_alloc(&ldmud_local_variable_type, 0);
+            varob = ldmud_local_variable_create(vars, var);
             if (varob == NULL)
             {
                 PyErr_Clear();
                 Py_DECREF(varname);
                 continue;
             }
-
-            reference_prog(vars->frame_ref_head.prog, "ldmud_local_variables_getattro");
-
-            varob->frame_ref_head.prog = vars->frame_ref_head.prog;
-            varob->frame_ref_head.frame_serial = vars->frame_ref_head.frame_serial;
-            varob->frame_ref_head.frame_level = vars->frame_ref_head.frame_level;
-            varob->var = var;
-            varob->varp = vars->fp + var->idx;
-
-            add_gc_object(&gc_call_frame_ref_list, (ldmud_gc_var_t*)varob);
 
             if (PyDict_SetItem(dict, varname, (PyObject*)varob) < 0)
                 PyErr_Clear();
@@ -14041,7 +14285,7 @@ static PyTypeObject ldmud_local_variables_type =
     0,                                  /* tp_clear */
     0,                                  /* tp_richcompare */
     0,                                  /* tp_weaklistoffset */
-    0,                                  /* tp_iter */
+    (getiterfunc)ldmud_local_variables_iter, /* tp_iter */
     0,                                  /* tp_iternext */
     ldmud_local_variables_methods,      /* tp_methods */
     0,                                  /* tp_members */
@@ -15969,11 +16213,15 @@ init_ldmud_module ()
         return NULL;
     if (PyType_Ready(&ldmud_any_lwobject_type_type) < 0)
         return NULL;
+    if (PyType_Ready(&ldmud_program_functions_iter_type) < 0)
+        return NULL;
     if (PyType_Ready(&ldmud_program_functions_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_program_lfun_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_program_lfun_argument_type) < 0)
+        return NULL;
+    if (PyType_Ready(&ldmud_program_variables_iter_type) < 0)
         return NULL;
     if (PyType_Ready(&ldmud_program_variables_type) < 0)
         return NULL;
@@ -19212,8 +19460,12 @@ python_replace_program_adjust_single_ref (ldmud_program_and_index_t* ref, replac
  */
 
 {
-    int index = (*convert_idx)(r_ob, ref->index);
+    int index;
 
+    if (ref->index < 0) // Start of an iterator.
+        return;
+
+    index = (*convert_idx)(r_ob, ref->index);
     if (index < 0)
     {
         /* We set the object to NULL. */
@@ -19244,11 +19496,13 @@ python_replace_program_adjust (replace_ob_t *r_ob)
         /* At least one more reference, otherwise we don't need to care. */
         if (prpp->ref->ob_refcnt > 1)
         {
-            if (Py_TYPE(prpp->ref) == &ldmud_program_lfun_type)
+            if (Py_TYPE(prpp->ref) == &ldmud_program_lfun_type ||
+                Py_TYPE(prpp->ref) == &ldmud_program_functions_iter_type)
                 python_replace_program_adjust_single_ref((ldmud_program_and_index_t*)prpp->ref
                                                        , r_ob
                                                        , replace_program_function_adjust);
-            else if (Py_TYPE(prpp->ref) == &ldmud_program_variable_type)
+            else if (Py_TYPE(prpp->ref) == &ldmud_program_variable_type ||
+                Py_TYPE(prpp->ref) == &ldmud_program_variables_iter_type)
                 python_replace_program_adjust_single_ref((ldmud_program_and_index_t*)prpp->ref
                                                        , r_ob
                                                        , replace_program_variable_adjust);
