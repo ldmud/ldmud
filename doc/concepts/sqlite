@@ -30,7 +30,7 @@ DESCRIPTION
           efun returns the last generated value.
 
         * sl_close()
-          Close the database file. This also autmatically happens when the
+          Close the database file. This also automatically happens when the
           object is destructed.
 
 
