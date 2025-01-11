@@ -43,7 +43,7 @@ DESCRIPTION
         and "public" or "static" when calling this_object(). "private"
         and "protected" function can never be called with call_other().
 
-        The return type of call_other() is 'any' be default. However,
+        The return type of call_other() is 'any' by default. However,
         if your LPC code uses #pragma strict_types, the return type is
         'unknown', and the result of call_other() must be casted to
         the appropriate type before you can use it for anything.
