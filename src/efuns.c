@@ -2354,7 +2354,7 @@ _resize_parts_lens(int num, char *** parts, p_int ** lens)
 /*-------------------------------------------------------------------------*/
 static size_t
 find_colour_delimiters (char * instr, char *** partsref, p_int ** lensref
-        , char * delimiter, int code_len)
+        , char * delimiter, char * end_delimiter, int code_len)
 
 /* Auxiliary function for terminal_colour().
  * Find the positions of all text and colour code parts, delimited by
@@ -2397,8 +2397,8 @@ find_colour_delimiters (char * instr, char *** partsref, p_int ** lensref
     int num;  /* Number of delimited parts in <instr> */
     char * cp;  /* workpointer */
     char * prev_cp;  /* previous workpointer */
-    int delimiter_length = strlen(delimiter); /* length of the delimiter */
-
+    int delimiter_length = strlen(delimiter); /* length of start delimiter */
+    int end_delimiter_length = strlen(end_delimiter); /* length of end delimiter */
     /* The string by definition starts with a non-keyword,
      * which might be empty.
      * Initialize our variables accordingly.
@@ -2498,7 +2498,7 @@ find_colour_delimiters (char * instr, char *** partsref, p_int ** lensref
             parts[num] = prev_cp;
 
             /* find next delimiter */
-            cp = strstr(prev_cp, delimiter);
+            cp = strstr(prev_cp, num % 2 ? end_delimiter : delimiter);
 
             if (!cp)
             {
@@ -2514,11 +2514,11 @@ find_colour_delimiters (char * instr, char *** partsref, p_int ** lensref
             {
                 /* found an escaped delimiter
                    let the previous part include one copy */
-                lens[num-1] += delimiter_length;
+                lens[num-1] += (num % 2 ? delimiter_length : end_delimiter_length);
             }
 
             /* skip colour_delimiter */
-            prev_cp = cp + delimiter_length;
+            prev_cp = cp + (num % 2 ? end_delimiter_length : delimiter_length);
         }
     }
 
@@ -2532,7 +2532,7 @@ find_colour_delimiters (char * instr, char *** partsref, p_int ** lensref
 static string_t *
 e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                   , int indent, int wrap
-                  , char * delimiter, int code_len
+                  , char * delimiter, char * end_delimiter, int code_len
                   )
 
 /* Implementation of the efun terminal_colour().
@@ -2608,7 +2608,8 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
     {
         _allocate_parts_lens(NSTRSEGS, &parts, &lens);
 
-        num = find_colour_delimiters(instr, &parts, &lens, delimiter, code_len);
+        num = find_colour_delimiters(instr, &parts, &lens,
+                delimiter, end_delimiter, code_len);
     }
     else
     {
@@ -3312,7 +3313,7 @@ v_terminal_colour (svalue_t *sp, int num_arg)
 /* EFUN terminal_colour()
  *
  *   varargs string terminal_colour( string str, mapping|closure map,
- *                                   int wrap, int indent,
+ *                                   [int wrap, int indent,]
  *                                   string delimiter, int code_len )
  *
  * Expands all colour-defines from the input-string and replaces them by the
@@ -3354,9 +3355,10 @@ v_terminal_colour (svalue_t *sp, int num_arg)
     svalue_t * cl = NULL;
     int        code_len = 0;
     char *     delim = "%^";
+    char *     end_delim = delim; /* default: enclosed with same delimiter */
 
-    /* if the last two arguments are string, int we have a delimiter config */
-    if ( num_arg >= 4 )
+    /* if the last two arguments are string,int or string,string we have a delimiter config */
+    if ( num_arg >= 3 )
     {
         if (sp->type == T_NUMBER && sp[-1].type == T_STRING)
         {
@@ -3368,7 +3370,20 @@ v_terminal_colour (svalue_t *sp, int num_arg)
                 return sp;
             }
             delim = get_txt((sp--)->u.str);
+            end_delim = delim;
             num_arg -= 2;
+        }
+        else if (sp->type == T_STRING && sp[-1].type == T_STRING)
+        {
+            end_delim = get_txt((sp--)->u.str);
+            delim = get_txt((sp--)->u.str);
+            num_arg -= 2;
+        }
+        else if (sp->type == T_STRING)
+        {
+            delim = get_txt((sp--)->u.str);
+            end_delim = delim;
+            num_arg -= 1;
         }
     }
     if ( num_arg > 4 )
@@ -3435,7 +3450,7 @@ v_terminal_colour (svalue_t *sp, int num_arg)
     inter_sp = sp;
 
     str = e_terminal_colour(sp[-1].u.str, map, cl, indent, wrap,
-            delim, code_len);
+            delim, end_delim, code_len);
 
     free_svalue(sp--);
     free_svalue(sp);
