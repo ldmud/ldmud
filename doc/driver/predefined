@@ -95,6 +95,7 @@ DESCRIPTION
         __PGSQL__                  : support for PostgreSQL.
         __SQLITE__                 : support for SQLite 3.
         __XML_DOM__                : support for XML parsing.
+        __JSON__                   : support for JSON parsing.
         __MCCP__                   : support for MCCP.
                                      http://www.randomly.org/projects/MCCP
         __ALISTS__                 : support for alists.
@@ -133,9 +134,8 @@ HISTORY
         3.3.719 removed __PTHREADS__, AMIGA, MSDOS_FS, __BEOS__
             and added __GCRYPT__.
         3.3.721 added __FUNCTION__.
-        3.5.0 changed __LPC_STRUCTS__, __LPC_INLINE_CLOSURES__,
-            __LPC_ARRAY_CALLS__ to be always on.
-            removed __ALISTS__
+        3.5.0 added __JSON__, removed __ALISTS__, and changed __LPC_STRUCTS__,
+            __LPC_INLINE_CLOSURES__, __LPC_ARRAY_CALLS__ to be always on.
 
 SEE ALSO
         pragma(LPC), preprocessor(LPC)
