@@ -272,7 +272,7 @@ DESCRIPTION
             Default is /dev/urandom, Fall-back if <filename> is not readable
             is the system clock. If you want to seed the PRNG with a specific
             seed, you can use a filename with the seed and give it here instead
-            of using --random-seed. (Note: the last one of --randominit and
+            of using --random-seed. (Note: the last one of --randomdevice and
             --random-seed wins!)
 
           --random-seed <num>
