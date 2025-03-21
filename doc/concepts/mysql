@@ -210,6 +210,6 @@ HISTORY
         LDMud 3.2.11 added a privilege_violation() call for each efun.
 
 SEE ALSO
-        pgsql(C), db_affected_rows(E), db_conv_string(E), db_close(E),
-        db_connect(E), db_exec(E), db_fetch(E), db_handles(E),
+        pgsql(C), sqlite(C), db_affected_rows(E), db_conv_string(E),
+        db_close(E), db_connect(E), db_exec(E), db_fetch(E), db_handles(E),
         db_insert_id(E), db_coldefs(E), db_error(E), privilege_violation(A)
