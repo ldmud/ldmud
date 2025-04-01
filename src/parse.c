@@ -200,6 +200,12 @@
 #define PREFIXED(x,y) (strncmp(x, y, strlen(x)) == 0)
 
 /*-------------------------------------------------------------------------*/
+/* Some useful constants
+ */
+#define PARSE_COMMAND_MIN_ARGS 3
+  /* The minimum number of arguments (non variable) to parse_command() */
+
+/*-------------------------------------------------------------------------*/
 /* To make parse_command() reentrant, the module maintains a list
  * of previous contexts using this structure:
  */
@@ -1653,8 +1659,8 @@ v_parse_command (svalue_t *sp, int num_arg)
 
     /* The remaining arguments are the lvalues.
      */
-    argp += 3;
-    num_arg -= 3;
+    argp += PARSE_COMMAND_MIN_ARGS;
+    num_arg -= PARSE_COMMAND_MIN_ARGS;
 
     /* Pattern and commands can not be empty
      */
@@ -1834,7 +1840,7 @@ v_parse_command (svalue_t *sp, int num_arg)
         fail = MY_TRUE;
 
     /* Clean up via the error handler */
-    sp = pop_n_elems(num_arg + 4, sp);
+    sp = pop_n_elems(num_arg + PARSE_COMMAND_MIN_ARGS, sp);
     push_number(sp, fail ? 0 : 1);
 
     return sp;
