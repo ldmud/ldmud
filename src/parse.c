@@ -1647,7 +1647,7 @@ v_parse_command (svalue_t *sp, int num_arg)
 
     pattern = trim_all_spaces(argp[2].u.str);
     free_mstring(argp[2].u.str);
-    argp[2].u.str = cmd;
+    argp[2].u.str = pattern;
 
     ob_or_array = argp + 1;
 
