@@ -1359,6 +1359,26 @@ mixed *tests = (this_object() == blueprint()) &&
          :)
     }),
 
+#if __EFUN_DEFINED__(parse_command)
+    ({ "parse_command of \"take apple\"", 0,
+       (:
+            mixed *items;
+            if (!parse_command("take apple", ({ this_object() }), " 'get' / 'take' %i ", items))
+                return 0;
+            return deep_eq(items, ({ 1, this_object() }));
+        :)
+    }),
+    ({ "parse_command of \"look at apple\"", 0,
+       (:
+            mixed *items;
+            string* prepos = ({ "towards", "at" });
+            if (!parse_command("look at apple", ({ this_object() }), " 'look' %p %i ", prepos, items))
+                return 0;
+            return prepos[0] == "at" && deep_eq(items, ({ 1, this_object() }));
+        :)
+    }),
+#endif
+
     ({ "regmatch 1", 0, (: regmatch("abcd", "abc") == "abc" :) }),
     ({ "regmatch 2", 0, (: regmatch("abcd", "abcdef") == 0 :) }),
     ({ "regmatch 3", 0, (: regmatch("abcd", "^$") == 0 :) }),
@@ -2020,6 +2040,8 @@ int privilege_violation(string op, mixed who, varargs mixed* args)
 
     return 1;
 }
+
+string* parse_command_id_list() { return ({ "apple" }); }
 
 int f(int arg)
 {
