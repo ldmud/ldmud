@@ -13,6 +13,13 @@
 
    If you don't rely on sorted keys you can use alists_unsorted.c instead
    which offers much better performance for some operations.
+
+   IMPORTANT NOTE on insert_alist():
+   Contrary to the original documentation, the actual efun _never_ updated
+   the key array in-place. This simul-efun checks if the key or value array
+   was passed by reference and does an in-place update in that case.
+   If you need the function to behave _strictly_ as originally implemented,
+   please remove the respective sections (marked as OPTIONAL) below.
  */
 
 #ifndef __ALISTS__
@@ -124,9 +131,12 @@ insert_alist(mixed key, varargs mixed * args)
 
         // new key
         idx = -idx - 1;
-        // update arg if given by reference
+
+        // OPTIONAL: update arg if passed by reference
         if (referencep(&(args[0])))
             args[0][idx..idx-1] = ({ key });
+        // *******************************************
+
         return idx;
     }
 
@@ -157,11 +167,11 @@ insert_alist(mixed key, varargs mixed * args)
         }
     }
 
-    /*
-    // update arg if it was given by reference
+    // OPTIONAL: update arg if passed by reference
     if (referencep(&(args[<1])))
         args[<1] = alist;
-     */
+    // *******************************************
+
     return alist;
 }
 

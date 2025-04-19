@@ -9,6 +9,13 @@
 
    Some Libs rely on the fact that integer keys happened to be in
    ascending order though. If yours does, use alists_sorted.c instead!
+
+   IMPORTANT NOTE on insert_alist():
+   Contrary to the original documentation, the actual efun _never_ updated
+   the key array in-place. This simul-efun checks if the key or value array
+   was passed by reference and does an in-place update in that case.
+   If you need the function to behave _strictly_ as originally implemented,
+   please remove the respective sections (marked as OPTIONAL) below.
  */
 
 #ifndef __ALISTS__
@@ -97,9 +104,11 @@ insert_alist(mixed key, varargs mixed * args)
 
         if (idx >= 0) return idx; // existing key
 
-        // add new key, if key array was given by reference
+        // OPTIONAL: update arg if passed by reference
         if (referencep(&(args[0])))
             args[0] += ({ key });
+        // *******************************************
+        
         return efun::sizeof(args[0]) - 1;
     }
 
@@ -129,11 +138,11 @@ insert_alist(mixed key, varargs mixed * args)
         }
     }
 
-    /*
-    // update arg if it was given by reference
+    // OPTIONAL: update arg if passed by reference
     if (referencep(&(args[<1])))
         args[<1] = alist;
-     */
+    // *******************************************
+
     return alist;
 }
 
