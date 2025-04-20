@@ -19,8 +19,9 @@
    the key array in-place. This simul-efun checks if the key or value array
    was passed by reference and does an in-place update in that case.
    If you need the function to behave _strictly_ as originally implemented,
-   please remove the respective sections (marked as OPTIONAL) below.
+   just remove the following define.
  */
+#define ALISTS_INPLACE_UPDATE
 
 #ifndef __ALISTS__
 /*
@@ -132,10 +133,10 @@ insert_alist(mixed key, varargs mixed * args)
         // new key
         idx = -idx - 1;
 
-        // OPTIONAL: update arg if passed by reference
+#ifdef ALISTS_INPLACE_UPDATE
         if (referencep(&(args[0])))
             args[0][idx..idx-1] = ({ key });
-        // *******************************************
+#endif
 
         return idx;
     }
@@ -167,10 +168,10 @@ insert_alist(mixed key, varargs mixed * args)
         }
     }
 
-    // OPTIONAL: update arg if passed by reference
+#ifdef ALISTS_INPLACE_UPDATE
     if (referencep(&(args[<1])))
         args[<1] = alist;
-    // *******************************************
+#endif
 
     return alist;
 }
