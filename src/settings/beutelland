@@ -11,6 +11,7 @@ exit 1
 # --- Timing ---
 with_time_to_clean_up=5400
 with_time_to_reset=3600
+with_alarm_time=1
 
 # --- Swap ---
 with_time_to_swap=-1
@@ -43,7 +44,6 @@ enable_eval_cost_trace=yes
 enable_use_parse_command=no
 enable_use_mysql=no
 enable_use_pcre=no
-enable_use_mccp=yes
 with_erq_dir=/RoleMUD/bin
 with_swap_file=Swap_File
 
