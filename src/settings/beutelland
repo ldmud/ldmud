@@ -4,7 +4,7 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/RoleMUD/ --libexecdir=/RoleMUD/bin --libdir=/RoleMUD/MUD-Lib --with-setting=beutelland $*
+exec ./configure --prefix=/RoleMUD/ --libexecdir=/RoleMUD/bin --libdir=/RoleMUD/MUD-Lib --enable-erq=xerq --with-setting=beutelland $*
 exit 1
 
 
@@ -29,6 +29,8 @@ with_max_user_trace=60
 with_portno=5678
 with_udp_port=4246
 enable_use_mccp=yes
+enable_use_json=yes
+enable_use_tls=yes
 
 # --- ERQ ---
 enable_erq=xerq
@@ -39,8 +41,11 @@ enable_malloc_trace=no
 enable_malloc_lpc_trace=no
 enable_eval_cost_trace=yes
 enable_use_parse_command=no
-enable_use_process_string=no
+enable_use_mysql=no
 enable_use_pcre=no
+enable_use_mccp=yes
+with_erq_dir=/RoleMUD/bin
+with_swap_file=Swap_File
 
 # --- Wizlist ---
 with_wizlist_file=no
