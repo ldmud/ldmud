@@ -69,4 +69,5 @@ enable_use_tls=yes
 enable_use_xml=xml2
 enable_use_json=yes
 enable_use_sqlite=yes
+enable_use_mccp=yes
 with_wizlist_file=WIZLIST
