@@ -33,6 +33,9 @@ int fun4(int a, closure cl = function int() : int b = 2+10*a { return b;})
     return a + funcall(cl);
 }
 
+// Overloading a nomask prototype should be allowed.
+nomask int iprototype(int a, int b = 100) { return a+b; }
+
 int run_test()
 {
     closure cl1 = function int(int a, int b = a, int c = 42) { return a + b + c; };

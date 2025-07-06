@@ -6099,7 +6099,7 @@ get_function_information (function_t * fun_p, program_t * prog, int ix)
 
     fun_p->num_arg = header->num_arg;
     fun_p->num_opt_arg = header->num_opt_arg;
-    if (is_undef_function(inhprogp->program + (inhprogp->functions[inhfx] & FUNSTART_MASK)))
+    if (is_undef_function(header, inhprogp->program + (inhprogp->functions[inhfx] & FUNSTART_MASK)))
         fun_p->flags |= NAME_UNDEFINED;
 } /* get_function_information() */
 
@@ -19249,8 +19249,8 @@ is_function_defined (program_t *progp, int fx)
     const program_t *inhprogp;
     int inh_fx;
 
-    get_function_header_extended(progp, fx, &inhprogp, &inh_fx);
-    return !is_undef_function(inhprogp->program + (inhprogp->functions[inh_fx] & FUNSTART_MASK));
+    function_t *header = get_function_header_extended(progp, fx, &inhprogp, &inh_fx);
+    return !is_undef_function(header, inhprogp->program + (inhprogp->functions[inh_fx] & FUNSTART_MASK));
 } /* is_function_defined */
 
 /*-------------------------------------------------------------------------*/
@@ -23273,14 +23273,14 @@ compile_block (string_t *block, code_context_t *context)
 } /* compile_block() */
 
 /*-------------------------------------------------------------------------*/
-Bool
-is_undef_function (bytecode_p fun)
+bool
+is_undef_function (function_t *header, bytecode_p funstart)
 
-/* Return TRUE if <fun> points to a referenced but undefined function.
+/* Return TRUE if the function points to a referenced but undefined function.
  */
 
 {
-    return GET_CODE(fun) == F_UNDEF;
+    return GET_CODE(funstart + sizeof(unsigned short) * header->num_opt_arg) == F_UNDEF;
 } /* is_undef_function() */
 
 /*-------------------------------------------------------------------------*/

@@ -125,7 +125,7 @@ extern void store_include_end(mp_uint inc_offset, int include_line);
 extern void compile_file(int fd, const char * fname, Bool isMasterObj);
 extern lambda_t *compile_expr(string_t *expr, code_context_t *context);
 extern lambda_t *compile_block(string_t *block, code_context_t *context);
-extern Bool is_undef_function (bytecode_p fun);
+extern bool is_undef_function (function_t *header, bytecode_p funstart);
 extern unsigned short find_inherited_function (const char * super_name, const char * real_name , unsigned short * pInherit, funflag_t *flags);
 extern const char *get_current_function_name();
 extern char *get_lpctype_name (lpctype_t *type);

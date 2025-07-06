@@ -779,7 +779,7 @@ function_exists (string_t *fun, program_t *progp, funflag_t inacceptable_flags
     *fun_type = header->type;
 
     /* And after all this, the function may be undefined */
-    if (is_undef_function(funstart))
+    if (is_undef_function(header, funstart))
     {
         *fun_flags |= NAME_UNDEFINED;
         return NULL;
@@ -2029,7 +2029,7 @@ f_functionlist (svalue_t *sp)
             /* If the function starts with the bytecodes F_UNDEF,
              * it referenced but undefined. But you know that.
              */
-            if (is_undef_function(funstart))
+            if (is_undef_function(header, funstart))
             {
                 active_flags |= NAME_UNDEFINED;
             }

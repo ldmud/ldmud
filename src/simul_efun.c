@@ -342,7 +342,7 @@ assert_simul_efun_object (void)
         funheader = inherit_progp->function_headers + FUNCTION_HEADER_INDEX(funstart);
 
         /* Don't stumble over undefined functions */
-        if (is_undef_function(funstart))
+        if (is_undef_function(funheader, funstart))
         {
             flags |= NAME_UNDEFINED;
         }

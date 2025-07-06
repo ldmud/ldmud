@@ -3943,6 +3943,7 @@ ldmud_program_lfun_get_file_name (ldmud_program_and_index_t *lfun, void *closure
 {
     program_t *progp;
     int fx;
+    function_t *header;
     bytecode_p funstart;
     string_t *name;
     PyObject* result;
@@ -3950,9 +3951,9 @@ ldmud_program_lfun_get_file_name (ldmud_program_and_index_t *lfun, void *closure
     if (!ldmud_program_check_available(&lfun->ob_base))
         return NULL;
 
-    get_function_header_extended(lfun->ob_base.lpc_program, lfun->index, (const program_t**) &progp, &fx);
+    header = get_function_header_extended(lfun->ob_base.lpc_program, lfun->index, (const program_t**) &progp, &fx);
     funstart = progp->program + (progp->functions[fx] & FUNSTART_MASK);
-    if (is_undef_function(funstart))
+    if (is_undef_function(header, funstart))
     {
         Py_INCREF(Py_None);
         return Py_None;
@@ -3981,15 +3982,16 @@ ldmud_program_lfun_get_line_number (ldmud_program_and_index_t *lfun, void *closu
 {
     program_t *progp;
     int fx, pos;
+    function_t *header;
     bytecode_p funstart;
     string_t *name;
 
     if (!ldmud_program_check_available(&lfun->ob_base))
         return NULL;
 
-    get_function_header_extended(lfun->ob_base.lpc_program, lfun->index, (const program_t**) &progp, &fx);
+    header = get_function_header_extended(lfun->ob_base.lpc_program, lfun->index, (const program_t**) &progp, &fx);
     funstart = progp->program + (progp->functions[fx] & FUNSTART_MASK);
-    if (is_undef_function(funstart))
+    if (is_undef_function(header, funstart))
     {
         Py_INCREF(Py_None);
         return Py_None;

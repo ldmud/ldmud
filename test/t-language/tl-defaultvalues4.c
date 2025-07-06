@@ -1,3 +1,4 @@
+// Not for compile_string()
 public mixed prototype(string arg1, mixed arg2, int opt_arg = 42);
 
 int run_test()
