@@ -22448,8 +22448,10 @@ epilog (void)
              */
             if ((f->flags & (NAME_UNDEFINED|NAME_INHERITED)) == NAME_UNDEFINED)
             {
+                int opt_arg_table = sizeof(short) * f->num_opt_arg;
+
                 CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
-                if (!realloc_a_program(FUNCTION_HDR_SIZE + 2))
+                if (!realloc_a_program(FUNCTION_HDR_SIZE + 2 + opt_arg_table))
                 {
                     yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                             , CURRENT_PROGRAM_SIZE + FUNCTION_HDR_SIZE + 2);
@@ -22469,10 +22471,18 @@ epilog (void)
                         f->flags &= ~NAME_UNDEFINED;
                         *p++ = F_CONST1;
                         *p   = F_RETURN;
-                    } else {
+                    }
+                    else
+                    {
+                        /* We don't want to have optional arg initializers with
+                         * possible side effects in undefined functions.
+                         * Therefore put jump offsets of 0 in there.
+                         */
+                        memset(p, 0, opt_arg_table);
+                        p += opt_arg_table;
                         *p = F_UNDEF;
                     }
-                    CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE + 2;
+                    CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE + 2 + opt_arg_table;
                 }
 
                 /* We'll include prototype in the function_names list,
