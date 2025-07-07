@@ -4,6 +4,12 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+07-Jul-2025 (LDMud Team) -- 3.5.8
+    - Fixed Crashes:
+       + Fixed a crash on __INT_MIN__ % -1.
+       + Fixed a crash during garbage collection.
+       + Fixed crash caused by C23 standard.
+
 01-Oct-2023 (LDMud Team) -- 3.5.7
     - Fixed Crashes:
        + Fixed a crash when multiple 'reserve' modifiers were given
