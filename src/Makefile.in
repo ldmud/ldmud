@@ -348,8 +348,8 @@ efuns.o : ../mudlib/sys/configuration.h ../mudlib/sys/driver_hook.h \
     mstrings.h my-alloca.h my-rusage.h my-stdint.h object.h otable.h \
     pkg-gcrypt.h pkg-gnutls.h pkg-openssl.h pkg-python.h pkg-tls.h port.h \
     prolang.h ptrtable.h random.h random/SFMT.h sent.h sha1.h simul_efun.h \
-    simulate.h stdstrings.h strfuns.h structs.h svalue.h swap.h typedefs.h \
-    types.h wiz_list.h xalloc.h
+    simulate.h stdstrings.h stdstructs.h strfuns.h structs.h svalue.h \
+    swap.h typedefs.h types.h wiz_list.h xalloc.h
 
 files.o : ../mudlib/sys/driver_hook.h ../mudlib/sys/files.h array.h \
     backend.h bytecode.h bytecode_gen.h comm.h config.h driver.h exec.h \

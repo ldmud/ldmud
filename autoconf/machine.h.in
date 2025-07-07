@@ -31,6 +31,9 @@
 /* Is it available as a subfunction of syscall()? */
 #undef GETRUSAGE_VIA_SYSCALL
 
+/* Does the machine offer C-Ares? */
+#undef HAS_C_ARES
+
 /* Does the machine offer libgcrypt? */
 #undef HAS_GCRYPT
 

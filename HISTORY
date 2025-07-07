@@ -4,6 +4,62 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+07-Jul-2025 (LDMud Team) -- 3.6.8
+    - Fixed Crashes:
+       + Fixed a crash on __INT_MIN__ % -1.
+       + Fixed a crash with the or operator on lpctypes.
+       + Fixed a crash during garbage collection.
+       + Fixed a crash when calling a prototype that has optional arguments.
+       + Fixed a crash when passing an uncallable closure as a callback
+         to efuns.
+       + Fixed a crash in compile_string() with nested inline closures.
+       + Fixed a crash when registering a Python type twice.
+       + Fixed a crash when Python called lfuns of destructed objects.
+
+    - Language:
+       + Fixed detection of prototypes with optional arguments when inheriting.
+       + Fixed compile error caused by pragma save_local_names.
+
+    - Runtime:
+       + Disregard sign for floating point zeros.
+
+    - New Efuns:
+       + to_type() converts a value to a given target type.
+
+    - Changed Efuns:
+       + compile_string() did not find functions in large programs.
+       + compile_string() referenced wrong object variables when the object
+         had virtual variables.
+       + attach_erq_demon(), compile_string(), execute_command(),
+         parse_command(), sl_open(), and to_text() leaked memory.
+       + m_contains(), map() and filter() could inadvertently modify values.
+
+    - Networking:
+       + Added support for asynchronous name lookup without erq.
+
+    - Portability:
+       + Fixed crash caused by C23 standard.
+       + Adapted to libxml2 2.12.
+
+    - Python:
+       + Added BEFORE_INSTRUCTION hook to be called for every instruction.
+       + Added support for registering global structs.
+
+       + Added iterators to variables, functions and struct members types.
+       + Made all LPC value representations hashable.
+       + Implemented str() for lpctype values.
+       + Implemented distinct types for various closure types.
+       + Added program_name member to the LPC object type.
+       + Fixed notifications for Python-registered sockets.
+       + Added a sub-namespace for registered efuns and types.
+
+    - Other:
+       + Added sefun replacements for these deprecated efuns:
+         allocate_mapping, assoc, copy_mapping, extract, file_name,
+         filter_array, filter_mapping, insert_alist, intersect_alist,
+         map_array, map_mapping, mapping_contains, member_array,
+         order_alist, query_imp_port, send_imp, and strlen.
+
 01-Oct-2023 (LDMud Team) -- 3.6.7
     - Fixed Crashes:
        + Fixed a crash when accessing members of hidden structs.
