@@ -27,16 +27,16 @@ DESCRIPTION
 
             int[LIMIT_EVAL]:         the max number of eval costs
             int[LIMIT_ARRAY]:        the max number of array entries
-            int[LIMIT_MAPPING_SIZE]: the max number of mapping values
             int[LIMIT_MAPPING_KEYS]: the max number of mapping entries
                (LIMIT_MAPPING is an alias for LIMIT_MAPPING_KEYS)
+            int[LIMIT_MAPPING_SIZE]: the max number of mapping values
             int[LIMIT_BYTE]:         the max number of bytes handled with
                                      one read_bytes()/write_bytes() call.
             int[LIMIT_FILE]:         the max number of bytes handled with
                                      one read_file()/write_file() call.
             int[LIMIT_CALLOUTS]:     the number of callouts at one time.
             int[LIMIT_COST]:         how to account the current cost.
-            int[LIMIT_MEMROY]:       the max. number of bytes which can be 
+            int[LIMIT_MEMORY]:       the max. number of bytes which can be 
                                      _additionally_ allocated/used 
                                      _per top-level execution thread_
 
