@@ -14,6 +14,7 @@ with_time_to_reset=3600
 with_alarm_time=1
 
 # --- Swap ---
+with_swap_file=Swap_File
 with_time_to_swap=-1
 with_time_to_swap_variables=-1
 
@@ -44,8 +45,6 @@ enable_eval_cost_trace=yes
 enable_use_parse_command=no
 enable_use_mysql=no
 enable_use_pcre=no
-with_erq_dir=/RoleMUD/bin
-with_swap_file=Swap_File
 
 # --- Wizlist ---
 with_wizlist_file=no
