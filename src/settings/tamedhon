@@ -26,8 +26,8 @@ with_soft_malloc_limit=0
 
 # --- Interpreter ---
 with_max_cost=9000000
-with_max_trace=65
-with_max_user_trace=60
+with_max_trace=1300
+with_max_user_trace=1200
 
 # --- Communication ---
 with_portno=4711
