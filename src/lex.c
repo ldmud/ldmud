@@ -920,7 +920,7 @@ init_lexer(void)
 #ifdef USE_JSON
     add_permanent_define_str("__JSON__", -1, "1");
 #endif
-#ifdef HAS_PCRE
+#if defined(HAS_PCRE) || defined(HAS_PCRE2)
     add_permanent_define_str("__PCRE__", -1, "1");
 #endif
     add_permanent_define_str("__LPC_NOSAVE__", -1, "1");

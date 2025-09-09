@@ -1304,7 +1304,15 @@ int main(void)
 else
     lp_cv_has_pcre=no
 fi
-if test "$lp_cv_has_pcre" = "no" && test "x$enable_use_pcre" = "xyes"; then
+
+lp_cv_has_pcre2_lib="no"
+AC_CHECK_LIB(pcre2-8, pcre2_config_8, PKGLIBS="$PKGLIBS -lpcre2-8" lp_cv_has_pcre2_lib="yes")
+
+if test "$lp_cv_has_pcre2_lib" = "yes"; then
+    AC_DEFINE(HAS_PCRE2, 1, [Does the machine offer PCRE2?])
+fi
+
+if test "$lp_cv_has_pcre" = "no" && test "$lp_cv_has_pcre2_lib" = "no" && test "x$enable_use_pcre" = "xyes"; then
   AC_NOT_AVAILABLE(use-pcre)
 fi
 

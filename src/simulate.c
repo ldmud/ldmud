@@ -5108,7 +5108,7 @@ f_set_driver_hook (svalue_t *sp)
         }
         else if (n == H_REGEXP_PACKAGE)
         {
-#ifdef HAS_PCRE
+#if defined(HAS_PCRE) || defined(HAS_PCRE2)
             if (sp->u.number != RE_PCRE
              && sp->u.number != RE_TRADITIONAL )
             {

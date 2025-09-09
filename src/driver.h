@@ -139,7 +139,7 @@
 
 /* If USE_PCRE is defined, check if the libpcre is available on this system.
  * Disable USE_PCRE if not. */
-#if defined(USE_PCRE) && !defined(HAS_PCRE)
+#if defined(USE_PCRE) && !defined(HAS_PCRE) && !defined(HAS_PCRE2)
 #undef USE_PCRE
 #endif
 
