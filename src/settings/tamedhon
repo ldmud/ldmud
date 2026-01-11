@@ -32,18 +32,17 @@ with_max_user_trace=1200
 # --- Communication ---
 with_portno=4711
 with_udp_port=4246
-enable_use_tls=yes
+enable_use_tls=gnu
 enable_use_xml=xml2
 enable_use_json=yes
-enable_use_sqlite=yes
 enable_use_mccp=yes
+enable_use_ipv6=yes
 
 # --- ERQ ---
-enable_erq=xerq
-with_erq_dir=${MUDHOME}/bin
+enable_erq=no
 
 # --- Wizlist ---
-with_wizlist_file=no
+with_wizlist_file=WIZLIST
 
 # --- Access Control ---
 enable_access_control=no
@@ -54,7 +53,7 @@ enable_malloc_lpc_trace=no
 enable_eval_cost_trace=yes
 enable_use_pcre=no
 enable_use_parse_command=no
-enable_use_mysql=no
+enable_use_mysql=yes
 enable_udp_send=yes
 enable_strict_euids=yes
 
