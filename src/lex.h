@@ -154,6 +154,10 @@ struct ident_s
     ident_t *inferior;       /* Ident of same name, but lower type */
     union {                  /* Type-depend data: */
         struct defn define;  /*   Macro definition */
+#ifdef USE_PYTHON
+        unsigned short python_type_id;
+                             /* Index into python_type_table. */
+#endif
         int code;            /*   Reserved word: lexem code */
         struct {             /*   Global identifier: */
             unsigned short function;
@@ -164,8 +168,8 @@ struct ident_s
               /* variable: Index number in the variable table.
                *           During compilation, virtual variables are offset
                *           by VIRTUAL_VAR_TAG.
-               * == I_GLOBAL_VARIABLE_OTHER: lfun/inherited hidden var
-               * == I_GLOBAL_VARIABLE_FUN:   efun/sefun
+               * == I_GLOBAL_VARIABLE_OTHER:        other program identifier
+               * == I_GLOBAL_VARIABLE_WORLDWIDE:    other worldwide identifier
                */
             unsigned short efun;
               /* efun: Index in instrs[]
@@ -179,10 +183,22 @@ struct ident_s
               /* struct index ('id') in the current program's struct table.
                * == I_GLOBAL_STRUCT_NONE: undefined
                */
+            unsigned short sefun_struct_id;
+              /* struct index in the simul-efun's program's struct table.
+               * == I_GLOBAL_SEFUN_STRUCT_NONE: not a simul-efun struct.
+               */
+            unsigned short std_struct_id;
+              /* Standard struct id. (Starting with 0.)
+               * == I_GLOBAL_STD_STRUCT_NONE: not a standard struct.
+               */
 #ifdef USE_PYTHON
             unsigned short python_efun;
-              /* python-efun: Index into python_efun_table, negative else
-               * == I_GLOBAL_PYTHON_EFUN_OTHER: efun/sefun/gvar
+              /* python-efun: Index into python_efun_table.
+               * == I_GLOBAL_PYTHON_EFUN_OTHER: undefined
+               */
+            unsigned short python_struct_id;
+              /* python-struct: Index into python_struct_table.
+               * == I_GLOBAL_PYTHON_STRUCT_OTHER: undefined
                */
 #endif
         } global;
@@ -209,19 +225,25 @@ struct ident_s
 #define I_TYPE_GLOBAL     2  /* function, variable or efuns/simul_efuns */
 #define I_TYPE_LOCAL      3
 #define I_TYPE_RESWORD    4  /* reserved word */
-#define I_TYPE_DEFINE     5
+#ifdef USE_PYTHON
+#  define I_TYPE_PYTHON_TYPE 5
+#endif
+#define I_TYPE_DEFINE     6
 
 /* ident_t.global magic values */
 
-#define I_GLOBAL_FUNCTION_OTHER  (USHRT_MAX)
-#define I_GLOBAL_VARIABLE_OTHER  (USHRT_MAX)
-#define I_GLOBAL_VARIABLE_FUN    (USHRT_MAX - 1)
-#define I_GLOBAL_EFUN_OTHER      (USHRT_MAX)
-#define I_GLOBAL_SEFUN_OTHER     (USHRT_MAX)
-#define I_GLOBAL_SEFUN_BY_NAME   (USHRT_MAX - 2)        /* Has no entry in the table. */
-#define I_GLOBAL_STRUCT_NONE     (USHRT_MAX)
+#define I_GLOBAL_FUNCTION_OTHER         (USHRT_MAX)
+#define I_GLOBAL_VARIABLE_OTHER         (USHRT_MAX)
+#define I_GLOBAL_VARIABLE_WORLDWIDE     (USHRT_MAX - 1)
+#define I_GLOBAL_EFUN_OTHER             (USHRT_MAX)
+#define I_GLOBAL_SEFUN_OTHER            (USHRT_MAX)
+#define I_GLOBAL_SEFUN_BY_NAME          (USHRT_MAX - 2) /* Has no entry in the table. */
+#define I_GLOBAL_STRUCT_NONE            (USHRT_MAX)
+#define I_GLOBAL_SEFUN_STRUCT_NONE      (USHRT_MAX)
+#define I_GLOBAL_STD_STRUCT_NONE        (USHRT_MAX)
 #ifdef USE_PYTHON
-#  define I_GLOBAL_PYTHON_EFUN_OTHER (USHRT_MAX)
+#  define I_GLOBAL_PYTHON_EFUN_OTHER    (USHRT_MAX)
+#  define I_GLOBAL_PYTHON_STRUCT_OTHER  (USHRT_MAX)
 #endif
 
 
@@ -248,6 +270,7 @@ extern bool pragma_no_clone;
 extern bool pragma_no_lightweight;
 extern Bool pragma_no_inherit;
 extern Bool pragma_no_shadow;
+extern bool pragma_no_simul_efuns;
 extern Bool pragma_pedantic;
 extern Bool pragma_range_check;
 extern Bool pragma_warn_missing_return;
@@ -276,7 +299,6 @@ enum efun_override_e
     OVERRIDE_LFUN  = 3,
     OVERRIDE_VAR   = 4,
 };
-typedef enum efun_override_e efun_override_t;
 
 /* --- Prototypes --- */
 
@@ -284,12 +306,13 @@ extern void init_lexer(void);
 extern int  symbol_operator(const char *symbol, const char **endp);
 extern void symbol_efun_str(const char *str, size_t len, svalue_t *sp, efun_override_t is_efun, bool privileged);
 extern void symbol_efun(string_t *name, svalue_t *sp);
-extern void init_global_identifier (ident_t * ident, Bool bVariable);
+extern void init_global_identifier (ident_t * ident, bool bProgram);
 extern ident_t *lookfor_shared_identifier(const char *s, size_t len, int n, int depth, bool bCreate, bool bExactDepth);
 #define make_shared_identifier(s,n,d) lookfor_shared_identifier(s,strlen(s),n,d, true, false)
 #define find_shared_identifier(s,n,d) lookfor_shared_identifier(s,strlen(s),n,d, false, false)
 #define make_shared_identifier_n(s,l,n,d) lookfor_shared_identifier(s,l,n,d, true, false)
 #define find_shared_identifier_n(s,l,n,d) lookfor_shared_identifier(s,l,n,d, false, false)
+#define insert_shared_identifier_n(s,l,n,d) lookfor_shared_identifier(s,l,n,d, true, true)
 #define make_shared_identifier_mstr(s,n,d) lookfor_shared_identifier(get_txt(s),mstrsize(s),n,d, true, false)
 #define find_shared_identifier_mstr(s,n,d) lookfor_shared_identifier(get_txt(s),mstrsize(s),n,d, false, false)
 #define insert_shared_identifier_mstr(s,n,d) lookfor_shared_identifier(get_txt(s),mstrsize(s),n,d, true, true)
@@ -299,6 +322,10 @@ extern int yylex(void);
 extern void end_new_file(void);
 extern void lex_close(char *msg);
 extern void start_new_file(int fd, const char * fname);
+extern void start_new_expr(string_t* str, bool end_detection);
+extern void end_new_expr();
+extern void start_new_block(string_t* str, bool end_detection);
+extern void end_new_block();
 extern char *get_f_name(int n);
 extern void free_defines(void);
 extern size_t show_lexer_status (strbuf_t * sbuf, Bool verbose);
@@ -306,7 +333,7 @@ extern void set_inc_list(vector_t *v);
 extern void remove_unknown_identifier(void);
 extern char *lex_error_context(void);
 extern svalue_t *f_expand_define(svalue_t *sp);
-extern char * lex_parse_number (char * cp, unsigned long * p_num, Bool * p_overflow);
+extern const char* lex_parse_number (const char* cp, const char* end, unsigned long* p_num, bool* p_overflow);
 extern void * get_include_handle (void);
 
 #ifdef GC_SUPPORT

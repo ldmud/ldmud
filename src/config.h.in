@@ -208,6 +208,11 @@
  */
 @cdef_use_ipv6@ USE_IPV6
 
+/* Define this if you want asynchronous name lookup using libanl
+ * instead of using the ERQ.
+ */
+@cdef_use_anl@ USE_ANL
+
 /* maximum number of concurrent outgoing connection attempts by net_connect()
  * (that is connections that are in progress but not fully established yet).
  */
@@ -292,6 +297,15 @@
  * by most of the shared libraries we use.
  */
 @cdef_malloc_replaceable@ MALLOC_REPLACEABLE
+
+/* Should third party libraries have their allocators wrapped to use our own?
+ * If third party libraries (e.g. pkg-openssl) will be invoked by threads
+ * other than the game driver these wrappers will cause crashes from overlapping
+ * stack/heap memory and should be disabled. Most users will not need to
+ * change this value from the default. Disabling the wrappers will obscure
+ * the driver's ability to track memory usage related to the third party libs.
+ */
+@cdef_allocator_wrappers@ ALLOCATOR_WRAPPERS
 
 /* --- Wizlist --- */
 
@@ -470,8 +484,10 @@
  */
 #define LD_PCRE_RECURSION_LIMIT    @val_pcre_recursion_limit@
 
-/* The maximum length of the buffer for commands. The maximum length of a
- * command will be MAX_COMMAND_LENGTH - 1.
+/* The maximum length of the buffer for commands. The buffer is used for
+ * commands issued from LPC either via H_MODIFY_COMMAND, command() or
+ * execute_command(). The maximum length of a command will be
+ * MAX_COMMAND_LENGTH - 1.
  */
 #define MAX_COMMAND_LENGTH       @val_max_command_length@
 
@@ -490,6 +506,9 @@
  */
 #define DEFMAX                   @val_defmax@
 
+/* Enable 'in' as a keyword.
+ */
+@cdef_keyword_in@ KEYWORD_IN
 
 /* --- Internal Tables --- */
 

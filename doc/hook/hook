@@ -9,8 +9,8 @@ DESCRIPTION
 
         The hooks are set with the privileged efun set_driver_hook().
         Some of the hooks are mandatory, some not. Most hooks accept
-        unbound lambda closures as values, some also lfun closures or
-        even strings.
+        unbound lambda closures as values, some also other types of
+        closures or even strings.
 
         The hooks are identified by an ordinal number, for which
         symbolic names are defined in /sys/driverhooks.h.

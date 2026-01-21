@@ -15,7 +15,7 @@
  *
  * An argument type can be supplemented by a '&' or '&&'. The former needs
  * protected lvalues to be passed, the later will automatically generate
- * protected lvalues when compiling a functionc all. The return type might
+ * protected lvalues when compiling a function call. The return type might
  * also be annotated with a '&' to indicate, that the efun might return an
  * lvalue reference that must be converted to an rvalue at the end.
  *
@@ -102,8 +102,10 @@
 "["     index     binary
 "[<"    rindex    binary
 "[>"    aindex    binary
-"[,]"   map_index ternary
-"."     s_index   binary
+"[,]"   map_index  ternary
+"[,<]"  map_rindex ternary
+"[,>]"  map_aindex ternary
+"."     s_index    binary
 "->"    sx_index   binary
 "[..]"     range     ternary
 "[..<]"    nr_range  ternary
@@ -117,6 +119,18 @@
 "[.."      nx_range  binary
 "[<.."     rx_range  binary
 "[>.."     ax_range  binary
+"[,..]"    map_range     quaternary
+"[,..<]"   map_nr_range  quaternary
+"[,<..]"   map_rn_range  quaternary
+"[,<..<]"  map_rr_range  quaternary
+"[,..>]"   map_na_range  quaternary
+"[,<..>]"  map_ra_range  quaternary
+"[,>..]"   map_an_range  quaternary
+"[,>..<]"  map_ar_range  quaternary
+"[,>..>]"  map_aa_range  quaternary
+"[,.."     map_nx_range  ternary
+"[,<.."    map_rx_range  ternary
+"[,>.."    map_ax_range  ternary
 "(void)+=" void_add_eq
 "+="    add_eq
 "-="    sub_eq
@@ -165,6 +179,7 @@
         call_inherited_noargs
         call_closure
         context_closure
+        context_lambda
         context_identifier
         transform_to_coroutine
         await
@@ -197,6 +212,20 @@
         rx_range_lvalue
         ax_range_lvalue
         map_index_lvalue
+        map_rindex_lvalue
+        map_aindex_lvalue
+        map_range_lvalue
+        map_nr_range_lvalue
+        map_rn_range_lvalue
+        map_rr_range_lvalue
+        map_na_range_lvalue
+        map_ra_range_lvalue
+        map_an_range_lvalue
+        map_ar_range_lvalue
+        map_aa_range_lvalue
+        map_nx_range_lvalue
+        map_rx_range_lvalue
+        map_ax_range_lvalue
         make_protected
         make_rvalue
         push_virtual_variable_vlvalue
@@ -210,6 +239,8 @@
         s_index_vlvalue
         sx_index_vlvalue
         map_index_vlvalue
+        map_rindex_vlvalue
+        map_aindex_vlvalue
         simul_efun
 "({"    aggregate
         m_aggregate
@@ -236,6 +267,8 @@
         pop_n
         put_array_element
         type_check
+        lambda_type_check
+        push_type
         call_other_cached
         call_strict_cached
 #ifdef USE_PYTHON
@@ -272,6 +305,7 @@ int     stringp(mixed);
 int     bytesp(mixed);
 int     structp(mixed);
 int     symbolp(mixed);
+int     lpctypep(mixed);
 int     typeof(mixed|mixed &);
 
 mixed   negate(int|float);
@@ -339,9 +373,11 @@ int     sgn(int|float);
 int     to_int(int|string|float|closure);
 float   to_float(float|string|int);
 string  to_string(mixed);
-mixed  *to_array(string|bytes|mixed*|symbol|quoted_array|struct);
+mixed  *to_array(string|bytes|mixed*|symbol|quoted_array|struct|lpctype);
 mixed   to_struct(mapping|mixed*|struct, void|struct);
 object  to_object(null|object|string|closure);
+lpctype to_lpctype(string);
+mixed   to_type(mixed,lpctype,void|struct to_type_options);
 
 bytes   to_bytes(string|bytes|int*, void|string);
 string  to_text(string|bytes|int*, void|string);
@@ -353,6 +389,7 @@ mixed   copy(mixed);
 mixed   deep_copy(mixed);
 int     ed(void|string, void|null|string) no_lightweight;
 mixed   get_type_info(mixed, void|int);
+int     check_type(mixed, lpctype);
 mixed   quote(mixed *|quoted_array|symbol|string);
 mixed   unquote(quoted_array|symbol);
 
@@ -461,6 +498,7 @@ closure lambda(null|mixed *, mixed);
 closure symbol_function(symbol|string, null|string|object|lwobject default: F_CONST0);
 closure symbol_variable(symbol|string|int);
 closure unbound_lambda(null|mixed *, mixed);
+closure compile_string(null|symbol*, string|string&, void|struct compile_string_options);
 
 void    call_out(string|closure, int, void|mixed, ...);
 mixed  *call_out_info();

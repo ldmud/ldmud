@@ -215,8 +215,11 @@ MD5Update (M_MD5_CTX *context, unsigned char *input, unsigned int inputLen)
                   , (unsigned char *)input, partLen);
         MD5Transform (context->state, context->buffer);
 
+DIAGWARN_PUSH
+DIAG_IGNORE_STRINGOP_OVERFLOW // This is safe with the inputLen checks.
         for (i = partLen; i + 63 < inputLen; i += 64)
             MD5Transform (context->state, &input[i]);
+DIAGWARN_POP
         ix = 0;
     }
     else

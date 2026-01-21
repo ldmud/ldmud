@@ -34,11 +34,11 @@ else
 # The default / fallback for non-git environments)
 version_major=3
 version_minor=6
-version_micro=5
+version_micro=8
 version_patch=0
 version_type="rel"
 version_longtype="release"
-version_date="Sun Jan 9 21:30:00 2022 +0100"
+version_date="Mon Jul 7 22:00:00 2025 +0200"
 version_tagger="Gnomi <gnomi@unitopia.de>"
-version_revision="3.6.5"
+version_revision="3.6.8"
 fi;

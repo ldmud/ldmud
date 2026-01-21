@@ -208,6 +208,10 @@ Bool pragma_no_shadow;
   /* True: prevent the program from being shadowed.
    */
 
+bool pragma_no_simul_efuns;
+  /* True: Ignore simul-efuns.
+   */
+
 Bool pragma_pedantic;
   /* True: treat a number of sloppy language constructs as errors.
    */
@@ -272,6 +276,14 @@ static Mempool lexpool = NULL;
   /* Fifopool to hold the allocations for the include and lpc_ifstate_t stacks.
    */
 
+static bool with_end_detection;
+  /* For compile_string(), when true the Lexer will
+   *  - return an L_EOF token for the end of string, so the actual end
+   *    position can be determined correctly,
+   *  - return L_ILLEGAL_CHAR token for unhandled characters so they
+   *    can be used for end detection.
+   */
+
 /*-------------------------------------------------------------------------*/
 /* The lexer can take data from either a file or a string buffer.
  * The handling is unified using the struct source_s structure.
@@ -294,6 +306,15 @@ typedef struct source_s
 
 static source_t yyin;
   /* Current input source.
+   */
+
+static int start_token = -1;
+  /* If not -1 this is the token that yylex() should return first
+   * to indicate to the compiler which rules to use.
+   */
+
+static int auto_include_hook;
+  /* Which auto-include hook to use.
    */
 
 /*-------------------------------------------------------------------------*/
@@ -343,6 +364,14 @@ static unsigned long defbuf_len = 0;
 
 static char *outp;
   /* Pointer to the next character in defbuf[] to be processed.
+   */
+
+static char *lastp;
+  /* Pointer to the end of data in defbuf[].
+   */
+
+static char *expandend;
+  /* Pointer to the end of define expanded data in defbuf[].
    */
 
 static char *linebufstart;
@@ -499,6 +528,8 @@ static struct incstate
     ptrdiff_t    linebufoffset;  /* Position of linebufstart */
     mp_uint      inc_offset;     /* Handle returned by store_include_info() */
     char         saved_char;
+    char*        prev_lastp;
+    char*        prev_expandend;
 } *inctop = NULL;
 
 /*-------------------------------------------------------------------------*/
@@ -523,6 +554,7 @@ static struct s_reswords reswords[]
    , { "closure",        L_CLOSURE_DECL  }
    , { "continue",       L_CONTINUE      }
    , { "coroutine",      L_COROUTINE     }
+   , { "decltype",       L_DECLTYPE      }
    , { "default",        L_DEFAULT       }
    , { "do",             L_DO            }
    , { "else",           L_ELSE          }
@@ -531,12 +563,13 @@ static struct s_reswords reswords[]
    , { "foreach",        L_FOREACH       }
    , { "function",       L_FUNC          }
    , { "if",             L_IF            }
-#ifdef L_IN
+#ifdef KEYWORD_IN
    , { "in",             L_IN            }
 #endif
    , { "inherit",        L_INHERIT       }
    , { "int",            L_INT           }
    , { "lwobject",       L_LWOBJECT      }
+   , { "lpctype",        L_LPCTYPE       }
    , { "mapping",        L_MAPPING       }
    , { "mixed",          L_MIXED         }
    , { "nomask",         L_NO_MASK       }
@@ -768,7 +801,7 @@ init_lexer(void)
             /* NOTREACHED */
             continue;
         }
-        init_global_identifier(p, /* bVariable: */ MY_FALSE);
+        init_global_identifier(p, /* bProgram: */ false);
         p->u.global.efun = (short)n;
         p->next_all = all_efuns;
         all_efuns = p;
@@ -898,6 +931,7 @@ init_lexer(void)
     add_permanent_define_str("__LPC_LWOBJECTS__", -1, "1");
     add_permanent_define_str("__LPC_INLINE_CLOSURES__", -1, "1");
     add_permanent_define_str("__LPC_COROUTINES__", -1, "1");
+    add_permanent_define_str("__LPC_LPCTYPES__", -1, "1");
     add_permanent_define_str("__LPC_ARRAY_CALLS__", -1, "1");
 #ifdef USE_TLS
     add_permanent_define_str("__TLS__", -1, "1");
@@ -1176,6 +1210,20 @@ symbol_operator (const char *symbol, const char **endp)
  *   #'[<..   -> F_RX_RANGE
  *   #'[>..   -> F_AX_RANGE
  *   #'[,]    -> F_MAP_INDEX
+ *   #'[,<]   -> F_MAP_RINDEX
+ *   #'[,>]   -> F_MAP_AINDEX
+ *   #'[,..]  -> F_MAP_RANGE
+ *   #'[,..<] -> F_MAP_NR_RANGE
+ *   #'[,<..] -> F_MAP_RN_RANGE
+ *   #'[,<..<]-> F_MAP_RR_RANGE
+ *   #'[,..>] -> F_MAP_NA_RANGE
+ *   #'[,>..] -> F_MAP_AN_RANGE
+ *   #'[,<..>]-> F_MAP_RA_RANGE
+ *   #'[,>..<]-> F_MAP_AR_RANGE
+ *   #'[,>..>]-> F_MAP_AA_RANGE
+ *   #'[,..   -> F_MAP_NX_RANGE
+ *   #'[,<..  -> F_MAP_RX_RANGE
+ *   #'[,>..  -> F_MAP_AX_RANGE
  *   #'[      -> F_INDEX
  *   #'[<     -> F_RINDEX
  *   #'[>     -> F_AINDEX
@@ -1498,11 +1546,100 @@ symbol_operator (const char *symbol, const char **endp)
             ret = F_NX_RANGE;
             break;
         }
-        else if (c == ',' && symbol[1] == ']')
+        else if (c == ',')
         {
-            symbol++;
-            ret = F_MAP_INDEX;
-            break;
+            c = *++symbol;
+            if (c == ']')
+            {
+                ret = F_MAP_INDEX;
+                break;
+            }
+            else if (c == '<')
+            {
+                if (symbol[1] == '.' && symbol[2] == '.')
+                {
+                    c = *(symbol+=3);
+                    if (c == ']')
+                    {
+                        ret = F_MAP_RN_RANGE;
+                        break;
+                    }
+                    else if (c == '>' && symbol[1] == ']')
+                    {
+                        symbol++;
+                        ret = F_MAP_RA_RANGE;
+                        break;
+                    }
+                    else if (c == '<' && symbol[1] == ']')
+                    {
+                        symbol++;
+                        ret = F_MAP_RR_RANGE;
+                        break;
+                    }
+                    symbol--;
+                    ret = F_MAP_RX_RANGE;
+                    break;
+                }
+                else if (symbol[1] == ']')
+                {
+                    symbol++;
+                    ret = F_MAP_RINDEX;
+                    break;
+                }
+            }
+            else if (c == '>')
+            {
+                if (symbol[1] == '.' && symbol[2] == '.')
+                {
+                    c = *(symbol+=3);
+                    if (c == ']')
+                    {
+                        ret = F_MAP_AN_RANGE;
+                        break;
+                    }
+                    else if (c == '>' && symbol[1] == ']')
+                    {
+                        symbol++;
+                        ret = F_MAP_AA_RANGE;
+                        break;
+                    }
+                    else if (c == '<' && symbol[1] == ']')
+                    {
+                        symbol++;
+                        ret = F_MAP_AR_RANGE;
+                        break;
+                    }
+                    symbol--;
+                    ret = F_MAP_AX_RANGE;
+                    break;
+                }
+                else if (symbol[1] == ']')
+                {
+                    symbol++;
+                    ret = F_MAP_AINDEX;
+                    break;
+                }
+            }
+            else if (c == '.' && symbol[1] == '.')
+            {
+                c = *(symbol+=2);
+                if (c == ']') {
+                    ret = F_MAP_RANGE;
+                    break;
+                } else if (c == '>' && symbol[1] == ']') {
+                    symbol++;
+                    ret = F_MAP_NA_RANGE;
+                    break;
+                } else if (c == '<' && symbol[1] == ']') {
+                    symbol++;
+                    ret = F_MAP_NR_RANGE;
+                    break;
+                }
+                symbol--;
+                ret = F_MAP_NX_RANGE;
+                break;
+            }
+            symbol--;
         }
         symbol--;
         ret = F_INDEX;
@@ -1671,8 +1808,11 @@ symbol_efun_str (const char * str, size_t len, svalue_t *sp, efun_override_t is_
         ident_t *p;
 
         /* Take care of an leading efun override */
-
-        if ( len >= 6 && !strncmp(str, "efun::", 6) )
+        if (efun_override != OVERRIDE_NONE)
+        {
+            /* Don't allow two overrides. */
+        }
+        else if (len >= 6 && !strncmp(str, "efun::", 6) )
         {
             str += 6;
             len -= 6;
@@ -1753,7 +1893,7 @@ undefined_function:
          * Check it with a privilege violation.
          */
         if (!privileged && efun_override == OVERRIDE_EFUN && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-         && get_simul_efun_header(p)->flags & TYPE_MOD_NO_MASK)
+         && get_simul_efun_header(p, NULL)->flags & TYPE_MOD_NO_MASK)
         {
             svalue_t *res;
 
@@ -1780,7 +1920,22 @@ undefined_function:
         /* Symbol is ok - create the closure value */
 
         sp->type = T_CLOSURE;
-        if (current_object.type == T_OBJECT)
+        if (efun_override != OVERRIDE_EFUN
+         && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
+         && p->u.global.sim_efun > USHRT_MAX - CLOSURE_SIMUL_EFUN_OFFS)
+        {
+            /* Special handling for simul-efuns with too big indices.
+             * We'll create an lfun closure here.
+             */
+            int fx = find_function(p->name, simul_efun_object->prog);
+            if (fx == -1)
+                fatal("Can't find simul_efun %s", get_txt(p->name));
+
+            closure_lfun(sp, svalue_object(simul_efun_object), simul_efun_object->prog, fx, 0, true);
+            assign_current_object(&(sp->u.lfun_closure->base.ob), "symbol_efun");
+            return;
+        }
+        else if (current_object.type == T_OBJECT)
         {
             sp->u.ob = ref_object(current_object.u.ob, "symbol_efun");
             sp->x.closure_type = 0;
@@ -1939,16 +2094,16 @@ cleanup_source_files (void)
 
 /*-------------------------------------------------------------------------*/
 void
-init_global_identifier (ident_t * ident, Bool bVariable)
+init_global_identifier (ident_t * ident, bool bProgram)
 
 /* The (newly created or to be reused) identifier <ident> is set up
  * to be a global identifier, with all the .global.* fields set to
  * a suitable default. The caller has to fill in the information specifying
  * what kind of global this is.
  *
- * <bVariable> is to be TRUE if the caller intends to use the identifier
- * for a (local or global) variable or lfun; and FALSE if it is for a
- * efun/sefun.
+ * <bProgram> is to be true if the caller intends to use the identifier
+ * for an identifier specific to an LPC program (variable, lfun or struct
+ * definition), and false if it is for a worldwide identifier (efun, sefun).
  *
  * The function is rather small, but having it here makes it easier to
  * guarantee that all fields are set to a proper default.
@@ -1957,15 +2112,18 @@ init_global_identifier (ident_t * ident, Bool bVariable)
 {
     ident->type = I_TYPE_GLOBAL;
     ident->u.global.function  = I_GLOBAL_FUNCTION_OTHER;
-    if (bVariable)
+    if (bProgram)
         ident->u.global.variable  = I_GLOBAL_VARIABLE_OTHER;
     else
-        ident->u.global.variable = I_GLOBAL_VARIABLE_FUN;
+        ident->u.global.variable = I_GLOBAL_VARIABLE_WORLDWIDE;
     ident->u.global.efun     = I_GLOBAL_EFUN_OTHER;
     ident->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
     ident->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+    ident->u.global.sefun_struct_id = I_GLOBAL_SEFUN_STRUCT_NONE;
+    ident->u.global.std_struct_id = I_GLOBAL_STD_STRUCT_NONE;
 #ifdef USE_PYTHON
     ident->u.global.python_efun = I_GLOBAL_PYTHON_EFUN_OTHER;
+    ident->u.global.python_struct_id = I_GLOBAL_PYTHON_STRUCT_OTHER;
 #endif
 
 } /* init_global_identifier() */
@@ -2067,8 +2225,8 @@ lookfor_shared_identifier (const char *s, size_t len, int n, int depth, bool bCr
             }
 
             if (bExactDepth
-             && I_TYPE_LOCAL == curr->type && I_TYPE_LOCAL == n
-             && depth != curr->u.local.depth)
+             && (curr->type > n
+              || (curr->type == n && n == I_TYPE_LOCAL && curr->u.local.depth > depth)))
             {
                 /* We have an identifier with a greater depth
                  * than was requested. Look for an inferior identifier.
@@ -2078,9 +2236,11 @@ lookfor_shared_identifier (const char *s, size_t len, int n, int depth, bool bCr
                     prev = curr;
                     curr = curr->inferior;
                 }
-                while (curr->type == I_TYPE_LOCAL && curr->u.local.depth > depth);
+                while (curr
+                    && (curr->type > n
+                     || (curr->type == n && n == I_TYPE_LOCAL && curr->u.local.depth > depth)));
 
-                if (curr->type != I_TYPE_LOCAL || curr->u.local.depth != depth)
+                if (!curr || curr->type != n || (n == I_TYPE_LOCAL && curr->u.local.depth != depth))
                 {
                     /* We haven't found the requested identifier. */
                     if (bCreate)
@@ -2305,7 +2465,7 @@ realloc_defbuf (void)
 
 /* Increase the size of defbuf[] (unless it would exceed MAX_TOTAL_BUF).
  * The old content of defbuf[] is copied to the end of the new buffer.
- * outp is corrected to the new position, other pointers into defbuf
+ * outp/lastp is corrected to the new position, other pointers into defbuf
  * become invalid.
  */
 
@@ -2335,6 +2495,8 @@ realloc_defbuf (void)
     memcpy(defbuf+defbuf_len-old_defbuf_len, old_defbuf, old_defbuf_len);
     xfree(old_defbuf);
     outp = &defbuf[defbuf_len] - outp_off;
+    lastp = lastp - old_outp + outp;
+    expandend = expandend - old_outp + outp;
 } /* realloc_defbuf() */
 
 /*-------------------------------------------------------------------------*/
@@ -2362,10 +2524,11 @@ set_input_source (int fd, const char* fname, string_t * str)
         else if (driver_hook[H_FILE_ENCODING].type == T_CLOSURE)
         {
             svalue_t *svp;
+            svalue_t master_sv = svalue_object(master_ob);
 
             /* Setup and call the closure */
             push_c_string(inter_sp, fname);
-            svp = secure_apply_lambda(driver_hook+H_FILE_ENCODING, 1);
+            svp = secure_apply_lambda_ob(driver_hook+H_FILE_ENCODING, 1, &master_sv);
 
             if (svp && svp->type == T_STRING)
                 encoding = svp->u.str;
@@ -2503,6 +2666,9 @@ _myfilbuf (void)
     if (linebufend - outp)
         memcpy(outp-MAXLINE, outp, (size_t)(linebufend - outp));
     outp -= MAXLINE;
+    expandend -= MAXLINE;
+    if (expandend < linebufstart)
+        expandend = linebufstart;
 
     *(outp-1) = '\n'; /* so an ungetc() gives a sensible result */
 
@@ -2633,7 +2799,7 @@ _myfilbuf (void)
             i = 0;
         }
 
-        p += i;
+        lastp = p += i;
         if ((p - outp) ? (p[-1] != '\n') : (current_loc.line == 1))
             *p++ = '\n';
         *p++ = CHAR_EOF;
@@ -2641,7 +2807,7 @@ _myfilbuf (void)
     }
 
     /* Buffer filled: mark the last line with the '\0' sentinel */
-    p += i;
+    lastp = p += i;
     while (*--p != '\n') NOOP; /* find last newline */
     if (p < linebufstart)
     {
@@ -3023,6 +3189,8 @@ start_new_include (int fd, string_t * str
     is->loc = current_loc;
     is->linebufoffset = linebufoffset;
     is->saved_char = saved_char;
+    is->prev_lastp = lastp;
+    is->prev_expandend = expandend;
     is->next = inctop;
 
 
@@ -3065,6 +3233,7 @@ start_new_include (int fd, string_t * str
     linebufend   = outp - 1; /* allow trailing zero */
     linebufstart = linebufend - MAXLINE;
     *(outp = linebufend) = '\0';
+    expandend  = linebufstart;
     set_input_source(fd, name, str);
     _myfilbuf();
 
@@ -3088,18 +3257,22 @@ add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
 {
     string_t * auto_include_string = NULL;
 
-    if (driver_hook[H_AUTO_INCLUDE].type == T_STRING
+    if (driver_hook[auto_include_hook].type == T_STRING
      && cur_file == NULL
        )
     {
-        auto_include_string = driver_hook[H_AUTO_INCLUDE].u.str;
+        auto_include_string = driver_hook[auto_include_hook].u.str;
     }
-    else if (driver_hook[H_AUTO_INCLUDE].type == T_CLOSURE)
+    else if (driver_hook[auto_include_hook].type == T_CLOSURE)
     {
         svalue_t *svp;
+        svalue_t master_sv = svalue_object(master_ob);
 
         /* Setup and call the closure */
-        push_c_string(inter_sp, obj_file);
+        if (auto_include_hook == H_AUTO_INCLUDE)
+            push_c_string(inter_sp, obj_file);
+        else
+            push_current_object(inter_sp, "auto_include");
         if (cur_file != NULL)
         {
             push_c_string(inter_sp, (char *)cur_file);
@@ -3110,7 +3283,7 @@ add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
             push_number(inter_sp, 0);
             push_number(inter_sp, 0);
         }
-        svp = secure_apply_lambda(driver_hook+H_AUTO_INCLUDE, 3);
+        svp = secure_apply_lambda_ob(driver_hook+auto_include_hook, 3, &master_sv);
         if (svp && svp->type == T_STRING)
         {
             auto_include_string = svp->u.str;
@@ -3445,13 +3618,12 @@ open_include_file (char *buf, char *name, mp_int namelen, char delim)
          */
 
         svalue_t *svp;
+        svalue_t master_sv = svalue_object(master_ob);
 
         /* Setup and call the closure */
         push_c_string(inter_sp, name);
         push_c_string(inter_sp, current_loc.file->name);
-        if (driver_hook[H_INCLUDE_DIRS].x.closure_type == CLOSURE_LAMBDA)
-            assign_current_object(&(driver_hook[H_INCLUDE_DIRS].u.lambda->ob), "open_include_file");
-        svp = secure_apply_lambda(&driver_hook[H_INCLUDE_DIRS], 2);
+        svp = secure_apply_lambda_ob(&driver_hook[H_INCLUDE_DIRS], 2, &master_sv);
 
         /* The result must be legal relative pathname */
         if (!svp || svp->type != T_STRING)
@@ -3994,6 +4166,33 @@ handle_pragma (char *str)
             pragma_no_shadow = MY_TRUE;
             validPragma = MY_TRUE;
         }
+        else if (wordcmp(base, "no_simul_efuns", namelen) == 0)
+        {
+            /* Everything that is needed for the master to be loaded
+             * has permission to use this pragma.
+             */
+            if (master_ob && !(master_ob->flags & O_DESTRUCTED))
+            {
+                svalue_t *res;
+
+                push_ref_string(inter_sp, STR_PRAGMA_NO_SIMUL_EFUNS);
+                push_c_string(inter_sp, current_loc.file->name);
+                res = apply_master(STR_PRIVILEGE, 2);
+
+                if (!res || res->type != T_NUMBER || res->u.number < 0)
+                    lexerror("Privilege violation: pragma no_simul_efuns");
+                else if (res->u.number > 0)
+                    pragma_no_simul_efuns = true;
+            }
+            else
+                pragma_no_simul_efuns = true;
+            validPragma = MY_TRUE;
+        }
+        else if (wordcmp(base, "simul_efuns", namelen) == 0)
+        {
+            pragma_no_simul_efuns = false;
+            validPragma = MY_TRUE;
+        }
         else if (wordcmp(base, "pedantic", namelen) == 0)
         {
             pragma_pedantic = MY_TRUE;
@@ -4450,8 +4649,8 @@ parse_numeric_escape (char * cp, p_int * p_char)
 } /* parse_numeric_escape() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE char *
-parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
+static INLINE const char *
+parse_number (const char* cp, const char* end, unsigned long* p_num, bool* p_overflow)
 
 /* Parse a positive integer number in one of the following formats:
  *   <decimal>
@@ -4461,6 +4660,7 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
  *   0b<binary>
  *
  * with <cp> pointing to the first character.
+ * If <end> is not NULL, it denotes the end of the string.
  *
  * The parsed number is stored in *<p_num>, the function returns the pointer
  * to the first character after the number. If the parsed number exceeded
@@ -4475,9 +4675,12 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
     unsigned long base = 10;
     unsigned long max_shiftable = ULONG_MAX / base;
 
-    *p_overflow = MY_FALSE;
-    c = *cp++;
+    *p_overflow = false;
+    *p_num = 0;
+    if (cp == end)
+        return cp;
 
+    c = *cp++;
     if ('0' == c)
     {
         /* '0' introduces decimal, octal, binary and sedecimal numbers, or it
@@ -4487,6 +4690,8 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
          * two possible prefixes.
          */
 
+        if (cp == end)
+            return cp;
         c = *cp++;
 
         switch (c)
@@ -4503,7 +4708,7 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
             l = 0;
             max_shiftable = ULONG_MAX / 2;
             --cp;
-            while('0' == (c = *++cp) || '1' == c)
+            while(cp != end && ('0' == (c = *++cp) || '1' == c))
             {
                 *p_overflow = *p_overflow || (l > max_shiftable);
                 l <<= 1;
@@ -4541,7 +4746,7 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
         max_shiftable = ULONG_MAX / 16;
         l = 0;
         --cp;
-        while(leXdigit(c = *++cp))
+        while(cp != end && leXdigit(c = *++cp))
         {
             *p_overflow = *p_overflow || (l > max_shiftable);
             if (c > '9')
@@ -4557,22 +4762,23 @@ parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
 
     max_shiftable = ULONG_MAX / base;
     l = c - '0';
-    while (lexdigit(c = *cp++) && c < (char)('0'+base))
+    while (cp != end && (lexdigit(c = *cp) && c < (char)('0'+base)))
     {
         *p_overflow = *p_overflow || (l > max_shiftable);
         c -= '0';
         l = l * base + c;
         *p_overflow = *p_overflow || (l < (unsigned long)c);
+        cp++;
     }
 
     *p_num = *p_overflow ? LONG_MAX : l;
-    return cp-1;
+    return cp;
 
 } /* parse_number() */
 
 /*-------------------------------------------------------------------------*/
-char *
-lex_parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
+const char *
+lex_parse_number (const char* cp, const char* end, unsigned long* p_num, bool* p_overflow)
 
 /* Parse a positive integer number in one of the following formats:
  *   <decimal>
@@ -4591,15 +4797,14 @@ lex_parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
  */
 
 {
-    char c = *cp;
-
     *p_overflow = MY_FALSE;
+    if (cp == end)
+        return cp;
 
-    if (isdigit(c))
-    {
-        cp = parse_number(cp, p_num, p_overflow);
-    }
-    return cp;
+    if (!isdigit(*cp))
+        return cp;
+
+    return parse_number(cp, end, p_num, p_overflow);
 } /* lex_parse_number() */
 
 /*-------------------------------------------------------------------------*/
@@ -4799,6 +5004,7 @@ closure (char *in_yyp)
     ident_t *p;
     char *wordstart = ++yyp;
     char *super_name = NULL;
+    int idx;
     efun_override_t efun_override;
     /* Set if 'efun::' or 'sefun::' is specified. */
 
@@ -4842,7 +5048,7 @@ closure (char *in_yyp)
         efun_override = OVERRIDE_EFUN;
         super_name = NULL;
     }
-    else if (super_name != NULL && !disable_sefuns && !strncmp(super_name, "sefun::", 7))
+    else if (super_name != NULL && !pragma_no_simul_efuns && !strncmp(super_name, "sefun::", 7))
     {
         efun_override = OVERRIDE_SEFUN;
         super_name = NULL;
@@ -4941,6 +5147,51 @@ closure (char *in_yyp)
             break;
     } /* while (p->type > I_TYPE_GLOBAL */
 
+    switch (efun_override)
+    {
+        case OVERRIDE_NONE:
+        case OVERRIDE_LFUN:
+            if (!p)
+            {
+                p = insert_shared_identifier_n(wordstart, yyp-wordstart, I_TYPE_GLOBAL, 0);
+                if (!p)
+                {
+                    lexerror("Out of memory");
+                    return 0;
+                }
+            }
+
+            if (lookup_function(p, NULL, efun_override)
+             || efun_override != OVERRIDE_NONE)
+                break;
+
+        /* FALLTHROUGH */
+        case OVERRIDE_VAR:
+            if (efun_override == OVERRIDE_NONE && p && p->type == I_TYPE_GLOBAL
+             && ((p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER && !pragma_no_simul_efuns)
+#ifdef USE_PYTHON
+              || is_python_efun(p)
+#endif
+              || p->u.global.efun != I_GLOBAL_EFUN_OTHER))
+                break;
+
+            if (!p)
+            {
+                p = insert_shared_identifier_n(wordstart, yyp-wordstart, I_TYPE_GLOBAL, 0);
+                if (!p)
+                {
+                    lexerror("Out of memory");
+                    return 0;
+                }
+            }
+
+            lookup_global_variable(p);
+            break;
+
+        default:
+            break;
+    }
+
     /* Did we find a suitable identifier? */
     if (!p || p->type < I_TYPE_GLOBAL)
     {
@@ -4963,13 +5214,13 @@ closure (char *in_yyp)
      */
     if (efun_override == OVERRIDE_EFUN
      && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-     && (get_simul_efun_header(p)->flags & TYPE_MOD_NO_MASK)
+     && (get_simul_efun_header(p, NULL)->flags & TYPE_MOD_NO_MASK)
      && (p->u.global.efun != I_GLOBAL_EFUN_OTHER
 #ifdef USE_PYTHON
       || is_python_efun(p)
 #endif
         )
-     && master_ob && !disable_sefuns
+     && master_ob && !pragma_no_simul_efuns
      && (!EVALUATION_TOO_LONG())
        )
     {
@@ -5010,27 +5261,32 @@ closure (char *in_yyp)
     yylval.closure.inhIndex = 0;
     switch(0) { default:
 
+        /* closure from string-compilation? */
+        if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_LFUN)
+         && (idx = get_function_closure(p)) >= 0)
+        {
+            yylval.number = idx;
+            return L_LAMBDA_CLOSURE_VALUE;
+        }
+
         /* lfun? */
         if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_LFUN)
-         && p->u.global.function != I_GLOBAL_FUNCTION_OTHER)
+         && (idx = get_function_index(p)) >= 0)
         {
-            int i;
-
-            i = p->u.global.function;
-            if (i >= CLOSURE_IDENTIFIER_OFFS)
+            if (idx >= CLOSURE_IDENTIFIER_OFFS)
             {
                 yyerrorf("Too high function index of %s for #'"
                         , get_txt(p->name));
-                i = CLOSURE_EFUN_OFFS;
+                idx = CLOSURE_EFUN_OFFS;
             }
 
-            yylval.closure.number = i;
+            yylval.closure.number = idx;
             break;
         }
 
         /* simul-efun? */
         if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_SEFUN)
-         && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER && !disable_sefuns)
+         && p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER && !pragma_no_simul_efuns)
         {
             yylval.ident = p;
             return L_SIMUL_EFUN_CLOSURE;
@@ -5071,14 +5327,25 @@ closure (char *in_yyp)
             break;
         }
 
+        /* lvalue reference from string-compilation? */
+        if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_VAR)
+         && (idx = get_global_variable_lvalue(p)) >= 0)
+        {
+            /* This is not supported, as the lvalue may not be a variable
+             * of a real object. We would need a separate closure type for that.
+             */
+            yyerrorf("closure of imaginary variable");
+            yylval.closure.number = CLOSURE_IDENTIFIER_OFFS;
+            break;
+        }
+
         /* object variable? */
         if ((efun_override == OVERRIDE_NONE || efun_override == OVERRIDE_VAR)
-         && p->u.global.variable != I_GLOBAL_VARIABLE_OTHER
-         && p->u.global.variable != I_GLOBAL_VARIABLE_FUN)
+         && (idx = get_global_variable_index(p, true)) != -1)
         {
-            if (p->u.global.variable & VIRTUAL_VAR_TAG) {
-                /* Handling this would require an extra coding of
-                 * this closure type, and special treatment in
+            if (idx == -2) {
+                /* Handling virtual variables would require an extra
+                 * coding of this closure type, and special treatment in
                  * replace_program_lambda_adjust(). Also deprecated-check in the
                  * L_CLOSURE rule in prolang.y must be adjusted.
                  */
@@ -5087,9 +5354,9 @@ closure (char *in_yyp)
                 break;
             }
 #ifdef USE_PYTHON
-            if (p->u.global.variable + num_virtual_variables >= CLOSURE_PYTHON_EFUN_OFFS - CLOSURE_IDENTIFIER_OFFS)
+            if (idx >= CLOSURE_PYTHON_EFUN_OFFS - CLOSURE_IDENTIFIER_OFFS)
 #else
-            if (p->u.global.variable + num_virtual_variables >= CLOSURE_EFUN_OFFS - CLOSURE_IDENTIFIER_OFFS)
+            if (idx >= CLOSURE_EFUN_OFFS - CLOSURE_IDENTIFIER_OFFS)
 #endif
             {
                 yyerrorf("Too high variable index of %s for #'"
@@ -5097,7 +5364,7 @@ closure (char *in_yyp)
                 yylval.closure.number = CLOSURE_IDENTIFIER_OFFS;
             }
             else
-                yylval.closure.number = p->u.global.variable + num_virtual_variables + CLOSURE_IDENTIFIER_OFFS;
+                yylval.closure.number = idx + CLOSURE_IDENTIFIER_OFFS;
             break;
         }
 
@@ -5517,6 +5784,8 @@ yylex1 (void)
 
                     yyin = p->yyin;
                     saved_char = p->saved_char;
+                    lastp = p->prev_lastp;
+                    expandend = p->prev_expandend;
                     inctop = p->next;
                     *linebufend = '\n';
                     yyp = linebufend + 1;
@@ -5551,6 +5820,11 @@ yylex1 (void)
 
                 /* Return the EOF condition */
                 outp = yyp-1;
+                if (with_end_detection)
+                {
+                    with_end_detection = false; /* Next call will return -1. */
+                    return L_EOF;
+                }
                 return -1;
 
 
@@ -5904,6 +6178,7 @@ yylex1 (void)
                     break;
                 }
 
+                yyp--;
                 goto badlex;
 
 
@@ -6168,7 +6443,7 @@ yylex1 (void)
                 }
 
                 /* Nope, normal number */
-                yyp = parse_number(numstart, &l, &overflow);
+                yyp = (char*)parse_number(numstart, NULL, &l, &overflow);
                 if (overflow || (l > (unsigned long)LONG_MAX+1))
                 {
                     /* Don't warn on __INT_MAX__+1 because there
@@ -6221,6 +6496,13 @@ yylex1 (void)
                             yyp=outp;
                             continue;
 
+#ifdef USE_PYTHON
+                        case I_TYPE_PYTHON_TYPE:
+                            outp = yyp;
+                            yylval.number = p->u.python_type_id;
+                            return L_PYTHON_TYPE;
+#endif
+
                         case I_TYPE_RESWORD:
                             outp = yyp;
                             return p->u.code;
@@ -6267,6 +6549,9 @@ badlex:
         {
             sprintf(buff, "Illegal character (hex %02" PRIxPINT") '%.*s'", c, (int)clen, yyp);
             outp = yyp + clen;
+
+            if (with_end_detection)
+                return L_ILLEGAL_CHAR;
         }
 
         yyerror(buff);
@@ -6277,6 +6562,57 @@ badlex:
 #undef RETURN
 
 } /* yylex1() */
+
+/*-------------------------------------------------------------------------*/
+static int
+get_string_position (void)
+
+/* When string compiling, return the current position in the string.
+ * If the current token is not from a string, return -1.
+ */
+
+{
+    source_t *src = &yyin;
+    struct incstate *inc = inctop;
+    char *yyp = outp;
+    char *lp = lastp;
+    char *expend = expandend;
+
+    while (src->fd != -1 || inc != NULL || expend > yyp)
+    {
+        // When we are not directly in the string,
+        // we try to peek ahead skipping whitespaces.
+        switch (*(unsigned char*)yyp)
+        {
+            case CHAR_EOF:
+                if (!inc)
+                    return -1;
+
+                src = &(inc->yyin);
+                expend = inc->prev_expandend;
+                lp = inc->prev_lastp;
+                yyp = linebufend+1;
+                inc = inc->next;
+                break;
+
+            case ' ':
+            case '\t':
+            case '\r':
+            case '\n':
+            case 0x1a:
+            case 0xef:
+            case 0xbb:
+            case 0xbf:
+                yyp++;
+                break;
+
+            default:
+                return -1;
+        }
+    }
+
+    return src->current - (lp - yyp);
+} /* get_string_position() */
 
 /*-------------------------------------------------------------------------*/
 int
@@ -6292,6 +6628,16 @@ yylex (void)
 {
     int r;
 
+    if (start_token != -1)
+    {
+        r = start_token;
+        start_token = -1;
+        yylloc.start = yylloc.end = 0;
+        return r;
+    }
+
+    yylloc.start = get_string_position();
+
 #ifdef LEXDEBUG
     yytext[0] = '\0';
 #endif
@@ -6299,22 +6645,21 @@ yylex (void)
 #ifdef LEXDEBUG
     fprintf(stderr, "%s lex=%d(%s) ", time_stamp(), r, yytext);
 #endif
+
+    yylloc.end = get_string_position();
+
     return r;
 }
 
 /*-------------------------------------------------------------------------*/
-void
-start_new_file (int fd, const char * fname)
+static void
+start_lex ()
 
-/* Start the compilation/lexing of the lpc file opened on file <fd> with
- * name <fname>.
- * This must not be called for included files.
+/* Prepare the lexer for a new compilation, reset all data structures.
  */
 
 {
     ident_t *p;
-
-    object_file = fname;
 
     cleanup_source_files();
     free_defines();
@@ -6326,20 +6671,13 @@ start_new_file (int fd, const char * fname)
     p->type = I_TYPE_RESWORD;
     p->u.code = L_BYTES_DECL;
 
-    current_loc.file = new_source_file(fname, NULL);
-    current_loc.line = 1; /* already used in first _myfilbuf() */
-
-    set_input_source(fd, object_file, NULL);
-
     if (!defbuf_len)
     {
         defbuf = xalloc(DEFBUF_1STLEN);
         defbuf_len = DEFBUF_1STLEN;
     }
 
-    *(outp = linebufend = (linebufstart = defbuf + DEFMAX) + MAXLINE) = '\0';
-
-    _myfilbuf();
+    *(outp = linebufend = (expandend = linebufstart = defbuf + DEFMAX) + MAXLINE) = '\0';
 
     lex_fatal = MY_FALSE;
 
@@ -6358,6 +6696,7 @@ start_new_file (int fd, const char * fname)
     pragma_no_lightweight_set = false;
     pragma_no_inherit = MY_FALSE;
     pragma_no_shadow = MY_FALSE;
+    pragma_no_simul_efuns = false;
     pragma_pedantic = MY_FALSE;
     pragma_warn_missing_return = MY_TRUE;
     pragma_warn_dead_code = MY_FALSE;
@@ -6371,15 +6710,15 @@ start_new_file (int fd, const char * fname)
     pragma_warn_unused_variables = false;
     pragma_warn_unused_values = false;
     pragma_warn_lightweight = true;
+    with_end_detection = false;
 
     nexpands = 0;
 
-    add_auto_include(object_file, NULL, MY_FALSE);
-} /* start_new_file() */
+} /* start_lex() */
 
 /*-------------------------------------------------------------------------*/
-void
-end_new_file (void)
+static void
+end_lex ()
 
 /* Clean up after a compilation terminated (successfully or not).
  */
@@ -6415,7 +6754,123 @@ end_new_file (void)
         last_lex_string = NULL;
     }
 
+} /* end_lex() */
+
+/*-------------------------------------------------------------------------*/
+void
+start_new_file (int fd, const char * fname)
+
+/* Start the compilation/lexing of the lpc file opened on file <fd> with
+ * name <fname>.
+ * This must not be called for included files.
+ */
+
+{
+    start_lex();
+
+    object_file = fname;
+
+    current_loc.file = new_source_file(fname, NULL);
+    current_loc.line = 1; /* already used in first _myfilbuf() */
+
+    set_input_source(fd, object_file, NULL);
+    _myfilbuf();
+
+    auto_include_hook = H_AUTO_INCLUDE;
+    add_auto_include(object_file, NULL, MY_FALSE);
+    start_token = L_START_PROG;
+
+} /* start_new_file() */
+
+/*-------------------------------------------------------------------------*/
+void
+end_new_file (void)
+
+/* Clean up after a compilation terminated (successfully or not).
+ */
+
+{
+    end_lex();
 } /* end_new_file() */
+
+/*-------------------------------------------------------------------------*/
+static void
+start_new_string (string_t* str, int token, int auto_include_hook_expr)
+
+/* Start the compilation/lexing of the lpc string <str>.
+ */
+
+{
+    program_t *prog = get_current_object_program();
+
+    start_lex();
+
+    object_file = "";
+
+    current_loc.file = new_source_file(NULL, NULL);
+    current_loc.file->name = xalloc(mstrsize(prog->name) + 10);
+    if (!current_loc.file->name)
+        lexerror("Out of memory");
+    else
+    {
+        memcpy(current_loc.file->name, get_txt(prog->name), mstrsize(prog->name));
+        memcpy(current_loc.file->name + mstrsize(prog->name), " (string)", 10);
+    }
+    current_loc.line = 1;
+
+    set_input_source(-1, object_file, str);
+    _myfilbuf();
+
+    auto_include_hook = auto_include_hook_expr;
+    add_auto_include(NULL, NULL, MY_FALSE);
+    start_token = token;
+} /* start_new_string() */
+
+/*-------------------------------------------------------------------------*/
+void
+start_new_expr (string_t* str, bool end_detection)
+
+/* Start the compilation/lexing of the lpc string <str> as an expression.
+ */
+
+{
+    start_new_string(str, end_detection ? L_START_EXPR_END_DETECTION : L_START_EXPR, H_AUTO_INCLUDE_EXPRESSION);
+    with_end_detection = end_detection;
+} /* start_new_expr() */
+
+/*-------------------------------------------------------------------------*/
+void
+end_new_expr ()
+
+/* Clean up after a compilation terminated (successfully or not).
+ */
+
+{
+    end_lex();
+} /* end_new_expr() */
+
+/*-------------------------------------------------------------------------*/
+void
+start_new_block (string_t* str, bool end_detection)
+
+/* Start the compilation/lexing of the lpc string <str> as a block.
+ */
+
+{
+    start_new_string(str, end_detection ? L_START_BLOCK_END_DETECTION : L_START_BLOCK, H_AUTO_INCLUDE_BLOCK);
+    with_end_detection = end_detection;
+} /* start_new_block() */
+
+/*-------------------------------------------------------------------------*/
+void
+end_new_block ()
+
+/* Clean up after a compilation terminated (successfully or not).
+ */
+
+{
+    end_lex();
+} /* end_new_block() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -6449,7 +6904,7 @@ lex_close (char *msg)
         msg = buf;
     }
 
-    end_new_file();
+    end_lex();
     outp = ("##")+1; /* TODO: Not really nice */
 
     lexerror(msg);
@@ -7241,6 +7696,8 @@ _expand_define (struct defn *p, ident_t * macro)
     if (p->nargs == -1)
     {
         /* --- Normal Macro --- */
+        if (expandend < outp)
+            expandend = outp;
 
         if (!p->special)
         {
@@ -7587,6 +8044,9 @@ _expand_define (struct defn *p, ident_t * macro)
             DEMUTEX;
             return MY_FALSE;
         }
+
+        if (expandend < outp)
+            expandend = outp;
 
         /* (Don't) handle dynamic function macros */
         if (p->special)

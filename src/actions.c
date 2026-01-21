@@ -551,18 +551,11 @@ call_modify_command (char *buff)
     {
         if (driver_hook[H_MODIFY_COMMAND].type == T_CLOSURE)
         {
-            lambda_t *l;
-
-            l = driver_hook[H_MODIFY_COMMAND].u.lambda;
-            if (driver_hook[H_MODIFY_COMMAND].x.closure_type == CLOSURE_LAMBDA)
-            {
-                free_svalue(&(l->ob));
-                put_ref_object(&(l->ob), command_giver, "call_modify_command");
-            }
             push_c_string(inter_sp, buff);
             push_ref_object(inter_sp, command_giver, "call_modify_command");
-            call_lambda(&driver_hook[H_MODIFY_COMMAND], 2);
-            transfer_svalue(svp = &apply_return_value, inter_sp--);
+            call_lambda_ob(&driver_hook[H_MODIFY_COMMAND], 2, inter_sp);
+            pop_apply_value();
+            svp = &apply_return_value;
             if (!command_giver)
                 return MY_TRUE;
         }
@@ -589,8 +582,9 @@ call_modify_command (char *buff)
                 {
                     push_ref_string(inter_sp, sv.u.str);
                     push_ref_object(inter_sp, command_giver, "call_modify_command");
-                    call_lambda(svp, 2);
-                    transfer_svalue(svp = &apply_return_value, inter_sp--);
+                    call_lambda_ob(svp, 2, inter_sp);
+                    pop_apply_value();
+                    svp = &apply_return_value;
                     if (!command_giver)
                         return MY_TRUE;
                 }
@@ -604,7 +598,10 @@ call_modify_command (char *buff)
     {
         if (svp->type == T_STRING)
         {
-            extract_cstr(buff, svp->u.str, (size_t)MAX_COMMAND_LENGTH);
+            size_t len = get_string_up_to_size(get_txt(svp->u.str), mstrsize(svp->u.str), MAX_COMMAND_LENGTH-1, NULL);
+
+            strncpy(buff, get_txt(svp->u.str), len);
+            buff[len] = 0;
         } else if (svp->type == T_NUMBER && svp->u.number) {
             return MY_TRUE;
         }
@@ -672,14 +669,11 @@ notify_no_command (char *command, object_t *save_command_giver)
     }
     else if (driver_hook[H_NOTIFY_FAIL].type == T_CLOSURE)
     {
-        if (driver_hook[H_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
-        {
-            free_svalue(&(driver_hook[H_NOTIFY_FAIL].u.lambda->ob));
-            put_ref_object(&(driver_hook[H_NOTIFY_FAIL].u.lambda->ob), command_giver, "notify_no_command");
-        }
+        svalue_t cgsv = svalue_object(command_giver);
+
         push_c_string(inter_sp, command);
         push_ref_valid_object(inter_sp, save_command_giver, "notify_no_command");
-        call_lambda(&driver_hook[H_NOTIFY_FAIL], 2);
+        call_lambda_ob(&driver_hook[H_NOTIFY_FAIL], 2, &cgsv);
         if (inter_sp->type == T_STRING)
         {
             if (!useHook)
@@ -726,12 +720,8 @@ notify_no_command (char *command, object_t *save_command_giver)
         }
         else
         {
-            if (driver_hook[H_SEND_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
-            {
-                free_svalue(&(driver_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob));
-                put_ref_object(&(driver_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob), command_giver, "notify_no_command");
-            }
-            call_lambda(&driver_hook[H_SEND_NOTIFY_FAIL], 3);
+            svalue_t cgsv = svalue_object(command_giver);
+            call_lambda_ob(&driver_hook[H_SEND_NOTIFY_FAIL], 3, &cgsv);
             pop_stack();
         }
     }
@@ -1144,17 +1134,9 @@ execute_command (char *str, object_t *ob)
     }
     else if (driver_hook[H_COMMAND].type == T_CLOSURE)
     {
-        lambda_t *l;
-
-        l = driver_hook[H_COMMAND].u.lambda;
-        if (driver_hook[H_COMMAND].x.closure_type == CLOSURE_LAMBDA)
-        {
-            free_svalue(&(l->ob));
-            put_ref_object(&(l->ob), ob, "execute_command");
-        }
         push_c_string(inter_sp, str);
         push_ref_object(inter_sp, ob, "execute_command");
-        call_lambda(&driver_hook[H_COMMAND], 2);
+        call_lambda_ob(&driver_hook[H_COMMAND], 2, inter_sp);
         res = (inter_sp->type != T_NUMBER) || (inter_sp->u.number != 0);
         free_svalue(inter_sp);
         inter_sp--;
@@ -1234,6 +1216,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
 
     /* Allocate and initialise a new sentence */
     p = new_action_sent();
+    p->sent.type = SENT_PLAIN;
 
     if (func->type == T_STRING)
     {
@@ -1269,6 +1252,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
     {
         error_index = setup_closure_callback(&(p->cb), func
                                              , 0, NULL
+                                             , true
                                              );
         func->type = T_INVALID; /* So that an error won't free it again. */
     }
@@ -1290,7 +1274,6 @@ e_add_action (svalue_t *func, svalue_t *cmd, p_int flag)
 
     /* Set ->verb to the command verb, made tabled */
     p->verb = make_tabled(cmd->u.str); cmd->type = T_NUMBER;
-    p->sent.type = SENT_PLAIN;
     p->short_verb = p->short_verb_bytes = 0;
 
     if (flag)
@@ -1522,7 +1505,7 @@ f_execute_command (svalue_t *sp)
         errorf("Command too long (size: %zu): '%.200s...'\n", 
                len, get_txt(argp->u.str));
     strncpy(buf, get_txt(argp->u.str), len);
-    buf[len+1] = '\0';
+    buf[len] = '\0';
 
     origin = check_object(argp[1].u.ob);
     if (!origin)
@@ -1541,9 +1524,20 @@ f_execute_command (svalue_t *sp)
     /* Test if we are allowed to use this function */
     if (privilege_violation4(STR_EXECUTE_COMMAND, svalue_object(origin), argp->u.str, 0, sp))
     {
+        struct command_context_s context;
+
+        /* Save the current context, as it also contains command parsing information. */
+        save_command_context(&context);
+        context.rt.last = rt_context;
+        rt_context = (rt_context_t *)&context.rt;
+
         marked_command_giver = origin;
         command_giver = player;
         res = parse_command(buf, MY_TRUE);
+
+        /* Restore the previous context */
+        rt_context = context.rt.last;
+        restore_command_context(&context);
     }
 
     /* Clean up the stack and push the result. */
@@ -1873,7 +1867,7 @@ f_remove_action (svalue_t *sp)
     }
     else
     {
-        efun_gen_arg_error(1, sp[-1].type, sp);
+        efun_gen_arg_error(1, sp-1, sp);
         /* NOTREACHED */
     }
     
@@ -2164,7 +2158,7 @@ f_query_actions (svalue_t *sp)
     else
     {
         if (arg->type != T_STRING)
-            efun_arg_error(1, T_STRING, arg->type, sp);
+            efun_arg_error(1, T_STRING, arg, sp);
         ob = get_object(arg[0].u.str);
         if (!ob)
             errorf("query_actions() failed\n");
@@ -2177,7 +2171,7 @@ f_query_actions (svalue_t *sp)
         v = e_get_all_actions(ob, arg[1].u.number);
     else {
         if (arg[1].type != T_OBJECT)
-            efun_arg_error(2, T_OBJECT, arg[1].type, sp);
+            efun_arg_error(2, T_OBJECT, arg+1, sp);
         v = e_get_object_actions(ob, arg[1].u.ob);
     }
 
@@ -2370,7 +2364,7 @@ f_set_this_player (svalue_t *sp)
     }
 
     if (sp->type != T_OBJECT)
-        efun_arg_error(1, T_OBJECT, sp->type, sp);
+        efun_arg_error(1, T_OBJECT, sp, sp);
 
     ob = sp->u.ob;
     command_giver = ob;
@@ -2549,7 +2543,7 @@ f_living (svalue_t *sp)
 
     if (sp->type != T_OBJECT)
     {
-        efun_arg_error(1, T_OBJECT, sp->type, sp);
+        efun_arg_error(1, T_OBJECT, sp, sp);
         return sp;
     }
 

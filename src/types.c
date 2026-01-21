@@ -5,15 +5,21 @@
  */
 
 #include <assert.h>
+#include <wctype.h>
 
 #include "gcollect.h"
+#include "lex.h"
 #include "lwobject.h"
 #include "main.h"
 #include "object.h"
+#include "pkg-python.h"
 #include "types.h"
+#include "simul_efun.h"
 #include "simulate.h"
 #include "structs.h"
 #include "xalloc.h"
+
+#include "i-current_object.h"
 
 #include "../mudlib/sys/driver_info.h"
 
@@ -26,6 +32,7 @@ lpctype_t _lpctype_mixed        = { 0, { TCLASS_PRIMARY, true }, {TYPE_ANY},    
 lpctype_t _lpctype_closure      = { 0, { TCLASS_PRIMARY, true }, {TYPE_CLOSURE},      NULL, NULL };
 lpctype_t _lpctype_symbol       = { 0, { TCLASS_PRIMARY, true }, {TYPE_SYMBOL},       NULL, NULL };
 lpctype_t _lpctype_coroutine    = { 0, { TCLASS_PRIMARY, true }, {TYPE_COROUTINE},    NULL, NULL };
+lpctype_t _lpctype_lpctype      = { 0, { TCLASS_PRIMARY, true }, {TYPE_LPCTYPE},      NULL, NULL };
 lpctype_t _lpctype_quoted_array = { 0, { TCLASS_PRIMARY, true }, {TYPE_QUOTED_ARRAY}, NULL, NULL };
 lpctype_t _lpctype_void         = { 0, { TCLASS_PRIMARY, true }, {TYPE_VOID},         NULL, NULL };
 lpctype_t _lpctype_bytes        = { 0, { TCLASS_PRIMARY, true }, {TYPE_BYTES},        NULL, NULL };
@@ -43,6 +50,7 @@ lpctype_t *lpctype_mixed        = &_lpctype_mixed;
 lpctype_t *lpctype_closure      = &_lpctype_closure;
 lpctype_t *lpctype_symbol       = &_lpctype_symbol;
 lpctype_t *lpctype_coroutine    = &_lpctype_coroutine;
+lpctype_t *lpctype_lpctype      = &_lpctype_lpctype;
 lpctype_t *lpctype_quoted_array = &_lpctype_quoted_array;
 lpctype_t *lpctype_any_struct   = &_lpctype_any_struct;
 lpctype_t *lpctype_any_object   = &_lpctype_any_object;
@@ -108,14 +116,12 @@ lpctype_touch (lpctype_t *uniontype)
 
 /*-------------------------------------------------------------------------*/
 lpctype_t *
-get_struct_type (struct_type_t* def)
+get_struct_name_type (struct_name_t* name)
 
-/* Create an lpctype_t around <def>, check for already
- * existing definitions.
+/* Create an lpctype_t for struct name <name>.
  */
 
 {
-    struct_name_t* name = def->name;
     lpctype_t *type = name->lpctype;
 
     if (type != NULL)
@@ -125,7 +131,23 @@ get_struct_type (struct_type_t* def)
         name->lpctype = type = lpctype_new();
         type->t_class = TCLASS_STRUCT;
         type->t_struct.name = ref_struct_name(name);
+        type->t_struct.def_idx = USHRT_MAX;
+        type->t_struct.def = NULL;
     }
+
+    return type;
+} /* get_struct_name_type() */
+
+/*-------------------------------------------------------------------------*/
+lpctype_t *
+get_struct_type (struct_type_t* def)
+
+/* Create an lpctype_t around <def>, check for already
+ * existing definitions.
+ */
+
+{
+    lpctype_t *type = get_struct_name_type(def->name);
 
     type->t_struct.def = def;
 
@@ -153,7 +175,7 @@ clean_struct_type (lpctype_t *t)
  */
 
 {
-    if(!t || t->t_class != TCLASS_STRUCT)
+    if(!t || t->t_class != TCLASS_STRUCT || t->t_static)
         return;
 
     t->t_struct.def = NULL;
@@ -351,6 +373,33 @@ get_lwobject_type (string_t *prog)
 } /* get_lwobject_type() */
 
 /*-------------------------------------------------------------------------*/
+#ifdef USE_PYTHON
+lpctype_t *
+get_python_type (int python_type_id)
+
+/* Create an lpctype_t for a Python type.
+ *
+ * Returns NULL when out of memory.
+ */
+
+{
+    lpctype_t *type = lookup_python_type(python_type_id);
+
+    if (type == NULL)
+    {
+        type = lpctype_new();
+        type->t_class = TCLASS_PYTHON;
+        type->t_python.type_id = python_type_id;
+        enter_python_type(python_type_id, type);
+    }
+
+    ref_lpctype(type);
+
+    return type;
+} /* get_python_type() */
+
+#endif
+/*-------------------------------------------------------------------------*/
 static void
 remove_object_type (lpctype_t *type)
 
@@ -485,16 +534,16 @@ get_union_type (lpctype_t *head, lpctype_t* member)
     lpctype_t *insert = head;
     lpctype_t *result, *next_member;
 
-    if (member == NULL)
+    if (member == NULL || member == lpctype_void)
         return ref_lpctype(head);
-    if (head == NULL)
+    if (head == NULL || head == lpctype_void)
         return ref_lpctype(member);
     if (head == lpctype_unknown || member == lpctype_unknown)
         return lpctype_unknown;
     if (head == lpctype_mixed || member == lpctype_mixed)
         return lpctype_mixed;
 
-    if(member->t_class == TCLASS_UNION)
+    if (member->t_class == TCLASS_UNION)
     {
         next_member = member;
         result = ref_lpctype(head);
@@ -507,7 +556,7 @@ get_union_type (lpctype_t *head, lpctype_t* member)
 
             next_member = next_member->t_union.head;
         }
-        while(next_member->t_class == TCLASS_UNION);
+        while (next_member->t_class == TCLASS_UNION);
 
         insert = result;
         result = get_union_type(result, next_member);
@@ -516,6 +565,50 @@ get_union_type (lpctype_t *head, lpctype_t* member)
         return result;
     }
 
+    if (lpctype_contains(member, head))
+        return ref_lpctype(head);
+    else if (lpctype_contains(head, member))
+        return ref_lpctype(member);
+
+    if (head->t_class == TCLASS_UNION)
+    {
+        // Let's go over the members in head, and see if we can remove
+        // some of them because they might be contained in member.
+        lpctype_t *current = head;
+        while (true)
+        {
+            lpctype_t *elem = current->t_class == TCLASS_UNION ? current->t_union.member : current;
+
+            if (lpctype_contains(elem, member))
+            {
+                // Okay, build a union type without those inferior members.
+                result = ref_lpctype(member);
+
+                while (true)
+                {
+                    lpctype_t *insert_elem = insert->t_class == TCLASS_UNION ? insert->t_union.member : insert;
+
+                    if (!lpctype_contains(insert_elem, member))
+                    {
+                        lpctype_t *prev_result = result;
+                        result = get_union_type(result, insert_elem);
+                        free_lpctype(prev_result);
+                    }
+
+                    if (insert->t_class == TCLASS_UNION)
+                        insert = insert->t_union.head;
+                    else
+                        return result;
+                }
+                /* NOTREACHED */
+            }
+
+            if (current->t_class == TCLASS_UNION)
+                current = current->t_union.head;
+            else
+                break;
+        }
+    }
 
     while (insert->t_class == TCLASS_UNION && insert->t_union.member > member)
     {
@@ -632,12 +725,19 @@ internal_get_common_type(lpctype_t *t1, lpctype_t* t2, bool find_one)
     case TCLASS_OBJECT:
         if (t2->t_class != TCLASS_OBJECT)
             return NULL;
+        else if (t1->t_object.type != t2->t_object.type)
+            return NULL;
         else if (t1->t_object.program_name == NULL)
             return ref_lpctype(t2);
         else if (t2->t_object.program_name == NULL)
             return ref_lpctype(t1);
         else
             return NULL;
+
+#ifdef USE_PYTHON
+    case TCLASS_PYTHON:
+        return NULL;
+#endif
 
     case TCLASS_ARRAY:
         if (t2->t_class != TCLASS_ARRAY)
@@ -742,6 +842,12 @@ make_static_type (lpctype_t *src, lpctype_t *dest)
         add_object_type(dest);
         break;
 
+#ifdef USE_PYTHON
+    case TCLASS_PYTHON:
+        /* Can't happen, Python types are not part of internal types. */
+        break;
+#endif
+
     case TCLASS_ARRAY:
         src->t_array.element->array_of = dest;
         break;
@@ -823,6 +929,12 @@ _free_lpctype (lpctype_t *t)
         if (t->t_object.program_name)
             free_mstring(t->t_object.program_name);
         break;
+
+#ifdef USE_PYTHON
+    case TCLASS_PYTHON:
+        /* Nothing to do. */
+        break;
+#endif
 
     case TCLASS_ARRAY:
         t->t_array.element->array_of = NULL;
@@ -908,10 +1020,18 @@ lpctype_contains (lpctype_t* src, lpctype_t* dest)
                 if (destbase->t_class == TCLASS_OBJECT)
                 {
                     if (srcbase == destbase
-                     || destbase->t_object.program_name == NULL) /* Matches any object */
+                     || (destbase->t_object.program_name == NULL  /* Matches any (lw)object */
+                      && destbase->t_object.type == srcbase->t_object.type))
                         found = true;
                 }
                 break;
+
+#ifdef USE_PYTHON
+            case TCLASS_PYTHON:
+                if (destbase == srcbase)
+                    found = true;
+                break;
+#endif
 
             case TCLASS_ARRAY:
                 if (destbase->t_class == TCLASS_ARRAY)
@@ -1051,6 +1171,292 @@ is_compatible_lwobject (lwobject_t* lwob, lpctype_t *t)
 } /* is_compatible_lwobject() */
 
 /*-------------------------------------------------------------------------*/
+struct lpctypename_s
+{
+    const char *name;
+    lpctype_t  *type;
+};
+
+static struct lpctypename_s lpctypenames[] = {
+    { "status",       &_lpctype_int          },
+    { "int",          &_lpctype_int          },
+    { "string",       &_lpctype_string       },
+    { "void",         &_lpctype_void         },
+    { "mapping",      &_lpctype_mapping      },
+    { "float",        &_lpctype_float        },
+    { "mixed",        &_lpctype_mixed        },
+    { "closure",      &_lpctype_closure      },
+    { "symbol",       &_lpctype_symbol       },
+    { "quoted_array", &_lpctype_quoted_array },
+    { "bytes",        &_lpctype_bytes        },
+    { "coroutine",    &_lpctype_coroutine    },
+    { "lpctype",      &_lpctype_lpctype      },
+    { "struct",       &_lpctype_any_struct   },
+    { "object",       &_lpctype_any_object   },
+    { "lwobject",     &_lpctype_any_lwobject },
+    { NULL, NULL }
+};
+
+/*-------------------------------------------------------------------------*/
+static const char*
+skip_whitespace(const char* str, const char* end)
+
+/* Skip any whitespace characters and return a pointer to the first
+ * non-whitespace character.
+ */
+
+{
+    while (str != end)
+    {
+        p_int c;
+        size_t clen = utf8_to_unicode(str, end - str, &c);
+
+        if (!clen || !iswspace(c))
+            return str;
+        str += clen;
+    }
+    return end;
+} /* skip_whitespace() */
+
+/*-------------------------------------------------------------------------*/
+static const char*
+skip_alunum(const char* str, const char* end)
+
+/* Skip any alpha-numeric characters (incl. underscore) and return a pointer
+ * to the first non-matching character.
+ */
+
+{
+    while (str != end)
+    {
+        p_int c;
+        size_t clen = utf8_to_unicode(str, end - str, &c);
+
+        if (!clen || !(c < 128 ? isalunum(c) : iswalnum((wint_t)c)))
+            return str;
+        str += clen;
+    }
+    return end;
+} /* skip_alunum() */
+
+/*-------------------------------------------------------------------------*/
+lpctype_t *
+parse_lpctype (const char** start, const char* end)
+
+/* Parse the string starting at <*start> as a type, not going beyond <end>.
+ * Return the resulting type (or NULL upon an error). On success <*start>
+ * will then point to the next unprocessed character.
+ */
+
+{
+    const char* str = *start;
+    lpctype_t *result = NULL;
+
+    while (true)
+    {
+        lpctype_t *part;
+        p_int c;
+        size_t clen = utf8_to_unicode(str, end - str, &c);
+        if (!clen)
+            break;
+
+        if (c == '<')
+        {
+            str += clen;
+            part = parse_lpctype(&str, end);
+            if (part == NULL)
+                break;
+
+            if (*str != '>')
+                break;
+            str++;
+        }
+        else if (iswspace(c))
+        {
+            str += clen;
+            continue;
+        }
+        else if (c < 128 ? isalunum(c) : iswalnum((wint_t)c))
+        {
+            const char* keyword = str;
+
+            /* Skip to end of alphanumeric characters. */
+            str = skip_alunum(str + clen, end);
+
+            part = NULL;
+            for (struct lpctypename_s *lpctypename = lpctypenames; lpctypename->name != NULL; lpctypename++)
+            {
+                if (!strncmp(lpctypename->name, keyword, str - keyword)
+                 && strlen(lpctypename->name) == str - keyword)
+                {
+                    part = lpctypename->type;
+                    break;
+                }
+            }
+
+#ifdef USE_PYTHON
+            if (part == NULL)
+            {
+                ident_t *p = find_shared_identifier_n(keyword, str - keyword, I_TYPE_PYTHON_TYPE, 0);
+                while (p && p->type != I_TYPE_PYTHON_TYPE)
+                    p = p->inferior;
+                if (p)
+                    part = get_python_type(p->u.python_type_id);
+            }
+#endif
+
+            if (part == NULL)
+                break;
+
+            str = skip_whitespace(str, end);
+
+            if (part == lpctype_any_struct)
+            {
+                /* Struct needs to have specific a name or 'mixed'. */
+                const char* structname = str;
+                str = skip_alunum(str, end);
+
+                if (structname == str)
+                    break;
+
+                if (str - structname != 5 || memcmp(structname, "mixed", 5))
+                {
+                    /* First look at the current program. */
+                    program_t *prog = get_current_object_program();
+                    string_t *name;
+                    if (!prog)
+                        break;
+
+                    name = find_tabled_str_n(structname, str - structname, STRING_UTF8);
+                    if (!name)
+                        break;
+
+                    part = NULL;
+                    for (int idx = 0; idx < prog->num_structs; idx++)
+                    {
+                        struct_type_t *st = prog->struct_defs[idx].type;
+                        if (st->name->name == name
+                         && !(prog->struct_defs[idx].flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)))
+                        {
+                            part = get_struct_type(st);
+                            break;
+                        }
+                    }
+
+                    if (!part)
+                    {
+                        /* Look at global struct definitions. */
+                        ident_t *p = find_shared_identifier_mstr(name, I_TYPE_GLOBAL, 0);
+                        while (p && p->type != I_TYPE_GLOBAL)
+                            p = p->inferior;
+                        if (p)
+                        {
+                            struct_type_t *st = NULL;
+                            if (p->u.global.sefun_struct_id != I_GLOBAL_SEFUN_STRUCT_NONE)
+                                st = get_simul_efun_program()->struct_defs[p->u.global.sefun_struct_id].type;
+                            else if (p->u.global.std_struct_id != I_GLOBAL_STD_STRUCT_NONE)
+                                st = get_std_struct_type(p->u.global.std_struct_id);
+
+                            if (st != NULL)
+                                part = get_struct_type(st);
+                        }
+                    }
+
+                    if (!part)
+                        break;
+                }
+
+                str = skip_whitespace(str, end);
+            }
+            else if ((part == lpctype_any_object || part == lpctype_any_lwobject)
+                  && str != end && *str == '"')
+            {
+                /* Specific (lw)object type. */
+                char buf[512];
+                const char *obname = ++str;
+                size_t oblen;
+                string_t *obstr;
+
+                while (str != end)
+                {
+                    if (*str == '\\')
+                    {
+                        str++;
+                        if (str == end)
+                            break;
+                    }
+                    else if (*str == '"')
+                        break;
+                    str++;
+                }
+
+                if (str == end)
+                    break;
+
+                oblen = unescape_string(obname, str - obname, buf, sizeof(buf));
+                if (!oblen)
+                    break;
+
+                obstr = new_n_unicode_mstring(buf, oblen);
+                if (!obstr)
+                    break;
+
+                if (part == lpctype_any_object)
+                    part = get_object_type(obstr);
+                else
+                    part = get_lwobject_type(obstr);
+                free_mstring(obstr);
+
+                str = skip_whitespace(str+1, end);
+            }
+        }
+        else
+            break;
+
+        /* At this point we have single type in <part>.
+         * Any whitespaces have been skipped.
+         */
+
+        if (part != lpctype_void)
+        {
+            while (str != end && *str == '*')
+            {
+                lpctype_t *dummy = part;
+                part = get_array_type(part);
+                free_lpctype(dummy);
+                str = skip_whitespace(str+1, end);
+            }
+        }
+
+        if (result == NULL)
+            result = part;
+        else if (part == lpctype_void)
+            break;
+        else
+        {
+            lpctype_t *u = get_union_type(result, part);
+            free_lpctype(result);
+            free_lpctype(part);
+            result = u;
+        }
+
+        if (str == end || *str == '>')
+        {
+            *start = str;
+            return result;
+        }
+        if (result == lpctype_void || *str != '|')
+            break;
+        str++;
+    }
+
+    /* We get here on errors only. */
+    free_lpctype(result);
+    return NULL;
+} /* parse_lpctype() */
+
+
+/*-------------------------------------------------------------------------*/
 
 /* The same definitions are in sys/lpctypes.h for the mudlibs. */
 #define COMPAT_TYPE_OBJECT       4
@@ -1075,6 +1481,8 @@ get_type_compat_int (lpctype_t *t)
                 val++;
             if (val >= COMPAT_TYPE_STRUCT)
                 val++;
+            if (val >= COMPAT_TYPE_LWOBJECT)
+                val++;
             return val;
         }
 
@@ -1083,6 +1491,11 @@ get_type_compat_int (lpctype_t *t)
 
         case TCLASS_OBJECT:
             return t->t_object.type == OBJECT_REGULAR ? COMPAT_TYPE_OBJECT : COMPAT_TYPE_LWOBJECT;
+
+#ifdef USE_PYTHON
+        case TCLASS_PYTHON:
+            return TYPE_ANY;
+#endif
 
         case TCLASS_ARRAY:
             return get_type_compat_int(t->t_array.element) | COMPAT_MOD_POINTER;
@@ -1158,13 +1571,19 @@ clear_lpctype_ref (lpctype_t *t)
     case TCLASS_STRUCT:
         if (t->t_struct.name)
             clear_struct_name_ref(t->t_struct.name);
-        t->t_struct.def = NULL;
+        if (!t->t_static)
+            t->t_struct.def = NULL;
         break;
 
     case TCLASS_OBJECT:
         if (t->t_object.program_name)
             t->t_object.program_name->info.ref = 0;
         break;
+
+#ifdef USE_PYTHON
+    case TCLASS_PYTHON:
+        break;
+#endif
 
     case TCLASS_ARRAY:
         clear_lpctype_ref(t->t_array.element);
@@ -1227,6 +1646,11 @@ count_lpctype_ref (lpctype_t *t)
                     count_ref_from_string(t->t_object.program_name);
                 break;
 
+#ifdef USE_PYTHON
+            case TCLASS_PYTHON:
+                break;
+#endif
+
             case TCLASS_ARRAY:
                 count_lpctype_ref(t->t_array.element);
                 break;
@@ -1246,6 +1670,9 @@ count_lpctype_ref (lpctype_t *t)
         case TCLASS_PRIMARY:
         case TCLASS_STRUCT:
         case TCLASS_OBJECT:
+#ifdef USE_PYTHON
+        case TCLASS_PYTHON:
+#endif
             break; /* Nothing to do. */
 
         case TCLASS_ARRAY:

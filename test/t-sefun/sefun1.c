@@ -1,5 +1,15 @@
 #pragma strong_types
 
+struct OldStruct
+{
+    int old_member;
+};
+
+struct SomeStruct
+{
+    string text;
+};
+
 nomask mixed call_strict(object ob, string fun, int arg)
 {
     mixed result;

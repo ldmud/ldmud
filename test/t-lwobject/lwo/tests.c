@@ -8,13 +8,23 @@
 #include "../inc/msg.inc"
 #include "../inc/testarray.inc"
 
-int var1 = 42;
+nosave int var1 = 42;
 string var2;
 mixed var3;
 
 void new()
 {
     var2 = "new";
+}
+
+void copied()
+{
+    var2 = "copied";
+}
+
+void restored()
+{
+    var2 = "restored";
 }
 
 int check(int val)
@@ -25,6 +35,11 @@ int check(int val)
 int get()
 {
     return var1;
+}
+
+string last_create()
+{
+    return var2;
 }
 
 string string_function(string arg)
@@ -65,6 +80,18 @@ int run_tests()
                 return lwobjectp(this_object())
                     && !lwobjectp(blueprint());
             }
+        }),
+        ({ "H_CREATE_LWOBJECT_COPY called", 0,
+            function int()
+            {
+                return copy(this_object()).last_create() == "copied";
+            },
+        }),
+        ({ "H_CREATE_LWOBJECT_RESTORE called", 0,
+            function int()
+            {
+                return restore_value(save_value(this_object())).last_create() == "restored";
+            },
         }),
         ({ "comparisons", 0,
             function int()
@@ -243,6 +270,7 @@ int run_tests()
                     && !sizeof(({cl3, cl2, cl1, lwob2, lwob1})^({lwob1, lwob2, cl1, cl2, cl3}));
             }
         }),
+#if __EFUN_DEFINED__(last_instructions)
         ({ "last_instructions()", 0,
             function int()
             {
@@ -251,6 +279,7 @@ int run_tests()
                 return 1;
             }
         }),
+#endif
         ({ "typeof(TO)", 0,
             function int()
             {
@@ -351,6 +380,23 @@ int run_tests()
             function int()
             {
                 return restore_value(save_value(#'var1)) == #'var1;
+            }
+        }),
+        ({ "save_value honoring nosave", 0,
+            function int()
+            {
+                string text = save_value(this_object());
+                return !("var1" in text) && "var2" in text && "var3" in text;
+            }
+        }),
+        ({ "restore_value honoring nosave", 0,
+            function int()
+            {
+                lwobject copy;
+
+                var3 = 110;
+                copy = restore_value(regreplace(save_value(this_object()), "var3", "var1", 0));
+                return copy.check(42);
             }
         }),
         ({ "to_string(op_cl)", 0,

@@ -7,5 +7,6 @@ DESCRIPTION
 SEE ALSO
         mkmapping(E), m_indices(E), m_values(E), m_add(E), m_delete(E),
         sizeof(E), widthof(E), bytesp(E), clonep(E), closurep(E),
-        floatp(E), objectp(E), intp(E), referencep(E), pointerp(E),
-        stringp(E), symbolp(E), structp(E)
+        coroutinep(E), floatp(E), intp(E), lpctypep(E), lwobjectp(E),
+        objectp(E), pointerp(E), referencep(E), stringp(E), structp(E),
+        symbolp(E)

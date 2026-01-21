@@ -229,6 +229,7 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#include "stdstructs.h"
 #include "strfuns.h"
 #include "structs.h"
 #include "svalue.h"
@@ -436,6 +437,8 @@ static const char * svalue_typename[]
    , /* T_BYTES  */         "bytes"
    , /* T_LWOBJECT */       "lwobject"
    , /* T_COROUTINE */      "coroutine"
+   , /* T_PYTHON */         "python-object"
+   , /* T_LPCTYPE */        "lpctype"
    , /* T_CALLBACK */       "callback"
    , /* T_ERROR_HANDLER */  "error-handler"
    , /* T_BREAK_ADDR */     "break-address"
@@ -461,7 +464,7 @@ bytecode_p inter_pc;
   /* Next bytecode to interpret.
    */
 
-static svalue_t *inter_fp;
+svalue_t *inter_fp;
   /* Framepointer: pointer to first argument.
    */
 
@@ -675,6 +678,16 @@ struct unprotected_mapentry
    * exist, yet. In contrast to protected mapping entries there is no
    * time here, that an entry will appear.
    */
+
+  /* --- struct unprotected_map_range: a range of a mapping */
+struct unprotected_map_range
+{
+    mapping_t *map;               /* The mapping that'll get the entry.   *
+                                   * (not refcounted).                    */
+    svalue_t   key;               /* The key (refcounted)                 */
+    mp_int     index1, index2;    /* The column range.                    */
+} current_unprotected_map_range = /* Static buffer, because there is only */
+  { NULL, { T_INVALID }, 0, 0};   /* one unprotected lvalue at a time.    */
 
 static svalue_t indexing_quickfix = { T_NUMBER };
   /* When indexing arrays and mappings with just one ref, especially
@@ -1007,6 +1020,12 @@ is_sto_context (void)
  * get_rvalue_no_collapse(v, &last_ref): Same as get_rvalue(), but don't
  *                        collapse any singular lvalues.
  *
+ * get_iterator(v, &it, ns): Builds an iterator over <v> if it is a range
+ *                           (array,string,bytes or range lvalue).
+ *
+ * get_iterator_for_vector(vec, size, &it, ns): Builds an iterator over
+ *                            <size> consecutive elements pointed to by <vec>.
+ *
  * link_protected_lvalue(dest, lv): Assign the lvalue <lv> to the lvalue <dest>.
  *
  * assign_svalue(dest,v): assign <v> to <dest>, freeing <dest> first.
@@ -1035,6 +1054,9 @@ is_sto_context (void)
 static void transfer_pointer_range(svalue_t *source);
 static void transfer_protected_pointer_range(
     struct protected_range_lvalue *dest, svalue_t *source);
+static void transfer_map_range(svalue_t *source);
+static void transfer_protected_map_range(
+    struct protected_map_range_lvalue *dest, svalue_t *source);
 static void assign_string_range(svalue_t *source, Bool do_free);
 static void assign_protected_string_range(
     struct protected_range_lvalue *dest,svalue_t *source, Bool do_free);
@@ -1210,6 +1232,16 @@ int_free_svalue (svalue_t *v)
         free_coroutine(v->u.coroutine);
         break;
 
+#ifdef USE_PYTHON
+    case T_PYTHON:
+        free_python_ob(v);
+        break;
+#endif
+
+    case T_LPCTYPE:
+        free_lpctype(v->u.lpctype);
+        break;
+
     case T_CALLBACK:
         free_callback(v->u.cb);
         xfree(v->u.cb);
@@ -1236,6 +1268,7 @@ int_free_svalue (svalue_t *v)
         case LVALUE_UNPROTECTED_CHAR:
         case LVALUE_UNPROTECTED_RANGE:
         case LVALUE_UNPROTECTED_MAPENTRY:
+        case LVALUE_UNPROTECTED_MAP_RANGE:
             NOOP;
             break;
 
@@ -1315,6 +1348,19 @@ int_free_svalue (svalue_t *v)
             }
             break;
 
+        case LVALUE_PROTECTED_MAP_RANGE:
+            if (--(v->u.protected_map_range_lvalue->ref) <= 0)
+            {
+                struct protected_map_range_lvalue *r = v->u.protected_map_range_lvalue;
+
+                free_mapping(r->map);
+                free_svalue(&(r->key));
+                xfree(r);
+
+                num_protected_lvalues--;
+            }
+            break;
+
         } /* switch (v->x.lvalue_type) */
         break; /* case T_LVALUE */
 
@@ -1388,8 +1434,18 @@ free_svalue (svalue_t *v)
         case LVALUE_PROTECTED_MAPENTRY:
             needs_deserializing = (v->u.protected_mapentry_lvalue->ref == 1);
             break;
+
+        case LVALUE_PROTECTED_MAP_RANGE:
+            needs_deserializing = (v->u.protected_map_range_lvalue->ref == 1);
+            break;
         }
         break;
+
+#ifdef USE_PYTHON
+    case T_PYTHON:
+        needs_deserializing = python_ob_has_last_ref(v);
+        break;
+#endif
     }
 
     /* If the value doesn't need de-serializing, it can be
@@ -1474,7 +1530,6 @@ _destructed_object_ref (svalue_t *svp)
 
         case T_CLOSURE:
         {
-            lambda_t *l;
             int type;
 
             if (!CLOSURE_MALLOCED(type = svp->x.closure_type))
@@ -1485,20 +1540,18 @@ _destructed_object_ref (svalue_t *svp)
                     return (svp->u.ob->flags & O_DESTRUCTED) ? MY_TRUE : MY_FALSE;
             }
 
-            /* Lambda closure */
+            /* Allocated closure */
 
-            l = svp->u.lambda;
-
-            if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
+            if (type == CLOSURE_UNBOUND_LAMBDA)
                 return MY_FALSE;
 
             if (type == CLOSURE_LFUN
-             && l->function.lfun.ob.type == T_OBJECT
-             && (l->function.lfun.ob.u.ob->flags & O_DESTRUCTED))
+             && svp->u.lfun_closure->fun_ob.type == T_OBJECT
+             && (svp->u.lfun_closure->fun_ob.u.ob->flags & O_DESTRUCTED))
                 return MY_TRUE;
 
-            if (l->ob.type == T_OBJECT
-             && (l->ob.u.ob->flags & O_DESTRUCTED))
+            if (svp->u.closure->ob.type == T_OBJECT
+             && (svp->u.closure->ob.u.ob->flags & O_DESTRUCTED))
                 return MY_TRUE;
 
             return MY_FALSE;
@@ -1532,7 +1585,6 @@ inl_object_ref (svalue_t *svp, object_t *obj)
 
         case T_CLOSURE:
         {
-            lambda_t *l;
             int type;
 
             if (!CLOSURE_MALLOCED(type = svp->x.closure_type))
@@ -1543,20 +1595,18 @@ inl_object_ref (svalue_t *svp, object_t *obj)
                     return svp->u.ob == obj;
             }
 
-            /* Lambda closure */
+            /* Allocated closure */
 
-            l = svp->u.lambda;
-
-            if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
+            if (type == CLOSURE_UNBOUND_LAMBDA)
                 return MY_FALSE;
 
             if (type == CLOSURE_LFUN
-             && l->function.lfun.ob.type == T_OBJECT
-             && l->function.lfun.ob.u.ob == obj)
+             && svp->u.lfun_closure->fun_ob.type == T_OBJECT
+             && svp->u.lfun_closure->fun_ob.u.ob == obj)
                 return MY_TRUE;
 
-            if (l->ob.type == T_OBJECT
-             && l->ob.u.ob == obj)
+            if (svp->u.closure->ob.type == T_OBJECT
+             && svp->u.closure->ob.u.ob == obj)
                 return MY_TRUE;
 
             return MY_FALSE;
@@ -1649,7 +1699,12 @@ internal_assign_svalue_no_free (svalue_t *to, svalue_t *from)
         break;
 
     case T_CLOSURE:
-        addref_closure(to, "ass to var");
+        if (CLOSURE_MALLOCED(to->x.closure_type))
+            to->u.closure->ref++;
+        else if (to->x.closure_type < CLOSURE_LWO)
+            ref_lwobject(to->u.lwob);
+        else
+            ref_object(to->u.ob, "ass to var");
         break;
 
     case T_COROUTINE:
@@ -1661,6 +1716,10 @@ internal_assign_svalue_no_free (svalue_t *to, svalue_t *from)
 
     case T_MAPPING:
         (void)ref_mapping(to->u.map);
+        break;
+
+    case T_LPCTYPE:
+        ref_lpctype(to->u.lpctype);
         break;
 
     case T_LVALUE:
@@ -1687,8 +1746,17 @@ internal_assign_svalue_no_free (svalue_t *to, svalue_t *from)
             to->u.protected_mapentry_lvalue->ref++;
             break;
 
+        case LVALUE_PROTECTED_MAP_RANGE:
+            to->u.protected_map_range_lvalue->ref++;
+            break;
+
         } /* switch */
         break;
+
+#ifdef USE_PYTHON
+    case T_PYTHON:
+        ref_python_ob(to);
+#endif
     }
 
 } /* internal_assign_svalue_no_free() */
@@ -1854,6 +1922,31 @@ internal_assign_rvalue_no_free ( svalue_t *to, svalue_t *from )
             }
             break;
 
+        case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                struct protected_map_range_lvalue *r = from->u.protected_map_range_lvalue;
+                svalue_t *val = get_map_value(r->map, &(r->key));
+                vector_t *arr;
+
+                if (val == &const0)
+                    arr = allocate_array(r->index2 - r->index1);
+                else
+                {
+                    arr = allocate_uninit_array(r->index2 - r->index1);
+                    if (arr != NULL)
+                    {
+                        for (mp_int i = 0, j = r->index1; j < r->index2; i++, j++)
+                            assign_rvalue_no_free(arr->item + i, val + j);
+                    }
+                }
+
+                if (arr == NULL)
+                    errorf("Out of memory: map[k,%"PRIdMPINT"..%"PRIdMPINT"].\n", r->index1, r->index2 - 1);
+                else
+                    put_array(to, arr);
+            }
+            break;
+
         } /* switch (from->x.lvalue_type) */
 
         break;
@@ -1947,16 +2040,6 @@ normalize_svalue (svalue_t *svp, bool collapse_lvalues)
             {
                 struct protected_range_lvalue *r = svp->u.protected_range_lvalue;
 
-                if (collapse_lvalues
-                 && r->ref == 1
-                 && (r->var == NULL || r->var->ref == 1))
-                {
-                    svalue_t temp = *svp;
-                    internal_assign_rvalue_no_free(svp, &temp);
-                    free_svalue(&temp);
-                    continue;
-                }
-
                 if (r->var != NULL
                  && (r->vec.type != r->var->val.type
                   || (r->vec.type == T_POINTER && r->vec.u.vec != r->var->val.u.vec)
@@ -1966,6 +2049,20 @@ normalize_svalue (svalue_t *svp, bool collapse_lvalues)
                     deref_protected_lvalue(r->var);
                     r->var = NULL;
                 }
+
+                if (collapse_lvalues
+                 && r->ref == 1
+                 && (r->var == NULL || r->var->ref == 1)
+                 && (r->vec.type == T_POINTER
+                    ? r->vec.u.vec->ref == (r->var == NULL ? 1 : 2)
+                    : r->vec.u.str->info.ref == (r->var == NULL ? 1 : 2)))
+                {
+                    svalue_t temp = *svp;
+                    internal_assign_rvalue_no_free(svp, &temp);
+                    free_svalue(&temp);
+                    continue;
+                }
+
                 break;
             }
 
@@ -1990,6 +2087,13 @@ normalize_svalue (svalue_t *svp, bool collapse_lvalues)
                     continue;
                 }
             }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+                /* Map ranges are special as they only allow assignments
+                 * of the same length. So there is no alternative to
+                 * collapse them into.
+                 */
+                break;
         }
         break;
     } /* switch */
@@ -2130,6 +2234,12 @@ inl_get_rvalue (svalue_t *v, bool *last_reference, bool collapse_lvalues)
 
                 return &const0;
             }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+                if (last_reference != NULL && v->u.protected_map_range_lvalue->ref == 1)
+                    *last_reference = true;
+
+                return NULL;
         } /* switch (v->x.lvalue_type) */
     }
     else
@@ -2147,6 +2257,236 @@ svalue_t * get_rvalue_no_collapse (svalue_t *v, bool *last_reference)
 
 #define get_rvalue(v, last_reference) inl_get_rvalue(v, last_reference, true)
 #define get_rvalue_no_collapse(v, last_reference) inl_get_rvalue(v, last_reference, false)
+
+/*-------------------------------------------------------------------------*/
+static svalue_t*
+vector_iterator_next_value(struct range_iterator* it)
+
+/* Returns the next value when iterating over an vector.
+ * (Also used for map entry ranges.)
+ */
+
+{
+    if (it->remaining > 0)
+    {
+        svalue_t *result = (svalue_t*)it->current;
+
+        it->remaining--;
+        it->current = result+1;
+
+        return result;
+    }
+
+    return NULL;
+} /* vector_iterator_next_value() */
+
+/*-------------------------------------------------------------------------*/
+static svalue_t*
+string_iterator_next_value(struct range_iterator* it)
+
+/* Returns the next value when iterating over a unicode string (range).
+ */
+
+{
+    if (it->remaining > 0)
+    {
+        char* str = (char*)it->current;
+        p_int ch;
+        size_t chlen = utf8_to_unicode(str, it->remaining, &ch);
+
+        if (!chlen)
+        {
+            ch = *(unsigned char*)str;
+            chlen = 1;
+        }
+
+        it->remaining -= chlen;
+        it->current = str + chlen;
+        put_number(&(it->temp), ch);
+
+        return &(it->temp);
+    }
+
+    return NULL;
+} /* string_iterator_next_value() */
+
+/*-------------------------------------------------------------------------*/
+static svalue_t*
+bytes_iterator_next_value(struct range_iterator* it)
+
+/* Returns the next value when iterating over a bytes sequence
+ * or ASCII string (range).
+ */
+
+{
+    if (it->remaining > 0)
+    {
+        unsigned char *result = (unsigned char*)it->current;
+
+        it->remaining--;
+        it->current = result+1;
+        put_number(&(it->temp), *result);
+
+        return &(it->temp);
+    }
+
+    return NULL;
+} /* bytes_iterator_next_value() */
+
+/*-------------------------------------------------------------------------*/
+static svalue_t*
+zero_iterator_next_value(struct range_iterator* it)
+
+/* Returns just zeroes (the value of it->temp).
+ */
+
+{
+    if (it->remaining > 0)
+        return &(it->temp);
+
+    return NULL;
+} /* zero_iterator_next_value() */
+
+/*-------------------------------------------------------------------------*/
+void
+get_iterator_for_vector (svalue_t *vec, p_int size, struct range_iterator* it)
+
+/* Create an interator for iterating over <size> consecutive elements with
+ * the first element being <vec>.
+ */
+
+{
+    it->next_value = &vector_iterator_next_value;
+    it->remaining = it->size = size;
+    it->current = vec;
+} /* get_iterator_for_vector() */
+
+/*-------------------------------------------------------------------------*/
+
+bool
+get_iterator (svalue_t *v, struct range_iterator* it, bool no_strings)
+
+/* If <v> is a range (vector, string, bytes, protected range lvalue,
+ * protected map entry range) fill the <it> structure with an iterator
+ * function and the length of the range and return true.
+ * Otherwise set the iterator function to NULL and return false.
+ * If <no_strings> is true, also for strings, bytes and range lvalues
+ * of strings and bytes false will be returned and the function
+ * set to NULL.
+ *
+ * Note that this iterator function is only for read access, because
+ * for strings and string ranges it makes additional transformations.
+ * For the same reasons the result pointer of a iterator call may point
+ * to a temporary storage and will only be valid until the next call.
+ *
+ * The iterator function will return NULL when out of bounds.
+ */
+
+{
+    svalue_t *rv = get_rvalue_no_collapse(v, NULL);
+
+    if (rv == NULL)
+    {
+        assert(v->type == T_LVALUE);
+        switch (v->x.lvalue_type)
+        {
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = v->u.protected_range_lvalue;
+                switch (r->vec.type)
+                {
+                    case T_POINTER:
+                        get_iterator_for_vector(r->vec.u.vec->item + r->index1, r->index2 - r->index1, it);
+                        return true;
+
+                    case T_STRING:
+                        if (no_strings)
+                            break;
+                        if (r->vec.u.str->info.unicode == STRING_UTF8)
+                        {
+                            it->next_value = &string_iterator_next_value;
+                            it->remaining = r->index2 - r->index1;
+                            it->current = get_txt(r->vec.u.str) + r->index1;
+                            it->size = byte_to_char_index(get_txt(r->vec.u.str) + r->index1, it->remaining, NULL);
+                            return true;
+                        }
+                        /* FALLTHROUGH */
+
+                    case T_BYTES:
+                        if (no_strings)
+                            break;
+                        it->next_value = &bytes_iterator_next_value;
+                        it->remaining = it->size = r->index2 - r->index1;
+                        it->current = get_txt(r->vec.u.str) + r->index1;
+                        return true;
+
+                    default:
+                        break;
+                }
+                break;
+            }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                struct protected_map_range_lvalue *r = v->u.protected_map_range_lvalue;
+                svalue_t *items = get_map_value(r->map, &(r->key));
+
+                if (items == &const0)
+                {
+                    /* Not existing entries, we have a dedicated iterator,
+                     * returning zeroes.
+                     */
+                    it->next_value = &zero_iterator_next_value;
+                    it->remaining = it->size = r->index2 - r->index1;
+                    put_number(&(it->temp), 0);
+                    return true;
+                }
+
+                get_iterator_for_vector(items + r->index1, r->index2 - r->index1, it);
+                return true;
+            }
+
+            default:
+                break;
+        }
+    }
+    else
+    {
+        switch (rv->type)
+        {
+            case T_POINTER:
+                get_iterator_for_vector(rv->u.vec->item, VEC_SIZE(rv->u.vec), it);
+                return true;
+
+            case T_STRING:
+                if (no_strings)
+                    break;
+                if (rv->u.str->info.unicode == STRING_UTF8)
+                {
+                    it->next_value = &string_iterator_next_value;
+                    it->remaining = mstrsize(rv->u.str);
+                    it->current = get_txt(rv->u.str);
+                    it->size = byte_to_char_index(get_txt(rv->u.str), it->remaining, NULL);
+                    return true;
+                }
+                /* FALLTHROUGH */
+
+            case T_BYTES:
+                if (no_strings)
+                    break;
+                it->next_value = &bytes_iterator_next_value;
+                it->remaining = it->size = mstrsize(rv->u.str);
+                it->current = get_txt(rv->u.str);
+                return true;
+
+            default:
+                break;
+        }
+    }
+
+    it->next_value = NULL;
+    return false;
+} /* get_iterator() */
 
 /*-------------------------------------------------------------------------*/
 static bool
@@ -2226,6 +2566,7 @@ link_protected_lvalue (svalue_t *dest, svalue_t *lv)
                     return false; /* For now. */
 
                 case LVALUE_PROTECTED_RANGE:
+                case LVALUE_PROTECTED_MAP_RANGE:
                     /* char and range are incompatible. */
                     return false;
 
@@ -2354,6 +2695,64 @@ link_protected_lvalue (svalue_t *dest, svalue_t *lv)
                     /* range and non-existent entry are incompatible. */
                     return false;
 
+                case LVALUE_PROTECTED_MAP_RANGE:
+                {
+                    struct protected_map_range_lvalue *lvrange = lv->u.protected_map_range_lvalue;
+                    struct protected_range_lvalue *destrange = dest->u.protected_range_lvalue;
+                    svalue_t *lventry;
+
+                    if (destrange->vec.type != T_POINTER)
+                        return false;
+
+                    lventry = get_map_lvalue(lvrange->map, &(lvrange->key));
+                    if (lventry == NULL)
+                        errorf("Out of memory when creating mapping entry.\n");
+
+                    if (lvrange->index2 - lvrange->index1 != destrange->index2 - destrange->index1)
+                    {
+                        /* Let's make them the same size, first.
+                         * We need to update all ranges in the linked list of dest.
+                         */
+                        vector_t *oldvec = destrange->vec.u.vec;
+                        vector_t *vec = allocate_array(VEC_SIZE(oldvec) + lvrange->index2 - lvrange->index1 + destrange->index1 - destrange->index2);
+                        svalue_t *srcitem = oldvec->item;
+                        svalue_t *dstitem = vec->item;
+
+                        for (int i = destrange->index1; i > 0; i--)
+                            assign_svalue_no_free(dstitem++, srcitem++);
+
+                        srcitem = lventry + lvrange->index1;
+                        for (int i = lvrange->index1; i < lvrange->index2; i++)
+                            assign_protected_lvalue_no_free(dstitem++, srcitem++);
+
+                        srcitem = oldvec->item + destrange->index2;
+                        for (int i = VEC_SIZE(oldvec) - destrange->index2; i > 0; i--)
+                            assign_svalue_no_free(dstitem++, srcitem++);
+
+                        if (destrange->var != NULL
+                         && destrange->var->val.type == T_POINTER
+                         && destrange->var->val.u.vec == oldvec)
+                        {
+                            destrange->var->val.u.vec = ref_array(vec);
+                            free_array(oldvec);
+                        }
+                        destrange->index2 = destrange->index1 + lvrange->index2 - lvrange->index1;
+                        destrange->vec.u.vec = vec;
+                        free_array(oldvec);
+                    }
+                    else
+                    {
+                        /* Link the elements together. */
+                        svalue_t *srcitem = lventry + lvrange->index1;
+                        svalue_t *dstitem = destrange->vec.u.vec->item + destrange->index1;
+
+                        for (int i = lvrange->index2 - lvrange->index1; i > 0; i--)
+                            assign_protected_lvalue(dstitem++, srcitem++);
+                    }
+
+                    return true;
+                }
+
             } /* switch (lv->x.lvalue_type) */
             break;
 
@@ -2370,6 +2769,92 @@ link_protected_lvalue (svalue_t *dest, svalue_t *lv)
             internal_assign_svalue_no_free(dest, lv);
             free_svalue(&temp);
             break;
+        }
+
+        case LVALUE_PROTECTED_MAP_RANGE:
+        {
+            struct protected_map_range_lvalue *dest_range = dest->u.protected_map_range_lvalue;
+            mp_int dest_length = dest_range->index2 - dest_range->index1;
+            svalue_t *dest_item, *src_item;
+
+            switch (lv->x.lvalue_type)
+            {
+                default:
+                    fatal("(link_protected_lvalue) Illegal lvalue %p type %d\n", lv, lv->x.lvalue_type);
+                    /* NOTREACHED */
+                    break;
+
+                case LVALUE_PROTECTED:
+                {
+                    /* So hopefully this points to an array.
+                     * Then we can link the elements together.
+                     */
+                    struct protected_lvalue *src_lval = lv->u.protected_lvalue;
+
+                    if (src_lval->val.type != T_POINTER)
+                        return false;
+
+                    /* The array needs to have the same length. */
+                    if (dest_length != VEC_SIZE(src_lval->val.u.vec))
+                        return false;
+
+                    src_item = src_lval->val.u.vec->item;
+                    break;
+                }
+
+                case LVALUE_PROTECTED_CHAR:
+                    /* char and range are incompatible. */
+                    return false;
+
+                case LVALUE_PROTECTED_RANGE:
+                {
+                    struct protected_range_lvalue *src_range = lv->u.protected_range_lvalue;
+
+                    if (src_range->vec.type != T_POINTER)
+                        return false;
+
+                    if (src_range->index2 - src_range->index1 !=dest_length)
+                        return false;
+
+                    src_item = src_range->vec.u.vec->item + src_range->index1;
+                    break;
+                }
+
+                case LVALUE_PROTECTED_MAPENTRY:
+                    /* range and non-existent entry are incompatible. */
+                    return false;
+
+                case LVALUE_PROTECTED_MAP_RANGE:
+                {
+                    struct protected_map_range_lvalue *src_range = lv->u.protected_map_range_lvalue;
+                    svalue_t *src_entry;
+
+                     /* Are they the same? */
+                    if (src_range == dest_range)
+                        return true;
+
+                    if (src_range->index2 - src_range->index1 != dest_length)
+                        return false;
+
+                    src_entry = get_map_lvalue(src_range->map, &(src_range->key));
+                    if (src_entry == NULL)
+                        errorf("Out of memory when creating mapping entry.\n");
+
+                    src_item = src_entry + src_range->index1;
+                    break;
+                }
+
+            } /* switch (lv->x.lvalue_type) */
+
+            dest_item = get_map_lvalue(dest_range->map, &(dest_range->key));
+            if (!dest_item)
+                errorf("Out of memory when creating mapping entry.\n");
+            dest_item += dest_range->index1;
+
+            for (mp_int i = dest_range->index1; i < dest_range->index2; i++)
+                assign_protected_lvalue(dest_item++, src_item++);
+
+            return true;
         }
 
     } /* switch (dest->x.lvalue_type) */
@@ -2464,6 +2949,14 @@ assign_svalue (svalue_t *dest, svalue_t *v)
                 break;
             }
 
+        case LVALUE_UNPROTECTED_MAP_RANGE:
+            if (v->type == T_POINTER)
+            {
+                ref_array(v->u.vec);
+                transfer_map_range(v);
+            }
+            return;
+
         case LVALUE_PROTECTED:
             if (v->type == T_LVALUE)
             {
@@ -2538,6 +3031,23 @@ assign_svalue (svalue_t *dest, svalue_t *v)
                 continue;
             }
 
+        case LVALUE_PROTECTED_MAP_RANGE:
+            if (v->type == T_LVALUE)
+            {
+                normalize_svalue(dest, false);
+                link_protected_lvalue(dest, v);
+                return;
+            }
+            else if (v->type == T_POINTER)
+            {
+                struct protected_map_range_lvalue *r = dest->u.protected_map_range_lvalue;
+
+                ref_array(v->u.vec);
+                transfer_protected_map_range(r, v);
+                return;
+            }
+            return;
+
         } /* switch() */
 
         break;
@@ -2550,6 +3060,36 @@ assign_svalue (svalue_t *dest, svalue_t *v)
     internal_assign_svalue_no_free(dest, v);
 
 } /* assign_svalue() */
+
+/*-------------------------------------------------------------------------*/
+void
+assign_rvalue (svalue_t *dest, svalue_t *v)
+
+/* Put a duplicate of svalue <v> into svalue <dest>, meaning that the
+ * original value is either copied when appropriate, or its refcount is
+ * increased.
+ *
+ * If <v> is a protected lvalue, it will be dereferenced to get the real
+ * value. (It is not allowed to be an unprotected lvalue.)
+ *
+ * <dest> is considered a valid svalue and therefore freed before the
+ * assignment. If <dest> is a lvalue, <v> will be assigned to the svalue
+ * referenced to by <dest>.
+ */
+
+{
+    svalue_t *rv = get_rvalue(v, NULL);
+    if (rv == NULL)
+    {
+        svalue_t tmp;
+        assign_rvalue_no_free(&tmp, v);
+        transfer_svalue(v, &tmp);
+    }
+    else
+    {
+        assign_svalue(dest, rv);
+    }
+} /* assign_rvalue() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -2680,6 +3220,10 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
                 break;
             }
 
+        case LVALUE_UNPROTECTED_MAP_RANGE:
+            transfer_map_range(v);
+            return;
+
         case LVALUE_PROTECTED:
             if (v->type == T_LVALUE)
             {
@@ -2758,6 +3302,23 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
                 dest = get_map_lvalue(e->map, &(e->key)) + e->index;
                 continue;
             }
+
+        case LVALUE_PROTECTED_MAP_RANGE:
+            if (v->type == T_LVALUE)
+            {
+                normalize_svalue(dest, false);
+                link_protected_lvalue(dest, v);
+                free_svalue(v);
+                return;
+            }
+            else if (v->type == T_POINTER)
+            {
+                transfer_protected_map_range(dest->u.protected_map_range_lvalue, v);
+            }
+            else
+                free_svalue(v);
+            return;
+
         } /* switch() */
 
         break;
@@ -3023,6 +3584,108 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
     }
 
 } /* transfer_protected_pointer_range() */
+
+/*-------------------------------------------------------------------------*/
+static void
+transfer_map_range (svalue_t *source)
+
+/* Transfer the vector <source> to the range defined by
+ * <current_unprotected_map_range>, modifying the target mapping accordingly.
+ * <source> is freed once in the call.
+ *
+ * If <source> is not a vector, it is just freed.
+ */
+
+{
+    if (source->type == T_POINTER)
+    {
+        svalue_t *dstitem, *srcitem;
+        vector_t *sv = source->u.vec;
+
+        if (VEC_SIZE(sv) != current_unprotected_map_range.index2 - current_unprotected_map_range.index1)
+            errorf("Assignment to mapping range of different width: %"PRIdMPINT" vs. %"PRIdMPINT".\n",
+                (mp_int) VEC_SIZE(sv),
+                current_unprotected_map_range.index2 - current_unprotected_map_range.index1);
+
+        dstitem = get_map_lvalue(current_unprotected_map_range.map, &(current_unprotected_map_range.key));
+        if (dstitem == NULL)
+            errorf("Out of memory when creating mapping entry.\n");
+
+        dstitem += current_unprotected_map_range.index1;
+        srcitem = sv->item;
+
+        /* In case the mapping is only referenced from a value that we will overwrite now. */
+        (void)ref_mapping(current_unprotected_map_range.map);
+
+        if (sv->ref == 1)
+        {
+            /* We can move the values to the mapping. */
+            for (mp_int i = current_unprotected_map_range.index1; i < current_unprotected_map_range.index2; i++)
+                transfer_svalue(dstitem++, srcitem++);
+            free_empty_vector(sv);
+        }
+        else
+        {
+            for (mp_int i = current_unprotected_map_range.index1; i < current_unprotected_map_range.index2; i++)
+                assign_svalue(dstitem++, srcitem++);
+            free_array(sv);
+        }
+
+        free_mapping(current_unprotected_map_range.map);
+    }
+    else
+        /* Not a pointer: just free it */
+        free_svalue(source);
+} /* transfer_map_range() */
+
+/*-------------------------------------------------------------------------*/
+static void
+transfer_protected_map_range (struct protected_map_range_lvalue *dest, svalue_t *source)
+
+/* Transfer the vector <source> to the range defined by <dest>, modifying the
+ * target mapping of <dest> accordingly. <source> is freed once in the call.
+ *
+ * If <source> is not a vector, it is just freed.
+ */
+
+{
+    if (source->type == T_POINTER)
+    {
+        svalue_t *dstitem, *srcitem;
+        vector_t *sv = source->u.vec;
+
+        if (VEC_SIZE(sv) != dest->index2 - dest->index1)
+            errorf("Assignment to mapping range of different width: %"PRIdMPINT" vs. %"PRIdMPINT".\n",
+                (mp_int) VEC_SIZE(sv), dest->index2 - dest->index1);
+
+        dstitem = get_map_lvalue(dest->map, &(dest->key));
+        if (dstitem == NULL)
+            errorf("Out of memory when creating mapping entry.\n");
+
+        dstitem += dest->index1;
+        srcitem = sv->item;
+
+        if (sv->ref == 1)
+        {
+            /* We can move the values to the mapping. */
+            for (mp_int i = dest->index1; i < dest->index2; i++)
+                transfer_svalue(dstitem++, srcitem++);
+            free_empty_vector(sv);
+        }
+        else
+        {
+            for (mp_int i = dest->index1; i < dest->index2; i++)
+                assign_svalue(dstitem++, srcitem++);
+            free_array(sv);
+        }
+    }
+    else
+    {
+        /* Not a pointer */
+        free_svalue(source);
+    }
+
+} /* transfer_protected_map_range() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE mp_int
@@ -4091,11 +4754,22 @@ push_error_handler(void (*errorhandler)(error_handler_t *), error_handler_t *arg
  *     Return &(v[i1..i2]), unprotected, using current_unprotected_range.
  *     Supports all range-index types.
  *
+ *   push_map_range_lvalue(mapping m, mixed key, int i1, int i2)
+ *     Return &(m[k,i1..i2]), unprotected, using current_unprotected_map_range.
+ *     Supports all range-index types.
+ *
  *   push_index_value(vector|string|mapping|struct v, int|mixed i)
  *     Return v[i]
  *
+ *   push_map_index_value(mapping m, mixed k, int i)
+ *     Return m[k,i]
+ *
  *   push_range_value(vector|string v, int i1, int i2)
  *     Return v[i1..i2]
+ *
+ *   push_map_range_value(mapping m, mixed k, int i1, int i2)
+ *     Return m[k,i1..i2]
+ *
  */
 
 enum index_type { REGULAR_INDEX, REVERSE_INDEX, ARITHMETIC_INDEX };
@@ -4207,6 +4881,87 @@ get_vector_range_item (vector_t * vec, mp_int index1, mp_int index2, svalue_t * 
 {
     return get_vector_item_extended(vec, index2 - index1, index1, i, sp, pc, itype);
 } /* get_vector_range_item() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+get_map_range_item (struct protected_map_range_lvalue *r, svalue_t *i, svalue_t *sp, bytecode_p pc, enum index_type itype, mp_int *column)
+
+/* Index the map range <r> with index <i> and return the pointer to the indexed item.
+ * If the index is invalid, throw an error. If the map range points to an entry
+ * that doesn't exist in the mapping, return &const0.
+ * In <column> we return the column number of the resulting item (if not NULL).
+ */
+
+{
+    mp_int size, ind;
+    svalue_t *item;
+
+    if (i->type != T_NUMBER)
+    {
+        ERRORF(("Illegal index for []: got %s, expected number.\n", typename(i->type)));
+        return NULL;
+    }
+
+    size = r->index2 - r->index1;
+    ind = i->u.number;
+
+    switch (itype)
+    {
+        case REGULAR_INDEX:
+            if (ind < 0)
+            {
+                ERROR("Illegal index for []: not a positive number.\n");
+                /* NOTREACHED */
+                return NULL;
+            }
+            if (ind >= size)
+            {
+                ERRORF(("Index for [] out of bounds: %"PRIdMPINT", vector size: %"PRIdMPINT"\n"
+                       , ind, size));
+                /* NOTREACHED */
+                return NULL;
+            }
+            break;
+
+        case REVERSE_INDEX:
+            if (ind <= 0)
+            {
+                ERROR("Illegal index for [<]: not a positive number.\n");
+                return NULL;
+            }
+
+            if (ind > size)
+            {
+                ERRORF(("Index out of bounds for [<]: %"PRIdMPINT", vector size: %"PRIdMPINT".\n"
+                       , i->u.number, size));
+                return NULL;
+            }
+
+            ind = size - ind;
+            break;
+
+        case ARITHMETIC_INDEX:
+            if (ind < 0)
+                ind = size + ind;
+
+            if (ind < 0 || ind >= size)
+            {
+                ERRORF(("Index out of bounds for [>]: %"PRIdMPINT", vector size: %"PRIdMPINT".\n"
+                       , i->u.number, size));
+                return NULL;
+            }
+            break;
+    }
+
+    ind += r->index1;
+
+    if (column)
+        *column = ind;
+    item = get_map_value(r->map, &(r->key));
+    if (item == &const0)
+        return item;
+    return item + ind;
+} /* get_map_range_item() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
@@ -4459,7 +5214,7 @@ check_struct_op (svalue_t * sp, bytecode_p pc, bool * ignore_error)
  */
 
 {
-    short s_index;
+    unsigned short s_index;
     svalue_t * svp, * isvp;
 
     if (ignore_error)
@@ -4473,7 +5228,8 @@ check_struct_op (svalue_t * sp, bytecode_p pc, bool * ignore_error)
                , typename((isvp ? isvp : sp)->type)
               ));
     if (isvp->u.number >= 0
-     && isvp->u.number >= current_prog->num_structs)
+     && isvp->u.number >= current_prog->num_structs
+     && (isvp->u.number < STD_STRUCT_OFFSET || isvp->u.number >= USHRT_MAX))
     {
         ERRORF(("Too big struct index: %"PRIdPINT", max %hu\n"
                , isvp->u.number, current_prog->num_structs
@@ -4481,7 +5237,7 @@ check_struct_op (svalue_t * sp, bytecode_p pc, bool * ignore_error)
     }
 
     /* Get the struct type index */
-    s_index = (short)isvp->u.number;
+    s_index = (unsigned short)isvp->u.number;
 
     /* Get the struct value itself */
     svp = get_rvalue(sp-2, NULL);
@@ -4494,9 +5250,11 @@ check_struct_op (svalue_t * sp, bytecode_p pc, bool * ignore_error)
     }
 
     /* Check if the struct on the stack is of the correct type */
-    if (s_index >= 0)
+    if (s_index != USHRT_MAX)
     {
-        struct_type_t * pExpected = current_prog->struct_defs[s_index].type;
+        struct_type_t * pExpected = (s_index >= STD_STRUCT_OFFSET)
+                                  ? get_std_struct_type(s_index - STD_STRUCT_OFFSET)
+                                  : current_prog->struct_defs[s_index].type;
         struct_type_t * pType = svp->u.strct->type;
 
         if (struct_baseof(pExpected, pType))
@@ -4703,7 +5461,7 @@ assign_mapentry_lvalue_no_free (svalue_t *dest, mapping_t *map, svalue_t *key, i
     free_svalue(&(current_unprotected_mapentry.key));
     internal_assign_svalue_no_free(&(current_unprotected_mapentry.key), key);
     current_unprotected_mapentry.index = index;
-} /* assign_protected_mapentry_lvalue_no_free() */
+} /* assign_mapentry_lvalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
 INLINE void
@@ -4837,7 +5595,7 @@ assign_protected_lvalue (svalue_t *dest, svalue_t *src)
         free_svalue(dest);
         assign_protected_lvalue_no_free(dest, src);
     }
-} /* assign_protected_lvalue_no() */
+} /* assign_protected_lvalue() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -4864,6 +5622,33 @@ assign_protected_mapentry_lvalue_no_free (svalue_t *dest, mapping_t *map, svalue
 
     num_protected_lvalues++;
 } /* assign_protected_mapentry_lvalue_no_free() */
+
+/*-------------------------------------------------------------------------*/
+void
+assign_protected_map_range_lvalue_no_free (svalue_t *dest, mapping_t *map, svalue_t *key, mp_int index1, mp_int index2)
+
+/* Put a protected map range lvalue to <map>[key,index1..index2-1] into <dest>.
+ * <dest> is considered empty at the time of call.
+ */
+{
+    struct protected_map_range_lvalue *lval;
+
+    memsafe(lval = xalloc(sizeof(*lval)), sizeof(*lval)
+           , "protected map range lvalue");
+
+    lval->ref = 1;
+    lval->map = ref_mapping(map);
+    lval->index1 = index1;
+    lval->index2 = index2;
+
+    assign_svalue_no_free(&(lval->key), key);
+
+    dest->type = T_LVALUE;
+    dest->x.lvalue_type = LVALUE_PROTECTED_MAP_RANGE;
+    dest->u.protected_map_range_lvalue = lval;
+
+    num_protected_lvalues++;
+} /* assign_protected_map_range_lvalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
@@ -4918,10 +5703,20 @@ push_protected_lvalue (svalue_t *sp)
             free_svalue(&(current_unprotected_mapentry.key));
             break;
 
+        case LVALUE_UNPROTECTED_MAP_RANGE:
+            assign_protected_map_range_lvalue_no_free(sp,
+                current_unprotected_map_range.map,
+                &(current_unprotected_map_range.key),
+                current_unprotected_map_range.index1,
+                current_unprotected_map_range.index2);
+            free_svalue(&(current_unprotected_map_range.key));
+            break;
+
         case LVALUE_PROTECTED:
         case LVALUE_PROTECTED_CHAR:
         case LVALUE_PROTECTED_RANGE:
         case LVALUE_PROTECTED_MAPENTRY:
+        case LVALUE_PROTECTED_MAP_RANGE:
             NOOP;
             break;
     }
@@ -4973,6 +5768,7 @@ get_unprotected_lvalue (svalue_t *lval)
         case LVALUE_UNPROTECTED_CHAR:
         case LVALUE_UNPROTECTED_RANGE:
         case LVALUE_UNPROTECTED_MAPENTRY:
+        case LVALUE_UNPROTECTED_MAP_RANGE:
             return lval;
 
         case LVALUE_PROTECTED:
@@ -5002,6 +5798,22 @@ get_unprotected_lvalue (svalue_t *lval)
             free_svalue(&(current_unprotected_mapentry.key));
             internal_assign_svalue_no_free(&(current_unprotected_mapentry.key), &(e->key));
             current_unprotected_mapentry.index = e->index;
+            return &unprotected_lvalue;
+        }
+
+        case LVALUE_PROTECTED_MAP_RANGE:
+        {
+            struct protected_map_range_lvalue *r = lval->u.protected_map_range_lvalue;
+
+            unprotected_lvalue.type = T_LVALUE;
+            unprotected_lvalue.x.lvalue_type = LVALUE_UNPROTECTED_MAP_RANGE;
+            current_unprotected_map_range.map = r->map;
+            current_unprotected_map_range.index1 = r->index1;
+            current_unprotected_map_range.index2 = r->index2;
+
+            free_svalue(&(current_unprotected_map_range.key));
+            internal_assign_svalue_no_free(&(current_unprotected_map_range.key), &(r->key));
+
             return &unprotected_lvalue;
         }
     }
@@ -5047,64 +5859,112 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool rese
 
     if (vec == NULL) /* It's a protected range lvalue */
     {
-        struct protected_range_lvalue *r;
-
         vec = sp - 1;
-        assert(vec->type == T_LVALUE && vec->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-        r = vec->u.protected_range_lvalue;
+        assert(vec->type == T_LVALUE);
 
-        switch (r->vec.type)
+        switch (vec->x.lvalue_type)
         {
-            case T_POINTER:
+            case LVALUE_PROTECTED_RANGE:
             {
-                item = get_vector_range_item(r->vec.u.vec, r->index1, r->index2, idx, sp, pc, itype);
+                struct protected_range_lvalue *r = vec->u.protected_range_lvalue;
 
-                if (last_reference)
-                    last_reference = (r->vec.u.vec->ref == 1);
+                switch (r->vec.type)
+                {
+                    case T_POINTER:
+                    {
+                        item = get_vector_range_item(r->vec.u.vec, r->index1, r->index2, idx, sp, pc, itype);
+
+                        if (last_reference)
+                            last_reference = (r->vec.u.vec->ref == 1);
+                        break;
+                    }
+
+                    case T_STRING:
+                    case T_BYTES:
+                    {
+                        svalue_t temp;
+                        string_t * orig = r->vec.u.str;
+                        char * cp = get_string_range_item(&(r->vec), r->index1, r->index2, idx, MY_TRUE, MY_FALSE, sp, pc, itype);
+
+                        /* Update the original variable. */
+                        if (r->vec.u.str != orig
+                         && r->var != NULL
+                         && r->var->val.type == r->vec.type
+                         && r->var->val.u.str == orig)
+                        {
+                            free_mstring(orig);
+                            r->var->val.u.str = ref_mstring(r->vec.u.str);
+                        }
+
+                        if (last_reference && vec->u.str->info.ref == 1)
+                        {
+                            /* The string will go away, store the number. */
+                            free_svalue(&indexing_quickfix);
+                            put_number(&indexing_quickfix, *(unsigned char*)cp);
+
+                            free_svalue(sp--);
+                            free_svalue(sp);
+
+                            assign_lvalue_no_free(sp, &indexing_quickfix);
+                            return sp;
+                        }
+
+                        assign_char_lvalue_no_free(&temp, r->var, r->vec.u.str, cp);
+                        free_svalue(sp--);
+                        free_svalue(sp);
+                        *sp = temp;
+
+                        return sp;
+                    }
+
+                    default:
+                        fatal("(index_lvalue)Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                }
                 break;
             }
 
-            case T_STRING:
-            case T_BYTES:
+            case LVALUE_PROTECTED_MAP_RANGE:
             {
-                svalue_t temp;
-                string_t * orig = r->vec.u.str;
-                char * cp = get_string_range_item(&(r->vec), r->index1, r->index2, idx, MY_TRUE, MY_FALSE, sp, pc, itype);
+                mp_int col;
+                struct protected_map_range_lvalue *r = vec->u.protected_map_range_lvalue;
 
-                /* Update the original variable. */
-                if (r->vec.u.str != orig
-                 && r->var != NULL
-                 && r->var->val.type == r->vec.type
-                 && r->var->val.u.str == orig)
+                if (last_reference)
+                    last_reference = (r->map->ref == 1);
+
+                item = get_map_range_item(r, idx, sp, pc, itype, &col);
+                if (item == &const0)
                 {
-                    free_mstring(orig);
-                    r->var->val.u.str = ref_mstring(r->vec.u.str);
-                }
+                    /* The key doesn't exist, we create a mapentry lvalue. */
+                    if (last_reference)
+                    {
+                        /* The mapping is going away... */
+                        free_svalue(&indexing_quickfix);
+                        assign_svalue_no_free(&indexing_quickfix, item);
 
-                if (last_reference && vec->u.str->info.ref == 1)
-                {
-                    /* The string will go away, store the number. */
-                    free_svalue(&indexing_quickfix);
-                    put_number(&indexing_quickfix, *(unsigned char*)cp);
+                        free_svalue(sp--);
+                        free_svalue(sp);
 
-                    free_svalue(sp--);
-                    free_svalue(sp);
+                        assign_var_lvalue_no_free(sp, &indexing_quickfix);
+                    }
+                    else
+                    {
+                        svalue_t temp;
 
-                    assign_lvalue_no_free(sp, &indexing_quickfix);
+                        assign_mapentry_lvalue_no_free(&temp, r->map, &(r->key), col);
+                        free_svalue(sp--);
+                        free_svalue(sp);
+                        *sp = temp;
+                    }
                     return sp;
                 }
-
-                assign_char_lvalue_no_free(&temp, r->var, r->vec.u.str, cp);
-                free_svalue(sp--);
-                free_svalue(sp);
-                *sp = temp;
-
-                return sp;
+                break;
             }
 
             default:
-                fatal("(index_lvalue)Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                fatal("Illegal lvalue type %d\n", vec->x.lvalue_type);
+                break;
         }
+
     }
     else
     {
@@ -5253,12 +6113,20 @@ push_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool rese
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-push_map_index_lvalue (svalue_t *sp, bytecode_p pc, bool reseating)
+push_map_index_lvalue (svalue_t *sp, bytecode_p pc, enum index_type itype, bool reseating)
 
-/* Operator F_MAP_INDEX_LVALUE(  mapping m=sp[-2]
- *                             , mixed i=sp[-1], int j=sp[0])
- *          F_MAP_INDEX_VLVALUE( mapping m=sp[-2]
- *                             , mixed i=sp[-1], int j=sp[0])
+/* Operator F_MAP_INDEX_LVALUE(   mapping m=sp[-2]
+ *                              , mixed i=sp[-1], int j=sp[0])
+ *          F_MAP_RINDEX_LVALUE(  mapping m=sp[-2]
+ *                              , mixed i=sp[-1], int j=sp[0])
+ *          F_MAP_AINDEX_LVALUE(  mapping m=sp[-2]
+ *                              , mixed i=sp[-1], int j=sp[0])
+ *          F_MAP_INDEX_VLVALUE(  mapping m=sp[-2]
+ *                              , mixed i=sp[-1], int j=sp[0])
+ *          F_MAP_RINDEX_VLVALUE( mapping m=sp[-2]
+ *                              , mixed i=sp[-1], int j=sp[0])
+ *          F_MAP_AINDEX_VLVALUE( mapping m=sp[-2]
+ *                              , mixed i=sp[-1], int j=sp[0])
  *
  * Compute the lvalue &(m[i,j]) and push it into the stack. If v has
  * just one ref left, the indexed item is stored in indexing_quickfix
@@ -5285,10 +6153,36 @@ push_map_index_lvalue (svalue_t *sp, bytecode_p pc, bool reseating)
 
     m = sp[-2].u.map;
     n = sp->u.number;
-    if (n < 0 || n >= m->num_values)
+    switch (itype)
     {
-        ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
-                PRIdPINT".\n", n, m->num_values));
+        case REGULAR_INDEX:
+            if (n < 0 || n >= m->num_values)
+            {
+                ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
+                        PRIdPINT".\n", n, m->num_values));
+            }
+            break;
+
+        case REVERSE_INDEX:
+            if (n <= 0 || n > m->num_values)
+            {
+                ERRORF(("Illegal sub-index <%"PRIdMPINT", mapping width is %"
+                        PRIdPINT".\n", n, m->num_values));
+            }
+
+            n = m->num_values - n;
+            break;
+
+        case ARITHMETIC_INDEX:
+            if (n < 0)
+                n += m->num_values;
+
+            if (n < 0 || n >= m->num_values)
+            {
+                ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
+                        PRIdPINT".\n", n, m->num_values));
+            }
+            break;
     }
 
     sp--; /* the key */
@@ -5340,7 +6234,7 @@ push_map_index_lvalue (svalue_t *sp, bytecode_p pc, bool reseating)
 
 
 /*-------------------------------------------------------------------------*/
-/* Code values used by push_range_lvalue() and push_range_value()
+/* Code values used by push_(map_)range_lvalue() and push_(map_)range_value()
  */
 
 enum range_type
@@ -5410,19 +6304,39 @@ push_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
     if (vec == NULL)
     {
         /* It must be a protected range. */
-        struct protected_range_lvalue *r;
-
         vec = sp - 2;
-        assert(vec->type == T_LVALUE && vec->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-        r = vec->u.protected_range_lvalue;
 
-        vec = &(r->vec);
-        offset = r->index1;
-        size = r->index2 - r->index1;
-        var = r->var;
+        assert(vec->type == T_LVALUE);
+        switch (vec->x.lvalue_type)
+        {
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = vec->u.protected_range_lvalue;
 
-        if (vec->type != T_POINTER && vec->type != T_STRING && vec->type != T_BYTES)
-            fatal("(range_lvalue)Illegal type for range lvalue '%s'.\n", typename(vec->type));
+                vec = &(r->vec);
+                offset = r->index1;
+                size = r->index2 - r->index1;
+                var = r->var;
+
+                if (vec->type != T_POINTER && vec->type != T_STRING && vec->type != T_BYTES)
+                    fatal("(range_lvalue)Illegal type for range lvalue '%s'.\n", typename(vec->type));
+                break;
+            }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                struct protected_map_range_lvalue *r = vec->u.protected_map_range_lvalue;
+
+                offset = r->index1;
+                size = r->index2 - r->index1;
+                var = NULL;
+                break;
+            }
+
+            default:
+                fatal("Illegal lvalue type %d\n", vec->x.lvalue_type);
+                break;
+        }
     }
     else
     {
@@ -5576,20 +6490,177 @@ push_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
 
     /* Save information to the current_unprotected_range structure.
      */
-    current_unprotected_range.var = var;
-    current_unprotected_range.vec = vec;
-    current_unprotected_range.index1 = offset+ind1;
-    current_unprotected_range.index2 = offset+ind2+1;
+    if (vec->type == T_LVALUE && vec->x.lvalue_type == LVALUE_PROTECTED_MAP_RANGE)
+    {
+        /* Indexing a map range will produce a map range. */
+        struct protected_map_range_lvalue *r = vec->u.protected_map_range_lvalue;
 
-    /* Drop the arguments and return the result. */
-    pop_n_elems(3);
-    sp++;
+        current_unprotected_map_range.map = r->map;
+        current_unprotected_map_range.index1 = offset + ind1;
+        current_unprotected_map_range.index2 = offset + ind2 + 1;
 
-    sp->type = T_LVALUE;
-    sp->x.lvalue_type = LVALUE_UNPROTECTED_RANGE;
+        free_svalue(&(current_unprotected_map_range.key));
+        internal_assign_svalue_no_free(&(current_unprotected_map_range.key), &(r->key));
+
+        /* Drop the arguments and return the result. */
+        pop_n_elems(3);
+        sp++;
+
+        sp->type = T_LVALUE;
+        sp->x.lvalue_type = LVALUE_UNPROTECTED_MAP_RANGE;
+    }
+    else
+    {
+        current_unprotected_range.var = var;
+        current_unprotected_range.vec = vec;
+        current_unprotected_range.index1 = offset+ind1;
+        current_unprotected_range.index2 = offset+ind2+1;
+
+        /* Drop the arguments and return the result. */
+        pop_n_elems(3);
+        sp++;
+
+        sp->type = T_LVALUE;
+        sp->x.lvalue_type = LVALUE_UNPROTECTED_RANGE;
+    }
 
     return sp;
 } /* push_range_lvalue() */
+
+/*-------------------------------------------------------------------------*/
+static svalue_t *
+push_map_range_lvalue (enum range_type code, svalue_t *sp, bytecode_p pc)
+
+/* Operator F_MAP_RANGE_LVALUE (mapping mv=sp[-3], mixed k=sp[-2], int i1=sp[-1], i2=sp[0])
+ * and the operators F_MAP_??_RANGE_LVALUE.
+ *
+ * Compute the range &(m[k,i1..i2]) and push it onto the stack.
+ * The value pushed is a lvalue pointing to <special_lvalue>.
+ * <special_lvalue> then is a MAP_RANGE_LVALUE.
+ *
+ * <code> is a four-bit flag determining whether the indexes are counted
+ * from the beginning ('[i1..' and '..i2]'), the end of the vector
+ * or string ('[<i1..' and '..<i2]'), or depending on the sign of the
+ * index either from the beginning or end ('[>i1..' and '..>i2]').
+ * <code>&NX_MASK determines the mode for the lower index (NN_RANGE,
+ * RN_RANGE or AN_RANGE), <code>&XN_MASK the upper index (NN_RANGE,
+ * NR_RANGE or NA_RANGE).
+ */
+
+{
+    mp_int ind1, ind2, width;
+    mapping_t *map;
+
+    if (sp[-3].type != T_MAPPING)
+    {
+        ERRORF(("Indexing on illegal type: %s, expected mapping.\n"
+               , typename(sp[-3].type)
+              ));
+    }
+    if (sp[-1].type != T_NUMBER)
+    {
+        ERRORF(("Illegal sub-index start interval type: %s, expected int.\n"
+               , typename(sp[-1].type)
+              ));
+    }
+    if (sp[-0].type != T_NUMBER)
+    {
+        ERRORF(("Illegal sub-index end interval type: %s, expected int.\n"
+               , typename(sp[0].type)
+              ));
+    }
+
+    map = sp[-3].u.map;
+    ind1 = sp[-1].u.number;
+    ind2 = sp[0].u.number;
+    width = map->num_values;
+
+    switch (code & NX_MASK)
+    {
+        case NN_RANGE:
+            // Nothing to do.
+            break;
+
+        case RN_RANGE:
+            ind1 = width - ind1;
+            break;
+
+        case AN_RANGE:
+            if (ind1 < 0)
+                ind1 = width + ind1;
+            break;
+
+        default:
+            fatal("(range_value)Illegal index type %d.\n", code);
+            break;
+    }
+
+    switch (code & XN_MASK)
+    {
+        case NN_RANGE:
+            // Nothing to do.
+            break;
+
+        case NR_RANGE:
+            ind2 = width - ind2;
+            break;
+
+        case NA_RANGE:
+            if (ind2 < 0)
+                ind2 = width + ind2;
+            break;
+
+        default:
+            fatal("(range_value)Illegal index type %d.\n", code);
+            break;
+    }
+
+    if (ind1 < 0 || ind1 > width)
+    {
+        if (ind2 < -1 || ind2 >= width)
+            ERRORF(("Mapping range limits are out of bounds: [%"PRIdMPINT"..%"PRIdMPINT"], mapping width is %"PRIdMPINT".\n"
+                  , ind1, ind2, width));
+        else
+            ERRORF(("Mapping lower range limit is out of bounds: %"PRIdMPINT", mapping width is %"PRIdMPINT".\n"
+                  , ind1, width));
+    }
+    else if (ind2 < -1 || ind2 >= width)
+    {
+        ERRORF(("Mapping upper range limit is out of bounds: %"PRIdMPINT", mapping width is %"PRIdMPINT".\n"
+              , ind2, width));
+    }
+    else if (ind1 > ind2 + 1)
+    {
+        ERRORF(("Mapping range of negative length: [%"PRIdMPINT"..%"PRIdMPINT"].\n"
+              , ind1, ind2));
+    }
+
+    /* Everything is fine, create the lvalue.
+     * We don't need to do the actual lookup.
+     */
+    if (map->ref == 1)
+    {
+        /* Rescue the mapping as it will go away */
+        svalue_t temp = indexing_quickfix;
+        assign_svalue_no_free(&indexing_quickfix, sp-3);
+        free_svalue(&temp);
+    }
+
+    current_unprotected_map_range.map = map;
+    current_unprotected_map_range.index1 = ind1;
+    current_unprotected_map_range.index2 = ind2+1;
+
+    free_svalue(&(current_unprotected_map_range.key));
+    internal_assign_svalue_no_free(&(current_unprotected_map_range.key), sp-2);
+
+    pop_n_elems(4);
+    sp++;
+
+    sp->type = T_LVALUE;
+    sp->x.lvalue_type = LVALUE_UNPROTECTED_MAP_RANGE;
+
+    return sp;
+} /* push_map_range_lvalue() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
@@ -5621,48 +6692,64 @@ push_index_value (svalue_t *sp, bytecode_p pc, bool ignore_error, enum index_typ
 
     if (vec == NULL) /* It's a protected range lvalue */
     {
-        struct protected_range_lvalue *r;
-
         vec = sp - 1;
-        assert(vec->type == T_LVALUE && vec->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-        r = vec->u.protected_range_lvalue;
+        assert(vec->type == T_LVALUE);
 
-        switch (r->vec.type)
+        switch (vec->x.lvalue_type)
         {
-            case T_POINTER:
+            case LVALUE_PROTECTED_RANGE:
             {
-                item = get_vector_range_item(r->vec.u.vec, r->index1, r->index2, idx, sp, pc, itype);
+                struct protected_range_lvalue *r = vec->u.protected_range_lvalue;
+
+                switch (r->vec.type)
+                {
+                    case T_POINTER:
+                    {
+                        item = get_vector_range_item(r->vec.u.vec, r->index1, r->index2, idx, sp, pc, itype);
+                        break;
+                    }
+
+                    case T_STRING:
+                    case T_BYTES:
+                    {
+                        char *cp = get_string_range_item(&(r->vec), r->index1, r->index2, idx, MY_FALSE, MY_TRUE, sp, pc, itype);
+                        p_int c;
+
+                        if (r->vec.u.str->info.unicode == STRING_UTF8)
+                        {
+                            if (!utf8_to_unicode(cp, 4, &c))
+                            {
+                                inter_sp = sp;
+                                inter_pc = pc;
+                                errorf("(index_value)Invalid character in string.\n");
+                                return NULL;
+                            }
+                        }
+                        else
+                            c = *((unsigned char*)cp);
+
+                        free_svalue(sp--);
+                        free_svalue(sp);
+
+                        put_number(sp, c);
+                        return sp;
+                    }
+
+                    default:
+                        fatal("(index_value)Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                }
                 break;
             }
 
-            case T_STRING:
-            case T_BYTES:
+            case LVALUE_PROTECTED_MAP_RANGE:
             {
-                char *cp = get_string_range_item(&(r->vec), r->index1, r->index2, idx, MY_FALSE, MY_TRUE, sp, pc, itype);
-                p_int c;
-
-                if (r->vec.u.str->info.unicode == STRING_UTF8)
-                {
-                    if (!utf8_to_unicode(cp, 4, &c))
-                    {
-                        inter_sp = sp;
-                        inter_pc = pc;
-                        errorf("(index_value)Invalid character in string.\n");
-                        return NULL;
-                    }
-                }
-                else
-                    c = *((unsigned char*)cp);
-
-                free_svalue(sp--);
-                free_svalue(sp);
-
-                put_number(sp, c);
-                return sp;
+                item = get_map_range_item(vec->u.protected_map_range_lvalue, idx, sp, pc, itype, NULL);
+                break;
             }
 
             default:
-                fatal("(index_value)Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                fatal("Illegal lvalue type %d\n", vec->x.lvalue_type);
+                break;
         }
     }
     else
@@ -5770,6 +6857,91 @@ push_index_value (svalue_t *sp, bytecode_p pc, bool ignore_error, enum index_typ
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
+push_map_index_value (svalue_t *sp, bytecode_p pc, enum index_type itype)
+
+/* Operator F_MAP_INDEX  (mapping m=sp[-2], mixed k=sp[-1], int i=sp[0])
+ *          F_MAP_RINDEX (mapping m=sp[-2], mixed k=sp[-1], int i=sp[0])
+ *          F_MAP_AINDEX (mapping m=sp[-2], mixed k=sp[-1], int i=sp[0])
+ *
+ * Compute the value (m[k,i]) and push it onto the stack.
+ * If the value would be a destructed object, 0 is pushed onto the stack
+ * and the ref to the object is removed from the vector/mapping.
+ * <ignore_error> will just be passed to get_struct_item() and
+ * results in returning 0, when a struct member is not found.
+ */
+
+{
+    mapping_t *m;
+    mp_int n;
+    svalue_t *data;
+
+    if (sp[-2].type != T_MAPPING)
+    {
+        ERRORF(("(value) Indexing on illegal type: %s, expected mapping.\n"
+               , typename(sp[-2].type)
+              ));
+    }
+    if (sp[0].type != T_NUMBER)
+    {
+        ERRORF(("Illegal sub-index type: %s, expected number.\n"
+               , typename(sp[0].type)
+              ));
+    }
+
+    m = sp[-2].u.map;
+    n = sp->u.number;
+
+    switch (itype)
+    {
+        case REGULAR_INDEX:
+            if (n < 0 || n >= m->num_values)
+            {
+                ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
+                        PRIdPINT".\n", n, m->num_values));
+            }
+            break;
+
+        case REVERSE_INDEX:
+            if (n <= 0 || n > m->num_values)
+            {
+                ERRORF(("Illegal sub-index <%"PRIdMPINT", mapping width is %"
+                        PRIdPINT".\n", n, m->num_values));
+            }
+
+            n = m->num_values - n;
+            break;
+
+        case ARITHMETIC_INDEX:
+            if (n < 0)
+                n += m->num_values;
+
+            if (n < 0 || n >= m->num_values)
+            {
+                ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
+                        PRIdPINT".\n", n, m->num_values));
+            }
+            break;
+    }
+
+    sp--; /* the sub-index */
+
+    data = get_map_value(m, sp);
+    pop_stack(); /* the key */
+
+    if (data == &const0)
+    {
+        put_number(sp, 0);
+    }
+    else
+    {
+        assign_rvalue_no_free(sp, data + n);
+    }
+    free_mapping(m);
+    return sp;
+} /* push_map_index_value() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
 push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
 
 /* Operator F_RANGE (string|vector &v=sp[-2], int i1=sp[-1], i2=sp[0])
@@ -5811,18 +6983,37 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
     if (vec == NULL)
     {
         /* It must be a protected range. */
-        struct protected_range_lvalue *r;
-
         vec = sp - 2;
-        assert(vec->type == T_LVALUE && vec->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-        r = vec->u.protected_range_lvalue;
 
-        vec = &(r->vec);
-        offset = r->index1;
-        size = r->index2 - r->index1;
+        assert(vec->type == T_LVALUE);
+        switch (vec->x.lvalue_type)
+        {
+            case LVALUE_PROTECTED_RANGE:
+            {
+                struct protected_range_lvalue *r = vec->u.protected_range_lvalue;
 
-        if (vec->type != T_POINTER && vec->type != T_STRING && vec->type != T_BYTES)
-            fatal("(range_value)Illegal type for range lvalue '%s'.\n", typename(vec->type));
+                vec = &(r->vec);
+                offset = r->index1;
+                size = r->index2 - r->index1;
+
+                if (vec->type != T_POINTER && vec->type != T_STRING && vec->type != T_BYTES)
+                    fatal("(range_value)Illegal type for range lvalue '%s'.\n", typename(vec->type));
+                break;
+            }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                struct protected_map_range_lvalue *r = vec->u.protected_map_range_lvalue;
+
+                offset = r->index1;
+                size = r->index2 - r->index1;
+                break;
+            }
+
+            default:
+                fatal("Illegal lvalue type %d\n", vec->x.lvalue_type);
+                break;
+        }
     }
     else
     {
@@ -5897,7 +7088,8 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
             break;
     }
 
-    if (runtime_array_range_check && vec->type == T_POINTER)
+    if ((runtime_array_range_check && vec->type == T_POINTER)
+      || vec->type == T_LVALUE)
     {
         if (ind1 < 0 || ind1 >= length)
         {
@@ -5985,10 +7177,174 @@ push_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
             return sp;
         }
 
+        case T_LVALUE:
+        {
+            struct protected_map_range_lvalue *r;;
+            svalue_t *src;
+            vector_t *v;
+
+            assert(vec->x.lvalue_type == LVALUE_PROTECTED_MAP_RANGE);
+
+            r = vec->u.protected_map_range_lvalue;
+            src = get_map_value(r->map, &(r->key));
+
+            if (src == &const0)
+                v = allocate_array(ind2 - ind1 + 1);
+            else
+            {
+                v = allocate_uninit_array(ind2 - ind1 + 1);
+                if (v)
+                {
+                    svalue_t *dest = v->item;
+                    src += offset + ind1;
+
+                    for (mp_int i = ind1; i <= ind2; i++)
+                        assign_rvalue_no_free(dest++, src++);
+                }
+            }
+
+            pop_n_elems(3);
+            if (v)
+                push_array(sp, v);
+            else
+                push_number(sp, 0);
+            return sp;
+        }
+
         default:
             fatal("(range_value)Illegal type for range lvalue '%s'.\n", typename(vec->type));
     }
 }
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+push_map_range_value (enum range_type code, svalue_t *sp, bytecode_p pc)
+
+/* Operator F_MAP_RANGE (mapping m=sp[-3], mixed k=sp[-2], int i1=sp[-1], i2=sp[0])
+ * and the operators F_MAP_??_RANGE.
+ *
+ * Compute the value m[k,i1..i2] and push it onto the stack.
+ *
+ * <code> is a four-bit flag determining whether the indexes are counted
+ * from the beginning ('[i1..' and '..i2]'), the end ('[<i1..' and '..<i2]'),
+ * or depending on the sign of the index either from the beginning or
+ * end ('[>i1..' and '..>i2]').
+ *
+ * <code>&NX_MASK determines the mode for the lower index (NN_RANGE,
+ * RN_RANGE or AN_RANGE), <code>&XN_MASK the upper index (NN_RANGE,
+ * NR_RANGE or NA_RANGE).
+ */
+
+{
+    svalue_t      *msv;         /* the mapping as an svalue */
+    mapping_t     *m;           /* the indexed mapping */
+    svalue_t      *k;           /* the mapping key */
+    mp_int         ind1, ind2;  /* Lower and upper range index */
+    mp_int         width;       /* Mapping width */
+    svalue_t      *data;        /* The requested elements. */
+    vector_t      *v;           /* The resulting array */
+
+    /* get the arguments */
+    msv = get_rvalue(sp-3, NULL);
+    if (msv == NULL || msv->type != T_MAPPING)
+        ERRORF(("Bad argument to [,..] operand: got %s, expected mapping.\n"
+              , typename(msv ? msv->type : sp[-3].type))
+              );
+    m = msv->u.map;
+
+    k = sp-2;
+
+    if (sp[-1].type != T_NUMBER)
+        ERRORF(("Bad type '%s' of start interval to [,..] range.\n"
+               , typename(sp[-1].type)
+               ));
+    if (sp[0].type != T_NUMBER)
+        ERRORF(("Bad type '%s' of end interval to [,..] range.\n"
+               , typename(sp[0].type)
+               ));
+    ind1 = sp[-1].u.number;
+    ind2 = sp[0].u.number;
+
+    width = m->num_values;
+
+    switch (code & NX_MASK)
+    {
+        case NN_RANGE:
+            // Nothing to do.
+            break;
+
+        case RN_RANGE:
+            ind1 = width - ind1;
+            break;
+
+        case AN_RANGE:
+            if (ind1 < 0)
+                ind1 = width + ind1;
+            break;
+
+        default:
+            fatal("(range_value)Illegal index type %d.\n", code);
+            break;
+    }
+
+    switch (code & XN_MASK)
+    {
+        case NN_RANGE:
+            // Nothing to do.
+            break;
+
+        case NR_RANGE:
+            ind2 = width - ind2;
+            break;
+
+        case NA_RANGE:
+            if (ind2 < 0)
+                ind2 = width + ind2;
+            break;
+
+        default:
+            fatal("(range_value)Illegal index type %d.\n", code);
+            break;
+    }
+
+    if (ind1 < 0 || ind1 >= width)
+    {
+        if (ind2 < 0 || ind2 >= width)
+            ERRORF(("Mapping range limits are out of bounds: [%"PRIdMPINT"..%"PRIdMPINT"], mapping width is %"PRIdMPINT".\n"
+                  , ind1, ind2, width));
+        else
+            ERRORF(("Mapping lower range limit is out of bounds: %"PRIdMPINT", mapping width is %"PRIdMPINT".\n"
+                  , ind1, width));
+    }
+    else if (ind2 < 0 || ind2 >= width)
+    {
+        ERRORF(("Mapping upper range limit is out of bounds: %"PRIdMPINT", mapping width is %"PRIdMPINT".\n"
+              , ind2, width));
+    }
+    else if (ind1 > ind2 + 1)
+    {
+        ERRORF(("Mapping range of negative length: [%"PRIdMPINT"..%"PRIdMPINT"].\n"
+              , ind1, ind2));
+    }
+
+    data = get_map_value(m, k);
+    if (data == &const0)
+        v = allocate_array(ind2 - ind1 + 1);
+    else
+    {
+        svalue_t *item;
+
+        v = allocate_uninit_array(ind2 - ind1 + 1);
+        item = v->item;
+
+        for (mp_int i = ind1; i <= ind2; i++, item++)
+            assign_rvalue_no_free(item, data + i);
+    }
+
+    pop_n_elems(4);
+    push_array(sp, v);
+    return sp;
+} /* push_map_range_value() */
 
 /*=========================================================================*/
 /*-------------------------------------------------------------------------*/
@@ -6302,6 +7658,22 @@ const char * typename (int type) { return typename_inline(type); }
 
 /*-------------------------------------------------------------------------*/
 const char *
+sv_typename (svalue_t *val)
+
+/* Translate the type of svalue <val> into a readable string.
+ */
+
+{
+#ifdef USE_PYTHON
+    if (val->type == T_PYTHON)
+        return get_txt(get_python_type_name(val->x.python_type)->name);
+#endif
+
+    return typename(val->type);
+} /* sv_typename() */
+
+/*-------------------------------------------------------------------------*/
+const char *
 efun_arg_typename (long type)
 
 /* Translate the bit-encoded efun argument <type> into a readable
@@ -6417,15 +7789,15 @@ vefun_bad_arg (int arg, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-raise_arg_error (int instr, int arg, long expected, int got)
+raise_arg_error (int instr, int arg, long expected, svalue_t *got)
   NORETURN;
 
 static INLINE void
-raise_arg_error (int instr, int arg, long expected, int got)
+raise_arg_error (int instr, int arg, long expected, svalue_t *got)
 
 /* The argument <arg> to <instr> had the wrong type: expected was the
  * type <expected> (bit-encoded as in the efun_lpc_types[]), but
- * it got the type <got> (the svalue type tag).
+ * it got the svalue <got>.
  * If <instr> is negative, the instruction code is read from
  * inter_pc - <instr>; otherwise it is the instruction code itself.
  *
@@ -6443,16 +7815,16 @@ raise_arg_error (int instr, int arg, long expected, int got)
         expected = efun_lpc_types[instrs[instr].lpc_arg_index];
 
     errorf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
-         , arg, get_f_name(instr), typename(got), efun_arg_typename(expected)
+         , arg, get_f_name(instr), sv_typename(got), efun_arg_typename(expected)
          );
     /* NOTREACHED */
 } /* raise_arg_error() */
 
 /*-------------------------------------------------------------------------*/
 void
-efun_gen_arg_error (int arg, int got, svalue_t *sp)
+efun_gen_arg_error (int arg, svalue_t *got, svalue_t *sp)
 
-/* The argument <arg> to the current tabled efun had the wrong type <got>.
+/* The argument <arg> to the current tabled efun had the wrong svalue <got>.
  * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
  */
 
@@ -6464,9 +7836,9 @@ efun_gen_arg_error (int arg, int got, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-vefun_gen_arg_error (int arg, int got, svalue_t *sp)
+vefun_gen_arg_error (int arg, svalue_t *got, svalue_t *sp)
 
-/* The argument <arg> to the current tabled vefun had the wrong type <got>.
+/* The argument <arg> to the current tabled vefun had the wrong svalue <got>.
  * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
  */
 
@@ -6478,11 +7850,11 @@ vefun_gen_arg_error (int arg, int got, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-efun_arg_error (int arg, int expected, int got, svalue_t *sp)
+efun_arg_error (int arg, int expected, svalue_t *got, svalue_t *sp)
 
 /* The argument <arg> to the current tabled efun had the wrong type:
- * expected was the type <expected>, but it got the type <got>
- * (both values are the svalue type tag).
+ * expected was the type <expected> (an svalue type tag), but it got
+ * the svalue <got>
  * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
  */
 
@@ -6494,11 +7866,11 @@ efun_arg_error (int arg, int expected, int got, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-efun_exp_arg_error (int arg, long expected, int got, svalue_t *sp)
+efun_exp_arg_error (int arg, long expected, svalue_t *got, svalue_t *sp)
 
 /* The argument <arg> to the current tabled efun had the wrong type:
- * expected was the type <expected> (given as bitflags), but it got the type
- * <got> (given as svalue type tag).
+ * expected was the type <expected> (given as bitflags), but it got the
+ * svalue <got>.
  * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
  */
 
@@ -6510,11 +7882,11 @@ efun_exp_arg_error (int arg, long expected, int got, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-vefun_arg_error (int arg, int expected, int got, svalue_t *sp)
+vefun_arg_error (int arg, int expected, svalue_t *got, svalue_t *sp)
 
 /* The argument <arg> to the current tabled vefun had the wrong type:
- * expected was the type <expected>, but it got the type <got>
- * (both values are the svalue type tag).
+ * expected was the type <expected> (an svalue type tag), but it got
+ * the svalue <got>.
  * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
  */
 
@@ -6526,11 +7898,11 @@ vefun_arg_error (int arg, int expected, int got, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-vefun_exp_arg_error (int arg, long expected, int got, svalue_t *sp)
+vefun_exp_arg_error (int arg, long expected, svalue_t *got, svalue_t *sp)
 
 /* The argument <arg> to the current tabled vefun had the wrong type:
  * expected was the type <expected> (in the bit-encoded format), but
- * it got the type <got> (the svalue type tag).
+ * it got the svalue <got>.
  * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
  */
 
@@ -6542,15 +7914,15 @@ vefun_exp_arg_error (int arg, long expected, int got, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-code_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp)
+code_exp_arg_error (int arg, long expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
   NORETURN;
 
 static INLINE void
-code_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp)
+code_exp_arg_error (int arg, long expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
 
 /* The argument <arg> to the current one-byte instruction had the wrong type:
  * expected was the type <expected> (in bit-flag encoding), but it got the
- * type <got> (the svalue type tag).
+ * svalue <got>.
  * inter_pc will be set from <pc>, inter_sp will be set from <sp>.
  */
 
@@ -6563,22 +7935,22 @@ code_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp
     instr = complete_instruction(-1);
 
     errorf("Bad arg %d to %s: got '%s', expected '%s'.\n"
-         , arg, get_f_name(instr), typename(got), efun_arg_typename(expected)
+         , arg, get_f_name(instr), sv_typename(got), efun_arg_typename(expected)
          );
     /* NOTREACHED */
 } /* code_exp_arg_error() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-code_arg_error (int arg, int expected, int got, bytecode_p pc, svalue_t *sp)
+code_arg_error (int arg, int expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
   NORETURN;
 
 static INLINE void
-code_arg_error (int arg, int expected, int got, bytecode_p pc, svalue_t *sp)
+code_arg_error (int arg, int expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
 
 /* The argument <arg> to the current one-byte instruction had the wrong type:
- * expected was the type <expected>, but it got the type <got>
- * (both values are the svalue type tag).
+ * expected was the type <expected> (an svalue type tag), but it got the
+ * svalue <got>.
  * inter_pc will be set from <pc>, inter_sp will be set from <sp>.
  */
 
@@ -6589,15 +7961,15 @@ code_arg_error (int arg, int expected, int got, bytecode_p pc, svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-op_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp)
+op_exp_arg_error (int arg, long expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
   NORETURN;
 
 static INLINE void
-op_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp)
+op_exp_arg_error (int arg, long expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
 
 /* The argument <arg> to the current one-byte operator had the wrong type:
  * expected was the type <expected> (bit-encoded as in efun_lpc_types[]),
- * but it got the type <got> (the svalue type tag).
+ * but it got the svalue <got>.
  * inter_pc will be set from <pc>, inter_sp will be set from <sp>.
  *
  * This function is to be used with binary operators like + or *; the
@@ -6614,22 +7986,22 @@ op_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp)
 
     errorf("Bad %s arg to %s: got '%s', expected '%s'.\n"
          , arg == 1 ? "left" : "right"
-         , get_f_name(instr), typename(got), efun_arg_typename(expected)
+         , get_f_name(instr), sv_typename(got), efun_arg_typename(expected)
          );
     /* NOTREACHED */
 } /* op_exp_arg_error() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-op_arg_error (int arg, int expected, int got, bytecode_p pc, svalue_t *sp)
+op_arg_error (int arg, int expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
   NORETURN;
 
 static INLINE void
-op_arg_error (int arg, int expected, int got, bytecode_p pc, svalue_t *sp)
+op_arg_error (int arg, int expected, svalue_t *got, bytecode_p pc, svalue_t *sp)
 
 /* The argument <arg> to the current one-byte operator had the wrong type:
- * expected was the type <expected>, but it got the type <got>
- * (both values are the svalue type tag).
+ * expected was the type <expected> (an svalue type tag), but it got the
+ * svalue <got>.
  * inter_pc will be set from <pc>, inter_sp will be set from <sp>.
  *
  * This function is to be used with binary operators like + or *; the
@@ -6670,7 +8042,7 @@ test_efun_args (int instr, int args, svalue_t *argp)
             continue;
 
         if (!(exp_type & (1 << act_type)))
-            raise_arg_error(instr, i, exp_type, act_type);
+            raise_arg_error(instr, i, exp_type, argp);
     }
 } /* test_efun_args() */
 
@@ -6690,8 +8062,14 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
 
     if (bsvp == NULL)
     {
-        assert(svp->type == T_LVALUE && svp->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-        bsvp = &(svp->u.protected_range_lvalue->vec);
+        assert(svp->type == T_LVALUE);
+
+        // For string/byte ranges we can use the target value.
+        // otherwise we need to handle the range explicitly to not look at hidden values.
+        if (svp->x.lvalue_type == LVALUE_PROTECTED_RANGE && svp->u.protected_range_lvalue->vec.type != T_POINTER)
+            bsvp = &(svp->u.protected_range_lvalue->vec);
+        else
+            bsvp = svp;
     }
 
     // No type saved? Anything is possible...
@@ -6719,7 +8097,6 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
         case T_ERROR_HANDLER:
         case T_BREAK_ADDR:
         case T_ARG_FRAME:
-        case T_LVALUE:
             if (svptype)
                 *svptype = lpctype_unknown;
             return MY_FALSE;
@@ -6732,6 +8109,7 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
             valuetype = lpctype_bytes;
             break;
 
+        case T_LVALUE:
         case T_POINTER:
         {
             // We have to look into it...
@@ -6739,6 +8117,18 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
             // In the later case we have to check both cases independently.
             lpctype_t* head = formaltype;
             lpctype_t* svpelement = NULL;
+            struct range_iterator start;
+
+            if (!get_iterator(bsvp, &start, true))
+                fatal("Illegal lvalue type %d\n", bsvp->x.lvalue_type);
+
+            if (start.next_value == &zero_iterator_next_value)
+            {
+                // Shortcut: The iterator would give us just zeroes.
+                // So we don't need to look at the elements, we know the type.
+                valuetype = lpctype_any_array;
+                break;
+            }
 
             while (true)
             {
@@ -6747,15 +8137,17 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
                 if (member->t_class == TCLASS_ARRAY)
                 {
                     lpctype_t *element = member->t_array.element;
-                    vector_t *vec = bsvp->u.vec;
-                    size_t i, size = VEC_SIZE(vec);
                     Bool correct = MY_TRUE;
 
-                    for (i=0; i < size; i++)
+                    for (struct range_iterator it = start;;)
                     {
                         lpctype_t *svpresult;
+                        svalue_t *item = it.next_value(&it);
 
-                        if(!check_rtt_compatibility_inl(element, vec->item + i, svptype ? &svpresult : NULL))
+                        if (!item)
+                            break;
+
+                        if(!check_rtt_compatibility_inl(element, item, svptype ? &svpresult : NULL))
                             correct = MY_FALSE;
 
                         // mixed is returned when the element is '0'.
@@ -6849,6 +8241,16 @@ check_rtt_compatibility_inl(lpctype_t *formaltype, svalue_t *svp, lpctype_t **sv
         case T_STRUCT:
             valuetype = get_struct_type(bsvp->u.strct->type);
             break;
+
+        case T_LPCTYPE:
+            valuetype = lpctype_lpctype;
+            break;
+
+#ifdef USE_PYTHON
+        case T_PYTHON:
+            valuetype = get_python_type(bsvp->x.python_type);
+            break;
+#endif
     }
 
     if (valuetype)
@@ -6939,7 +8341,7 @@ check_function_args(int fx, program_t *progp, bytecode_p funstart)
         && progp->type_start && progp->type_start[fx] != INDEX_START_NONE)
     {
         // check for the correct argument types
-        lpctype_t **arg_type = progp->argument_types + progp->type_start[fx];
+        unsigned short *arg_type_idx = progp->argument_types + progp->type_start[fx];
         svalue_t *firstarg = inter_sp - csp->num_local_variables + 1;
         function_t *header = current_prog->function_headers + FUNCTION_HEADER_INDEX(funstart);
 
@@ -6947,16 +8349,17 @@ check_function_args(int fx, program_t *progp, bytecode_p funstart)
         int i = 0;
         while (i < formal_args)
         {
+            lpctype_t *arg_type = progp->types[arg_type_idx[i]];
             // do the types match (in case of structs also the structure)
             // or is the formal argument of type TYPE_ANY (mixed)?
-            if (!check_rtt_compatibility(arg_type[i], firstarg+i))
+            if (!check_rtt_compatibility(arg_type, firstarg+i))
             {
                 // How many control stack frames to remove.
                 int num_csf = 0;
 
-                // Determine the lpctype of arg_type[i] for a better error message.
+                // Determine the lpctype of arg[i] for a better error message.
                 static char buff[512];
-                lpctype_t *realtype = get_rtt_type(arg_type[i], firstarg+i);
+                lpctype_t *realtype = get_rtt_type(arg_type, firstarg+i);
                 get_lpctype_name_buf(realtype, buff, sizeof(buff));
                 free_lpctype(realtype);
 
@@ -7012,7 +8415,7 @@ check_function_args(int fx, program_t *progp, bytecode_p funstart)
                     // warnf will return (errors are caught).
                     warnf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
                            , i+1, get_txt(header->name), buff,
-                           get_lpctype_name(arg_type[i]));
+                           get_lpctype_name(arg_type));
 
                     for (int j = num_csf; j >= 0; j--)
                         *(++csp) = saved_csf[j];
@@ -7026,7 +8429,7 @@ check_function_args(int fx, program_t *progp, bytecode_p funstart)
 
                     errorf("Bad arg %d to %s(): got '%s', expected '%s'.\n"
                            , i+1, get_txt(header->name), buff,
-                           get_lpctype_name(arg_type[i]));
+                           get_lpctype_name(arg_type));
                 }
             }
             ++i;
@@ -7390,12 +8793,14 @@ do_trace_call (bytecode_p funstart, Bool is_lambda)
         /* Trace the function itself */
         if (is_lambda)
         {
-            lambda_t *l = current_lambda.u.lambda;
+            lambda_t *l;
             if (current_lambda.x.closure_type == CLOSURE_BOUND_LAMBDA)
-                l = l->function.lambda;
+                l = current_lambda.u.bound_lambda->lambda;
+            else
+                l = current_lambda.u.lambda;
 
             do_trace("Call direct ", "lambda-closure", " ");
-            num_args = l->function.code.num_arg;
+            num_args = l->num_arg;
         }
         else
         {
@@ -7949,6 +9354,7 @@ setup_new_frame2 (bytecode_p funstart, svalue_t *sp
                    */
     int num_arg;  /* Number of formal args */
     int num_vars; /* Number of local variables */
+    int num_opt_arg;  /* Number of optional formal arguments */
     bool has_varargs; /* Function has an varargs parameter. */
 
     /* Setup the frame pointer */
@@ -7960,20 +9366,21 @@ setup_new_frame2 (bytecode_p funstart, svalue_t *sp
     /* (Re)move excessive arguments.  */
     if (is_lambda)
     {
-        lambda_t *l = current_lambda.u.lambda;
+        lambda_t *l;
         if (current_lambda.x.closure_type == CLOSURE_BOUND_LAMBDA)
-            l = l->function.lambda;
+            l = current_lambda.u.bound_lambda->lambda;
+        else
+            l = current_lambda.u.lambda;
 
-        num_arg = l->function.code.num_arg;
-        num_vars = l->function.code.num_locals;
-        has_varargs = false;
+        num_arg = l->num_arg;
+        num_opt_arg = l->num_opt_arg;
+        num_vars = l->num_locals;
+        has_varargs = l->xvarargs;
 
         inter_pc = funstart;
     }
     else
     {
-        int num_opt_arg; /* Number of optional formal arguments */
-
         function_t *header = current_prog->function_headers + FUNCTION_HEADER_INDEX(funstart);
         num_arg = header->num_arg;
         num_opt_arg = header->num_opt_arg;
@@ -7981,24 +9388,25 @@ setup_new_frame2 (bytecode_p funstart, svalue_t *sp
         has_varargs = (header->flags & TYPE_MOD_XVARARGS) != 0;
 
         inter_pc = funstart;
-        if (num_opt_arg)
-        {
-            /* Modify inter_pc, depending on how many
-             * arguments are missing. */
-            int missing = num_arg - csp->num_local_variables;
+    }
 
-            if (has_varargs)
-                missing--;
-            if (missing < 0)
-                missing = 0;
-            else if (missing > num_opt_arg)
-                missing = num_opt_arg;
+    if (num_opt_arg)
+    {
+        /* Modify inter_pc, depending on how many
+         * arguments are missing. */
+        int missing = num_arg - csp->num_local_variables;
 
-            /* Skip the initial jump table. */
-            inter_pc += num_opt_arg * sizeof(unsigned short);
-            if (missing < num_opt_arg)
-                inter_pc += get_short(funstart + sizeof(unsigned short) * (num_opt_arg - missing - 1));
-        }
+        if (has_varargs)
+            missing--;
+        if (missing < 0)
+            missing = 0;
+        else if (missing > num_opt_arg)
+            missing = num_opt_arg;
+
+        /* Skip the initial jump table. */
+        inter_pc += num_opt_arg * sizeof(unsigned short);
+        if (missing < num_opt_arg)
+            inter_pc += get_short(funstart + sizeof(unsigned short) * (num_opt_arg - missing - 1));
     }
 
     if (has_varargs)
@@ -8243,7 +9651,12 @@ reset_machine (Bool first)
         {
             if (csp->lambda.type == T_CLOSURE)
                 free_closure(&csp->lambda);
-            free_coroutine(csp->coroutine);
+            if (csp->coroutine != NULL)
+            {
+                if (csp->coroutine->state == CS_RUNNING)
+                    abort_coroutine(csp->coroutine);
+                free_coroutine(csp->coroutine);
+            }
             free_svalue(&(csp->pretend_to_be));
             csp--;
         }
@@ -8315,6 +9728,7 @@ free_interpreter_temporaries (void)
     free_svalue(&struct_member_temporary);
     struct_member_temporary.type = T_NUMBER;
     free_svalue(&current_unprotected_mapentry.key);
+    free_svalue(&current_unprotected_map_range.key);
 
 #ifdef TRACE_CODE
     {
@@ -8547,6 +9961,8 @@ eval_instruction (bytecode_p first_instruction
      *                It is either the left or the right argument to a
      *                one-byte operator.
      *
+     *   CALL_PYTHON_TYPE_EFUN(code, num_arg): if there is a Python
+     *                efun override for the argument, call it.
      */
 
 #   ifdef DEBUG
@@ -8590,11 +10006,11 @@ eval_instruction (bytecode_p first_instruction
        OP_ARG_ERROR_TEMPL(op_exp_arg_error, arg, expected, got)
 
 #   define TYPE_TEST_TEMPL(num, arg, t) \
-        if ( (arg)->type != t ) code_arg_error(num, t, (arg)->type, pc, sp); else NOOP;
+        if ( (arg)->type != t ) code_arg_error(num, t, arg, pc, sp); else NOOP;
 #   define OP_TYPE_TEST_TEMPL(num, arg, t) \
-        if ( (arg)->type != t ) op_arg_error(num, t, (arg)->type, pc, sp); else NOOP;
+        if ( (arg)->type != t ) op_arg_error(num, t, arg, pc, sp); else NOOP;
 #   define EXP_TYPE_TEST_TEMPL(num, arg, t) \
-        if (!( (1 << (arg)->type) & (t)) ) op_exp_arg_error(num, (t), (arg)->type, pc, sp); else NOOP;
+        if (!( (1 << (arg)->type) & (t)) ) op_exp_arg_error(num, (t), arg, pc, sp); else NOOP;
 
 #   define TYPE_TEST1(arg, t) TYPE_TEST_TEMPL(1, arg, t)
 #   define TYPE_TEST2(arg, t) TYPE_TEST_TEMPL(2, arg, t)
@@ -8608,6 +10024,18 @@ eval_instruction (bytecode_p first_instruction
 #   define TYPE_TEST_EXP_RIGHT(arg, t) EXP_TYPE_TEST_TEMPL(2, arg, t)
       /* Test the type of a certain argument.
        */
+
+#ifdef USE_PYTHON
+#   define CALL_PYTHON_TYPE_EFUN(code, num_arg) \
+        svalue_t *python_result = call_python_type_efun(sp, code, num_arg); \
+        if (python_result) \
+        { \
+            sp = python_result; \
+            break; \
+        }
+#else
+#   define CALL_PYTHON_TYPE_EFUN(code, num_arg) NOOP
+#endif
 
 #   ifdef MARK
 #        define CASE(x) case (x): MARK(x);
@@ -8644,6 +10072,8 @@ eval_instruction (bytecode_p first_instruction
         sp = restore_argument_frames(sp-1, &ap)+1;
         if (sp < inter_sp)
             *sp = *inter_sp;
+
+        tracedepth++;
     }
     SET_TRACE_EXEC();
 
@@ -8695,9 +10125,9 @@ again:
         previous_programs[last] = current_prog;
 #   endif  /* ifdef TRACE_CODE */
 
-#   ifdef MALLOC_LPC_TRACE
-        inter_pc = pc;
-#   endif
+#if defined(MALLOC_LPC_TRACE) || defined(USE_PYTHON)
+        inter_pc = pc-1;
+#endif
 
 #   ifdef OPCPROF
         opcount[full_instr]++;
@@ -8716,6 +10146,11 @@ again:
         }
         traceing_recursion--;
     }
+
+#ifdef USE_PYTHON
+    if (current_prog != NULL)
+        python_call_instruction_hook(full_instr);
+#endif
 
     /* Test the evaluation cost.
      * eval_cost < 0 signify a wrap-around - unlikely, but with these crazy
@@ -8958,6 +10393,7 @@ again:
             errorf("%s() from lightweight object.\n", instrs[instruction].name);
 
         assign_eval_cost_inl();
+        CALL_PYTHON_TYPE_EFUN(instruction, 1);
         test_efun_args(instruction, 1, sp);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
 #ifdef CHECK_OBJECT_REF
@@ -9012,6 +10448,7 @@ again:
             errorf("%s() from lightweight object.\n", instrs[instruction].name);
 
         assign_eval_cost_inl();
+        CALL_PYTHON_TYPE_EFUN(instruction, 2);
         test_efun_args(instruction, 2, sp-1);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
 #ifdef CHECK_OBJECT_REF
@@ -9067,6 +10504,7 @@ again:
             errorf("%s() from lightweight object.\n", instrs[instruction].name);
 
         assign_eval_cost_inl();
+        CALL_PYTHON_TYPE_EFUN(instruction, 3);
         test_efun_args(instruction, 3, sp-2);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
 #ifdef CHECK_OBJECT_REF
@@ -9121,6 +10559,7 @@ again:
             errorf("%s() from lightweight object.\n", instrs[instruction].name);
 
         assign_eval_cost_inl();
+        CALL_PYTHON_TYPE_EFUN(instruction, 4);
         test_efun_args(instruction, 4, sp-3);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
 #ifdef CHECK_OBJECT_REF
@@ -9171,6 +10610,8 @@ again:
         if (max_arg >= 0 && numarg > max_arg)
             ERRORF(("Too many args for %s: got %d, expected %d.\n"
                    , instrs[instruction].name, numarg, max_arg));
+
+        CALL_PYTHON_TYPE_EFUN(instruction, numarg);
 
         test_efun_args(instruction, numarg, sp-numarg+1);
         sp = (*vefun_table[instruction-EFUNV_OFFSET])(sp, numarg);
@@ -9409,7 +10850,7 @@ again:
             if (explicit_context_size != 0)
             {
                 unsigned short i;
-                svalue_t * context = sp->u.lambda->context;
+                svalue_t * context = sp->u.lfun_closure->context;
 
                 for (i = 0; i < explicit_context_size; i++)
                 {
@@ -9426,7 +10867,7 @@ again:
             {
                 unsigned short i;
                 svalue_t * arg = sp - implicit_context_size;
-                svalue_t * context = sp->u.lambda->context + explicit_context_size;
+                svalue_t * context = sp->u.lfun_closure->context + explicit_context_size;
 
                 for (i = 0; i < implicit_context_size; i++)
                     transfer_svalue_no_free(context+i, arg+i);
@@ -9485,6 +10926,90 @@ again:
                 }
             }
         }
+        break;
+    }
+
+    CASE(F_CONTEXT_LAMBDA); /* --- context_lambda <lix> <lsize> <vix> <num_ex> <num_im> --- */
+    {
+        /* Create a copy of a lambda closure and put context values into it.
+         * The lambda to be copied is the value at index <lix> of the current
+         * lambda closure. It's code size is <lsize>. The context consists of
+         * <num_ex> explicit values (to be taken from the local variables
+         * at <vix>) and <num_in> implicit values on the stack.
+         */
+
+        uint16_t lambda_index = load_uint16(&pc);
+        uint32_t code_size = load_uint32(&pc);
+        svalue_t * explicit_context = fp + load_uint8(&pc);
+        uint16_t explicit_context_size = load_uint16(&pc);
+        uint16_t implicit_context_size = load_uint16(&pc);
+
+        lambda_t *orig, *l;
+        void *block;
+        svalue_t *values, *orig_svp, *orig_values;
+        size_t lambda_size, value_size;
+
+        /* Get the original lambda from the current lambda. */
+        orig_svp = (svalue_t *)((void *)(csp->funstart) - LAMBDA_VALUE_OFFSET) - lambda_index;
+        assert(orig_svp->type == T_CLOSURE);
+        assert(orig_svp->x.closure_type == CLOSURE_LAMBDA);
+        orig = orig_svp->u.lambda;
+
+        /* Create the new lambda closure. */
+        lambda_size = sizeof(lambda_t) + code_size;
+        value_size = orig->num_values * sizeof(svalue_t);
+
+        if ( !(block = xalloc(lambda_size + value_size)) )
+        {
+            ERRORF(("Out of memory: closure structure (%zd bytes)", lambda_size + value_size));
+            break;
+        }
+
+        /* Copy header and code. */
+        l =  (lambda_t*)(block + value_size);
+        memcpy(l, orig, lambda_size);
+        l->base.prog_ob = ref_valid_object(orig->base.prog_ob, "context_lambda");
+        assign_object_svalue_no_free(&l->base.ob, orig->base.ob, "context_lambda");
+
+        /* Copy context values. */
+        assert(implicit_context_size + explicit_context_size <= l->num_values);
+
+        values = (svalue_t*) block;
+
+        /* Now copy the context values */
+        if (explicit_context_size != 0)
+        {
+            for (uint16_t i = 0; i < explicit_context_size; i++)
+            {
+                transfer_svalue_no_free(values++, explicit_context+i);
+
+                /* Set it to T_INVALID, as it is still a variable of
+                 * the function frame and will be freed on return.
+                 */
+                explicit_context[i].type = T_INVALID;
+            }
+        }
+
+        if (implicit_context_size != 0)
+        {
+            svalue_t * arg = sp - implicit_context_size + 1;
+
+            for (uint16_t i = 0; i < implicit_context_size; i++)
+                transfer_svalue_no_free(values++, arg+i);
+
+            sp -= implicit_context_size;
+        }
+
+        /* Copy the remaining values from the lambda closure. */
+        orig_values = (svalue_t*)(((void*)orig) - ((void*)l) + ((void*)values));
+        while (values != (void*)l)
+            assign_svalue_no_free(values++, orig_values++);
+
+        sp++;
+        sp->type = T_CLOSURE;
+        sp->x.closure_type = CLOSURE_LAMBDA;
+        sp->u.lambda = l;
+
         break;
     }
 
@@ -9609,6 +11134,9 @@ again:
             }
         }
 
+        if (csp->extern_call)
+            assign_eval_cost_inl();
+
         if (current_coroutine)
         {
             /* Is there some coroutine waiting? Then continue there. */
@@ -9640,6 +11168,8 @@ again:
                 *(++sp) = value;
                 break;
             }
+
+            /* At this point, current_object might not be valid anymore. */
         }
 
         /* Restore the previous execution context */
@@ -9647,8 +11177,6 @@ again:
         if (extern_call)
         {
             /* eval_instruction() must be left - setup the globals */
-            assign_eval_cost_inl();
-
             current_object = csp->ob;
             previous_ob = csp->prev_ob;
         }
@@ -9901,7 +11429,7 @@ again:
 
         tracedepth--; /* We leave this level */
         if (trace_level)
-            do_trace_return(sp);
+            do_trace_return(inter_sp);
 
         pop_control_stack();
 
@@ -10542,6 +12070,9 @@ again:
          * If CATCH_FLAG_RESERVE is set, the top most stack value denotes
          * the eval cost to reserve for the catch handling - it is removed
          * from the stack before continuing.
+         * If CATCH_FLAG_LIMIT is set, the (next) top most stack value
+         * contains the eval limit for the expression - it is also removed
+         * from the stack.
          *
          * The implementation is such that a control-stack entry is created
          * as if the instructions following catch are called as a subroutine
@@ -10564,6 +12095,7 @@ again:
         uint offset;
         int  flags;
         int32 reserve_cost = CATCH_RESERVED_COST;
+        int32 cost_limit = -1;
 
         /* Get the flags */
         flags = LOAD_UINT8(pc);
@@ -10588,6 +12120,28 @@ again:
             reserve_cost = sp->u.number;
             sp--;
         }
+
+        if (flags & CATCH_FLAG_LIMIT)
+        {
+            if (sp->type != T_NUMBER)
+            {
+                ERRORF(("Illegal 'limit' type for catch(): got %s, expected number.\n"
+                       , typename(sp->type)
+                       ));
+            }
+
+            if (sp->u.number <= 0)
+            {
+                ERRORF(("Illegal 'limit' value for catch(): got %"PRIdPINT
+                        ", expected a positive value.\n"
+                       , sp->u.number
+                       ));
+            }
+
+            cost_limit = sp->u.number;
+            sp--;
+        }
+
         /* Get the offset to the next instruction after the CATCH statement.
          */
         offset = LOAD_UINT8(pc);
@@ -10606,6 +12160,7 @@ again:
 #endif
                               , inter_pc, inter_fp
                               , reserve_cost
+                              , cost_limit
                               , inter_context
                               )
            )
@@ -10842,6 +12397,13 @@ again:
          *   vector      + vector             -> vector
          *   mapping     + mapping            -> mapping
          */
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_ADD, PYTHON_OP_RADD, "+");
+            break;
+        }
+#endif
 
         switch ( sp[-1].type )
         {
@@ -10923,7 +12485,7 @@ again:
               }
 
             default:
-                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp);
                 /* NOTREACHED */
             }
             break;
@@ -10992,7 +12554,7 @@ again:
               }
 
             default:
-                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp);
                 /* NOTREACHED */
             }
             break;
@@ -11045,7 +12607,7 @@ again:
                 put_string(sp, res);
                 break;
             }
-            OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+            OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp);
             /* NOTREACHED */
           }
           /* End of case T_FLOAT */
@@ -11095,7 +12657,7 @@ again:
 
         default:
             OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_STRING|TF_BYTES|TF_FLOAT|TF_NUMBER
-                          , sp[-1].type);
+                          , sp-1);
             /* NOTREACHED */
         }
 
@@ -11119,6 +12681,14 @@ again:
          */
 
         p_int i;
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_SUB, PYTHON_OP_RSUB, "-");
+            break;
+        }
+#endif
 
         if ((sp-1)->type == T_NUMBER)
         {
@@ -11156,7 +12726,7 @@ again:
                 sp->type = T_FLOAT;
                 break;
             }
-            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
+            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp);
             /* NOTREACHED */
         }
         else if ((sp-1)->type == T_FLOAT)
@@ -11184,7 +12754,7 @@ again:
                 STORE_DOUBLE(sp, diff);
                 break;
             }
-            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
+            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp);
             /* NOTREACHED */
         }
         else if ((sp-1)->type == T_POINTER)
@@ -11208,7 +12778,7 @@ again:
                 sp--;
                 break;
             }
-            OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp->type);
+            OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp);
             /* NOTREACHED */
         }
         else if ((sp-1)->type == T_MAPPING)
@@ -11234,7 +12804,7 @@ again:
                 sp->u.map = m;
                 break;
             }
-            OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp->type);
+            OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp);
         }
         else if ((sp-1)->type == T_STRING || (sp-1)->type == T_BYTES)
         {
@@ -11252,7 +12822,7 @@ again:
         }
 
         OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_STRING|TF_BYTES|TF_FLOAT|TF_NUMBER
-                      , sp[-1].type);
+                      , sp-1);
         /* NOTREACHED */
     }
 
@@ -11276,6 +12846,14 @@ again:
          */
 
         p_int i;
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_MUL, PYTHON_OP_RMUL, "*");
+            break;
+        }
+#endif
 
         switch ( sp[-1].type )
         {
@@ -11422,7 +13000,7 @@ again:
                 break;
             }
             OP_ARG_ERROR(2, TF_POINTER|TF_STRING|TF_BYTES|TF_FLOAT|TF_NUMBER
-                          , sp->type);
+                          , sp);
             /* NOTREACHED */
         case T_FLOAT:
           {
@@ -11449,7 +13027,7 @@ again:
                 sp--;
                 break;
             }
-            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
+            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp);
             /* NOTREACHED */
           }
         case T_STRING:
@@ -11486,7 +13064,7 @@ again:
                 sp->u.str = result;
                 break;
             }
-            BAD_OP_ARG(2, T_NUMBER, sp->type);
+            BAD_OP_ARG(2, T_NUMBER, sp);
             /* NOTREACHED */
           }
         case T_POINTER:
@@ -11536,12 +13114,12 @@ again:
                 put_array(sp, result);
                 break;
               }
-            BAD_OP_ARG(2, T_NUMBER, sp->type);
+            BAD_OP_ARG(2, T_NUMBER, sp);
             /* NOTREACHED */
           }
         default:
             OP_ARG_ERROR(1, TF_POINTER|TF_STRING|TF_BYTES|TF_FLOAT|TF_NUMBER
-                          , sp[-1].type);
+                          , sp-1);
             /* NOTREACHED */
         }
         break;
@@ -11561,6 +13139,14 @@ again:
          */
 
         p_int i;
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_DIV, PYTHON_OP_RDIV, "/");
+            break;
+        }
+#endif
 
         if ((sp-1)->type == T_NUMBER)
         {
@@ -11593,7 +13179,7 @@ again:
                 sp->type = T_FLOAT;
                 break;
             }
-            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
+            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp);
             /* NOTREACHED */
         }
         else if ((sp-1)->type == T_FLOAT)
@@ -11631,10 +13217,10 @@ again:
                 STORE_DOUBLE(sp, dtmp);
                 break;
             }
-            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
+            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp);
             /* NOTREACHED */
         }
-        OP_ARG_ERROR(1, TF_FLOAT|TF_NUMBER, sp[-1].type);
+        OP_ARG_ERROR(1, TF_FLOAT|TF_NUMBER, sp-1);
         /* NOTREACHED */
         break;
     }
@@ -11652,15 +13238,23 @@ again:
 
         p_int i;
 
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_MOD, PYTHON_OP_RMOD, "%");
+            break;
+        }
+#endif
+
         TYPE_TEST_LEFT((sp-1), T_NUMBER);
         TYPE_TEST_RIGHT(sp, T_NUMBER);
         if (sp->u.number == 0)
-        {
             ERROR("Modulus by zero.\n");
-            break;
-        }
+        else if (sp->u.number == -1) // Shortcut, needed for sp[-1] == PINT_MIN
+            i = 0;
         else
             i = (sp-1)->u.number % sp->u.number;
+
         sp--;
         sp->u.number = i;
         break;
@@ -11676,6 +13270,14 @@ again:
          */
 
         int i;
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_GT, PYTHON_OP_RGT, ">");
+            break;
+        }
+#endif
 
         if (((sp-1)->type == T_STRING && sp->type == T_STRING)
          || ((sp-1)->type == T_BYTES  && sp->type == T_BYTES))
@@ -11738,6 +13340,14 @@ again:
 
         int i;
 
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_GE, PYTHON_OP_RGE, ">=");
+            break;
+        }
+#endif
+
         if (((sp-1)->type == T_STRING && sp->type == T_STRING)
          || ((sp-1)->type == T_BYTES  && sp->type == T_BYTES))
         {
@@ -11799,6 +13409,14 @@ again:
 
         int i;
 
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_LT, PYTHON_OP_RLT, "<");
+            break;
+        }
+#endif
+
         if (((sp-1)->type == T_STRING && sp->type == T_STRING)
          || ((sp-1)->type == T_BYTES  && sp->type == T_BYTES))
         {
@@ -11859,6 +13477,14 @@ again:
          */
 
         int i;
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_LE, PYTHON_OP_RLE, "<=");
+            break;
+        }
+#endif
 
         if (((sp-1)->type == T_STRING && sp->type == T_STRING)
          || ((sp-1)->type == T_BYTES  && sp->type == T_BYTES))
@@ -11923,6 +13549,14 @@ again:
 
         int i = 0;
 
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_EQ, PYTHON_OP_REQ, "==");
+            break;
+        }
+#endif
+
         if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
         {
             i = (double)((sp-1)->u.number) == READ_DOUBLE( sp );
@@ -11984,6 +13618,17 @@ again:
             case T_MAPPING:
                 i = (sp-1)->u.map == sp->u.map;
                 break;
+
+            case T_LPCTYPE:
+                i = (sp-1)->u.lpctype == sp->u.lpctype;
+                break;
+
+#ifdef USE_PYTHON
+            case T_PYTHON:
+                i = (sp-1)->u.generic == sp->u.generic;
+                break;
+#endif
+
             default:
                 if (sp->type == T_LVALUE)
                     errorf("Reference passed to ==\n");
@@ -12011,6 +13656,14 @@ again:
          */
 
         int i = 0;
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_NE, PYTHON_OP_RNE, "!=");
+            break;
+        }
+#endif
 
         if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
         {
@@ -12067,6 +13720,17 @@ again:
             case T_MAPPING:
                 i = (sp-1)->u.map != sp->u.map;
                 break;
+
+            case T_LPCTYPE:
+                i = (sp-1)->u.lpctype != sp->u.lpctype;
+                break;
+
+#ifdef USE_PYTHON
+            case T_PYTHON:
+                i = (sp-1)->u.generic != sp->u.generic;
+                break;
+#endif
+
             default:
                 if (sp->type == T_LVALUE)
                     errorf("Reference passed to !=\n");
@@ -12112,7 +13776,7 @@ again:
 
                 for (svalue_t *entry = container->u.vec->item + start; count != 0; entry++, count--)
                 {
-                    if (rvalue_eq(item, entry) == 0)
+                    if (rvalue_eq(item, entry))
                     {
                         result = 1;
                         break;
@@ -12183,13 +13847,25 @@ again:
                         }
                         /* else FALLTHROUGH */
                     default:
-                        OP_ARG_ERROR(1, TF_NUMBER|(container->type == T_STRING ? TF_STRING : TF_BYTES), item->type);
+                        OP_ARG_ERROR(1, TF_NUMBER|(container->type == T_STRING ? TF_STRING : TF_BYTES), item);
                 }
                 break;
             }
 
+            case T_LPCTYPE:
+                if (item->type == T_LPCTYPE)
+                {
+                    if (item->u.lpctype == lpctype_void)
+                        result = 1;
+                    else
+                        result = lpctype_contains(item->u.lpctype, container->u.lpctype) ? 1 : 0;
+                }
+                else
+                    OP_ARG_ERROR(1, TF_LPCTYPE, item);
+                break;
+
             default:
-                OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING|TF_STRING|TF_BYTES, sp->type);
+                OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING|TF_STRING|TF_BYTES|TF_LPCTYPE, sp);
                 /* NOTREACHED */
         }
 
@@ -12203,6 +13879,14 @@ again:
         /* Compute the binary complement of number sp[0] and leave
          * that on the stack.
          */
+#ifdef USE_PYTHON
+        if (sp->type == T_PYTHON)
+        {
+            sp = do_python_unary_operation(sp, PYTHON_OP_INVERT, "~");
+            break;
+        }
+#endif
+
         TYPE_TEST1(sp, T_NUMBER);
         sp->u.number = ~ sp->u.number;
         break;
@@ -12220,8 +13904,17 @@ again:
          *   vector & mapping  -> vector
          *   mapping & vector  -> mapping
          *   mapping & mapping -> mapping
+         *   lpctype & lpctype -> lpctype
          *
          */
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_AND, PYTHON_OP_RAND, "&");
+            break;
+        }
+#endif
 
         if (sp->type == T_POINTER && (sp-1)->type == T_POINTER)
         {
@@ -12271,8 +13964,22 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER|TF_MAPPING);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER|TF_MAPPING);
+        if (sp->type == T_LPCTYPE && (sp-1)->type == T_LPCTYPE)
+        {
+            lpctype_t * result = get_common_type(sp[-1].u.lpctype, sp[0].u.lpctype);
+
+            free_lpctype(sp[-1].u.lpctype);
+            free_lpctype(sp[0].u.lpctype);
+            sp--;
+            if (result)
+                sp->u.lpctype = result;
+            else
+                sp->u.lpctype = lpctype_void;
+            break;
+        }
+
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER|TF_MAPPING|TF_LPCTYPE);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER|TF_MAPPING|TF_LPCTYPE);
         ERRORF(("Arguments to & don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -12285,13 +13992,21 @@ again:
          * the result on the stack.
          *
          * Possible type combinations:
-         *   int    | int    -> int
-         *   array  | array  -> array
+         *   int     | int     -> int
+         *   array   | array   -> array
+         *   lpctype | lpctype -> lpctype
          *
          * TODO: Extend this to mappings.
          */
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_POINTER);
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_OR, PYTHON_OP_ROR, "|");
+            break;
+        }
+#endif
+
         if ((sp-1)->type == T_NUMBER)
         {
             TYPE_TEST_RIGHT(sp, T_NUMBER);
@@ -12306,6 +14021,20 @@ again:
             inter_pc = pc;
             sp--;
             sp->u.vec = join_array(sp->u.vec, (sp+1)->u.vec);
+        }
+        else if ((sp-1)->type == T_LPCTYPE)
+        {
+            TYPE_TEST_RIGHT(sp, T_LPCTYPE);
+            lpctype_t * result = get_union_type(sp[-1].u.lpctype, sp[0].u.lpctype);
+
+            free_lpctype(sp[-1].u.lpctype);
+            free_lpctype(sp[0].u.lpctype);
+            sp--;
+            sp->u.lpctype = result;
+        }
+        else
+        {
+            OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER|TF_LPCTYPE, sp-1);
         }
 
         break;
@@ -12322,6 +14051,14 @@ again:
          *
          * TODO: Extend this to mappings.
          */
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_XOR, PYTHON_OP_RXOR, "^");
+            break;
+        }
+#endif
 
         TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_POINTER);
         if ((sp-1)->type == T_NUMBER)
@@ -12353,6 +14090,14 @@ again:
          * TODO: Implement an arithmetic shift.
          */
 
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_LSH, PYTHON_OP_RLSH, "<<");
+            break;
+        }
+#endif
+
         TYPE_TEST_LEFT((sp-1), T_NUMBER);
         TYPE_TEST_RIGHT(sp, T_NUMBER);
 
@@ -12372,6 +14117,14 @@ again:
          *
          * TODO: Extend this to vectors and mappings.
          */
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_RSH, PYTHON_OP_RRSH, ">>");
+            break;
+        }
+#endif
 
         TYPE_TEST_LEFT((sp-1), T_NUMBER);
         TYPE_TEST_RIGHT(sp, T_NUMBER);
@@ -12397,6 +14150,14 @@ again:
          *
          * TODO: Extend this to vectors and mappings.
          */
+
+#ifdef USE_PYTHON
+        if (sp[0].type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_binary_operation(sp, PYTHON_OP_RSH, PYTHON_OP_RRSH, ">>>");
+            break;
+        }
+#endif
 
         TYPE_TEST_LEFT((sp-1), T_NUMBER);
         TYPE_TEST_RIGHT(sp, T_NUMBER);
@@ -12555,7 +14316,7 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, type2);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
@@ -12568,10 +14329,24 @@ again:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
                 free_svalue(&(current_unprotected_mapentry.key));
                 break;
+
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+                ERRORF(("Bad argument to +=: Addition to a mapping range is not allowed.\n"));
+                break; /* NOTREACHED */
         }
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || type2 == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IADD, PYTHON_OP_ADD, PYTHON_OP_RADD, "+=");
+            if (instruction == F_VOID_ADD_EQ)
+                pop_stack();
+            break;
+        }
+#endif
 
         /* Now do it */
         switch(argp->type)
@@ -12637,7 +14412,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, type2);
+                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
 
@@ -12699,7 +14474,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, type2);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -12707,7 +14482,7 @@ again:
         case T_MAPPING:  /* Add to a mapping */
             if (type2 != T_MAPPING)
             {
-                OP_ARG_ERROR(2, TF_MAPPING, type2);
+                OP_ARG_ERROR(2, TF_MAPPING, sp-1);
                 /* NOTREACHED */
             }
             else
@@ -12735,7 +14510,7 @@ again:
         case T_POINTER:  /* Add to an array */
             if (type2 != T_POINTER)
             {
-                OP_ARG_ERROR(2, TF_POINTER, type2);
+                OP_ARG_ERROR(2, TF_POINTER, sp-1);
                 /* NOTREACHED */
             }
             else
@@ -12778,14 +14553,14 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, type2);
+                OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
             OP_ARG_ERROR(1, TF_STRING|TF_BYTES|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
-                        , argp->type);
+                        , argp);
             /* NOTREACHED */
         } /* end of switch */
 
@@ -12871,7 +14646,7 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, type2);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
@@ -12884,10 +14659,22 @@ again:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
                 free_svalue(&(current_unprotected_mapentry.key));
                 break;
+
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+                ERRORF(("Bad argument to -=: Subtraction from a mapping range is not allowed.\n"));
+                break; /* NOTREACHED */
         }
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || type2 == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_ISUB, PYTHON_OP_SUB, PYTHON_OP_RSUB, "-=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -12924,7 +14711,7 @@ again:
             else
             {
                 /* type2 of the wrong type */
-                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, type2);
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -12942,7 +14729,7 @@ again:
             }
             else
             {
-                BAD_OP_ARG(2, argp->type, type2);
+                BAD_OP_ARG(2, argp->type, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -12971,7 +14758,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_POINTER, type2);
+                OP_ARG_ERROR(2, TF_POINTER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -13004,7 +14791,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, type2);
+                OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -13040,14 +14827,14 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_MAPPING, type2);
+                OP_ARG_ERROR(2, TF_MAPPING, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
             OP_ARG_ERROR(1, TF_STRING|TF_BYTES|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
-                        , argp->type);
+                        , argp);
             /* NOTREACHED */
         } /* end of switch */
 
@@ -13145,7 +14932,7 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
@@ -13158,10 +14945,22 @@ again:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
                 free_svalue(&(current_unprotected_mapentry.key));
                 break;
+
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+                ERRORF(("Bad argument to *=: Multiplicating a mapping range is not allowed.\n"));
+                break; /* NOTREACHED */
         }
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IMUL, PYTHON_OP_MUL, PYTHON_OP_RMUL, "*=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -13228,7 +15027,7 @@ again:
             else
             {
                 /* Unsupported type2 */
-                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -13258,7 +15057,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -13301,7 +15100,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -13355,14 +15154,14 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
             OP_ARG_ERROR(1, TF_STRING|TF_BYTES|TF_FLOAT|TF_POINTER|TF_NUMBER
-                        , argp->type);
+                        , argp);
             /* NOTREACHED */
             break;
         }
@@ -13423,14 +15222,18 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
 
             case LVALUE_UNPROTECTED_RANGE:
-                OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, T_POINTER);
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+            {
+                svalue_t error_vector = { T_POINTER, {}, {.vec = &null_vector} };
+                OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, &error_vector);
                 break; /* NOTREACHED */
+            }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
@@ -13440,6 +15243,14 @@ again:
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IDIV, PYTHON_OP_DIV, PYTHON_OP_RDIV, "/=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -13473,7 +15284,7 @@ again:
             else
             {
                 /* Unsupported type2 */
-                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -13510,13 +15321,13 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_FLOAT|TF_NUMBER, argp->type);
+            OP_ARG_ERROR(1, TF_FLOAT|TF_NUMBER, argp);
             /* NOTREACHED */
         }
 
@@ -13576,14 +15387,18 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
 
             case LVALUE_UNPROTECTED_RANGE:
-                OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+            {
+                svalue_t error_vector = { T_POINTER, {}, {.vec = &null_vector} };
+                OP_ARG_ERROR(2, TF_NUMBER, &error_vector);
                 break; /* NOTREACHED */
+            }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
@@ -13593,6 +15408,14 @@ again:
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IMOD, PYTHON_OP_MOD, PYTHON_OP_RMOD, "%=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -13606,13 +15429,13 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+            OP_ARG_ERROR(1, TF_NUMBER, argp);
             /* NOTREACHED */
         }
 
@@ -13634,6 +15457,7 @@ again:
          *   array  & mapping -> array
          *   mapping & array -> mapping
          *   mapping & mapping -> mapping
+         *   lpctype & lpctype -> lpctype
          */
 
         svalue_t *argp;
@@ -13671,7 +15495,7 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
@@ -13684,10 +15508,22 @@ again:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
                 free_svalue(&(current_unprotected_mapentry.key));
                 break;
+
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+                ERRORF(("Bad argument to &=: Intersecting a mapping range is not allowed.\n"));
+                break; /* NOTREACHED */
         }
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IAND, PYTHON_OP_AND, PYTHON_OP_RAND, "&=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -13699,7 +15535,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -13744,7 +15580,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp[-1].type);
+                OP_ARG_ERROR(2, TF_POINTER|TF_MAPPING, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -13759,7 +15595,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_MAPPING|TF_POINTER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_MAPPING|TF_POINTER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -13778,12 +15614,30 @@ again:
             }
             else
             {
-                BAD_OP_ARG(2, argp->type, sp[-1].type);
+                BAD_OP_ARG(2, argp->type, sp-1);
                 /* NOTREACHED */
             }
             break;
+
+        case T_LPCTYPE:
+            if (sp[-1].type == T_LPCTYPE)
+            {
+                lpctype_t * result = get_common_type(argp->u.lpctype, sp[-1].u.lpctype);
+
+                free_lpctype(argp->u.lpctype);
+                if (result)
+                    argp->u.lpctype = result;
+                else
+                    argp->u.lpctype = lpctype_void;
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_LPCTYPE, sp-1);
+            }
+            break;
+
         default:
-            OP_ARG_ERROR(1, TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER, argp->type);
+            OP_ARG_ERROR(1, TF_NUMBER|TF_STRING|TF_BYTES|TF_POINTER|TF_LPCTYPE, argp);
             /* NOTREACHED */
         }
 
@@ -13836,7 +15690,7 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
@@ -13849,10 +15703,22 @@ again:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
                 free_svalue(&(current_unprotected_mapentry.key));
                 break;
+
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+                ERRORF(("Bad argument to |=: Joining a mapping range is not allowed.\n"));
+                break; /* NOTREACHED */
         }
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IOR, PYTHON_OP_OR, PYTHON_OP_ROR, "|=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -13864,7 +15730,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -13887,13 +15753,27 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_POINTER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_POINTER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
+        case T_LPCTYPE:
+            if (sp[-1].type == T_LPCTYPE)
+            {
+                lpctype_t * result = get_union_type(argp->u.lpctype, sp[-1].u.lpctype);
+
+                free_lpctype(argp->u.lpctype);
+                argp->u.lpctype = result;
+            }
+            else
+            {
+                OP_ARG_ERROR(2, TF_LPCTYPE, sp-1);
+            }
+            break;
+
         default:
-            OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER, argp->type);
+            OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER|TF_LPCTYPE, argp);
             /* NOTREACHED */
         }
 
@@ -13948,7 +15828,7 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
@@ -13961,10 +15841,22 @@ again:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
                 free_svalue(&(current_unprotected_mapentry.key));
                 break;
+
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+                ERRORF(("Bad argument to ^=: Symmetric difference with a mapping range is not allowed.\n"));
+                break; /* NOTREACHED */
         }
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IXOR, PYTHON_OP_XOR, PYTHON_OP_RXOR, "^=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -13976,7 +15868,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
@@ -13997,13 +15889,13 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_POINTER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_POINTER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER, argp->type);
+            OP_ARG_ERROR(1, TF_NUMBER|TF_POINTER, argp);
             /* NOTREACHED */
         }
 
@@ -14061,14 +15953,18 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
 
             case LVALUE_UNPROTECTED_RANGE:
-                OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+            {
+                svalue_t error_vector = { T_POINTER, {}, {.vec = &null_vector} };
+                OP_ARG_ERROR(2, TF_NUMBER, &error_vector);
                 break; /* NOTREACHED */
+            }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
@@ -14078,6 +15974,14 @@ again:
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_ILSH, PYTHON_OP_LSH, PYTHON_OP_RLSH, "<<=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -14092,13 +15996,13 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+            OP_ARG_ERROR(1, TF_NUMBER, argp);
             /* NOTREACHED */
         }
 
@@ -14154,14 +16058,18 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
 
             case LVALUE_UNPROTECTED_RANGE:
-                OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+            {
+                svalue_t error_vector = { T_POINTER, {}, {.vec = &null_vector} };
+                OP_ARG_ERROR(2, TF_NUMBER, &error_vector);
                 break; /* NOTREACHED */
+            }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
@@ -14171,6 +16079,14 @@ again:
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IRSH, PYTHON_OP_RSH, PYTHON_OP_RRSH, ">>=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -14185,13 +16101,13 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+            OP_ARG_ERROR(1, TF_NUMBER, argp);
             /* NOTREACHED */
         }
 
@@ -14247,14 +16163,18 @@ again:
                 }
                 else
                 {
-                    OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                    OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                     /* NOTREACHED */
                 }
                 break;
 
             case LVALUE_UNPROTECTED_RANGE:
-                OP_ARG_ERROR(2, TF_NUMBER, T_POINTER);
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+            {
+                svalue_t error_vector = { T_POINTER, {}, {.vec = &null_vector} };
+                OP_ARG_ERROR(2, TF_NUMBER, &error_vector);
                 break; /* NOTREACHED */
+            }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
                 argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
@@ -14264,6 +16184,14 @@ again:
 
         if(argp == NULL) /* Already handled. */
             break;
+
+#ifdef USE_PYTHON
+        if (argp->type == T_PYTHON || sp[-1].type == T_PYTHON)
+        {
+            sp = do_python_assignment_operation(sp, argp, PYTHON_OP_IRSH, PYTHON_OP_RSH, PYTHON_OP_RRSH, ">>>=");
+            break;
+        }
+#endif
 
         /* Now do it */
         switch (argp->type)
@@ -14278,13 +16206,13 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                OP_ARG_ERROR(2, TF_NUMBER, sp-1);
                 /* NOTREACHED */
             }
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+            OP_ARG_ERROR(1, TF_NUMBER, argp);
             /* NOTREACHED */
         }
 
@@ -14813,7 +16741,7 @@ again:
              */
             inter_pc = pc;
 
-            int_call_lambda(ap, num_arg, MY_FALSE);
+            int_call_lambda(ap, num_arg, false, &current_object);
 
             pc = inter_pc;
             sp = inter_sp;
@@ -15021,7 +16949,29 @@ again:
          * just one ref left, the indexed item is stored in indexing_quickfix
          * and the lvalue refers to that variable.
          */
-        sp = push_map_index_lvalue(sp, pc, false);
+        sp = push_map_index_lvalue(sp, pc, REGULAR_INDEX, false);
+        break;
+
+    CASE(F_MAP_RINDEX_LVALUE);      /* --- map_rindex_lvalue  --- */
+        /* Operator F_MAP_RINDEX_LVALUE( mapping m=sp[-2]
+         *                             , mixed i=sp[-1], int j=sp[0])
+         *
+         * Compute the lvalue &(m[i,<j]) and push it into the stack. If v has
+         * just one ref left, the indexed item is stored in indexing_quickfix
+         * and the lvalue refers to that variable.
+         */
+        sp = push_map_index_lvalue(sp, pc, REVERSE_INDEX, false);
+        break;
+
+    CASE(F_MAP_AINDEX_LVALUE);      /* --- map_aindex_lvalue  --- */
+        /* Operator F_MAP_AINDEX_LVALUE( mapping m=sp[-2]
+         *                             , mixed i=sp[-1], int j=sp[0])
+         *
+         * Compute the lvalue &(m[i,>j]) and push it into the stack. If v has
+         * just one ref left, the indexed item is stored in indexing_quickfix
+         * and the lvalue refers to that variable.
+         */
+        sp = push_map_index_lvalue(sp, pc, ARITHMETIC_INDEX, false);
         break;
 
     CASE(F_INDEX_LVALUE);           /* --- index_lvalue       --- */
@@ -15317,6 +17267,162 @@ again:
         sp = push_range_lvalue(AR_RANGE, sp, pc);
         break;
 
+    CASE(F_MAP_RANGE_LVALUE);          /* --- map_range_lvalue    --- */
+        /* Operator F_MAP_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                            , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,i1..i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(NN_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_NR_RANGE_LVALUE);       /* --- map_nr_range_lvalue --- */
+        /* Operator F_MAP_NR_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,i1..<i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(NR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RN_RANGE_LVALUE);       /* --- map_rn_range_lvalue --- */
+        /* Operator F_MAP_RN_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,<i1..i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(RN_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RR_RANGE_LVALUE);       /* --- map_rr_range_lvalue --- */
+        /* Operator F_MAP_RR_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,<i1..<i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(RR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_NA_RANGE_LVALUE);       /* --- map_na_range_lvalue --- */
+        /* Operator F_MAP_NA_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,i1..>i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(NA_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_AN_RANGE_LVALUE);       /* --- map_an_range_lvalue --- */
+        /* Operator F_MAP_AN_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,>i1..i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(AN_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RA_RANGE_LVALUE);       /* --- map_ra_range_lvalue --- */
+        /* Operator F_MAP_RA_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,<i1..>i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(RA_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_AR_RANGE_LVALUE);       /* --- map_ar_range_lvalue --- */
+        /* Operator F_MAP_AR_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,>i1..<i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(AR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_AA_RANGE_LVALUE);       /* --- map_aa_range_lvalue --- */
+        /* Operator F_MAP_AA_RANGE_LVALUE (mapping m=sp[-3], mixed k=sp[-2]
+         *                               , int i1=sp[-1], i2=sp[0])
+         *
+         * Compute the range &(m[k,>i1..>i2]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         */
+
+        sp = push_map_range_lvalue(AA_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_NX_RANGE_LVALUE);       /* --- map_nx_range_lvalue --- */
+        /* Operator F_MAP_NX_RANGE_LVALUE (mapping m=sp[-2], mixed k=sp[-1]
+         *                               , int i1=sp[0])
+         *
+         * Compute the range &(m[k,i1..]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         *
+         * We implement this by pushing '1' onto the stack and then
+         * call F_MAP_NR_RANGE_LVALUE, effectively computing &(m[k,i1..<1]).
+         */
+
+        push_number(sp, 1);  /* 'Push' the 1 for the upper bound */
+        sp = push_map_range_lvalue(NR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RX_RANGE_LVALUE);       /* --- map_rx_range_lvalue --- */
+        /* Operator F_MAP_RX_RANGE_LVALUE (mapping m=sp[-2], mixed k=sp[-1]
+         *                               , int i1=sp[0])
+         *
+         * Compute the range &(m[k,<i1..]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         *
+         * We implement this by pushing '1' onto the stack and then
+         * call F_MAP_RR_RANGE_LVALUE, effectively computing &(m[k,<i1..<1]).
+         */
+
+        push_number(sp, 1);  /* 'Push' the 1 for the upper bound */
+        sp = push_map_range_lvalue(RR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_AX_RANGE_LVALUE);       /* --- map_ax_range_lvalue --- */
+        /* Operator F_MAP_AX_RANGE_LVALUE (mapping m=sp[-2], mixed k=sp[-1]
+         *                               , int i1=sp[0])
+         *
+         * Compute the range &(m[k,>i1..]) and push it into the stack.
+         * The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the MAP_RANGE_LVALUE.
+         *
+         * We implement this by pushing '1' onto the stack and then
+         * call F_MAP_AR_RANGE_LVALUE, effectively computing &(m[k,>i1..<1]).
+         */
+
+        push_number(sp, 1);  /* 'Push' the 1 for the upper bound */
+        sp = push_map_range_lvalue(AR_RANGE, sp, pc);
+        break;
+
     CASE(F_MAKE_PROTECTED);
         /* Operator &(ref=sp[0])
          *
@@ -15497,7 +17603,37 @@ again:
          * so the entry can be changed without respecting any existing
          * stack. The computed index is a lvalue itself.
          */
-        sp = push_map_index_lvalue(sp, pc, true);
+        sp = push_map_index_lvalue(sp, pc, REGULAR_INDEX, true);
+        break;
+
+    CASE(F_MAP_RINDEX_VLVALUE);     /* --- map_rindex_vlvalue  --- */
+        /* Operator F_MAP_RINDEX_VLVALUE( mapping m=sp[-2]
+         *                              , mixed i=sp[-1], int j=sp[0])
+         *
+         * Compute the lvalue &(m[i,<j]) and push it into the stack. If v has
+         * just one ref left, the indexed item is stored in indexing_quickfix
+         * and the lvalue refers to that variable.
+         *
+         * This'll create an unprotected lvalue directly to the entry,
+         * so the entry can be changed without respecting any existing
+         * stack. The computed index is a lvalue itself.
+         */
+        sp = push_map_index_lvalue(sp, pc, REVERSE_INDEX, true);
+        break;
+
+    CASE(F_MAP_AINDEX_VLVALUE);     /* --- map_aindex_vlvalue  --- */
+        /* Operator F_MAP_AINDEX_VLVALUE( mapping m=sp[-2]
+         *                              , mixed i=sp[-1], int j=sp[0])
+         *
+         * Compute the lvalue &(m[i,>j]) and push it into the stack. If v has
+         * just one ref left, the indexed item is stored in indexing_quickfix
+         * and the lvalue refers to that variable.
+         *
+         * This'll create an unprotected lvalue directly to the entry,
+         * so the entry can be changed without respecting any existing
+         * stack. The computed index is a lvalue itself.
+         */
+        sp = push_map_index_lvalue(sp, pc, ARITHMETIC_INDEX, true);
         break;
 
 
@@ -15722,6 +17858,7 @@ again:
                          , get_txt(ap[1].u.str)
                          , get_txt(ap[0].u.lwob->prog->name));
                 sp = _pop_n_elems(2, inter_sp);
+                push_number(sp, 0);
             }
         }
         else
@@ -15878,7 +18015,8 @@ again:
          * index for the topmost stack value comes first.
          */
         struct_t * st;
-        short idx;
+        struct_type_t *pType;
+        unsigned short idx;
         int num_values;
         Bool has_template;
         svalue_t * svp;
@@ -15887,10 +18025,8 @@ again:
         num_values = load_uint8(&pc);
         has_template = MY_FALSE;
 
-        if (idx < 0 && instruction == F_S_AGGREGATE)
+        if (idx == USHRT_MAX && instruction == F_S_AGGREGATE)
         {
-            struct_type_t *pType;
-
             if ((sp - num_values)->type != T_STRUCT)
             {
                 ERRORF(("Bad template arg to #'(<: got %s, expected struct\n"
@@ -15912,12 +18048,60 @@ again:
                 /* NOTREACHED */
             }
             has_template = MY_TRUE;
-            st = struct_new(pType);
+        }
+        else if (idx >= STD_STRUCT_OFFSET)
+        {
+            pType = get_std_struct_type(idx - STD_STRUCT_OFFSET);
         }
         else
         {
-            st = struct_new(current_prog->struct_defs[idx].type);
+            pType = current_prog->struct_defs[idx].type;
         }
+
+        if (current_prog->flags & P_RTT_CHECKS)
+        {
+            bytecode_t *pix = pc;
+
+            /* Let's check the types of the values. */
+            for (int i = 0; i < num_values; i++)
+            {
+                struct_member_t *pMember;
+                int ix;
+
+                if (instruction == F_S_AGGREGATE)
+                {
+                    ix = i;
+                    svp = sp - num_values + i + 1;
+                }
+                else
+                {
+                    ix = load_uint8(&pix);
+                    svp = sp - i;
+                }
+
+                pMember = pType->member+ix;
+
+                if (!check_rtt_compatibility(pMember->type, svp))
+                {
+                    static char buff[512];
+                    lpctype_t *realtype = get_rtt_type(pMember->type, svp);
+                    get_lpctype_name_buf(realtype, buff, sizeof(buff));
+                    free_lpctype(realtype);
+
+                    inter_sp = sp;
+                    if (current_prog->flags & P_WARN_RTT_CHECKS)
+                        warnf("Bad type for struct member '%s': got '%s', expected '%s'.\n",
+                           get_txt(pMember->name), buff,
+                           get_lpctype_name(pMember->type));
+                    else
+                        errorf("Bad type for struct member '%s': got '%s', expected '%s'.\n",
+                           get_txt(pMember->name), buff,
+                           get_lpctype_name(pMember->type));
+                }
+            }
+        }
+
+        st = struct_new(pType);
         if  (!st)
             ERROR("Out of memory!\n");
 
@@ -16025,54 +18209,80 @@ again:
     }
 
     CASE(F_MAP_INDEX);              /* --- map_index           --- */
-    {
         /* Operator F_MAP_INDEX( mapping m=sp[-2], mixed i=sp[-1], int j=sp[0])
          *
          * Compute m[i,j] and push it onto the stack.
          */
-
-        mapping_t *m;
-        mp_int n;
-        svalue_t *data;
-
-        if (sp[-2].type != T_MAPPING)
-        {
-            ERRORF(("(value) Indexing on illegal type: %s, expected mapping.\n"
-                   , typename(sp[-2].type)
-                  ));
-        }
-        if (sp[0].type != T_NUMBER)
-        {
-            ERRORF(("Illegal sub-index type: %s, expected number.\n"
-                   , typename(sp[0].type)
-                  ));
-        }
-
-        m = sp[-2].u.map;
-        n = sp->u.number;
-
-        if (n < 0 || n >= m->num_values)
-        {
-            ERRORF(("Illegal sub-index %"PRIdMPINT", mapping width is %"
-                    PRIdPINT".\n", n, m->num_values));
-        }
-
-        sp--; /* the key */
-
-        data = get_map_value(m, sp);
-        pop_stack();
-
-        if (data == &const0)
-        {
-            put_number(sp, 0);
-        }
-        else
-        {
-            assign_rvalue_no_free(sp, data + n);
-        }
-        free_mapping(m);
+        sp = push_map_index_value(sp, pc, REGULAR_INDEX);
         break;
-    }
+
+    CASE(F_MAP_RINDEX);             /* --- map_rindex          --- */
+        /* Operator F_MAP_RINDEX( mapping m=sp[-2], mixed i=sp[-1], int j=sp[0])
+         *
+         * Compute m[i,<j] and push it onto the stack.
+         */
+        sp = push_map_index_value(sp, pc, REVERSE_INDEX);
+        break;
+
+    CASE(F_MAP_AINDEX);             /* --- map_aindex          --- */
+        /* Operator F_MAP_AINDEX( mapping m=sp[-2], mixed i=sp[-1], int j=sp[0])
+         *
+         * Compute m[i,>j] and push it onto the stack.
+         */
+        sp = push_map_index_value(sp, pc, ARITHMETIC_INDEX);
+        break;
+
+    CASE(F_MAP_NX_RANGE);           /* --- map_nx_range        --- */
+        /* Push '1' onto the stack to make up for the missing
+         * upper range bound, then fall through to the normal
+         * range handling.
+         */
+        sp++;
+        put_number(sp, 1);
+        /* FALLTHROUGH */
+    CASE(F_MAP_NR_RANGE);           /* --- map_nr_range        --- */
+        sp = push_map_range_value(NR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RX_RANGE);           /* --- map_rx_range        --- */
+        sp++;
+        put_number(sp, 1);
+        /* FALLTHROUGH */
+    CASE(F_MAP_RR_RANGE);           /* --- map_rr_range        --- */
+        sp = push_map_range_value(RR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_AX_RANGE);           /* --- map_ax_range        --- */
+        sp++;
+        put_number(sp, 1);
+        /* FALLTHROUGH */
+    CASE(F_MAP_AR_RANGE);           /* --- map_ar_range        --- */
+        sp = push_map_range_value(AR_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RANGE);              /* --- map_range           --- */
+        sp = push_map_range_value(NN_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RN_RANGE);           /* --- map_rn_range        --- */
+        sp = push_map_range_value(RN_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_NA_RANGE);           /* --- map_na_range        --- */
+        sp = push_map_range_value(NA_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_AN_RANGE);           /* --- map_an_range        --- */
+        sp = push_map_range_value(AN_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_RA_RANGE);           /* --- map_ra_range        --- */
+        sp = push_map_range_value(RA_RANGE, sp, pc);
+        break;
+
+    CASE(F_MAP_AA_RANGE);           /* --- map_aa_range        --- */
+        sp = push_map_range_value(AA_RANGE, sp, pc);
+        break;
 
     CASE(F_FOREACH);       /* --- foreach       <nargs> <offset> --- */
     CASE(F_FOREACH_REF);   /* --- foreach_ref   <nargs> <offset> --- */
@@ -16160,26 +18370,76 @@ again:
                 /* This is a range lvalue, take that string/vector
                  * But set start and count accordingly.
                  */
-                struct protected_range_lvalue *r;
+                assert(sp->type == T_LVALUE);
 
-                assert(sp->type == T_LVALUE && sp->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-                r = sp->u.protected_range_lvalue;
+                switch (sp->x.lvalue_type)
+                {
+                    case LVALUE_PROTECTED_RANGE:
+                    {
+                        struct protected_range_lvalue *r = sp->u.protected_range_lvalue;
 
-                arg = &(r->vec);
+                        arg = &(r->vec);
 
-                start = r->index1;
-                count = r->index2 - r->index1;
-                if (count < 0)
-                    count = 0;
+                        start = r->index1;
+                        count = r->index2 - r->index1;
+                        if (count < 0)
+                            count = 0;
 
-                /* Remember the variable, if it is a string,
-                 * because we might need to update it.
-                 */
-                if ((arg->type == T_STRING || arg->type == T_BYTES)
-                 && r->var != NULL
-                 && r->var->val.type == arg->type
-                 && r->var->val.u.str == arg->u.str )
-                    argvar = r->var;
+                        /* Remember the variable, if it is a string,
+                         * because we might need to update it.
+                         */
+                        if ((arg->type == T_STRING || arg->type == T_BYTES)
+                         && r->var != NULL
+                         && r->var->val.type == arg->type
+                         && r->var->val.u.str == arg->u.str )
+                            argvar = r->var;
+                        break;
+                    }
+
+                    case LVALUE_PROTECTED_MAP_RANGE:
+                    {
+                        /* We'll replace it with a vector containing those entries. */
+                        struct protected_map_range_lvalue *r = sp->u.protected_map_range_lvalue;
+                        vector_t *vec = allocate_uninit_array(r->index2 - r->index1);
+                        svalue_t *item = get_map_value(r->map, &(r->key));
+
+                        if (vec == NULL)
+                            ERRORF(("Out of memory when iterating over mapping values.\n"));
+
+                        if (item == &const0)
+                        {
+                            /* We'll use map entry lvalues. This is a bit more expensive,
+                             * as each access will lookup the key again, but it will prevent
+                             * the entries from being generated without an assignment.
+                             */
+                            svalue_t *dest = vec->item;
+
+                            for (mp_int i = r->index1; i < r->index2; i++)
+                                assign_protected_mapentry_lvalue_no_free(dest++, r->map, &(r->key), i);
+                        }
+                        else
+                        {
+                            /* Create an array of lvalues to item + r->index1 ... item + r->index2. */
+                            svalue_t *dest = vec->item;
+
+                            for (mp_int i = r->index1; i < r->index2; i++)
+                                assign_protected_lvalue_no_free(dest++, item + i);
+                        }
+
+                        start = 0;
+                        count = r->index2 - r->index1;
+
+                        free_svalue(sp);
+                        put_array(sp, vec);
+                        arg = sp;
+
+                        break;
+                    }
+
+                    default:
+                        fatal("Illegal lvalue type %d\n", sp->x.lvalue_type);
+                        break;
+                }
             }
             else if (sp->x.lvalue_type == LVALUE_PROTECTED
                   && (arg->type == T_STRING || arg->type == T_BYTES))
@@ -16444,7 +18704,7 @@ again:
                 /* Do runtime type checks. */
                 for (int i = 0; i <= left; i++)
                 {
-                    lpctype_t* exptype = current_prog->argument_types[typeidx + i];
+                    lpctype_t* exptype = current_prog->types[current_prog->argument_types[typeidx + i]];
                     svalue_t * val = i ? (values + i - 1) : (indices->item + ix);
                     if (!check_rtt_compatibility(exptype, val))
                     {
@@ -16612,7 +18872,7 @@ again:
             if (typeidx != USHRT_MAX && current_prog->argument_types)
             {
                 /* Do runtime type checks. */
-                lpctype_t* exptype = current_prog->argument_types[typeidx];
+                lpctype_t* exptype = current_prog->types[current_prog->argument_types[typeidx]];
                 if (!check_rtt_compatibility(exptype, val))
                 {
                     char buf[512];
@@ -16899,12 +19159,13 @@ again:
     }
 
     CASE(F_TYPE_CHECK);             /* --- type_check <op> <ix> --- */
+    CASE(F_LAMBDA_TYPE_CHECK);      /* --- lambda_type_check <op> <ix> --- */
     {
         /* Check the top value off the stack against the type
-         * at prog->argument_types[<ix>]. Raise an error if
-         * it doesn't match. Do nothing otherwise.
-         * <op> contains a value of enum type_check_operation to
-         * give a specific error message.
+         * at prog->types[<ix>] resp. lambda constant <ix>.
+         * Raise an error if it doesn't match.
+         * Do nothing otherwise. <op> contains a value of
+         * enum type_check_operation to give a specific error message.
          */
 
         unsigned short ix, op = LOAD_UINT8(pc);
@@ -16913,10 +19174,21 @@ again:
         LOAD_SHORT(ix, pc);
 
         /* Types were saved? */
-        if (!current_prog->argument_types)
-            break;
+        if (instruction == F_TYPE_CHECK)
+        {
+            if (!current_prog->types)
+                break;
 
-        exptype = current_prog->argument_types[ix];
+            exptype = current_prog->types[ix];
+        }
+        else /* F_LAMBDA_TYPE_CHECK */
+        {
+            svalue_t * cstart = (svalue_t *)((char *)(csp->funstart) - LAMBDA_VALUE_OFFSET);
+
+            assert(cstart[-ix].type == T_LPCTYPE);
+            exptype = cstart[-ix].u.lpctype;
+        }
+
         if (!check_rtt_compatibility(exptype, sp))
         {
             static char buff[512];
@@ -16959,6 +19231,23 @@ again:
         break;
     }
 
+    CASE(F_PUSH_TYPE);              /* --- push_type <ix> --- */
+    {
+        /* Push the type at prog->types[<ix>] as an lpctype onto
+         * the stack.
+         */
+        unsigned short ix;
+
+        LOAD_SHORT(ix, pc);
+
+        /* Types were saved? */
+        if (!current_prog->types)
+            break;
+
+        push_ref_lpctype(sp, current_prog->types[ix]);
+        break;
+    }
+
     /* --- Efuns: Miscellaneous --- */
 
     CASE(F_CLONEP);                 /* --- clonep              --- */
@@ -16976,6 +19265,8 @@ again:
          */
 
         int i;
+
+        CALL_PYTHON_TYPE_EFUN(F_CLONEP, 1);
 
         if (sp->type == T_OBJECT)
         {
@@ -17008,6 +19299,8 @@ again:
 
         int i;
 
+        CALL_PYTHON_TYPE_EFUN(F_CLOSUREP, 1);
+
         i = sp->type == T_CLOSURE;
         free_svalue(sp);
         put_number(sp, i);
@@ -17024,6 +19317,8 @@ again:
          */
 
         int i;
+
+        CALL_PYTHON_TYPE_EFUN(F_COROUTINEP, 1);
 
         i = sp->type == T_COROUTINE;
         free_svalue(sp);
@@ -17042,6 +19337,8 @@ again:
 
         int i;
 
+        CALL_PYTHON_TYPE_EFUN(F_FLOATP, 1);
+
         i = sp->type == T_FLOAT;
         free_svalue(sp);
         put_number(sp, i);
@@ -17058,6 +19355,8 @@ again:
          */
 
         int i;
+
+        CALL_PYTHON_TYPE_EFUN(F_INTP, 1);
 
         i = sp->type == T_NUMBER;
         free_svalue(sp);
@@ -17076,6 +19375,8 @@ again:
 
         int i;
 
+        CALL_PYTHON_TYPE_EFUN(F_MAPPINGP, 1);
+
         i = sp->type == T_MAPPING;
         free_svalue(sp);
         put_number(sp, i);
@@ -17092,6 +19393,8 @@ again:
          */
 
         int i;
+
+        CALL_PYTHON_TYPE_EFUN(F_OBJECTP, 1);
 
         i = sp->type == T_OBJECT;
         free_svalue(sp);
@@ -17110,6 +19413,8 @@ again:
 
         int i;
 
+        CALL_PYTHON_TYPE_EFUN(F_LWOBJECTP, 1);
+
         i = sp->type == T_LWOBJECT;
         free_svalue(sp);
         put_number(sp, i);
@@ -17126,6 +19431,8 @@ again:
          */
 
         int i;
+
+        CALL_PYTHON_TYPE_EFUN(F_POINTERP, 1);
 
         i = sp->type == T_POINTER;
         free_svalue(sp);
@@ -17144,6 +19451,9 @@ again:
          */
 
         int i = 0;
+
+        CALL_PYTHON_TYPE_EFUN(F_REFERENCEP, 1);
+
         if (sp->type == T_LVALUE)
         {
             /* It must be an protected lvalue with at least 3 references:
@@ -17174,6 +19484,10 @@ again:
                 case LVALUE_PROTECTED_MAPENTRY:
                     i = (sp->u.protected_mapentry_lvalue->ref > 2);
                     break;
+
+                case LVALUE_PROTECTED_MAP_RANGE:
+                    i = (sp->u.protected_map_range_lvalue->ref > 2);
+                    break;
             } /* switch (sp->x.lvalue_type) */
         }
         free_svalue(sp);
@@ -17192,6 +19506,8 @@ again:
 
         int i;
 
+        CALL_PYTHON_TYPE_EFUN(F_STRINGP, 1);
+
         i = sp->type == T_STRING;
         free_svalue(sp);
         put_number(sp, i);
@@ -17208,6 +19524,8 @@ again:
          */
 
         int i;
+
+        CALL_PYTHON_TYPE_EFUN(F_BYTESP, 1);
 
         i = sp->type == T_BYTES;
         free_svalue(sp);
@@ -17226,6 +19544,8 @@ again:
 
         int i;
 
+        CALL_PYTHON_TYPE_EFUN(F_STRUCTP, 1);
+
         i = sp->type == T_STRUCT;
         free_svalue(sp);
         put_number(sp, i);
@@ -17243,7 +19563,28 @@ again:
 
         int i;
 
+        CALL_PYTHON_TYPE_EFUN(F_SYMBOLP, 1);
+
         i = sp->type == T_SYMBOL;
+        free_svalue(sp);
+        put_number(sp, i);
+        break;
+    }
+
+    CASE(F_LPCTYPEP);               /* --- lpctypep            --- */
+    {
+        /* EFUN lpctypep()
+         *
+         *   int lpctypep(mixed)
+         *
+         * Returns 1 if the argument is an LPC type object.
+         */
+
+        int i;
+
+        CALL_PYTHON_TYPE_EFUN(F_LPCTYPEP, 1);
+
+        i = sp->type == T_LPCTYPE;
         free_svalue(sp);
         put_number(sp, i);
         break;
@@ -17258,6 +19599,8 @@ again:
          * Returns a code for the type of the argument, as defined in
          * <sys/lpctypes.h>
          */
+
+        CALL_PYTHON_TYPE_EFUN(F_TYPEOF, 1);
 
         mp_int i = sp->type;
         free_svalue(sp);
@@ -17275,6 +19618,13 @@ again:
          * it sees the unary '-' used.
          */
 
+#ifdef USE_PYTHON
+        if (sp->type == T_PYTHON)
+        {
+            sp = do_python_unary_operation(sp, PYTHON_OP_NEG, "-");
+            break;
+        }
+#endif
         if (sp->type == T_NUMBER)
         {
             if (sp->u.number == PINT_MIN)
@@ -17311,12 +19661,15 @@ again:
          * anywhere.
          */
 
+        CALL_PYTHON_TYPE_EFUN(F_RAISE_ERROR, 1);
+
         TYPE_TEST1(sp, T_STRING);
 
         ERRORF(("%s", get_txt(sp->u.str)));
       }
 
     CASE(F_THROW);                  /* --- throw               --- */
+    {
         /* EFUN throw()
          *
          *   void throw(mixed arg)
@@ -17326,10 +19679,14 @@ again:
          */
 
         assign_eval_cost_inl();
+
+        CALL_PYTHON_TYPE_EFUN(F_THROW, 1);
+
         inter_sp = --sp;
         inter_pc = pc;
         throw_error(sp+1); /* do the longjump, with extra checks... */
         break;
+    }
 
     /* --- Efuns: Arrays and Mappings --- */
 
@@ -17347,6 +19704,8 @@ again:
          */
 
         p_int i;
+
+        CALL_PYTHON_TYPE_EFUN(F_SIZEOF, 1);
 
         if (sp->type == T_STRING || sp->type == T_BYTES)
         {
@@ -17392,7 +19751,7 @@ again:
         if (sp->type == T_NUMBER && sp->u.number == 0)
             break;
 
-        RAISE_ARG_ERROR(1, TF_STRING|TF_BYTES|TF_STRUCT|TF_MAPPING|TF_POINTER, sp->type);
+        RAISE_ARG_ERROR(1, TF_STRING|TF_BYTES|TF_STRUCT|TF_MAPPING|TF_POINTER, sp);
         /* NOTREACHED */
     }
 
@@ -17458,6 +19817,8 @@ again:
          * If <dont_load> is true, the function just returns the current
          * master object, or 0 if the current master has been destructed.
          */
+
+        CALL_PYTHON_TYPE_EFUN(F_MASTER, 1);
 
         TYPE_TEST1(sp, T_NUMBER)
 
@@ -17563,11 +19924,13 @@ again:
         object_t *ob;
         int flags;
 
+        CALL_PYTHON_TYPE_EFUN(F_SWAP, 2);
+
         /* Test the arguments */
         if (sp[-1].type != T_OBJECT)
-            RAISE_ARG_ERROR(1, TF_OBJECT, sp[-1].type);
+            RAISE_ARG_ERROR(1, TF_OBJECT, sp-1);
         if (sp[0].type != T_NUMBER)
-            RAISE_ARG_ERROR(1, TF_NUMBER, sp[0].type);
+            RAISE_ARG_ERROR(1, TF_NUMBER, sp);
 
         ob = sp[-1].u.ob;
         flags = sp[0].u.number;
@@ -17697,6 +20060,7 @@ again:
 #   undef TYPE_TEST_TEMPL
 #   undef OP_TYPE_TEST_TEMPL
 #   undef EXP_TYPE_TEST_TEMPL
+#   undef CALL_PYTHON_TYPE_EFUN
 
 } /* eval_instruction() */
 
@@ -18117,7 +20481,7 @@ int_apply (string_t *fun, object_t *ob, int num_arg
             }
             else /* hook->type == T_CLOSURE */
             {
-                int_call_lambda(hook, num_arg+num_extra-1, MY_TRUE);
+                int_call_lambda(hook, num_arg+num_extra-1, true, &current_object);
                 rc = 1; /* This call obviously succeeds */
             }
 
@@ -18235,9 +20599,7 @@ sapply_lwob_int (string_t *fun, lwobject_t *lwob, int num_arg, bool b_find_stati
     if (!apply_lwob(fun, lwob, num_arg, b_find_static, NULL))
         return NULL;
 
-    free_svalue(&apply_return_value);
-    transfer_svalue_no_free(&apply_return_value, inter_sp);
-    inter_sp--;
+    pop_apply_value();
 
 #ifdef DEBUG
     if (expected_sp != inter_sp)
@@ -18297,9 +20659,7 @@ sapply_int (string_t *fun, object_t *ob, int num_arg
             inter_sp = _pop_n_elems(num_arg, inter_sp);
         return NULL;
     }
-    free_svalue(&apply_return_value);
-    transfer_svalue_no_free(&apply_return_value, inter_sp);
-    inter_sp--;
+    pop_apply_value();
 
 #ifdef DEBUG
     if (expected_sp != inter_sp)
@@ -18694,7 +21054,7 @@ assert_master_ob_loaded (void)
       /* Flag to notice recursive calls */
 
     static object_t *destructed_master_ob = NULL;
-      /* Old, destructed master object */
+      /* Old, destructed master object, ref-counted. */
 
     int i;
 
@@ -18881,7 +21241,7 @@ assert_master_ob_loaded (void)
             ob->next_inv = NULL;
 
             /* Reactivate the old master */
-            master_ob = ref_object(ob, "assert_master_ob_loaded");
+            master_ob = ob;
             if (get_current_object() == &dummy_current_object_for_loads)
                 set_current_object(master_ob);
             push_number(inter_sp, newly_removed);
@@ -18936,7 +21296,10 @@ assert_master_ob_loaded (void)
         ref_object(master_ob, "assert_master_ob_loaded");
 
         if (destructed_master_ob)
+        {
             free_object(destructed_master_ob, "assert_master_ob_loaded");
+            destructed_master_ob = NULL;
+        }
 
         fprintf(stderr, "%s Reloading done.\n", time_stamp());
     }
@@ -18947,11 +21310,12 @@ assert_master_ob_loaded (void)
 
 /*-------------------------------------------------------------------------*/
 void
-int_call_lambda (svalue_t *lsvp, int num_arg, Bool external)
+int_call_lambda (svalue_t *lsvp, int num_arg, bool external, svalue_t *bind_ob)
 
 /* Call the closure <lsvp> with <num_arg> arguments on the stack. On
  * success, the arguments are replaced with the result, else an errorf()
- * is generated.
+ * is generated. If <lsvp> is an unbound lambda, use <bind_ob> as the
+ * corresponding object (or generate an error when NULL).
  *
  * If <external> is TRUE, the eval_instruction is called to execute the
  * closure. Otherwise inter_pc is just set and int_call_lambda returns
@@ -18968,7 +21332,7 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool external)
    */
 
     svalue_t *sp;
-    lambda_t *l = lsvp->u.lambda;
+    lambda_t *lambda = NULL; /* The lambda to execute if any. */
 
     sp = inter_sp;
 
@@ -18984,472 +21348,480 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool external)
 
     switch(lsvp->x.closure_type)
     {
-
-    case CLOSURE_LFUN:  /* --- lfun closure --- */
-      {
-        Bool      extra_frame;
-
-        if (l->ob.type == T_OBJECT)
+        case CLOSURE_LFUN:  /* --- lfun closure --- */
         {
-            /* Can't call from a destructed object */
-            if (l->ob.u.ob->flags & O_DESTRUCTED)
+            lfun_closure_t *l = lsvp->u.lfun_closure;
+            bool extra_frame;
+
+            if (l->base.ob.type == T_OBJECT)
             {
-                /* inter_sp == sp */
-                CLEAN_CSP
-                pop_n_elems(num_arg);
-                push_number(sp, 0);
-                inter_sp = sp;
-                return;
+                /* Can't call from a destructed object */
+                if (l->base.ob.u.ob->flags & O_DESTRUCTED)
+                {
+                    /* inter_sp == sp */
+                    CLEAN_CSP
+                    pop_n_elems(num_arg);
+                    push_number(sp, 0);
+                    inter_sp = sp;
+                    return;
+                }
+
+                /* Reference the bound and the originating object */
+                l->base.ob.u.ob->time_of_ref = current_time;
             }
 
-            /* Reference the bound and the originating object */
-            l->ob.u.ob->time_of_ref = current_time;
-        }
-
-        if (l->function.lfun.ob.type == T_OBJECT)
-        {
-            l->function.lfun.ob.u.ob->time_of_ref = current_time;
-            l->function.lfun.ob.u.ob->flags &= ~O_RESET_STATE;
-
-            /* Can't call a function in a destructed object */
-            if (l->function.lfun.ob.u.ob->flags & O_DESTRUCTED)
+            if (l->fun_ob.type == T_OBJECT)
             {
-                /* inter_sp == sp */
-                CLEAN_CSP
-                pop_n_elems(num_arg);
-                push_number(sp, 0);
-                inter_sp = sp;
-                return;
-            }
-        }
+                l->fun_ob.u.ob->time_of_ref = current_time;
+                l->fun_ob.u.ob->flags &= ~O_RESET_STATE;
 
-        /* Make the objects resident */
-        if ( (   current_object.type == T_OBJECT
-              && current_object.u.ob->flags & O_SWAPPED
-              && load_ob_from_swap(current_object.u.ob) < 0)
-         ||  (   l->function.lfun.ob.type == T_OBJECT
-              && l->function.lfun.ob.u.ob->flags & O_SWAPPED
-              && load_ob_from_swap(l->function.lfun.ob.u.ob) < 0)
-           )
-        {
-            /* inter_sp == sp */
-            CLEAN_CSP
-            errorf("Out of memory\n");
-            /* NOTREACHED */
-            return;
-        }
-
-        current_object = l->ob;
-
-        /* If the object creating the closure wasn't the one in which
-         * it will be executed, we need to record the fact in a second
-         * 'dummy' control frame. If we didn't, major security holes
-         * open up.
-         */
-
-        if (!object_svalue_eq(l->ob, l->function.lfun.ob))
-        {
-            extra_frame = MY_TRUE;
-            csp->extern_call = MY_TRUE;
-            csp->funstart = NULL;
-            push_control_stack(sp, 0, inter_fp, inter_context);
-            csp->ob = current_object;
-            csp->prev_ob = previous_ob;
-            csp->num_local_variables = num_arg;
-            previous_ob = current_object;
-            external = MY_TRUE;
-        }
-        else
-            extra_frame = MY_FALSE;
-
-        /* Finish the setup of the control frame.
-         * This is a real inter-object call.
-         */
-        csp->extern_call = external;
-        current_object = l->function.lfun.ob;
-        current_prog = get_current_object_program();
-
-#ifdef DEBUG
-        if (l->function.lfun.index >= current_prog->num_functions)
-            fatal("Calling non-existing lfun closure #%hu in program '%s' "
-                  "with %hu functions.\n"
-                 , l->function.lfun.index
-                 , get_txt(current_prog->name)
-                 , current_prog->num_functions
-                );
-#endif
-
-        /* inter_sp == sp */
-        setup_new_frame(l->function.lfun.index, l->function.lfun.inhProg);
-          
-        // check arguments
-        check_function_args(current_prog->function_headers[FUNCTION_HEADER_INDEX(csp->funstart)].offset.fx, current_prog, csp->funstart);
-        if (l->function.lfun.context_size > 0)
-            inter_context = l->context;
-        if (external)
-            eval_instruction(inter_pc, inter_sp);
-
-        /* If l->ob selfdestructs during the call, l might have been
-         * deallocated at this point!
-         */
-
-        /* If necessary, remove the second control frame */
-        if (extra_frame)
-        {
-            current_object = csp->ob;
-            previous_ob = csp->prev_ob;
-            pop_control_stack();
-        }
-
-        /* The result is on the stack (inter_sp) */
-        return;
-      }
-
-    case CLOSURE_IDENTIFIER:  /* --- variable closure --- */
-      {
-        short i; /* the signed variant of lambda_t->function.index */
-        svalue_t *vars;
-
-        CLEAN_CSP  /* no call will be done */
-
-        /* Ignore any arguments passed to a variable closure. */
-        pop_n_elems(num_arg);
-
-        if (l->ob.type == T_OBJECT)
-        {
-            /* Don't use variables in a destructed object */
-            if (l->ob.u.ob->flags & O_DESTRUCTED)
-            {
-                push_number(sp, 0);
-                inter_sp = sp;
-                return;
+                /* Can't call a function in a destructed object */
+                if (l->fun_ob.u.ob->flags & O_DESTRUCTED)
+                {
+                    /* inter_sp == sp */
+                    CLEAN_CSP
+                    pop_n_elems(num_arg);
+                    push_number(sp, 0);
+                    inter_sp = sp;
+                    return;
+                }
             }
 
-            /* Make the object resident */
-            if (   (l->ob.u.ob->flags & O_SWAPPED)
-                 && load_ob_from_swap(l->ob.u.ob) < 0
+            /* Make the objects resident */
+            if ( (   current_object.type == T_OBJECT
+                  && current_object.u.ob->flags & O_SWAPPED
+                  && load_ob_from_swap(current_object.u.ob) < 0)
+             ||  (   l->fun_ob.type == T_OBJECT
+                  && l->fun_ob.u.ob->flags & O_SWAPPED
+                  && load_ob_from_swap(l->fun_ob.u.ob) < 0)
                )
             {
-                errorf("Out of memory.\n");
+                /* inter_sp == sp */
+                CLEAN_CSP
+                errorf("Out of memory\n");
                 /* NOTREACHED */
                 return;
             }
-        }
 
-        /* Do we have the variable? */
-        if ( (i = (short)l->function.var_index) < 0)
-        {
-            errorf("Variable not inherited\n");
-            /* NOTREACHED */
+            current_object = l->base.ob;
+
+            /* If the object creating the closure wasn't the one in which
+             * it will be executed, we need to record the fact in a second
+             * 'dummy' control frame. If we didn't, major security holes
+             * open up.
+             */
+
+            if (!object_svalue_eq(l->base.ob, l->fun_ob))
+            {
+                extra_frame = MY_TRUE;
+                csp->extern_call = MY_TRUE;
+                csp->funstart = NULL;
+                push_control_stack(sp, 0, inter_fp, inter_context);
+                csp->ob = current_object;
+                csp->prev_ob = previous_ob;
+                csp->num_local_variables = num_arg;
+                previous_ob = current_object;
+                external = MY_TRUE;
+            }
+            else
+                extra_frame = MY_FALSE;
+
+            /* Finish the setup of the control frame.
+             * This is a real inter-object call.
+             */
+            csp->extern_call = external;
+            current_object = l->fun_ob;
+            current_prog = get_current_object_program();
+
+#ifdef DEBUG
+            if (l->fun_index >= current_prog->num_functions)
+                fatal("Calling non-existing lfun closure #%hu in program '%s' "
+                      "with %hu functions.\n"
+                     , l->fun_index
+                     , get_txt(current_prog->name)
+                     , current_prog->num_functions
+                    );
+#endif
+
+            /* inter_sp == sp */
+            setup_new_frame(l->fun_index, l->inhProg);
+
+            /* Check arguments. */
+            check_function_args(current_prog->function_headers[FUNCTION_HEADER_INDEX(csp->funstart)].offset.fx, current_prog, csp->funstart);
+            if (l->context_size > 0)
+                inter_context = l->context;
+            if (external)
+                eval_instruction(inter_pc, inter_sp);
+
+            /* If l->base.ob selfdestructs during the call, l might have been
+             * deallocated at this point!
+             */
+
+            /* If necessary, remove the second control frame */
+            if (extra_frame)
+            {
+                current_object = csp->ob;
+                previous_ob = csp->prev_ob;
+                pop_control_stack();
+            }
+
+            /* The result is on the stack (inter_sp) */
             return;
         }
 
-        if (l->ob.type == T_OBJECT)
+        case CLOSURE_IDENTIFIER:  /* --- variable closure --- */
         {
-            l->ob.u.ob->time_of_ref = current_time;
-            vars = l->ob.u.ob->variables;
-#ifdef DEBUG
-            if (!vars)
-                fatal("%s Fatal: call_lambda on variable for object %p '%s' "
-                      "w/o variables, index %d\n"
-                     , time_stamp(), l->ob.u.ob, get_txt(l->ob.u.ob->name), i);
-#endif
-        }
-        else
-        {
-            vars = l->ob.u.lwob->variables;
-#ifdef DEBUG
-            if (!vars)
-                fatal("%s Fatal: call_lambda on variable for lightweight object %p '/%s' "
-                      "w/o variables, index %d\n"
-                     , time_stamp(), l->ob.u.lwob, get_txt(l->ob.u.lwob->prog->name), i);
-#endif
-        }
+            identifier_closure_t *cl = lsvp->u.identifier_closure;
+            svalue_t *vars;
 
-        assign_svalue_no_free(++sp, vars+i);
-        inter_sp = sp;
-        return;
-      }
+            CLEAN_CSP  /* no call will be done */
 
-    case CLOSURE_BOUND_LAMBDA:  /* --- bound lambda closure --- */
-      {
-        lambda_t *l2;
+            /* Ignore any arguments passed to a variable closure. */
+            pop_n_elems(num_arg);
 
-        /* Deref the closure and then treat the resulting unbound
-         * lambda like a normal lambda
-         */
-        l2 = l->function.lambda;
-        l2->ob = l->ob;
-        l = l2;
-      }
-      /* FALLTHROUGH */
-
-    case CLOSURE_UNBOUND_LAMBDA:
-      if (lsvp->x.closure_type == CLOSURE_UNBOUND_LAMBDA)
-      {
-          if (external)
-              break;
-
-          /* Internal call of an unbound closure.
-           * Bind it on the fly.
-           */
-          l->ob = current_object;
-      }
-      /* FALLTHROUGH */
-
-    case CLOSURE_LAMBDA:
-      {
-        bytecode_p funstart;
-
-        if (l->ob.type == T_OBJECT)
-        {
-            /* Can't call from a destructed object */
-            if (l->ob.u.ob->flags & O_DESTRUCTED)
+            if (cl->base.ob.type == T_OBJECT)
             {
-                /* inter_sp == sp */
-                CLEAN_CSP
-                pop_n_elems(num_arg);
-                push_number(sp, 0);
-                inter_sp = sp;
-                return;
-            }
-
-            /* Make the object resident */
-            if (l->ob.u.ob->flags & O_SWAPPED
-             && load_ob_from_swap(l->ob.u.ob) < 0)
-            {
-                /* inter_sp == sp */
-                CLEAN_CSP
-                errorf("Out of memory\n");
-                /* NOTREACHED */
-                return;
-            }
-
-            /* Reference the object */
-            l->ob.u.ob->time_of_ref = current_time;
-            l->ob.u.ob->flags &= ~O_RESET_STATE;
-        }
-
-        current_object = l->ob;
-
-        /* Finish the setup */
-
-        current_prog = get_current_object_program();
-        current_lambda = *lsvp; addref_closure(lsvp, "call_lambda()");
-        variable_index_offset = 0;
-        function_index_offset = 0;
-        funstart = l->function.code.program;
-        csp->funstart = funstart;
-        csp->extern_call = external;
-        sp = setup_new_frame2(funstart, sp, MY_TRUE);
-
-        current_variables = get_current_object_variables();
-        current_strings = current_prog->strings;
-        if (external)
-            eval_instruction(inter_pc, sp);
-        else
-            inter_sp = sp;
-
-        /* The result is on the stack (inter_sp). */
-        return;
-      }
-
-    default: /* --- efun-, simul efun-, operator closure */
-      {
-        int i = lsvp->x.closure_type;  /* the closure type */
-
-        if (i < CLOSURE_LWO)
-        {
-            i -= CLOSURE_LWO;
-            set_current_lwobject(lsvp->u.lwob);
-        }
-        else
-        {
-            object_t *ob = lsvp->u.ob;
-
-            /* Can't call from a destructed object */
-            if (ob->flags & O_DESTRUCTED)
-            {
-                /* inter_sp == sp */
-                CLEAN_CSP
-                pop_n_elems(num_arg);
-                push_number(sp, 0);
-                inter_sp = sp;
-                return;
-            }
-
-            /* Make the object resident */
-            if (ob->flags & O_SWAPPED
-             && load_ob_from_swap(ob) < 0)
-            {
-                /* inter_sp == sp */
-                CLEAN_CSP
-                errorf("Out of memory\n");
-                /* NOTREACHED */
-                return;
-            }
-
-            /* Reference the object */
-            ob->time_of_ref = current_time;
-
-            set_current_object(ob);
-        }
-
-        if (i < CLOSURE_SIMUL_EFUN)
-        {
-            /* It's an operator or efun */
-
-            if (i == CLOSURE_EFUN + F_UNDEF)
-            {
-                /* The closure was discovered to be bound to a destructed
-                 * object and thus disabled.
-                 * This situation should no longer happen - in all situations
-                 * the closure should be zeroed out.
-                 */
-                CLEAN_CSP
-                pop_n_elems(num_arg);
-                push_number(sp, 0);
-                inter_sp = sp;
-                return;
-            }
-
-#ifdef USE_PYTHON
-            if (i >= CLOSURE_PYTHON_EFUN && i < CLOSURE_EFUN)
-            {
-                inter_pc = csp->funstart = PYTHON_EFUN_FUNSTART;
-                csp->instruction = i - CLOSURE_PYTHON_EFUN;
-                csp->num_local_variables = 0;
-
-                call_python_efun(i - CLOSURE_PYTHON_EFUN, num_arg);
-                CLEAN_CSP
-                return;
-            }
-#endif
-
-            i -= CLOSURE_EFUN;
-              /* Efuns have now a positive value, operators a negative one.
-               */
-
-            if (i >= 0
-             || instrs[i -= CLOSURE_OPERATOR-CLOSURE_EFUN].min_arg)
-            {
-                /* To call an operator or efun, we have to construct
-                 * a small piece of program with this instruction.
-                 */
-                bytecode_t code[9];    /* the code fragment */
-                bytecode_p p;          /* the code pointer */
-
-                int min, max, def;
-
-                min = instrs[i].min_arg;
-                max = instrs[i].max_arg;
-                p = code;
-
-                /* Fix up the number of arguments passed */
-                if (num_arg < min)
+                /* Don't use variables in a destructed object */
+                if (cl->base.ob.u.ob->flags & O_DESTRUCTED)
                 {
-                    /* Add some arguments */
-
-                    int f;
-
-                    if (num_arg == min-1
-                     && 0 != (def = instrs[i].Default) && def != -1)
-                    {
-                        /* We lack one argument for which a default
-                         * is provided.
-                         */
-                        if (instrs[def].prefix)
-                            *p++ = instrs[def].prefix;
-                        *p++ = instrs[def].opcode;
-                        max--;
-                        min--;
-                    }
-                    else
-                    {
-                        /* Maybe there is a fitting replacement efun */
-                        f = proxy_efun(i, num_arg);
-                        if (f >= 0)
-                            /* Yup, use that one */
-                            i = f;
-                        else
-                        {
-                            /* Nope. */
-                            csp->extern_call = MY_TRUE;
-                            inter_pc = csp->funstart = EFUN_FUNSTART;
-                            csp->instruction = i;
-                            errorf("Too few arguments to %s\n", instrs[i].name);
-                        }
-                    }
-                }
-                else if (num_arg > 0xff || (num_arg > max && max != -1))
-                {
-                    csp->extern_call = MY_TRUE;
-                    inter_pc = csp->funstart = EFUN_FUNSTART;
-                    csp->instruction = i;
-                    errorf("Too many arguments to %s\n", instrs[i].name);
+                    push_number(sp, 0);
+                    inter_sp = sp;
+                    return;
                 }
 
-                /* Store the instruction code */
-                if (instrs[i].prefix)
-                    *p++ = instrs[i].prefix;
-                *p++ = instrs[i].opcode;
-
-                /* And finally the return instruction */
-                if ( instrs[i].ret_type == lpctype_void )
-                    *p++ = F_RETURN0;
-                else
-                    *p++ = F_RETURN;
-
-                csp->instruction = i;
-                csp->funstart = EFUN_FUNSTART;
-                csp->num_local_variables = 0;
-                inter_fp = sp - num_arg + 1;
-                inter_context = NULL;
-                tracedepth++; /* Counteract the F_RETURN */
-                eval_instruction(code, sp);
-                /* The result is on the stack (inter_sp) */
-                return;
-            }
-            else
-            {
-                /* It is an operator or syntactic marker: fall through
-                 * to uncallable closure type.
-                 */
-                break;
-            }
-        }
-        else
-        {
-            /* simul_efun */
-            object_t *ob;
-
-            /* Mark the call as sefun closure */
-            inter_pc = csp->funstart = SIMUL_EFUN_FUNSTART;
-
-            /* Get the simul_efun object */
-            if ( !(ob = simul_efun_object) )
-            {
-                /* inter_sp == sp */
-                if (!assert_simul_efun_object()
-                 || !(ob = simul_efun_object)
+                /* Make the object resident */
+                if (   (cl->base.ob.u.ob->flags & O_SWAPPED)
+                     && load_ob_from_swap(cl->base.ob.u.ob) < 0
                    )
                 {
-                    csp->extern_call = MY_TRUE;
-                    errorf("Couldn't load simul_efun object\n");
+                    errorf("Out of memory.\n");
                     /* NOTREACHED */
                     return;
                 }
             }
-            call_simul_efun(i - CLOSURE_SIMUL_EFUN, ob, num_arg);
-            CLEAN_CSP
-        }
-        /* The result is on the stack (inter_sp) */
-        return;
-      }
 
+            /* Do we have the variable? */
+            if ( cl->var_index == VANISHED_VARCLOSURE_INDEX)
+            {
+                errorf("Variable not inherited\n");
+                /* NOTREACHED */
+                return;
+            }
+
+            if (cl->base.ob.type == T_OBJECT)
+            {
+                cl->base.ob.u.ob->time_of_ref = current_time;
+                vars = cl->base.ob.u.ob->variables;
+#ifdef DEBUG
+                if (!vars)
+                    fatal("%s Fatal: call_lambda on variable for object %p '%s' "
+                          "w/o variables, index %d\n"
+                         , time_stamp(), cl->base.ob.u.ob
+                         , get_txt(cl->base.ob.u.ob->name), cl->var_index);
+#endif
+            }
+            else
+            {
+                vars = cl->base.ob.u.lwob->variables;
+#ifdef DEBUG
+                if (!vars)
+                    fatal("%s Fatal: call_lambda on variable for lightweight object %p '/%s' "
+                          "w/o variables, index %d\n"
+                         , time_stamp(), cl->base.ob.u.lwob
+                         , get_txt(cl->base.ob.u.lwob->prog->name), cl->var_index);
+#endif
+            }
+
+            assign_svalue_no_free(++sp, vars+cl->var_index);
+            inter_sp = sp;
+            return;
+        }
+
+        case CLOSURE_BOUND_LAMBDA:  /* --- bound lambda closure --- */
+        {
+            /* Deref the closure and then treat the resulting unbound
+             * lambda like a normal lambda
+             */
+            lambda = lsvp->u.bound_lambda->lambda;
+            lambda->base.ob = lsvp->u.bound_lambda->base.ob;
+
+            /* FALLTHROUGH */
+        }
+
+        case CLOSURE_UNBOUND_LAMBDA:
+            if (lsvp->x.closure_type == CLOSURE_UNBOUND_LAMBDA)
+            {
+                if (!bind_ob)
+                    break;
+
+                /* Internal call of an unbound closure.
+                 * Bind it on the fly.
+                 */
+                lambda = lsvp->u.lambda;
+                lambda->base.ob = *bind_ob;
+            }
+            /* FALLTHROUGH */
+
+        case CLOSURE_LAMBDA:
+        {
+            bytecode_p funstart;
+
+            if (lsvp->x.closure_type == CLOSURE_LAMBDA)
+                lambda = lsvp->u.lambda;
+
+            if (lambda->base.ob.type == T_OBJECT)
+            {
+                /* Can't call from a destructed object */
+                if (lambda->base.ob.u.ob->flags & O_DESTRUCTED)
+                {
+                    /* inter_sp == sp */
+                    CLEAN_CSP
+                    pop_n_elems(num_arg);
+                    push_number(sp, 0);
+                    inter_sp = sp;
+                    return;
+                }
+
+                /* Make the object resident */
+                if (lambda->base.ob.u.ob->flags & O_SWAPPED
+                 && load_ob_from_swap(lambda->base.ob.u.ob) < 0)
+                {
+                    /* inter_sp == sp */
+                    CLEAN_CSP
+                    errorf("Out of memory\n");
+                    /* NOTREACHED */
+                    return;
+                }
+
+                /* Reference the object */
+                lambda->base.ob.u.ob->time_of_ref = current_time;
+                lambda->base.ob.u.ob->flags &= ~O_RESET_STATE;
+            }
+
+            current_object = lambda->base.ob;
+
+            /* Finish the setup */
+
+            current_prog = get_current_object_program();
+            internal_assign_svalue_no_free(&current_lambda, lsvp);
+            variable_index_offset = 0;
+            function_index_offset = 0;
+            funstart = lambda->program;
+            csp->funstart = funstart;
+            csp->extern_call = external;
+            sp = setup_new_frame2(funstart, sp, MY_TRUE);
+
+            current_variables = get_current_object_variables();
+            current_strings = current_prog->strings;
+            inter_context = ((svalue_t*)(void*)lambda) - lambda->num_values;
+            if (external)
+                eval_instruction(inter_pc, sp);
+            else
+                inter_sp = sp;
+
+            /* The result is on the stack (inter_sp). */
+            return;
+        }
+
+        default: /* --- efun-, simul efun-, operator closure */
+        {
+            int i = lsvp->x.closure_type;  /* the closure type */
+
+            if (i < CLOSURE_LWO)
+            {
+                i -= CLOSURE_LWO;
+                set_current_lwobject(lsvp->u.lwob);
+            }
+            else
+            {
+                object_t *ob = lsvp->u.ob;
+
+                /* Can't call from a destructed object */
+                if (ob->flags & O_DESTRUCTED)
+                {
+                    /* inter_sp == sp */
+                    CLEAN_CSP
+                    pop_n_elems(num_arg);
+                    push_number(sp, 0);
+                    inter_sp = sp;
+                    return;
+                }
+
+                /* Make the object resident */
+                if (ob->flags & O_SWAPPED
+                 && load_ob_from_swap(ob) < 0)
+                {
+                    /* inter_sp == sp */
+                    CLEAN_CSP
+                    errorf("Out of memory\n");
+                    /* NOTREACHED */
+                    return;
+                }
+
+                /* Reference the object */
+                ob->time_of_ref = current_time;
+
+                set_current_object(ob);
+            }
+
+            switch (i & -0x0800)
+            {
+#ifdef USE_PYTHON
+                case CLOSURE_PYTHON_EFUN:
+                    inter_pc = csp->funstart = PYTHON_EFUN_FUNSTART;
+                    csp->instruction = i - CLOSURE_PYTHON_EFUN;
+                    csp->num_local_variables = 0;
+
+                    call_python_efun(i - CLOSURE_PYTHON_EFUN, num_arg);
+                    CLEAN_CSP
+                    return;
+#endif
+
+                case CLOSURE_EFUN:
+                {
+                    bytecode_t code[9];    /* the code fragment */
+                    bytecode_p p;          /* the code pointer */
+
+                    int min, max, def;
+
+                    i -= CLOSURE_EFUN;
+                    if (i == F_UNDEF)
+                    {
+                        /* The closure was discovered to be bound to a destructed
+                         * object and thus disabled.
+                         * This situation should no longer happen - in all situations
+                         * the closure should be zeroed out.
+                        */
+                        CLEAN_CSP
+                        pop_n_elems(num_arg);
+                        push_number(sp, 0);
+                        inter_sp = sp;
+                        return;
+                    }
+
+                    /* To call an efun, we have to construct a small piece
+                     * of program with this instruction.
+                     */
+                    min = instrs[i].min_arg;
+                    max = instrs[i].max_arg;
+                    p = code;
+
+                    /* Fix up the number of arguments passed */
+                    if (num_arg < min)
+                    {
+                        /* Add some arguments */
+
+                        int f;
+
+                        if (num_arg == min-1
+                         && 0 != (def = instrs[i].Default) && def != -1)
+                        {
+                            /* We lack one argument for which a default
+                             * is provided.
+                             */
+                            if (instrs[def].prefix)
+                                *p++ = instrs[def].prefix;
+                            *p++ = instrs[def].opcode;
+                            max--;
+                            min--;
+                        }
+                        else
+                        {
+                            /* Maybe there is a fitting replacement efun */
+                            f = proxy_efun(i, num_arg);
+                            if (f >= 0)
+                                /* Yup, use that one */
+                                i = f;
+                            else
+                            {
+                                /* Nope. */
+                                csp->extern_call = MY_TRUE;
+                                inter_pc = csp->funstart = EFUN_FUNSTART;
+                                csp->instruction = i;
+                                errorf("Too few arguments to %s\n", instrs[i].name);
+                            }
+                        }
+                    }
+                    else if (num_arg > 0xff || (num_arg > max && max != -1))
+                    {
+                        csp->extern_call = MY_TRUE;
+                        inter_pc = csp->funstart = EFUN_FUNSTART;
+                        csp->instruction = i;
+                        errorf("Too many arguments to %s\n", instrs[i].name);
+                    }
+
+                    /* Store the instruction code */
+                    if (instrs[i].prefix)
+                        *p++ = instrs[i].prefix;
+                    *p++ = instrs[i].opcode;
+
+                    /* And finally the return instruction */
+                    if ( instrs[i].ret_type == lpctype_void )
+                        *p++ = F_RETURN0;
+                    else
+                        *p++ = F_RETURN;
+
+                    csp->instruction = i;
+                    csp->funstart = EFUN_FUNSTART;
+                    csp->num_local_variables = 0;
+                    inter_fp = sp - num_arg + 1;
+                    inter_context = NULL;
+                    tracedepth++; /* Counteract the F_RETURN */
+                    eval_instruction(code, sp);
+                    /* The result is on the stack (inter_sp) */
+                    return;
+                }
+
+                case CLOSURE_OPERATOR:
+                    /* It is an operator or syntactic marker.
+                     */
+                    csp->extern_call = MY_TRUE;
+                    inter_pc = csp->funstart = EFUN_FUNSTART;
+                    csp->instruction = i - CLOSURE_OPERATOR;
+                    break;
+
+                case CLOSURE_SIMUL_EFUN:
+                {
+                    /* simul_efun */
+                    object_t *ob;
+
+                    /* Mark the call as sefun closure */
+                    inter_pc = csp->funstart = SIMUL_EFUN_FUNSTART;
+                    csp->instruction = i - CLOSURE_SIMUL_EFUN;
+
+                    /* Get the simul_efun object */
+                    if ( !(ob = simul_efun_object) )
+                    {
+                        /* inter_sp == sp */
+                        if (!assert_simul_efun_object()
+                         || !(ob = simul_efun_object)
+                           )
+                        {
+                            csp->extern_call = MY_TRUE;
+                            errorf("Couldn't load simul_efun object\n");
+                            /* NOTREACHED */
+                            return;
+                        }
+                    }
+                    call_simul_efun(i - CLOSURE_SIMUL_EFUN, ob, num_arg);
+                    CLEAN_CSP
+
+                    /* The result is on the stack (inter_sp) */
+                    return;
+                }
+
+                default:
+                    fatal("Invalid closure type: %d.\n",  lsvp->x.closure_type);
+            }
+            break;
+        }
     }
 
-    CLEAN_CSP
+    /* We need to have at least one stack entry for error handling. */
+    if (csp > CONTROL_STACK)
+    {
+        CLEAN_CSP
+    }
     errorf("Uncallable closure\n");
     /* NOTREACHED */
     return;
@@ -19459,13 +21831,15 @@ int_call_lambda (svalue_t *lsvp, int num_arg, Bool external)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-secure_call_lambda (svalue_t *closure, int num_arg, Bool external)
+secure_call_lambda (svalue_t *closure, int num_arg, bool external, svalue_t *bind_ob)
 
 /* Aliases:
- *   secure_apply_lambda(fun, num_arg)
- *     == secure_call_lambda(fun, num_arg, FALSE)
+ *   secure_apply_lambda_ob(fun, num_arg, ob)
+ *     == secure_call_lambda(fun, num_arg, FALSE, ob)
  *   secure_callback_lambda(fun, num_arg)
- *     == secure_call_lambda(fun, num_arg, TRUE)
+ *     == secure_call_lambda(fun, num_arg, TRUE, current_object)
+ *   secure_callback_lambda_ob(fun, num_arg, ob)
+ *     == secure_call_lambda(fun, num_arg, TRUE, ob)
  *
  * Call the closure <closure> with <num_arg> arguments on the stack.
  * On success, the functions returns a pointer to the result in the
@@ -19478,6 +21852,9 @@ secure_call_lambda (svalue_t *closure, int num_arg, Bool external)
  * function call (clearing the eval costs before calling runtime_error()).
  *
  * This error recovery is the difference to call_lambda().
+ *
+ * If the closure is an unbound lambda, then it is executed in the
+ * context of <bind_ob>.
  */
 
 {
@@ -19501,9 +21878,11 @@ secure_call_lambda (svalue_t *closure, int num_arg, Bool external)
     {
         if (external)
             mark_start_evaluation();
-        call_lambda(closure, num_arg);
-        transfer_svalue((result = &apply_return_value), inter_sp);
-        inter_sp--;
+        call_lambda_ob(closure, num_arg, bind_ob);
+
+        pop_apply_value();
+        result = &apply_return_value;
+
         if (external)
             mark_end_evaluation();
     }
@@ -19728,7 +22107,7 @@ warn_missing_function_lwob (lwobject_t* lwob, string_t* fun)
 
 /*-------------------------------------------------------------------------*/
 int
-get_line_number (bytecode_p p, program_t *progp, string_t **namep)
+get_line_number (bytecode_p p, program_t *progp, string_t **namep, string_t **fnamep)
 
 /* Look up the line number for address <p> within the program <progp>.
  * Result is the line number, and *<namep> is set to the name of the
@@ -19740,6 +22119,10 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
  *
  * In either case, the string returned in *<namep> has one reference
  * added.
+ *
+ * In fnamep (if != NULL) the original file name (either included file name
+ * or program name) will be returned not ref-counted. If no filename is found,
+ * it will be NULL.
  *
  * TODO: (an old comment which might no longer be true): This can be done
  * TODO:: much more efficiently, but that change has low priority.)
@@ -19768,6 +22151,8 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
     if (!progp || !p)
     {
         *namep = ref_mstring(STR_UNDEFINED);
+        if (fnamep)
+            *fnamep = NULL;
         return 0;
     }
 
@@ -19791,6 +22176,8 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
             if (!rc)
             {
                 *namep = ref_mstring(STR_UNDEFINED);
+                if (fnamep)
+                    *fnamep = NULL;
                 return 0;
             }
         }
@@ -19806,6 +22193,8 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
                       " in object %s\n",
                       time_stamp(), offset, get_txt(progp->name));
         *namep = ref_mstring(STR_UNDEFINED);
+        if (fnamep)
+            *fnamep = NULL;
         return 0;
     }
 
@@ -19957,6 +22346,8 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
             /* No memory for the new string - improvise */
             *namep = ref_mstring(inctop->name);
         }
+        if (fnamep)
+            *fnamep = inctop->name;
 
         /* Free the include stack structures */
         do {
@@ -19972,6 +22363,8 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
         /* Normal code */
 
         *namep = ref_mstring(progp->name);
+        if (fnamep)
+            *fnamep = progp->name;
     }
 
     if (used_system_mem)
@@ -20063,10 +22456,9 @@ get_line_number_if_any (string_t **name)
             memsafe(*name = new_mstring(name_buffer, STRING_ASCII), strlen(name_buffer)
                    , "lambda name");
             /* Find the beginning of the lambda structure.*/
-            l = (lambda_t *)( (PTRTYPE)(csp->funstart)
-                             - offsetof(lambda_t, function.code.program));
+            l = (lambda_t *)( (PTRTYPE)(csp->funstart) - offsetof(lambda_t, program));
 
-            location = closure_location(l);
+            location = closure_location(&(l->base));
 
             tmp = mstr_add(*name, location);
             if (tmp)
@@ -20077,7 +22469,7 @@ get_line_number_if_any (string_t **name)
             free_mstring(location);
             return inter_pc - csp->funstart - 2;
         }
-        return get_line_number(inter_pc, current_prog, name);
+        return get_line_number(inter_pc, current_prog, name, NULL);
     }
   
     *name = ref_mstring(STR_EMPTY);
@@ -20414,7 +22806,7 @@ not_catch:  /* The frame does not point at a catch here */
         /* Nothing of the above: a normal program */
         if (file)
             free_mstring(file);
-        line = get_line_number(dump_pc, prog, &file);
+        line = get_line_number(dump_pc, prog, &file, NULL);
         name = prog->function_headers[FUNCTION_HEADER_INDEX(p[0].funstart)].name;
 
 name_computed: /* Jump target from the catch detection */
@@ -20544,6 +22936,52 @@ dump_trace (Bool how, vector_t ** rvec, string_t ** rstr)
 
     return hb_obj_name;
 } /* dump_trace() */
+
+/*-------------------------------------------------------------------------*/
+local_variable_dbg_t*
+get_first_local_variable (program_t *progp, bytecode_p pc)
+
+/* For the given code position return the debugging information for the first
+ * local variable. Return NULL if there is no local variable or no debugging
+ * information.
+ */
+
+{
+    if (pc < progp->program || pc >= PROGRAM_END(*progp))
+        return NULL;
+
+    if (!progp->num_local_variables)
+        return NULL;
+
+    return get_next_local_variable(progp, pc, progp->local_variables-1);
+} /* get_first_local_variable() */
+
+/*-------------------------------------------------------------------------*/
+local_variable_dbg_t*
+get_next_local_variable (program_t *progp, bytecode_p pc, local_variable_dbg_t *prev)
+
+/* For the given code position return the debugging information for the next
+ * local variable after <prev>. <prev> should be the result of a call to
+ * get_first_local_variable() or get_next_local_variable() with the same
+ * <progp> and <pc>. Return NULL if there is no further local variable.
+ */
+
+{
+    local_variable_dbg_t *end = progp->local_variables + progp->num_local_variables;
+    uint32_t pos = pc - progp->program;
+
+    assert(prev != NULL);
+
+    for (local_variable_dbg_t* cur = prev+1; cur < end; cur++)
+    {
+        if (cur->code_start > pos)
+            return NULL;
+        if (cur->code_end > pos)
+            return cur;
+    }
+
+    return NULL;
+} /* get_next_local_variable() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -20916,7 +23354,7 @@ last_instructions (int length, Bool verbose, svalue_t **svpp)
                 }
                 else
                 {
-                    line = get_line_number(ppc, ppr, &file);
+                    line = get_line_number(ppc, ppr, &file, NULL);
                 }
 
                 if (!object_svalue_eq(previous_objects[i], old_obj)
@@ -21041,6 +23479,14 @@ int control_stack_depth (void)
 {
     return (csp - CONTROL_STACK) + 1; 
 } /* control_stack_depth() */
+
+/*-------------------------------------------------------------------------*/
+struct control_stack* control_stack_start (void)
+  /* Returns the outermost stack entry.
+   */
+{
+    return CONTROL_STACK;
+} /* control_stack_start() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE int
@@ -21366,60 +23812,70 @@ count_extra_ref_in_object (object_t *ob)
 
     if (was_swapped)
         swap_program(ob);
+
+    if (ob->sent)
+    {
+        sentence_t *sent = ob->sent;
+        if (ob->flags & O_SHADOW)
+            sent = sent->next;
+        if (sent)
+        {
+            for (action_t *action = (action_t*) sent;
+                 action != NULL;
+                 action = (action_t*)action->sent.next)
+            {
+                count_callback_extra_refs(&(action->cb));
+            }
+        }
+    }
 } /* count_extra_ref_in_object() */
 
 /*-------------------------------------------------------------------------*/
 static void
-count_extra_ref_in_closure (lambda_t *l, ph_int type)
+count_extra_ref_in_base_closure (closure_base_t *cl, ph_int type)
 
 /* Count the extra refs in the closure <l> of type <type>.
  */
 
 {
-    if (CLOSURE_HAS_CODE(type))
-    {
-        /* We need to count the extra_refs in the constant values. */
-
-        mp_int num_values;
-        svalue_t *svp;
-
-        svp = (svalue_t *)l;
-        num_values = l->function.code.num_values;
-
-        svp -= num_values;
-        count_extra_ref_in_vector(svp, (size_t)num_values);
-    }
-    else
-    {
-        /* Count the referenced closures and objects */
-        if (type == CLOSURE_BOUND_LAMBDA)
-        {
-            lambda_t *l2 = l->function.lambda;
-
-            if (NULL != register_pointer(ptable, l2) )
-                count_extra_ref_in_closure(l2, CLOSURE_UNBOUND_LAMBDA);
-        }
-        else if (type == CLOSURE_LFUN)
-        {
-            count_extra_ref_in_vector(&(l->function.lfun.ob), 1);
-            if (l->function.lfun.inhProg)
-            {
-                l->function.lfun.inhProg->extra_ref++;
-                count_extra_ref_in_prog(l->function.lfun.inhProg);
-            }
-        }
-    }
-
     if (type != CLOSURE_UNBOUND_LAMBDA)
+        count_extra_ref_in_vector(&(cl->ob), 1);
+
+    if (cl->prog_ob)
+        count_extra_ref_in_object(cl->prog_ob);
+} /* count_extra_ref_in_base_closure() */
+
+/*-------------------------------------------------------------------------*/
+static void
+count_extra_ref_in_lfun_closure (lfun_closure_t *l)
+
+/* Count the extra refs in the closure <l> of type <type>.
+ */
+
+{
+    /* Count the referenced closures and objects */
+    count_extra_ref_in_vector(&(l->fun_ob), 1);
+    if (l->inhProg)
     {
-        count_extra_ref_in_vector(&(l->ob), 1);
+        l->inhProg->extra_ref++;
+        count_extra_ref_in_prog(l->inhProg);
     }
-    
-    if (l->prog_ob)
-    {
-        count_extra_ref_in_object(l->prog_ob);
-    }
-} /* count_extra_ref_in_closure() */
+
+    count_extra_ref_in_vector(l->context, l->context_size);
+
+} /* count_extra_ref_in_lfun_closure() */
+
+/*-------------------------------------------------------------------------*/
+static void
+count_extra_ref_in_lambda_closure (lambda_t *l)
+
+/* Count the extra refs in the closure <l> of type <type>.
+ */
+
+{
+    /* We need to count the extra_refs in the constant values. */
+    count_extra_ref_in_vector(((svalue_t *)l) - l->num_values, (size_t)l->num_values);
+} /* count_extra_ref_in_lambda_closure() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -21438,16 +23894,32 @@ count_extra_ref_in_vector (svalue_t *svp, size_t num)
     {
         switch(p->type)
         {
-
         case T_CLOSURE:
             if (CLOSURE_MALLOCED(p->x.closure_type))
             {
-                lambda_t *l;
-
-                l = p->u.lambda;
-                if ( NULL == register_pointer(ptable, l) )
+                if (NULL == register_pointer(ptable, p->u.closure))
                     continue;
-                count_extra_ref_in_closure(l, p->x.closure_type);
+                count_extra_ref_in_base_closure(p->u.closure, p->x.closure_type);
+
+                switch (p->x.closure_type)
+                {
+                    case CLOSURE_LFUN:
+                        count_extra_ref_in_lfun_closure(p->u.lfun_closure);
+                        break;
+
+                    case CLOSURE_BOUND_LAMBDA:
+                        count_extra_ref_in_base_closure(&(p->u.bound_lambda->lambda->base), CLOSURE_UNBOUND_LAMBDA);
+                        count_extra_ref_in_lambda_closure(p->u.bound_lambda->lambda);
+                        break;
+
+                    case CLOSURE_LAMBDA:
+                    case CLOSURE_UNBOUND_LAMBDA:
+                        count_extra_ref_in_lambda_closure(p->u.lambda);
+                        break;
+
+                    default:
+                        break;
+                }
             }
             else if (p->x.closure_type < CLOSURE_LWO)
             {
@@ -21463,24 +23935,35 @@ count_extra_ref_in_vector (svalue_t *svp, size_t num)
 
         case T_COROUTINE:
         {
+            /* We'll check the complete waiting list. */
             coroutine_t *cr = p->u.coroutine;
+
+            while (cr->awaitee)
+                cr = cr->awaitee;
 
             if (NULL == register_pointer(ptable, cr))
                 continue;
-            if (cr->prog)
+
+            while (cr)
             {
-                cr->prog->extra_ref++;
-                count_extra_ref_in_prog(cr->prog);
+                if (cr->prog)
+                {
+                    cr->prog->extra_ref++;
+                    count_extra_ref_in_prog(cr->prog);
+                }
+                count_extra_ref_in_vector(&cr->ob, 1);
+                count_extra_ref_in_vector(&cr->closure, 1);
+                if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
+                {
+                    count_extra_ref_in_vector(cr->variables, cr->num_variables);
+                    count_extra_ref_in_vector(cr->variables[cr->num_variables].u.lvalue, cr->num_values);
+                }
+                else
+                    count_extra_ref_in_vector(cr->variables, cr->num_variables
+                                                           + cr->num_values);
+
+                cr = cr->awaiter;
             }
-            count_extra_ref_in_vector(&cr->ob, 1);
-            if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
-            {
-                count_extra_ref_in_vector(cr->variables, cr->num_variables);
-                count_extra_ref_in_vector(cr->variables[cr->num_variables].u.lvalue, cr->num_values);
-            }
-            else
-                count_extra_ref_in_vector(cr->variables, cr->num_variables
-                                                       + cr->num_values);
             continue;
         }
 
@@ -21519,6 +24002,52 @@ count_extra_ref_in_vector (svalue_t *svp, size_t num)
               (void *)p->u.map->num_values
             );
             continue; /* no extra ref count implemented */
+
+        case T_LVALUE:
+            switch (p->x.lvalue_type)
+            {
+                case LVALUE_PROTECTED:
+                    if (NULL != register_pointer(ptable, p->u.protected_lvalue))
+                        count_extra_ref_in_vector(&p->u.protected_lvalue->val, 1);
+                    break;
+
+                case LVALUE_PROTECTED_CHAR:
+                    break;
+
+                case LVALUE_PROTECTED_RANGE:
+                    if (p->u.protected_range_lvalue->vec.type == T_POINTER
+                     && NULL != register_pointer(ptable, p->u.protected_range_lvalue))
+                    {
+                        count_extra_ref_in_vector(&p->u.protected_range_lvalue->vec, 1);
+                        count_extra_ref_in_vector(&p->u.protected_range_lvalue->var->val, 1);
+                    }
+                    break;
+
+                case LVALUE_PROTECTED_MAPENTRY:
+                    if (NULL != register_pointer(ptable, p->u.protected_mapentry_lvalue))
+                    {
+                        struct protected_mapentry_lvalue *e = p->u.protected_mapentry_lvalue;
+                        svalue_t map = { T_MAPPING };
+
+                        map.u.map = e->map;
+                        count_extra_ref_in_vector(&map, 1);
+                        count_extra_ref_in_vector(&(e->key), 1);
+
+                    }
+                    break;
+
+                case LVALUE_PROTECTED_MAP_RANGE:
+                    if (NULL != register_pointer(ptable, p->u.protected_map_range_lvalue))
+                    {
+                        struct protected_map_range_lvalue *r = p->u.protected_map_range_lvalue;
+                        svalue_t map = { T_MAPPING, {}, {.map = r->map} };
+
+                        count_extra_ref_in_vector(&map, 1);
+                        count_extra_ref_in_vector(&(r->key), 1);
+                    }
+                    break;
+            }
+            continue;
         }
     }
 } /* count_extra_ref_in_vector() */
@@ -21544,16 +24073,25 @@ check_extra_ref_in_vector (svalue_t *svp, size_t num)
           {
             coroutine_t *cr = p->u.coroutine;
 
+            while (cr->awaitee)
+                cr = cr->awaitee;
+
             if (NULL == register_pointer(ptable, cr))
                 continue;
-            if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
+
+            while (cr)
             {
-                check_extra_ref_in_vector(cr->variables, cr->num_variables);
-                check_extra_ref_in_vector(cr->variables[cr->num_variables].u.lvalue, cr->num_values);
+                if (cr->num_values > CR_RESERVED_EXTRA_VALUES)
+                {
+                    check_extra_ref_in_vector(cr->variables, cr->num_variables);
+                    check_extra_ref_in_vector(cr->variables[cr->num_variables].u.lvalue, cr->num_values);
+                }
+                else
+                    check_extra_ref_in_vector(cr->variables, cr->num_variables
+                                                           + cr->num_values);
+
+                cr = cr->awaiter;
             }
-            else
-                check_extra_ref_in_vector(cr->variables, cr->num_variables
-                                                       + cr->num_values);
             continue;
           }
 
@@ -21585,6 +24123,52 @@ check_extra_ref_in_vector (svalue_t *svp, size_t num)
               (void *)((p_int)p->u.map->num_values)
             );
             continue; /* no extra ref count implemented */
+
+        case T_LVALUE:
+            switch (p->x.lvalue_type)
+            {
+                case LVALUE_PROTECTED:
+                    if (NULL != register_pointer(ptable, p->u.protected_lvalue))
+                        check_extra_ref_in_vector(&p->u.protected_lvalue->val, 1);
+                    break;
+
+                case LVALUE_PROTECTED_CHAR:
+                    break;
+
+                case LVALUE_PROTECTED_RANGE:
+                    if (p->u.protected_range_lvalue->vec.type == T_POINTER
+                     && NULL != register_pointer(ptable, p->u.protected_range_lvalue))
+                    {
+                        check_extra_ref_in_vector(&p->u.protected_range_lvalue->vec, 1);
+                        check_extra_ref_in_vector(&p->u.protected_range_lvalue->var->val, 1);
+                    }
+                    break;
+
+                case LVALUE_PROTECTED_MAPENTRY:
+                    if (NULL != register_pointer(ptable, p->u.protected_mapentry_lvalue))
+                    {
+                        struct protected_mapentry_lvalue *e = p->u.protected_mapentry_lvalue;
+                        svalue_t map = { T_MAPPING };
+
+                        map.u.map = e->map;
+                        check_extra_ref_in_vector(&map, 1);
+                        check_extra_ref_in_vector(&(e->key), 1);
+
+                    }
+                    break;
+
+                case LVALUE_PROTECTED_MAP_RANGE:
+                    if (NULL != register_pointer(ptable, p->u.protected_map_range_lvalue))
+                    {
+                        struct protected_map_range_lvalue *r = p->u.protected_map_range_lvalue;
+                        svalue_t map = { T_MAPPING, {}, {.map = r->map} };
+
+                        check_extra_ref_in_vector(&map, 1);
+                        check_extra_ref_in_vector(&(r->key), 1);
+                    }
+                    break;
+            }
+            continue;
         }
     }
 } /* check_extra_ref_in_vector() */
@@ -21776,6 +24360,7 @@ expand_argument (svalue_t *sp)
     svalue_t *val = sp;
     p_int start = 0, size = 0;
     bool make_ref = false;
+    bool is_map_range = false;
 
     while (val->type == T_LVALUE)
     {
@@ -21824,6 +24409,10 @@ expand_argument (svalue_t *sp)
             case LVALUE_UNPROTECTED_MAPENTRY:
                 /* Non-existent entry cannot be an array. */
                 push_protected_lvalue(val);
+                break;
+
+            case LVALUE_UNPROTECTED_MAP_RANGE:
+                is_map_range = true;
                 break;
 
             case LVALUE_PROTECTED:
@@ -21878,6 +24467,12 @@ expand_argument (svalue_t *sp)
                 }
                 break;
             }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+                get_unprotected_lvalue(val);
+                is_map_range = true;
+                break;
+
         } /* switch */
         break;
     }
@@ -21935,6 +24530,33 @@ expand_argument (svalue_t *sp)
         }
 
         return size;
+    }
+    else if (is_map_range)
+    {
+        /* The mapping range is in current_unprotected_map_range. */
+        svalue_t *item;
+
+        /* We keep a reference to the mapping. */
+        (void)ref_mapping(current_unprotected_map_range.map);
+        free_svalue(sp--);
+
+        item = get_map_value(current_unprotected_map_range.map, &(current_unprotected_map_range.key));
+        if (item == &const0)
+        {
+            /* The key doesn't exist. Create map-entry lvalues. */
+            for (mp_int i = current_unprotected_map_range.index1; i < current_unprotected_map_range.index2; i++)
+                assign_protected_mapentry_lvalue_no_free(++sp, current_unprotected_map_range.map, &(current_unprotected_map_range.key), i);
+        }
+        else
+        {
+            for (mp_int i = current_unprotected_map_range.index1; i < current_unprotected_map_range.index2; i++)
+                assign_protected_lvalue_no_free(++sp, item + i);
+        }
+
+        free_mapping(current_unprotected_map_range.map);
+        free_svalue(&(current_unprotected_map_range.key));
+
+        return current_unprotected_map_range.index2 - current_unprotected_map_range.index1;
     }
     else
         return 1;

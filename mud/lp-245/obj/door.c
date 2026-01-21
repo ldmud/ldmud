@@ -497,6 +497,8 @@ int unlock( string str)
     unlock_door( ob);
     return 1;
   }
+
+  return 0;
 }
 
 void lock_door(object  key)
@@ -551,6 +553,8 @@ int lock( string str)
     lock_door( ob);
     return 1;
   }
+
+  return 0;
 }
 
 

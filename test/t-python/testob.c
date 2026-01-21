@@ -27,3 +27,8 @@ async string* testcoroutine(varargs string* args)
     string local = "X";
     return args + ({ yield(sizeof(args)), local });
 }
+
+mixed callback(closure fun)
+{
+    return funcall(fun);
+}

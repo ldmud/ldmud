@@ -385,6 +385,18 @@ DESCRIPTION
         <what> == DI_NUM_NAMED_OBJECT_TYPES_TABLE_SLOTS:
           Number of table entries for named object types.
 
+        <what> == DI_NUM_COROUTINES:
+          Number of coroutines.
+
+        <what> == DI_NUM_LWOBJECTS:
+          Number of lightweight objects.
+
+        <what> == DI_NUM_LPC_PYTHON_REFS:
+          Number of references to Python objects from LPC.
+
+        <what> == DI_NUM_PYTHON_LPC_REFS:
+          Number of references to LPC values from Python.
+
         <what> == DI_SIZE_ACTIONS:
           Total size of allocated actions.
 
@@ -457,6 +469,14 @@ DESCRIPTION
 
         <what> == DI_SIZE_NAMED_OBJECT_TYPES_TABLE:
           The size of the table for named object types.
+
+        <what> == DI_SIZE_LWOBJECTS:
+          The size of all lightweight objects (not counting the size
+          of the values of their variables).
+
+        <what> == DI_SIZE_COROUTINES
+          The size of all coroutines (not counting the size of any
+          values held by the coroutines).
 
 
 

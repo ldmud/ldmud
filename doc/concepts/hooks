@@ -70,8 +70,7 @@ DESCRIPTION
 
         H_MODIFY_COMMAND
           Optional hook to modify commands (both entered or given by a
-          call to command()) before the parser sees them (this includes
-          special commands like 'status').
+          call to command()) before the parser sees them.
 
 
         H_MODIFY_COMMAND_FNAME
@@ -107,6 +106,10 @@ DESCRIPTION
           Optional hook specifying a string to be included before
           the source of every compiled LPC object.
 
+        H_AUTO_INCLUDE_EXPRESSION
+        H_AUTO_INCLUDE_BLOCK
+          Optional hook specifying a string to be prepended before
+          the string of a compile_string() call.
 
         H_FILE_ENCODING
           Optonal hook specifying the name of the encoding to be used

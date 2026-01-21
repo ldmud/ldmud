@@ -19,7 +19,7 @@ extern gc_status_t gc_status;
 extern int gcollect_outfd;
 extern int default_gcollect_outfd;
 extern object_t *gc_obj_list_destructed;
-extern lambda_t *stale_misc_closures;
+extern closure_base_t *stale_misc_closures;
 extern mapping_t *stale_mappings;
 
 
@@ -59,6 +59,7 @@ extern mapping_t *stale_mappings;
 
 /* --- Prototypes --- */
 
+extern void cleanup_vector(svalue_t *svp, size_t num, cleanup_t * context);
 extern void clear_memory_reference(void *p);
 extern void clear_program_ref(program_t *p, Bool clear_ref);
 extern void clear_object_ref (object_t *p);

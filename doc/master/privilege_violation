@@ -39,11 +39,12 @@ DESCRIPTION
                                  for the flags. This is used for flag values
                                  including the 'no bang' option.
         limited                : Execute <arg> with reduced/changed limits
-                                 1<arg2> (as return by query_limits()).
+                                 <arg2> (as return by query_limits()).
         mysql                  : Object <who> attempted to execute mySQL efun
                                  <arg>.
         pgsql                  : Object <who> attempted to execute Postgres efun
                                  <arg>.
+        pragma no_simul_efuns  : The program <who> wants to use this pragma.
         net_connect            : Attempt to open a connection to host <arg>,
                                  port <arg2>.
         nomask simul_efun      : Attempt to get an efun <arg> via efun:: when

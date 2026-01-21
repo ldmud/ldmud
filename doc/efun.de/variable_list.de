@@ -31,7 +31,8 @@ BESCHREIBUNG
         Auswahl der gesammelten Information:
             RETURN_FUNCTION_NAME    liefert den Namen der Variablen
             RETURN_FUNCTION_FLAGS   liefert die Flags der Variablen (s. unten)
-            RETURN_FUNCTION_TYPE    liefert den Rueckgabetyp
+            RETURN_FUNCTION_TYPE    liefert den Variablentyp als Zahl.
+            RETURN_FUNCTION_LPCTYPE liefert den Variablentyp als lpctype.
             RETURN_VARIABLE_VALUE   liefert den Wert der Variablen
 
         Auswahl der Variablen, die ausgewertet werden:
@@ -54,6 +55,7 @@ BESCHREIBUNG
 
 GESCHICHTE
         Eingefuehrt in LDMud 3.2.10.
+        LDMud 3.6.7 fuehrte RETURN_FUNCTION_LPCTYPE ein.
 
 SIEHE AUCH
         inherit_list(E), functionlist(E), variable_exists(E)

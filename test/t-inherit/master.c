@@ -14,13 +14,14 @@
 void run_test()
 {
     object ob;
-    closure cl_symbol_variable;
+    closure cl_symbol_variable, cl_compile_string;
 
     msg("\nRunning test for runtime inherit handling:\n"
           "------------------------------------------\n");
 
     ob = load_object("main");
     cl_symbol_variable = bind_lambda(#'symbol_variable, ob);
+    cl_compile_string = bind_lambda(#'compile_string, ob);
 
     run_array(
         ({
@@ -70,6 +71,30 @@ void run_test()
                function int()
                {
                    return funcall(funcall(cl_symbol_variable, "virtual2_var")) == "virtual2";
+               }
+             }),
+            ({ "Global variable access via compile_string() of main", 0,
+               function int()
+               {
+                   return funcall(funcall(cl_compile_string, 0, "main_var", (<compile_string_options> use_object_variables: 1))) == "main";
+               }
+             }),
+            ({ "Global variable access via compile_string() of regular", 0,
+               function int()
+               {
+                   return funcall(funcall(cl_compile_string, 0, "regular_var", (<compile_string_options> use_object_variables: 1))) == "regular";
+               }
+             }),
+            ({ "Global variable access via compile_string() of virtual1", 0,
+               function int()
+               {
+                   return funcall(funcall(cl_compile_string, 0, "virtual1_var", (<compile_string_options> use_object_variables: 1))) == "virtual1";
+               }
+             }),
+            ({ "Global variable access via compile_string() of virtual2", 0,
+               function int()
+               {
+                   return funcall(funcall(cl_compile_string, 0, "virtual2_var", (<compile_string_options> use_object_variables: 1))) == "virtual2";
                }
              }),
         }), function void(int errors)

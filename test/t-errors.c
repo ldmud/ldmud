@@ -139,11 +139,13 @@ mixed *tests = ({
           return 1;
       :)
    }),
+#ifdef __SQLITE__
    ({ "Crash in reentrant SQLite calls.", TF_ERROR,
       (:
           unpriv.sl_check1();
       :)
    }),
+#endif
 });
 
 void run_test()
@@ -172,15 +174,18 @@ string *epilog(int eflag)
 
 int privilege_violation(string op, mixed who, mixed arg, mixed arg2)
 {
+#ifdef __SQLITE__
     switch (op)
     {
         case "sqlite_pragma":
             who.sl_check2();
             return 0;
     }
+#endif
     return 1;
 }
 
+#ifdef __SQLITE__
 void sl_check1()
 {
     sl_open(__FILE__ + ".db");
@@ -192,3 +197,4 @@ void sl_check2()
     /* Shouldn't crash or report Valgrind errors. */
     sl_close();
 }
+#endif

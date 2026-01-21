@@ -57,66 +57,14 @@
  * lambda closure:         type = CLOSURE_LAMBDA (5)
  *   Lambda closure bound to an object at compilation time.
  *   u.lambda points to the lambda structure with the compiled function.
+ *   This structure is embedded in the middle of a larger memory block:
+ *   it is prepended by an array of the svalues used as constants in
+ *   the function, and followed by the actual function code.
  *
  * unbound lambda closure: type = CLOSURE_UNBOUND_LAMBDA (6)
  *   Unbound lambda closure, which is not bound to any object at
  *   compile time.
  *   u.lambda points to the lambda structure with the compiled function.
- *
- *
- * The additional information for closure are stored in structures
- * of type lambda_s, which are refcounted. For lambda closures the lambda
- * structure is in fact embedded in the middle of a larger memory block:
- * it is prepended by an array of the svalues used as constants in
- * the function, and followed by the actual function code.
- *
- *   struct lambda_s
- *   {
- *       svalue_t values[] (lambda closures only)
- *           For lambda closures, the constant values used by the function
- *           which are indexed from the end ((svalue_t*)lambda_t).
- *       p_int ref;
- *       object_t *ob;
- *           Object the closure is bound to (for bound UNBOUND_LAMBDAs just
- *           during the execution of the lambda).
- *       union --- Closure information ---
- *       {
- *           unsigned short var_index;
- *               _IDENTIFIER: index in the variable table
- *               The special value VANISHED_VARCLOSURE_INDEX (-1) is
- *               used to mark vanished variables.
- *
- *           struct -- CLOSURE_LFUN
- *           {
- *               object_t *ob;
- *                   Originating object
- *               unsigned short  index
- *                   Index in the objects function table
- *           } lfun;
- *
- *           struct
- *           {
- *               mp_int num_values;         -- Number of svalues.
- *               unsigned char num_locals;  -- Number of local variables
- *               unsigned char num_arg;     -- Number of arguments needed
- *               bytecode_t program[1];
- *           } code;
- *               LAMBDA and UNBOUND_LAMBDA closures: the function code.
- *               'num_values' is the number of constants store before
- *               the lambda structure.
- *
- *           lambda_t *lambda;
- *               BOUND_LAMBDA: pointer to the UNBOUND_LAMBDA structure.
- *
- *       } function;
- *
- *       svalue_t context[.lfun.context_size];
- *          lfun-closure context variables, if any.
- *          Putting this array into the function.lfun somehow causes memory
- *          corruption because some lambda structures won't be allocated large
- *          enough.
- *   }
- *
  *
  * If a lambda() is compiled while replace_program() is scheduled, the
  * construction information is stored in the protector and the lambda
@@ -157,12 +105,14 @@
 #include "interpret.h"
 #include "lex.h"
 #include "main.h"
+#include "mapping.h"
 #include "mstrings.h"
 #include "object.h"
 #include "prolang.h"
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#include "stdstructs.h"
 #include "structs.h"
 #include "svalue.h"
 #include "swap.h"
@@ -245,7 +195,7 @@ typedef struct work_area_s work_area_t;
  * is kept in replace_ob_s.lambda_rpp to hold the necessary information
  * to adjust the closures after the program has been replaced.
  *
- * The list is created by calls to lambda_ref_replace_program() and evaluated
+ * The list is created by calls to closure_ref_replace_program() and evaluated
  * in lambda_replace_program_adjust().
  */
 
@@ -358,12 +308,12 @@ static void lambda_cerror(const char *s) FORMATDEBUG(printf,1,0) NORETURN;
 static void lambda_cerrorl(const char *s1, const char *s2 UNUSED, int line1 UNUSED, 
                            int line2 UNUSED) NORETURN FORMATDEBUG(printf,1,0);
 static void free_symbols(void);
-static int compile_efun_call(ph_int type, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags);
-static int compile_sefun_call(ph_int type, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags);
+static int compile_efun_call(ph_int type, struct range_iterator *args_it, enum compile_value_input_flags opt_flags);
+static int compile_sefun_call(ph_int type, struct range_iterator *args_it, enum compile_value_input_flags opt_flags);
 #ifdef USE_PYTHON
-static int compile_python_efun_call(ph_int type, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags);
+static int compile_python_efun_call(ph_int type, struct range_iterator *args_it, enum compile_value_input_flags opt_flags);
 #endif
-static int compile_lambda_call(ph_int type, svalue_t* closure, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags);
+static int compile_closure_call(ph_int type, svalue_t* closure, struct range_iterator *args_it, enum compile_value_input_flags opt_flags);
 static Bool is_lvalue (svalue_t *argp, int flags);
 static void compile_lvalue(svalue_t *, int);
 static lambda_t * lambda (vector_t *args, svalue_t *block, svalue_t origin);
@@ -455,75 +405,67 @@ closure_eq (svalue_t * left, svalue_t * right)
  */
 
 {
-    int i;
+    if (left->x.closure_type != right->x.closure_type)
+        return false;
 
-    /* Operator, Efun and Simul efun closures don't have a .u.lambda
-     * part.
-     */
-    i = left->x.generic == right->x.generic;
-
-    if (i
-     && (   left->x.closure_type >= 0
-         || right->x.closure_type >= 0)
-       )
-        i = left->u.lambda  == right->u.lambda;
-
-    /* Lfun- and identifier closure can be equal even if
-     * their pointers differ.
-     */
-    if (!i
-     && left->x.closure_type == right->x.closure_type
-     && (   left->x.closure_type == CLOSURE_LFUN
-         || left->x.closure_type == CLOSURE_IDENTIFIER
-        )
-     && object_svalue_eq(left->u.lambda->ob, right->u.lambda->ob)
-       )
+    switch (left->x.closure_type)
     {
-        if (left->x.closure_type == CLOSURE_LFUN)
+        case CLOSURE_LFUN:
         {
-            i =    object_svalue_eq(left->u.lambda->function.lfun.ob,
-                                    right->u.lambda->function.lfun.ob)
-                && (   left->u.lambda->function.lfun.index
-                    == right->u.lambda->function.lfun.index)
-                && (   left->u.lambda->function.lfun.inhProg
-                    == right->u.lambda->function.lfun.inhProg)
-                && (    left->u.lambda->function.lfun.context_size
-                     == right->u.lambda->function.lfun.context_size)
-                ;
+            unsigned int context_size;
+            bool result = true;
 
-            if (i)
+            if (!object_svalue_eq(left->u.lfun_closure->base.ob, right->u.lfun_closure->base.ob)
+             || !object_svalue_eq(left->u.lfun_closure->fun_ob, right->u.lfun_closure->fun_ob)
+             || left->u.lfun_closure->fun_index != right->u.lfun_closure->fun_index
+             || left->u.lfun_closure->inhProg != right->u.lfun_closure->inhProg
+             || left->u.lfun_closure->context_size != right->u.lfun_closure->context_size)
+                return false;
+
+            /* Compare the context variables.
+             *
+             * There might be a difference is in the context svalues.
+             * To prevent recursion, hide them while comparing them.
+             */
+            context_size = left->u.lfun_closure->context_size;
+            left->u.lfun_closure->context_size = 0;
+            right->u.lfun_closure->context_size = 0;
+
+            for (unsigned int ix = 0; ix < context_size; ix++)
             {
-                unsigned int context_size, ix;
-
-                /* There might be a difference is in the context svalues.
-                 * To prevent recursion, hide them while comparing them.
-                 */
-
-                context_size = left->u.lambda->function.lfun.context_size;
-                left->u.lambda->function.lfun.context_size = 0;
-                right->u.lambda->function.lfun.context_size = 0;
-
-                for (ix = 0; i && ix < context_size; ix++)
+                if (!svalue_eq(left->u.lfun_closure->context+ix, right->u.lfun_closure->context+ix))
                 {
-                    i = svalue_eq( &(left->u.lambda->context[ix])
-                                 , &(right->u.lambda->context[ix])
-                                 );
+                    result = false;
+                    break;
                 }
-
-                /* Restore the context size.
-                 */
-                left->u.lambda->function.lfun.context_size = context_size;
-                right->u.lambda->function.lfun.context_size = context_size;
             }
-        }
-        else /* CLOSURE_IDENTIFIER */
-        {
-            i =    left->u.lambda->function.var_index
-                == right->u.lambda->function.var_index;
-        }
-    }
 
-    return (Bool)i;
+            /* Restore the context size.
+             */
+            left->u.lfun_closure->context_size = context_size;
+            right->u.lfun_closure->context_size = context_size;
+            return result;
+        }
+
+        case CLOSURE_IDENTIFIER:
+            return object_svalue_eq(left->u.identifier_closure->base.ob, right->u.identifier_closure->base.ob)
+                && left->u.identifier_closure->var_index == right->u.identifier_closure->var_index;
+
+        case CLOSURE_BOUND_LAMBDA:
+            return left->u.bound_lambda == right->u.bound_lambda;
+
+        case CLOSURE_LAMBDA:
+        case CLOSURE_UNBOUND_LAMBDA:
+            return left->u.lambda == right->u.lambda;
+
+        default:
+            if (left->x.closure_type < CLOSURE_LWO)
+                return left->u.lwob == right->u.lwob;
+            else
+                return left->u.ob == right->u.ob;
+    }
+    /* NOTREACHED */
+
 } /* closure_eq() */
 
 /*-------------------------------------------------------------------------*/
@@ -538,103 +480,86 @@ closure_cmp (svalue_t * left, svalue_t * right)
  */
 
 {
-    if (closure_eq(left, right)) return 0;
-
     /* First comparison criterium is the closure_type */
     if (left->x.closure_type != right->x.closure_type)
-    {
-        return (left->x.closure_type < right->x.closure_type) ? -1 : 1;
-    }
+        return int_cmp(left->x.closure_type, right->x.closure_type);
 
-    /* The types are identical and determine the next comparison.
-     * For lfun/identifier closure, we compare the actual closure data,
-     * for other closures a comparison of the lambda pointer is sufficient.
-     */
-    if (left->x.closure_type == CLOSURE_IDENTIFIER
-     || left->x.closure_type == CLOSURE_LFUN
-       )
+    switch (left->x.closure_type)
     {
-        int d = object_svalue_cmp(left->u.lambda->ob, right->u.lambda->ob);
-        if (d)
-            return d;
-
-        if (left->x.closure_type == CLOSURE_LFUN)
+        case CLOSURE_LFUN:
         {
-            unsigned context_size, i;
+            int d;
+            unsigned int context_size;
 
-            d = object_svalue_cmp(left->u.lambda->function.lfun.ob,
-                                  right->u.lambda->function.lfun.ob);
-            if (d)
+            if ((d = object_svalue_cmp(left->u.lfun_closure->base.ob, right->u.lfun_closure->base.ob)) != 0
+             || (d = object_svalue_cmp(left->u.lfun_closure->fun_ob, right->u.lfun_closure->fun_ob)) != 0
+             || (d = int_cmp(left->u.lfun_closure->fun_index, right->u.lfun_closure->fun_index)) != 0
+             || (d = ptr_cmp(left->u.lfun_closure->inhProg, right->u.lfun_closure->inhProg)) != 0
+             || (d = int_cmp(left->u.lfun_closure->context_size, right->u.lfun_closure->context_size)) != 0)
                 return d;
 
-            if (   left->u.lambda->function.lfun.index
-                != right->u.lambda->function.lfun.index
-               )
-                return (  left->u.lambda->function.lfun.index
-                        < right->u.lambda->function.lfun.index)
-                       ? -1 : 1;
-
-            if (   left->u.lambda->function.lfun.inhProg
-                != right->u.lambda->function.lfun.inhProg
-               )
-                return (  left->u.lambda->function.lfun.inhProg
-                        < right->u.lambda->function.lfun.inhProg)
-                       ? -1 : 1;
-
-            /* The difference is in the context svalues.
+            /* The difference might be in the context svalues.
              * To prevent recursion, hide them while comparing them.
              */
-            if (   left->u.lambda->function.lfun.context_size
-                != right->u.lambda->function.lfun.context_size
-               )
-                return (  left->u.lambda->function.lfun.context_size
-                        < right->u.lambda->function.lfun.context_size)
-                       ? -1 : 1;
+            context_size = left->u.lfun_closure->context_size;
+            left->u.lfun_closure->context_size = 0;
+            right->u.lfun_closure->context_size = 0;
 
-            context_size = left->u.lambda->function.lfun.context_size;
-            left->u.lambda->function.lfun.context_size = 0;
-            right->u.lambda->function.lfun.context_size = 0;
-
-            for (i = 0, d = 0; d == 0 && i < context_size; i++)
+            for (unsigned int ix = 0; ix < context_size; ix++)
             {
-                d = svalue_cmp( &(left->u.lambda->context[i])
-                              , &(right->u.lambda->context[i])
-                              );
+                d = svalue_cmp(left->u.lfun_closure->context+ix, right->u.lfun_closure->context+ix);
+                if (d != 0)
+                    break;
             }
 
             /* Restore the context size, the return the comparison
              * result in d.
              */
-            left->u.lambda->function.lfun.context_size = context_size;
-            right->u.lambda->function.lfun.context_size = context_size;
+            left->u.lfun_closure->context_size = context_size;
+            right->u.lfun_closure->context_size = context_size;
 
             return d;
         }
-        else /* CLOSURE_IDENTIFIER */
-        {
-            /* This is the only field left, so it is guaranteed to differ */
-            return (  left->u.lambda->function.var_index
-                    < right->u.lambda->function.var_index)
-                   ? -1 : 1;
-        }
-    }
 
-    /* Normal closure: compare the lambda pointers */
-    return (left->u.lambda < right->u.lambda) ? -1 : 1;
+        case CLOSURE_IDENTIFIER:
+        {
+            int d = object_svalue_cmp(left->u.identifier_closure->base.ob, right->u.identifier_closure->base.ob);
+            if (d)
+                return d;
+            else
+                return int_cmp(left->u.identifier_closure->var_index, right->u.identifier_closure->var_index);
+        }
+
+        case CLOSURE_BOUND_LAMBDA:
+            return ptr_cmp(left->u.bound_lambda, right->u.bound_lambda);
+
+        case CLOSURE_LAMBDA:
+        case CLOSURE_UNBOUND_LAMBDA:
+            return ptr_cmp(left->u.lambda, right->u.lambda);
+
+        default:
+            if (left->x.closure_type < CLOSURE_LWO)
+                return ptr_cmp(left->u.lwob, right->u.lwob);
+            else
+                return ptr_cmp(left->u.ob, right->u.ob);
+    }
+    /* NOTREACHED */
+
 } /* closure_cmp() */
 
 /*-------------------------------------------------------------------------*/
 Bool
-lambda_ref_replace_program( object_t * curobj, lambda_t *l, int type
-                          , p_int size, vector_t *args, svalue_t *block)
+closure_ref_replace_program( object_t * curobj, svalue_t *cl
+                           , p_int size, vector_t *args, svalue_t *block)
 
-/* The lambda <l> of type <type> is about to be bound to the object <curobj>
+/* The closure <cl> is about to be bound to the object <curobj>
  * which might be scheduled for program replacement.
  * If that is the case, a(nother) protector is added to replace_ob_s.lambda_rpp
  * and the function returns TRUE. Otherwise the function just returns FALSE.
  *
- * If <size> is not zero, it is the size of <args>, a vector with parameter
- * descriptions for a lambda(), and <block> holds the body of the lambda().
+ * If <size> is not zero, it is the size of the resulting lambda bytecode.
+ * Also then <args> holds a vector with parameter descriptions for a lambda(),
+ * and <block> holds the body of the lambda().
  * If <size> is zero, both <args> and <block> are undetermined.
  */
 
@@ -652,10 +577,8 @@ lambda_ref_replace_program( object_t * curobj, lambda_t *l, int type
 
             struct lambda_replace_program_protector *lrpp;
 
-            l->ref++;
             lrpp = xalloc(sizeof *lrpp);
-            lrpp->l.u.lambda = l;
-            lrpp->l.x.closure_type = (short)type;
+            assign_svalue_no_free(&lrpp->l, cl);
             lrpp->next = r_ob->lambda_rpp;
             r_ob->lambda_rpp = lrpp;
             if (size)
@@ -671,7 +594,7 @@ lambda_ref_replace_program( object_t * curobj, lambda_t *l, int type
 
     /* No replacement found: return false */
     return MY_FALSE;
-} /* lambda_ref_replace_program() */
+} /* closure_ref_replace_program() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -979,7 +902,7 @@ replace_program_lfun_closure_adjust (replace_ob_t *r_ob)
 
             if (lrpp->l.x.closure_type == CLOSURE_LFUN)
             {
-                lambda_t *l = lrpp->l.u.lambda;
+                lfun_closure_t *l = lrpp->l.u.lfun_closure;
 
                 /* Adjust the index of the lfun
                  * If the lfun closure is a reference to an inherited
@@ -987,46 +910,46 @@ replace_program_lfun_closure_adjust (replace_ob_t *r_ob)
                  * changes.
                  */
 
-                int newidx = replace_program_function_adjust(r_ob, l->function.lfun.index);
+                int newidx = replace_program_function_adjust(r_ob, l->fun_index);
                 if (newidx < 0)
                 {
                     /* If the function vanished, replace it with a default */
                     assert_master_ob_loaded();
-                    free_svalue(&(l->function.lfun.ob));
-                    if(l->function.lfun.inhProg)
-                        free_prog(l->function.lfun.inhProg, MY_TRUE);
+                    free_svalue(&(l->fun_ob));
+                    if(l->inhProg)
+                        free_prog(l->inhProg, MY_TRUE);
 
-                    put_ref_object(&(l->function.lfun.ob), master_ob, "replace_program_lambda_adjust");
+                    put_ref_object(&(l->fun_ob), master_ob, "replace_program_lambda_adjust");
                     newidx = find_function( STR_DANGLING_LFUN, master_ob->prog);
-                    l->function.lfun.index = (unsigned short)(newidx < 0 ? 0 : newidx);
-                    l->function.lfun.inhProg = NULL;
+                    l->fun_index = (unsigned short)(newidx < 0 ? 0 : newidx);
+                    l->inhProg = NULL;
                 }
                 else
                 {
-                    l->function.lfun.index = newidx;
+                    l->fun_index = newidx;
                 }
 
                 /* For inherited lfuns we might have to adjust the program. */
-                if (l->function.lfun.inhProg == r_ob->new_prog)
+                if (l->inhProg == r_ob->new_prog)
                 {
                     /* Easy case: The new program is the same one the closure
                      * is pointing to. Just concert the closure into a
                      * straight lfun closure.
                      */
-                     free_prog(l->function.lfun.inhProg, MY_TRUE);
-                     l->function.lfun.inhProg = NULL;
+                     free_prog(l->inhProg, MY_TRUE);
+                     l->inhProg = NULL;
                 }
-                else if (l->function.lfun.inhProg)
+                else if (l->inhProg)
                 {
                     program_t *prog = r_ob->new_prog;
-                    int fx = l->function.lfun.index;
+                    int fx = l->fun_index;
 
                     /* Checkt hat inhProg is still in the inherit chain.
                      * If not, convert the closure into a straight
                      * lfun closure.
                      */
 
-                    while(prog != l->function.lfun.inhProg)
+                    while(prog != l->inhProg)
                     {
                         inherit_t *inheritp = prog->inherit;
                         int inhcount = prog->num_inherited;
@@ -1041,8 +964,8 @@ replace_program_lfun_closure_adjust (replace_ob_t *r_ob)
                         if (inhcount < 0)
                         {
                             /* Didn't find it. */
-                            free_prog(l->function.lfun.inhProg, MY_TRUE);
-                            l->function.lfun.inhProg = NULL;
+                            free_prog(l->inhProg, MY_TRUE);
+                            l->inhProg = NULL;
                             break;
                         }
 
@@ -1053,17 +976,17 @@ replace_program_lfun_closure_adjust (replace_ob_t *r_ob)
             }
             else /* CLOSURE_IDENTIFIER */
             {
-                lambda_t *l = lrpp->l.u.lambda;
-                int newidx = replace_program_variable_adjust(r_ob, l->function.var_index);
+                identifier_closure_t *cl = lrpp->l.u.identifier_closure;
+                int newidx = replace_program_variable_adjust(r_ob, cl->var_index);
                 if (newidx < 0)
                 {
-                    l->function.var_index = VANISHED_VARCLOSURE_INDEX;
+                    cl->var_index = VANISHED_VARCLOSURE_INDEX;
                     /* TODO: This value should be properly publicized and
                      * TODO:: tested.
                      */
                 }
                 else
-                    l->function.var_index = newidx;
+                    cl->var_index = newidx;
             }
         } /* if (!CLOSURE_HAS_CODE()) */
     } while ( NULL != (lrpp = lrpp->next) );
@@ -1115,7 +1038,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
         lrpp = current_lrpp;
 
         /* Replace the function with "undef" */
-        lrpp->l.u.lambda->function.code.program[0] = F_UNDEF;
+        lrpp->l.u.lambda->program[0] = F_UNDEF;
 
         /* Free the protector and all held values */
         free_array(lrpp->args);
@@ -1151,13 +1074,13 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
 
             /* Remember the original lambda, and also recompile it */
             l = lrpp->l.u.lambda;
-            l2 = lambda(lrpp->args, &lrpp->block, l->ob);
+            l2 = lambda(lrpp->args, &lrpp->block, l->base.ob);
 
             svp = (svalue_t *)l;
-            num_values = l->function.code.num_values;
+            num_values = l->num_values;
 
             svp2 = (svalue_t *)l2;
-            num_values2 = l2->function.code.num_values;
+            num_values2 = l2->num_values;
 
             code_size2 = current.code_max - current.code_left;
 
@@ -1187,12 +1110,17 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
              */
             while (--num_values >= 0)
                 transfer_svalue(--svp, --svp2);
-            memcpy(&l->function.code, &l2->function.code, sizeof(l->function.code) - 1 + (size_t)code_size2);
+            l2->num_values = l->num_values;
+            l2->num_locals = l->num_locals;
+            l2->num_arg = l->num_arg;
+            l2->num_opt_arg = l->num_opt_arg;
+            l2->xvarargs = l->xvarargs;
+            memcpy(&l->program, &l2->program, (size_t)code_size2);
 
             /* Free the (now empty) memory */
-            free_svalue(&(l2->ob));
-            if  (l2->prog_ob)
-                free_object(l2->prog_ob, "replace_program_lambda_adjust");
+            free_svalue(&(l2->base.ob));
+            if  (l2->base.prog_ob)
+                free_object(l2->base.prog_ob, "replace_program_lambda_adjust");
             xfree(svp2);
             free_array(lrpp->args);
             free_svalue(&lrpp->block);
@@ -1212,60 +1140,27 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
 
 /*-------------------------------------------------------------------------*/
 void
-closure_init_lambda (lambda_t * l, svalue_t obj)
+closure_init_base (closure_base_t * cl, svalue_t obj)
 
-/* Initialize the freshly created lambda <l> to be bound to object <obj>
+/* Initialize the freshly created closure <cl> to be bound to object <obj>
  * (if given), and set the other generic fields (.ref, .prog_ob, .prog_pc).
  */
 
 {
-    l->ref = 1;
+    cl->ref = 1;
     if (current_prog)
     {
-        l->prog_ob = ref_valid_object(current_prog->blueprint, "lambda creator");
-        l->prog_pc = inter_pc - current_prog->program;
+        cl->prog_ob = ref_valid_object(current_prog->blueprint, "closure creator");
+        cl->prog_pc = inter_pc - current_prog->program;
     }
     else
     {
-        l->prog_ob = NULL;
-        l->prog_pc = 0;
+        cl->prog_ob = NULL;
+        cl->prog_pc = 0;
     }
 
-    assign_object_svalue_no_free(&(l->ob), obj, "lambda object");
-} /* closure_init_lambda() */
-
-/*-------------------------------------------------------------------------*/
-lambda_t *
-closure_new_lambda ( svalue_t obj,  unsigned short context_size
-                   , Bool raise_error)
-/* Create a basic lambda closure structure, suitable to hold <context_size>
- * context values, and bound to <obj>. The structure has the generic
- * fields (.ref, .ob, .prog_ob, .prog_pc) initialized.
- *
- * The function may raise an error on out of memory if <raise_error> is TRUE,
- * or just return NULL.
- */
-
-{
-    lambda_t *l;
-
-    /* Allocate a new lambda structure */
-    l = xalloc(SIZEOF_LAMBDA(context_size));
-    if (!l)
-    {
-        if (raise_error)
-        {
-            outofmem(SIZEOF_LAMBDA(context_size)
-                    , "closure literal");
-            /* NOTREACHED */
-        }
-    	return NULL;
-    }
-
-    closure_init_lambda(l, obj);
-
-    return l;
-} /* closure_new_lambda() */
+    assign_object_svalue_no_free(&(cl->ob), obj, "closure object");
+} /* closure_init_base() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1282,15 +1177,26 @@ closure_identifier (svalue_t *dest, svalue_t obj, int ix, Bool raise_error)
  */
 
 {
-    lambda_t *l;
+    identifier_closure_t *cl;
 
-    /* Allocate an initialise a new lambda structure */
-    l = closure_new_lambda(obj, 0, raise_error);
-    if (!l)
+    /* Allocate an initialise a new closure structure */
+    cl = xalloc(sizeof(identifier_closure_t));
+    if (!cl)
     {
-        put_number(dest, 0);
+        if (raise_error)
+            outofmem(sizeof(identifier_closure_t), "identifier closure");
+        else
+            put_number(dest, 0);
         return;
     }
+
+    closure_init_base(&(cl->base), obj);
+    cl->var_index = (unsigned short)ix;
+
+    /* Fill in the result svalue */
+    dest->type = T_CLOSURE;
+    dest->x.closure_type = CLOSURE_IDENTIFIER;
+    dest->u.identifier_closure = cl;
 
     /* If the object's program will be replaced, store the closure
      * in lambda protector, otherwise mark the object as referenced by
@@ -1298,19 +1204,12 @@ closure_identifier (svalue_t *dest, svalue_t obj, int ix, Bool raise_error)
      */
     if (obj.type == T_OBJECT
      && (!(obj.u.ob->prog->flags & P_REPLACE_ACTIVE)
-      || !lambda_ref_replace_program(obj.u.ob, l, CLOSURE_IDENTIFIER, 0, NULL, NULL)
+      || !closure_ref_replace_program(obj.u.ob, dest, 0, NULL, NULL)
        ))
     {
         obj.u.ob->flags |= O_LAMBDA_REFERENCED;
     }
 
-    dest->x.closure_type = CLOSURE_IDENTIFIER;
-    l->function.var_index = (unsigned short)ix;
-
-    /* Fill in the rest of the lambda and of the result svalue */
-
-    dest->type = T_CLOSURE;
-    dest->u.lambda = l;
 } /* closure_identifier() */
 
 /*-------------------------------------------------------------------------*/
@@ -1334,36 +1233,26 @@ closure_lfun ( svalue_t *dest, svalue_t obj, program_t *prog, int ix
  */
 
 {
-    lambda_t *l;
+    lfun_closure_t *l;
 
-    /* Allocate and initialise a new lambda structure */
-    l = closure_new_lambda(obj, num, raise_error);
+    /* Allocate and initialise a new closure structure */
+    l = xalloc(sizeof(lfun_closure_t) + num * sizeof(svalue_t));
     if (!l)
     {
-        put_number(dest, 0);
+        if (raise_error)
+            outofmem(sizeof(lfun_closure_t) + num * sizeof(svalue_t), "lfun closure");
+        else
+            put_number(dest, 0);
         return;
     }
 
-    /* If the object's program will be replaced, store the closure
-     * in lambda protector, otherwise mark the object as referenced by
-     * a closure.
-     */
-    if (obj.type == T_OBJECT
-     && (!(obj.u.ob->prog->flags & P_REPLACE_ACTIVE)
-      || !lambda_ref_replace_program(obj.u.ob, l, CLOSURE_LFUN, 0, NULL, NULL)
-       ))
-    {
-        obj.u.ob->flags |= O_LAMBDA_REFERENCED;
-    }
-
-    dest->x.closure_type = CLOSURE_LFUN;
-
-    assign_object_svalue_no_free(&(l->function.lfun.ob), obj, "closure");
-    l->function.lfun.index = (unsigned short)ix;
-    l->function.lfun.inhProg = prog;
+    closure_init_base(&(l->base), obj);
+    assign_object_svalue_no_free(&(l->fun_ob), obj, "closure");
+    l->fun_index = (unsigned short)ix;
+    l->inhProg = prog;
     if (prog)
         reference_prog(prog, "closure_lfun");
-    l->function.lfun.context_size = num;
+    l->context_size = num;
 
     /* Init the context variables */
     while (num > 0)
@@ -1372,10 +1261,23 @@ closure_lfun ( svalue_t *dest, svalue_t obj, program_t *prog, int ix
         put_number(&(l->context[num]), 0);
     }
 
-    /* Fill in the rest of the lambda and of the result svalue */
-
+    /* Fill in the result svalue */
     dest->type = T_CLOSURE;
-    dest->u.lambda = l;
+    dest->x.closure_type = CLOSURE_LFUN;
+    dest->u.lfun_closure = l;
+
+    /* If the object's program will be replaced, store the closure
+     * in lambda protector, otherwise mark the object as referenced by
+     * a closure.
+     */
+    if (obj.type == T_OBJECT
+     && (!(obj.u.ob->prog->flags & P_REPLACE_ACTIVE)
+      || !closure_ref_replace_program(obj.u.ob, dest, 0, NULL, NULL)
+       ))
+    {
+        obj.u.ob->flags |= O_LAMBDA_REFERENCED;
+    }
+
 } /* closure_lfun() */
 
 /*-------------------------------------------------------------------------*/
@@ -1849,70 +1751,29 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
  */
 
 {
+    struct range_iterator it;
     enum compile_value_output_flags result_flags = 0;
-    svalue_t *rvalue = get_rvalue(value, NULL);
-    struct protected_range_lvalue* r = NULL;
-
-    if (rvalue == NULL)
-    {
-        r = value->u.protected_range_lvalue;
-        if (r->vec.type == T_POINTER)
-            rvalue = &(r->vec);
-        else
-            rvalue = value;
-    }
 
     if (!--current.levels_left)
         lambda_error("Too deep recursion inside lambda()\n");
 
-    switch(rvalue->type)
+    if (get_iterator(value, &it, true))
     {
-    case T_LVALUE:                             /* ----- T_LVALUE ----- */
-      {
-        /* Can only be a string/bytes range, otherwise get_rvalue
-         * would have returned another type. And array ranges
-         * were handled before.
-         */
-        svalue_t tmp;
-
-        assert(value->x.lvalue_type == LVALUE_PROTECTED_RANGE);
-        assert(r->vec.type == T_STRING || r->vec.type == T_BYTES);
-
-        assign_rvalue_no_free(&tmp, value);
-        insert_value_push(value);
-        free_svalue(&tmp);
-        break;
-      }
-
-    case T_POINTER:                            /* ----- T_POINTER ----- */
-      {
-        svalue_t *block;  /* The block of svalues to compile */
-        svalue_t *argp;   /* Pointer to the current svalue */
-        svalue_t *item;   /* The rvalue of argp. */
+        svalue_t *fun;    /* Pointer to the first element. */
+        svalue_t *rfun;   /* The rvalue of fun. */
         ph_int type;      /* Various types */
-        mp_int block_size;/* Number of elements in block .*/
 
-        block = rvalue->u.vec->item;
-        if (r != NULL)
-        {
-            argp = block + r->index1;
-            block_size = (mp_int)(r->index2 - r->index1);
-        }
-        else
-        {
-            argp = block;
-            block_size = (mp_int)VEC_SIZE(rvalue->u.vec);
-        }
+        fun = it.next_value(&it);
 
         /* The first value must be a closure */
-        if (block_size == 0)
+        if (it.size == 0 || fun == NULL)
             lambda_error("Missing function\n");
 
-        item = get_rvalue(argp, NULL);
-        if (item == NULL || item->type != T_CLOSURE)
+        rfun = get_rvalue(fun, NULL);
+        if (rfun == NULL || rfun->type != T_CLOSURE)
             lambda_error("Missing function\n");
 
-        type = item->x.closure_type;
+        type = rfun->x.closure_type;
         if (type < CLOSURE_LWO)
             type -= CLOSURE_LWO;
 
@@ -1996,11 +1857,11 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                      * an empty byte and store the position of the inserted
                      * byte in the branchp table.
                      */
-                    i = block_size - 1;
+                    i = it.size - 1;
                     branchp = alloca(i * sizeof *branchp);
                     while (--i > 0)
                     {
-                        compile_value(++argp, opt_flags & REF_ACCEPTED);
+                        compile_value(it.next_value(&it), opt_flags & REF_ACCEPTED);
                         if (current.code_left < 2)
                             realloc_code();
                         *branchp++ = current.code_max - current.code_left;
@@ -2018,7 +1879,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                          , opt_flags & (VOID_ACCEPTED|REF_ACCEPTED)
                                      );
                     else
-                        void_given = compile_value(++argp
+                        void_given = compile_value(it.next_value(&it)
                                          , opt_flags & (VOID_ACCEPTED|REF_ACCEPTED)
                                      );
 
@@ -2038,7 +1899,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                      * instructions. If necessary, the short branches are
                      * converted into long ones.
                      */
-                    i = block_size - 1;
+                    i = it.size - 1;
                     end = current.code_max - current.code_left;
                       /* The target to jump to */
                     while (--i > 0)
@@ -2184,6 +2045,8 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                      * below.
                      */
 
+                    svalue_t *defaultval = NULL;
+                      /* Default value (if it exists. */
                     mp_int *branchp;
                       /* Table storing two values for every argument pair: the
                        * position after the cond-part and the position after
@@ -2206,32 +2069,12 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     code = type - CLOSURE_OPERATOR;
                     is_notif = (code == F_BRANCH_WHEN_NON_ZERO);
 
-                    /* If the default part exists, is the number 0 or at least
-                     * has no side-effects, and if the caller accepts void/0
-                     * for an answer, it is not compiled as it won't have
-                     * any effect anyway.
-                     */
-                    if (!(block_size & 1)
-                      && (opt_flags & (VOID_ACCEPTED|ZERO_ACCEPTED)))
-                    {
-                       item = get_rvalue(argp + block_size - 1, NULL);
-                       if (!item)
-                           item = &(argp->u.protected_range_lvalue->vec);
-                       if (( opt_flags & VOID_ACCEPTED )
-                          ? item->type != T_POINTER /* no side effect */
-                          : (item->type == T_NUMBER && !item->u.number))
-                        {
-                            /* Ignore the default-part by hiding it */
-                            block_size--;
-                        }
-                    }
-
                     /* Generate the code for the (cond, cond-part) pairs,
                      * and add the necessary branch instructions.
                      * Also store the positions of the inserted code
                      * in the branchp table.
                      */
-                    i = block_size;
+                    i = it.size;
                     branchp = alloca(i * sizeof *branchp);
                     all_void = VOID_GIVEN;
                     while ( (i -= 2) > 0)
@@ -2241,7 +2084,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                         /* Compile the condition and add the branch
                          * to skip the cond-part.
                          */
-                        opt_used = compile_value(++argp, NEGATE_ACCEPTED);
+                        opt_used = compile_value(it.next_value(&it), NEGATE_ACCEPTED);
                         if (current.code_left < 2)
                             realloc_code();
                         last_branch = current.code_max - current.code_left;
@@ -2257,8 +2100,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                         STORE_UINT8(current.codep, 0);
 
                         /* Compile the cond-part */
-                        ++argp;
-                        opt_used = compile_value(argp,
+                        opt_used = compile_value(it.next_value(&it),
                             (i == 1 && !all_void) ?
                                 opt_flags & REF_ACCEPTED :
                                 opt_flags &
@@ -2325,7 +2167,32 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                         STORE_CODE(current.codep, F_BRANCH);
                         STORE_CODE(current.codep, (bytecode_t)opt_used);
                     } /* while() */
+
                     /* If i is not zero now, then there is no default part */
+                    if (!i)
+                    {
+                        defaultval = it.next_value(&it);
+
+                        /* If the default part exists, is the number 0 or at least
+                         * has no side-effects, and if the caller accepts void/0
+                         * for an answer, it is not compiled as it won't have
+                         * any effect anyway.
+                         */
+                        if (opt_flags & (VOID_ACCEPTED|ZERO_ACCEPTED))
+                        {
+                           svalue_t *rvalue = get_rvalue(defaultval, NULL);
+                           if (!rvalue && defaultval->x.lvalue_type == LVALUE_PROTECTED_RANGE)
+                               rvalue = &(defaultval->u.protected_range_lvalue->vec);
+                           if (rvalue != NULL
+                            && (( opt_flags & VOID_ACCEPTED )
+                              ? rvalue->type != T_POINTER /* no side effect */
+                              : (rvalue->type == T_NUMBER && !rvalue->u.number)))
+                            {
+                                /* Ignore the default-part by hiding it */
+                                i--;
+                            }
+                        }
+                    }
 
                     /* Now compile the default part.
                      * There are a few conditions to distinguish...
@@ -2362,7 +2229,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                              *       <condn>
                              * ln: end:
                              */
-                            if (block_size < 2)
+                            if (it.size < 2)
                             {
                             	/* empty statement: all done */
                                 break; /* switch() */
@@ -2421,7 +2288,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                         current.codep += offset;
                         current.code_left -= offset;
                         branchp--;
-                        i = block_size - 2;
+                        i = it.size - 2;
                     }
                     else
                     {
@@ -2446,7 +2313,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
 
                         /* Compile the default part */
                         opt_used = compile_value(
-                          i ? &const0 : ++argp,
+                          i ? &const0 : defaultval,
                           opt_flags &
                             ( all_void ?
                               (VOID_ACCEPTED|ZERO_ACCEPTED|REF_ACCEPTED) :
@@ -2484,14 +2351,14 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                             opt_used = VOID_GIVEN;
                             void_dest = non_void_dest + 1;
                         }
-                        else if (all_void && block_size > 2)
+                        else if (all_void && it.size > 2)
                         {
                             /* The caller wants a result, <default> has one,
                              * but none of the <cond>s does (and they exist).
                              */
                             if (current.code_left < 3)
                                 realloc_code();
-                            if (block_size > 4
+                            if (it.size > 4
                              || branchp[-2] - branchp[-1] > 0xfd)
                             {
                             	/* There is more than one <cond>, or the one
@@ -2559,7 +2426,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
 
                             /* Check all <cond>s if there is a void one */
                             branchp2 = branchp;
-                            for (j = block_size;  (j -= 2) > 0; )
+                            for (j = it.size;  (j -= 2) > 0; )
                             {
                                 start = *(branchp2 -= 2);
                                 if (current.code[start+1] & VOID_GIVEN)
@@ -2580,7 +2447,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                         }
 
                         /* Prepare the backpatching run */
-                        i = block_size;
+                        i = it.size;
                     }
 
                     /* Now walk backwards through all the <cond>branches, insert
@@ -2657,24 +2524,19 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                     PUT_UINT8(pstart+1, GET_UINT8(pstart+1)+1);
                                 }
 
+                                /* Count the extra byte we're going to insert */
+                                end++;
+                                void_dest++;
+                                non_void_dest++;
+
                                 /* Compute the distance for the <cond> branch */
                                 start = *--branchp;
                                 offset = (current.code[start+1] & VOID_GIVEN)
                                           ? void_dest - start - 1
                                           : non_void_dest - start - 1;
 
-                                /* Count the extra byte we're going to insert */
-                                end++;
-                                void_dest++;
-                                non_void_dest++;
-
                                 if (offset > 0x7fff)
                                     UNIMPLEMENTED
-
-                                /* Compute the distance to store while q and p
-                                 * give the proper offset.
-                                 */
-                                dist = (unsigned short)(offset + (q-p));
 
                                 /* Move the code after this branch.
                                  */
@@ -2684,7 +2546,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                 } while (--j);
 
                                 /* Store the new branch in place of the old one. */
-                                RSTORE_SHORT(q, dist);
+                                RSTORE_SHORT(q, offset);
 
                                 p -= 2;
                                 code = GET_CODE(p);
@@ -2728,9 +2590,9 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     enum compile_value_output_flags void_given;
 
                     /* Compile the first n-1 expressions */
-                    for (i = block_size - 1; --i > 0; )
+                    for (i = it.size - 1; --i > 0; )
                     {
-                        void_given = compile_value(++argp, VOID_WANTED|REF_ACCEPTED);
+                        void_given = compile_value(it.next_value(&it), VOID_WANTED|REF_ACCEPTED);
 
                         /* If we got a result, pop it */
                         if ( !(void_given & VOID_GIVEN) )
@@ -2745,7 +2607,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     /* Compile the last expression.
                      * If there is none (i != 0), use CONST0 instead.
                      */
-                    result_flags = compile_value(i ? &const0 : ++argp, opt_flags);
+                    result_flags = compile_value(i ? &const0 : it.next_value(&it), opt_flags);
                     break;
                   }
 
@@ -2775,13 +2637,13 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     /* There must be at least one assignment in order to get
                      * a return value.
                      */
-                    if ( !(i = block_size - 1) || (i & 1) )
+                    if ( !(i = it.size - 1) || (i & 1) )
                         lambda_error("Missing value in assignment\n");
-                    argp++;
-                    for (; (i -= 2) >= 0; argp+=2)
+                    while ((i -= 2) >= 0)
                     {
-                        compile_value(argp+1, REF_ACCEPTED);
-                        compile_lvalue(argp, RESEATING_ACCEPTED);
+                        svalue_t *lvalue = it.next_value(&it);
+                        compile_value(it.next_value(&it), REF_ACCEPTED);
+                        compile_lvalue(lvalue, RESEATING_ACCEPTED);
                         if (!i)
                         {
                             /* Last assignment: we might need to keep this value */
@@ -2808,6 +2670,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                 /* ({#'+=, <lvalue>, <expr> })
                  */
                 case F_ADD_EQ:
+                  {
                     /* This is compiled as:
                      *
                      *   <expr>
@@ -2819,17 +2682,21 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                      *   <lvalue>
                      *   (PRE_)INC
                      */
+                    svalue_t *lvalue, *expr, *rexpr;
 
-                    if (block_size != 3)
+                    if (it.size != 3)
                         lambda_error(
                           "Bad number of arguments to #'%s\n",
                           instrs[type - CLOSURE_OPERATOR].name
                         );
 
-                    item = get_rvalue(argp + 2, NULL);
-                    if (item != NULL && item->type == T_NUMBER && item->u.number == 1)
+                    lvalue = it.next_value(&it);
+                    expr = it.next_value(&it);
+
+                    rexpr = get_rvalue(expr, NULL);
+                    if (rexpr != NULL && rexpr->type == T_NUMBER && rexpr->u.number == 1)
                     {
-                        compile_lvalue(argp+1, 0);
+                        compile_lvalue(lvalue, 0);
                         if (opt_flags & VOID_ACCEPTED)
                         {
                             result_flags = VOID_GIVEN;
@@ -2843,8 +2710,8 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     }
                     else
                     {
-                        compile_value(argp+2, 0);
-                        compile_lvalue(argp+1, 0);
+                        compile_value(expr, 0);
+                        compile_lvalue(lvalue, 0);
                         if (opt_flags & VOID_ACCEPTED)
                         {
                             result_flags = VOID_GIVEN;
@@ -2855,10 +2722,12 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                         current.code_left--;
                     }
                     break;
+                  }
 
                 /* ({#'-=, <lvalue>, <expr> })
                  */
                 case F_SUB_EQ:
+                  {
                     /* This is compiled as:
                      *
                      *   <expr>
@@ -2870,17 +2739,21 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                      *   <lvalue>
                      *   (PRE_)DEC
                      */
+                    svalue_t *lvalue, *expr, *rexpr;
 
-                    if (block_size != 3)
+                    if (it.size != 3)
                         lambda_error(
                           "Bad number of arguments to #'%s\n",
                           instrs[type - CLOSURE_OPERATOR].name
                         );
 
-                    item = get_rvalue(argp + 2, NULL);
-                    if (item != NULL && item->type == T_NUMBER && item->u.number == 1)
+                    lvalue = it.next_value(&it);
+                    expr = it.next_value(&it);
+
+                    rexpr = get_rvalue(expr, NULL);
+                    if (rexpr != NULL && rexpr->type == T_NUMBER && rexpr->u.number == 1)
                     {
-                        compile_lvalue(argp+1, 0);
+                        compile_lvalue(lvalue, 0);
                         if (opt_flags & VOID_ACCEPTED)
                         {
                             result_flags = VOID_GIVEN;
@@ -2894,12 +2767,13 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     }
                     else
                     {
-                        compile_value(argp+2, 0);
-                        compile_lvalue(argp+1, 0);
+                        compile_value(expr, 0);
+                        compile_lvalue(lvalue, 0);
                         STORE_CODE(current.codep, F_SUB_EQ);
                         current.code_left--;
                     }
                     break;
+                  }
 
                 /* ({#'op=, <lvalue>, <expr> })
                  * with op: *, &, |, ^, <<, >>, >>>, /, %, &&, ||
@@ -2913,25 +2787,31 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                 case F_RSHL_EQ:
                 case F_DIV_EQ:
                 case F_MOD_EQ:
+                  {
                     /* This is compiled as:
                      *
                      *   <expr>
                      *   <lvalue>
                      *   <op>_EQ
                      */
+                    svalue_t *lvalue;
 
-                    if (block_size != 3)
+                    if (it.size != 3)
                     {
                         lambda_error(
                           "Bad number of arguments to #'%s\n",
                           instrs[type - CLOSURE_OPERATOR].name
                         );
                     }
-                    compile_value(argp+2, 0);
-                    compile_lvalue(argp+1, 0);
+
+                    lvalue = it.next_value(&it);
+
+                    compile_value(it.next_value(&it), 0);
+                    compile_lvalue(lvalue, 0);
                     STORE_CODE(current.codep, (bytecode_t)(type - CLOSURE_OPERATOR));
                     current.code_left--;
                     break;
+                  }
 
                 /* ({#'op=, <lvalue>, <expr> })
                  * with op: &&, ||
@@ -2979,7 +2859,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                         is_and = MY_FALSE;
                     }
 
-                    if (block_size != 3)
+                    if (it.size != 3)
                     {
                         lambda_error(
                           "Bad number of arguments to #'%s\n",
@@ -2987,7 +2867,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                         );
                     }
 
-                    compile_lvalue(argp+1, PROTECT_LVALUE);
+                    compile_lvalue(it.next_value(&it), PROTECT_LVALUE);
 
                     if (current.code_left < 3)
                         realloc_code();
@@ -3000,7 +2880,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     STORE_CODE(current.codep, (bytecode_t)code);
                     STORE_CODE(current.codep, (bytecode_t)0);
 
-                    compile_value(argp+2, REF_ACCEPTED);
+                    compile_value(it.next_value(&it), REF_ACCEPTED);
 
                     /* Store the correct offsets for the operator/branch
                      * instruction. If necessary, the short branch is
@@ -3061,7 +2941,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                      *   (POST_)INC      (POST_)DEC
                      */
 
-                    if (block_size != 2)
+                    if (it.size != 2)
                     {
                         lambda_error(
                           "Bad number of arguments to #'%s\n",
@@ -3069,7 +2949,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                         );
                     }
 
-                    compile_lvalue(argp+1, 0);
+                    compile_lvalue(it.next_value(&it), 0);
 
                     if (opt_flags & VOID_ACCEPTED)
                     {
@@ -3114,7 +2994,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     enum compile_value_output_flags void_given;
                     mp_int offset;      /* Position of first <body> */
 
-                    i = block_size - 3;
+                    i = it.size - 3;
                     if (i < 0)
                         lambda_error("Missing argument(s) to #'do\n");
 
@@ -3123,7 +3003,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     /* Compile all the bodys */
                     if (i) do
                     {
-                        void_given = compile_value(++argp, VOID_WANTED|REF_ACCEPTED);
+                        void_given = compile_value(it.next_value(&it), VOID_WANTED|REF_ACCEPTED);
                         if ( !(void_given & VOID_GIVEN) )
                         {
                             /* POP the unwanted result */
@@ -3135,7 +3015,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     } while(--i);
 
                     /* Compile the condition */
-                    void_given = compile_value(++argp, NEGATE_ACCEPTED);
+                    void_given = compile_value(it.next_value(&it), NEGATE_ACCEPTED);
                     offset += current.code_max - current.code_left + 1;
 
                     if (current.code_left < 3)
@@ -3163,7 +3043,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     }
 
                     /* Compile the result */
-                    result_flags = compile_value(++argp, opt_flags);
+                    result_flags = compile_value(it.next_value(&it), opt_flags);
                     break;
                   }
 
@@ -3193,6 +3073,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                      * is reversed.
                      */
 
+                    svalue_t *cond, *result;
                     mp_int i;
                     enum compile_value_output_flags void_given;
                     mp_int start_branch;
@@ -3208,16 +3089,17 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     STORE_CODE(current.codep, F_BRANCH);
                     STORE_UINT8(current.codep, 0);
 
-                    i = block_size - 3;
+                    i = it.size - 3;
                     if (i < 0)
                         lambda_error("Missing argument(s) to #'while\n");
 
                     /* Compile all bodies */
                     offset = current.code_left - current.code_max;
-                    argp += 2;
+                    cond = it.next_value(&it);
+                    result = it.next_value(&it);
                     if (i) do
                     {
-                        void_given = compile_value(++argp, VOID_WANTED|REF_ACCEPTED);
+                        void_given = compile_value(it.next_value(&it), VOID_WANTED|REF_ACCEPTED);
                         if ( !(void_given & VOID_GIVEN) )
                         {
                             /* The body returned a result: POP it */
@@ -3263,8 +3145,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     }
 
                     /* Compile the condition and generate the branch */
-                    argp = block;
-                    void_given = compile_value(++argp, NEGATE_ACCEPTED);
+                    void_given = compile_value(cond, NEGATE_ACCEPTED);
 
                     if (current.code_left < 3)
                         realloc_code();
@@ -3294,7 +3175,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     }
 
                     /* Compile the result */
-                    result_flags = compile_value(++argp, opt_flags);
+                    result_flags = compile_value(result, opt_flags);
                     break;
                   }
 
@@ -3336,12 +3217,12 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     enum compile_value_output_flags void_given;
                     mp_int start;
                     mp_int offset;
-                    int    vars_given;
                     int    body_count;
                     bool   foreach_ref = false;
-                    svalue_t *svp;
+                    struct range_iterator var_it;
+                    svalue_t *vars;
 
-                    body_count = block_size - 3;
+                    body_count = it.size - 3;
                     if (body_count < 0)
                         lambda_error("Missing argument(s) to #'foreach\n");
 
@@ -3350,7 +3231,8 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                         /* Just create the code for the expression
                          * and pop the value
                          */
-                        compile_value(argp+2, REF_ACCEPTED);
+                        it.next_value(&it);
+                        compile_value(it.next_value(&it), REF_ACCEPTED);
                         if (current.code_left < 2)
                             realloc_code();
                         current.code_left--;
@@ -3370,41 +3252,24 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
 
                     /* Create the code to push the variable lvalues
                      */
-                    item = get_rvalue(++argp, NULL);
-                    if (item == NULL)
-                    {
-                        struct protected_range_lvalue *vr = argp->u.protected_range_lvalue;
+                    vars = it.next_value(&it);
+                    if (!get_iterator(vars, &var_it, true))
+                        get_iterator_for_vector(vars, 1, &var_it);
 
-                        if (vr->vec.type != T_POINTER)
-                            lambda_error("Missing variable lvalue to #'foreach\n");
-
-                        svp = vr->vec.u.vec->item + vr->index1;
-                        vars_given = i = vr->index2 - vr->index1;
-                    }
-                    else if (item->type != T_POINTER)
-                    {
-                        vars_given = 1;
-                        svp = item;
-                    }
-                    else
-                    {
-                        svp = item->u.vec->item;
-                        vars_given = i = (int)VEC_SIZE(item->u.vec);
-                    }
-
-                    if (!vars_given)
+                    if (!var_it.size)
                         lambda_error("Missing variable lvalue to #'foreach\n");
-                    if (vars_given > 0xFE)
-                        lambda_error("Too many lvalues to #'foreach: %d\n", vars_given);
-                    for (i = vars_given; i > 0; i--, svp++)
+                    if (var_it.size > 0xFE)
+                        lambda_error("Too many lvalues to #'foreach: %"PRIdPINT"\n", var_it.size);
+                    for (i = var_it.size; i > 0; i--)
                     {
-                        if (!is_lvalue(svp, MAKE_VAR_LVALUE))
+                        svalue_t *lvalue = var_it.next_value(&var_it);
+                        if (!is_lvalue(lvalue, MAKE_VAR_LVALUE))
                             lambda_error("Missing variable lvalue to #'foreach\n");
-                        compile_lvalue(svp, MAKE_VAR_LVALUE);
+                        compile_lvalue(lvalue, MAKE_VAR_LVALUE);
                     }
 
                     /* Create the code for the expression */
-                    foreach_ref = (compile_value(++argp, REF_ACCEPTED) & REF_GIVEN) != 0;
+                    foreach_ref = (compile_value(it.next_value(&it), REF_ACCEPTED) & REF_GIVEN) != 0;
 
                     /* Create the FOREACH instruction and remember the position
                      */
@@ -3412,7 +3277,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                         realloc_code();
                     current.code_left -= 4;
                     STORE_CODE(current.codep, foreach_ref ? F_FOREACH_REF : F_FOREACH);
-                    STORE_UINT8(current.codep, vars_given+1);
+                    STORE_UINT8(current.codep, var_it.size+1);
                     STORE_SHORT(current.codep, 0);
                     start = current.code_max - current.code_left;
 
@@ -3420,7 +3285,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                      */
                     for (i = body_count; i > 0; i--)
                     {
-                        void_given = compile_value(++argp, VOID_WANTED|REF_ACCEPTED);
+                        void_given = compile_value(it.next_value(&it), VOID_WANTED|REF_ACCEPTED);
                         if ( !(void_given & VOID_GIVEN) )
                         {
                             /* The body returned a result: POP it */
@@ -3462,60 +3327,98 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                  * ({#'catch, <body>, 'publish })
                  * ({#'catch, <body>, 'nolog, 'publish })
                  * ({#'catch, <body>, 'nolog, 'publish, 'reserve, <expr> })
+                 * ({#'catch, <body>, 'nolog, 'publish, 'reserve, <expr>, 'limit, <expr> })
                  */
                 case F_CATCH:
                   {
                     /* This is compiled as:
                      *
                      *      SAVE_ARG_FRAME
+                     *      <reserve value>
                      *      CATCH l / CATCH_NO_LOG l
                      *      <body>
                      *   l: END_CATCH
                      *      RESTORE_ARG_FRAME
                      */
 
+                    svalue_t *body;
                     mp_int start, offset;
-                    int flags, i;
+                    int flags;
 
-                    if (block_size < 2 || block_size > 6)
+                    if (it.size < 2 || it.size > 8)
                         lambda_error("Wrong number of arguments to #'catch\n");
 
-                    flags = 0;
-                    for (i = 3; i <= block_size; i++)
-                    {
-                        item = get_rvalue(argp + i -1, NULL);
-                        if (item == NULL)
-                            item = argp + i - 1;
+                    if (current.code_left < 1)
+                        realloc_code();
+                    current.code_left--;
+                    STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
 
-                        if (item->type == T_SYMBOL
-                         && mstreq(item->u.str, STR_NOLOG))
+                    body = it.next_value(&it);
+                    flags = 0;
+                    while (true)
+                    {
+                        svalue_t *option = it.next_value(&it);
+                        svalue_t *roption;
+                        if (option == NULL)
+                            break;
+
+                        roption = get_rvalue(option, NULL);
+                        if (roption == NULL)
+                            roption = option;
+
+                        if (roption->type == T_SYMBOL
+                         && mstreq(roption->u.str, STR_NOLOG))
                             flags |= CATCH_FLAG_NOLOG;
-                        else if (item->type == T_SYMBOL
-                         && mstreq(item->u.str, STR_PUBLISH))
+                        else if (roption->type == T_SYMBOL
+                         && mstreq(roption->u.str, STR_PUBLISH))
                             flags |= CATCH_FLAG_PUBLISH;
-                        else if (item->type == T_SYMBOL
-                         && mstreq(item->u.str, STR_RESERVE)
+                        else if (roption->type == T_SYMBOL
+                         && mstreq(roption->u.str, STR_RESERVE)
                                  )
                         {
-                            if (i > block_size)
+                            svalue_t *reserve = it.next_value(&it);
+                            if (reserve == NULL)
                                 lambda_error("Missing expression for 'reserve "
                                              "catch-modifier.\n");
+                            if (flags & CATCH_FLAG_RESERVE)
+                                lambda_error("Multiple 'reserve catch-modifiers.\n");
                             flags |= CATCH_FLAG_RESERVE;
-                            if (compile_value(argp+i, 0) & VOID_GIVEN)
+                            if (compile_value(reserve, 0) & VOID_GIVEN)
                                 lambda_error("Expression for 'reserve "
                                              "doesn't return a value.\n");
-                            i++;
+                        }
+                        else if (roption->type == T_SYMBOL
+                         && mstreq(roption->u.str, STR_LIMIT)
+                                 )
+                        {
+                            svalue_t *limit = it.next_value(&it);
+                            if (limit == NULL)
+                                lambda_error("Missing expression for 'limit "
+                                             "catch-modifier.\n");
+                            if (flags & CATCH_FLAG_LIMIT)
+                                lambda_error("Multiple 'limit catch-modifiers.\n");
+                            flags |= CATCH_FLAG_LIMIT;
+                            if (compile_value(limit, 0) & VOID_GIVEN)
+                                lambda_error("Expression for 'limit "
+                                             "doesn't return a value.\n");
+                            if (flags & CATCH_FLAG_RESERVE)
+                            {
+                                /* The reserve value needs to be on top of the stack. */
+                                if (current.code_left < 1)
+                                    realloc_code();
+                                current.code_left--;
+                                STORE_CODE(current.codep, F_SWAP_VALUES);
+                            }
                         }
                         else
-                            lambda_error("Expected 'nolog, 'publish or "
-                                         "'reserve as catch-modifier.\n");
+                            lambda_error("Expected 'nolog, 'publish, 'reserve "
+                                         "or 'limit as catch-modifier.\n");
                     }
 
-                    if (current.code_left < 4)
+                    if (current.code_left < 3)
                         realloc_code();
-                    current.code_left -= 4;
+                    current.code_left -= 3;
 
-                    STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
                     STORE_CODE(current.codep, F_CATCH);
 
                     STORE_UINT8(current.codep, flags);
@@ -3523,7 +3426,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     STORE_UINT8(current.codep, 0);
                     start = current.code_max - current.code_left;
 
-                    compile_value(++argp, REF_ACCEPTED);
+                    compile_value(body, REF_ACCEPTED);
                     if (current.code_left < 2)
                         realloc_code();
 
@@ -3553,10 +3456,10 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                      */
                     int i, size;
 
-                    size = i = block_size - 1;
+                    size = i = it.size - 1;
                     while (--i >= 0)
                     {
-                        compile_value(++argp, REF_ACCEPTED);
+                        compile_value(it.next_value(&it), REF_ACCEPTED);
                     }
                     if (current.code_left < 3)
                         realloc_code();
@@ -3585,32 +3488,18 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     mp_int num_values;  /* Number of values per key */
 
                     num_values = 1;
-                    i = block_size;
+                    i = it.size;
                     num_keys = i - 1;
 
                     /* Check and compile all mapping keys and values */
-                    for (i = block_size; --i;)
+                    for (i = it.size; --i;)
                     {
-                        svalue_t *element;
-                        item = get_rvalue(++argp, NULL);
+                        struct range_iterator arg_it;
 
-                        if (item == NULL)
-                        {
-                            struct protected_range_lvalue *ar = argp->u.protected_range_lvalue;
-                            if (ar->vec.type != T_POINTER)
-                                lambda_error("Bad argument to #'([\n");
-
-                            element = ar->vec.u.vec->item + ar->index1;
-                            j = ar->index2 - ar->index1;
-                        }
-                        else if (item->type == T_POINTER)
-                        {
-                            element = item->u.vec->item;
-                            j = (mp_int)VEC_SIZE(item->u.vec);
-                        }
-                        else
+                        if (!get_iterator(it.next_value(&it), &arg_it, true))
                             lambda_error("Bad argument to #'([\n");
 
+                        j = arg_it.size;
 
                         /* The first array determines the width */
                         if (j != num_values)
@@ -3625,7 +3514,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
 
                         while (--j >= 0)
                         {
-                            compile_value(element++, REF_ACCEPTED);
+                            compile_value(arg_it.next_value(&arg_it), REF_ACCEPTED);
                         }
                     }
 
@@ -3664,28 +3553,33 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                      *   <exprN>
                      *   F_S_AGGREGATE -1 N
                      */
-                    int i, size;
+                    svalue_t *template, *rtemplate;
+                    int size;
 
-                    size = block_size - 2;
+                    size = it.size - 2;
+                    if (size < 0)
+                        lambda_error("Missing tempate for #'(<.\n");
                     if (size > STRUCT_MAX_MEMBERS)
                     {
                         lambda_error("Too many elements for struct.\n");
                         size = STRUCT_MAX_MEMBERS;
                     }
 
-                    item = get_rvalue(argp+1, NULL);
-                    if (item != NULL && item->type == T_STRUCT
-                     && struct_size(item->u.strct) < size)
+                    template = it.next_value(&it);
+                    rtemplate = get_rvalue(template, NULL);
+                    if (rtemplate != NULL && rtemplate->type == T_STRUCT
+                     && struct_size(rtemplate->u.strct) < size)
                     {
                         lambda_error("Too many elements for struct %s.\n"
-                                    , get_txt(struct_name(item->u.strct))
+                                    , get_txt(struct_name(rtemplate->u.strct))
                                     );
-                        size = struct_size(item->u.strct);
+                        size = struct_size(rtemplate->u.strct);
                     }
-                    i = size+1;
-                    while (--i >= 0)
+
+                    compile_value(template, 0);
+                    for (int i = size; i > 0; i--)
                     {
-                        compile_value(++argp, REF_ACCEPTED);
+                        compile_value(it.next_value(&it), REF_ACCEPTED);
                     }
                     if (current.code_left < 4)
                         realloc_code();
@@ -3707,16 +3601,16 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                      *   RETURN
                      */
 
-                    if (block_size != 2)
+                    if (it.size != 2)
                     {
-                        if (block_size > 1)
+                        if (it.size > 1)
                             lambda_error("Too many arguments to #'return\n");
                         result_flags = VOID_GIVEN;
                     }
                     else
                     {
                         result_flags =
-                          compile_value(++argp, ZERO_ACCEPTED|REF_ACCEPTED);
+                          compile_value(it.next_value(&it), ZERO_ACCEPTED|REF_ACCEPTED);
                     }
 
                     if (current.code_left < 1)
@@ -3730,57 +3624,6 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     else
                         STORE_CODE(current.codep, F_RETURN);
 
-                    break;
-                  }
-
-                /* ({#'[.., <value>, <index> })
-                 * ({#'[<.., <value>, <index> })
-                 */
-                case F_NX_RANGE:
-                case F_RX_RANGE:
-                case F_AX_RANGE:
-                  {
-                    /* This is compiled as:
-                     *     <value>
-                     *     <index>
-                     *     CONST1
-                     *     NR_RANGE/RR_RANGE/AR_RANGE
-                     */
-
-                    bytecode_t opcode = (type - CLOSURE_OPERATOR);
-                    const char *opname;
-
-                    switch (type - CLOSURE_OPERATOR)
-                    {
-                    case F_NX_RANGE:
-                        opcode = F_NR_RANGE;
-                        opname = "#'[..";
-                        break;
-                    case F_RX_RANGE:
-                        opcode = F_RR_RANGE;
-                        opname = "#'[<..";
-                        break;
-                    case F_AX_RANGE:
-                        opcode = F_AR_RANGE;
-                        opname = "#'[>..";
-                        break;
-                    default:
-                        fatal("Illegal operator %d\n", type - CLOSURE_OPERATOR);
-                        break;
-                    }
-
-                    if (block_size != 3)
-                        lambda_error("Bad number of arguments to %s\n"
-                                    , opname);
-
-                    compile_value(++argp, 0);
-                    compile_value(argp, 0);
-
-                    if (current.code_left < 2)
-                        realloc_code();
-                    current.code_left -= 2;
-                    STORE_CODE(current.codep, F_CONST1);
-                    STORE_CODE(current.codep, opcode);
                     break;
                   }
 
@@ -3859,11 +3702,11 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
 
                     /* Let's begin */
 
-                    num_blocks = (block_size) / 3;
-                    if (block_size != 2 + num_blocks * 3)
+                    num_blocks = (it.size) / 3;
+                    if (it.size != 2 + num_blocks * 3)
                         lambda_error("Bad number of arguments to #'switch\n");
 
-                    compile_value(++argp, 0);
+                    compile_value(it.next_value(&it), 0);
 
                     if (current.code_left < 3)
                         realloc_code();
@@ -3888,68 +3731,89 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                      */
                     for (i = num_blocks; --i >= 0;)
                     {
-                        svalue_t *labels;     /* Label value(s) */
-                        mp_int j;             /* Number of (remaining) labels */
                         case_list_entry_t *l;
+                        svalue_t *labels, *block, *delim, *rdelim;
                         enum compile_value_output_flags opt_used;
-                        svalue_t tmp_label = { T_NUMBER };  /* Temporary string label. */
+                        struct range_iterator label_it;
 
                         /* Compile the case labels */
 
-                        ++argp;
-                        item = get_rvalue(argp, NULL);
-                        if (item == NULL)
-                        {
-                            struct protected_range_lvalue *lr = argp->u.protected_range_lvalue;
-                            if (lr->vec.type == T_POINTER)
-                            {
-                                labels = lr->vec.u.vec->item + lr->index1;
-                                j = lr->index2 - lr->index1;
-                            }
-                            else
-                            {
-                                assign_rvalue_no_free(&tmp_label, argp);
-                                labels = &tmp_label;
-                                j = 1;
-                            }
-                        }
-                        else if (item->type == T_POINTER)
-                        {
-                            labels = item->u.vec->item;
-                            j = (mp_int)VEC_SIZE(item->u.vec);
-                        }
-                        else
-                        {
-                            labels = item;
-                            j = 1;
-                        }
+                        labels = it.next_value(&it);
+                        if (!get_iterator(labels, &label_it, true))
+                            get_iterator_for_vector(labels, 1, &label_it);
 
-                        for (; j--; labels++)
+                        while (true)
                         {
+                            svalue_t *label = label_it.next_value(&label_it);
+                            svalue_t *rlabel;
+                            svalue_t tmp_label = { T_NUMBER };  /* Temporary string label. */
+                            bool have_range = false;
+
+                            if (label == NULL) /* We're done here? */
+                                break;
+
+                            rlabel = get_rvalue(label, NULL);
+                            if (!rlabel)
+                            {
+                                assert(label->type == T_LVALUE);
+
+                                if (label->x.lvalue_type == LVALUE_PROTECTED_RANGE
+                                 && (label->u.protected_range_lvalue->vec.type == T_STRING
+                                  || label->u.protected_range_lvalue->vec.type == T_BYTES))
+                                {
+                                    assign_rvalue_no_free(&tmp_label, label);
+                                    rlabel = &tmp_label;
+                                }
+                                else
+                                    rlabel = label;
+                            }
+
                             l = new_case_entry();
                             l->addr =
                               current.code_max - current.code_left - switch_pc;
                             l->line = 1;
 
-                            /* Create the case_list_entry for this case label */
-                            item = NULL;
-                            if (j > 1)
-                                item = get_rvalue(labels + 1, NULL);
-                            if (item != NULL && item->type == T_CLOSURE
-                                             && (item->x.closure_type == F_RANGE +CLOSURE_EFUN
-                                              || item->x.closure_type == F_RANGE +CLOSURE_EFUN +CLOSURE_LWO))
+                            /* Peek at the next entry for a #'[..] */
+                            do
+                            {
+                                struct range_iterator peek_it = label_it;
+                                svalue_t *next_label = peek_it.next_value(&peek_it);
+                                svalue_t *next_rlabel;
+
+                                if (next_label == NULL)
+                                    break;
+
+                                next_rlabel = get_rvalue(next_label, NULL);
+                                if (next_rlabel != NULL
+                                 && next_rlabel->type == T_CLOSURE
+                                 && (next_rlabel->x.closure_type == F_RANGE +CLOSURE_EFUN
+                                  || next_rlabel->x.closure_type == F_RANGE +CLOSURE_EFUN +CLOSURE_LWO))
+                                {
+                                    have_range = true;
+                                    label_it = peek_it;
+                                }
+                            } while (false);
+
+                            if (have_range)
                             {
                                 /* It's a ({<low>, #'[..], <high>}) range */
-                            	
-                                if (j < 2) {
-                                    lambda_error(
-                                      "case label range lacks end\n"
-                                    );
+                                svalue_t *end_label = label_it.next_value(&label_it);
+                                svalue_t *end_rlabel;
+
+                                if (end_label == NULL)
+                                {
+                                    free_svalue(&tmp_label);
+                                    lambda_error("case label range lacks end\n");
                                 }
 
-                                if (labels[0].type != T_NUMBER
-                                 || labels[2].type != T_NUMBER )
+                                end_rlabel = get_rvalue(end_label, NULL);
+                                if (end_rlabel == NULL)
+                                    end_rlabel = end_label;
+
+                                if (rlabel->type != T_NUMBER
+                                 || end_rlabel->type != T_NUMBER)
                                 {
+                                    free_svalue(&tmp_label);
                                     lambda_error(
                                       "case label range must be numeric\n"
                                     );
@@ -3961,17 +3825,15 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                     );
 
                                 some_numeric = MY_TRUE;
-                                l->key = labels->u.number;
+                                l->key = rlabel->u.number;
 
                                 /* Get the upper end of the range */
 
-                                j -= 2;
-                                labels += 2;
-                                if (labels[-2].u.number == labels->u.number)
+                                if (rlabel->u.number == end_rlabel->u.number)
                                     continue;
                                     /* Single entry sufficient */
 
-                                if (labels[-2].u.number > labels->u.number)
+                                if (rlabel->u.number > end_rlabel->u.number)
                                 {
                                     /* <low> > <high>: invalid case */
                                     REUSE_LIST_ENTRY
@@ -3984,14 +3846,14 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                   current.code_max - current.code_left -
                                     switch_pc;
                                 l->line = 0;
-                                l->key = labels->u.number;
+                                l->key = end_rlabel->u.number;
                             }
-                            else if (labels->type == T_STRING || labels->type == T_BYTES)
+                            else if (rlabel->type == T_STRING || rlabel->type == T_BYTES)
                             {
-                            	/* String label: we have to make the string shared
-                            	 * and store it in the value table (to keep the
-                            	 * reference).
-                            	 */
+                                /* String label: we have to make the string shared
+                                 * and store it in the value table (to keep the
+                                 * reference).
+                                 */
 
                                 svalue_t stmp;
 
@@ -4006,19 +3868,20 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                 if (--current.values_left < 0)
                                     realloc_values();
                                 no_string = MY_FALSE;
-                                stmp.type = labels->type;
-                                stmp.u.str = make_tabled_from(labels->u.str);
+                                stmp.type = rlabel->type;
+                                stmp.u.str = make_tabled_from(rlabel->u.str);
                                 *--current.valuep = stmp;
 
                                 l->key = (p_int)stmp.u.str;
                                 free_svalue(&tmp_label);
                             }
-                            else if (labels->type == T_NUMBER)
+                            else if (rlabel->type == T_NUMBER)
                             {
-                            	/* Numeric label, with special treatment of
-                            	 * the label 0.
-                            	 */
-                                if ( 0 != (l->key = labels->u.number) )
+                                /* Numeric label, with special treatment of
+                                 * the label 0.
+                                 */
+                                l->key = rlabel->u.number;
+                                if (rlabel->u.number != 0)
                                 {
                                     if (!no_string)
                                         lambda_error(
@@ -4031,12 +3894,12 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                     zero = l;
                                 }
                             }
-                            else if (labels->type == T_CLOSURE
-                                     && (labels->x.closure_type == F_CSTRING0 +CLOSURE_OPERATOR
-                                      || labels->x.closure_type == F_CSTRING0 +CLOSURE_OPERATOR +CLOSURE_LWO))
+                            else if (rlabel->type == T_CLOSURE
+                                     && (rlabel->x.closure_type == F_CSTRING0 +CLOSURE_OPERATOR
+                                      || rlabel->x.closure_type == F_CSTRING0 +CLOSURE_OPERATOR +CLOSURE_LWO))
                             {
-                            	/* #'default label */
-                            	
+                                /* #'default label */
+
                                 if (default_addr)
                                     lambda_error("duplicate default\n");
                                 default_addr = l->addr;
@@ -4045,32 +3908,41 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                             }
                             else
                             {
-                            	/* Something else - bad wizard! */
+                                /* Something else - bad wizard! */
                                 lambda_error("bad type of case label\n");
                             }
-                        } /* for(j over labels) */
+                        } /* while over labels */
 
                         /* Compile the code block for this case */
-                        argp++;
+                        block = it.next_value(&it);
+                        delim = it.next_value(&it);
+                        rdelim = get_rvalue(delim, NULL);
+                        if (!rdelim)
+                            rdelim = delim;
+
                         opt_used = compile_value(
-                          argp,
-                          (argp[1].x.closure_type == F_POP_VALUE+CLOSURE_OPERATOR ||
-                           argp[1].x.closure_type == F_POP_VALUE+CLOSURE_OPERATOR+CLOSURE_LWO)
+                          block,
+                          (delim->type == T_CLOSURE
+                           && (delim->x.closure_type == F_POP_VALUE+CLOSURE_OPERATOR
+                            || delim->x.closure_type == F_POP_VALUE+CLOSURE_OPERATOR+CLOSURE_LWO))
                           ? VOID_ACCEPTED|REF_ACCEPTED : REF_ACCEPTED
                         );
 
                         /* Check and compile the delimiter #', or #'break */
-                        item = get_rvalue(++argp, NULL);
-                        if (item == NULL)
-                            item = argp;
-
-                        if (item->type != T_CLOSURE
-                         || (   item->x.closure_type != F_BREAK+CLOSURE_OPERATOR
-                             && item->x.closure_type != F_BREAK+CLOSURE_OPERATOR+CLOSURE_LWO
-                             && (!i || (item->x.closure_type != F_POP_VALUE+CLOSURE_OPERATOR
-                                     && item->x.closure_type != F_POP_VALUE+CLOSURE_OPERATOR+CLOSURE_LWO))) )
+                        if (rdelim->type != T_CLOSURE
+                         || (rdelim->x.closure_type != F_BREAK+CLOSURE_OPERATOR
+                          && rdelim->x.closure_type != F_BREAK+CLOSURE_OPERATOR+CLOSURE_LWO
+                          && rdelim->x.closure_type != F_POP_VALUE+CLOSURE_OPERATOR
+                          && rdelim->x.closure_type != F_POP_VALUE+CLOSURE_OPERATOR+CLOSURE_LWO))
                         {
                             lambda_error("Bad delimiter in #'switch\n");
+                        }
+                        else if (rdelim->x.closure_type == F_POP_VALUE+CLOSURE_OPERATOR
+                              || rdelim->x.closure_type == F_POP_VALUE+CLOSURE_OPERATOR+CLOSURE_LWO)
+                        {
+                            struct range_iterator peek_it = it;
+                            if (peek_it.next_value(&peek_it) == NULL)
+                                lambda_error("#', used as last delimiter in #'switch\n");
                         }
 
                         if ( !(opt_used & VOID_GIVEN) )
@@ -4079,7 +3951,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                 realloc_code();
                             current.code_left--;
                             STORE_CODE(current.codep
-                                      , (bytecode_t) item->x.closure_type);
+                                      , (bytecode_t) rdelim->x.closure_type);
                         }
                     } /* for (i = num_blocks) */
 
@@ -4125,7 +3997,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
             {
                 /* Closure is an python-defined efun */
 
-                result_flags = compile_python_efun_call(type, block_size - 1, argp+1, opt_flags);
+                result_flags = compile_python_efun_call(type, &it, opt_flags);
             }
 #endif
             else /* it's an EFUN closure */
@@ -4139,7 +4011,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                   {
                     int i;
 
-                    i = block_size - 2;
+                    i = it.size - 2;
 
                     if ( i > 0 )
                     {
@@ -4152,9 +4024,9 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     	 *   <exprn>
                     	 *   AND
                     	 */
-                        compile_value(++argp, 0);
+                        compile_value(it.next_value(&it), 0);
                         do {
-                            compile_value(++argp, 0);
+                            compile_value(it.next_value(&it), 0);
                             if (current.code_left < 1)
                                 realloc_code();
                             current.code_left--;
@@ -4172,7 +4044,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     	 */
                         if (!(opt_flags & REF_ACCEPTED))
                             lambda_error("Reference value in bad position\n");
-                        compile_lvalue(++argp, PROTECT_LVALUE|ALLOW_FUNCTION_CALL);
+                        compile_lvalue(it.next_value(&it), PROTECT_LVALUE|ALLOW_FUNCTION_CALL);
                         result_flags |= REF_GIVEN;
                     }
                     else
@@ -4188,7 +4060,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                   {
                     int i;
 
-                    i = block_size - 2;
+                    i = it.size - 2;
 
                     if ( i > 0 )
                     {
@@ -4201,9 +4073,9 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     	 *   <exprn>
                     	 *   OR
                     	 */
-                        compile_value(++argp, 0);
+                        compile_value(it.next_value(&it), 0);
                         do {
-                            compile_value(++argp, 0);
+                            compile_value(it.next_value(&it), 0);
                             if (current.code_left < 1)
                                 realloc_code();
                             current.code_left--;
@@ -4223,7 +4095,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                   {
                     int i;
 
-                    i = block_size - 2;
+                    i = it.size - 2;
 
                     if ( i > 0 )
                     {
@@ -4236,9 +4108,9 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                     	 *   <exprn>
                     	 *   OR
                     	 */
-                        compile_value(++argp, 0);
+                        compile_value(it.next_value(&it), 0);
                         do {
-                            compile_value(++argp, 0);
+                            compile_value(it.next_value(&it), 0);
                             if (current.code_left < 1)
                                 realloc_code();
                             current.code_left--;
@@ -4265,10 +4137,10 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                      * omitted and the fact is stored in result_flags:NEGATE_GIVEN.
                      */
 
-                    if (block_size != 2)
+                    if (it.size != 2)
                         lambda_error("Wrong number of arguments to #'!\n");
 
-                    result_flags = compile_value(++argp, opt_flags & ~(ZERO_ACCEPTED|REF_ACCEPTED));
+                    result_flags = compile_value(it.next_value(&it), opt_flags & ~(ZERO_ACCEPTED|REF_ACCEPTED));
                     if (opt_flags & NEGATE_ACCEPTED)
                     {
                         result_flags ^= NEGATE_GIVEN;
@@ -4284,24 +4156,23 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                   }
 
                 default:
-                    result_flags = compile_efun_call(type, block_size - 1, argp+1, opt_flags);
+                    result_flags = compile_efun_call(type, &it, opt_flags);
                     break;
 
                 } /* switch */
-                break;
             }
         } /* if (efun or operator closure) */
         else switch (type) /* type >= CLOSURE_SIMUL_EFUN */
         {
         default: /* SIMUL_EFUN closure */
-            result_flags = compile_sefun_call(type, block_size - 1, argp+1, opt_flags);
+            result_flags = compile_sefun_call(type, &it, opt_flags);
             break;
 
         case CLOSURE_UNBOUND_LAMBDA:
         case CLOSURE_BOUND_LAMBDA:
         case CLOSURE_LAMBDA:
         case CLOSURE_LFUN:
-            result_flags = compile_lambda_call(type, item, block_size - 1, argp+1, opt_flags);
+            result_flags = compile_closure_call(type, rfun, &it, opt_flags);
             break;
 
         case CLOSURE_IDENTIFIER:
@@ -4317,22 +4188,21 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
              * recognize the CLOSURE_IDENTIFIER and act accordingly.
              */
 
-            lambda_t *l;
+            identifier_closure_t *cl = rfun->u.identifier_closure;
 
-            l = item->u.lambda;
-            if (block_size != 1)
+            if (it.size != 1)
                 lambda_error("Argument to variable\n");
 
-            if (!object_svalue_eq(l->ob, current.lambda_origin))
+            if (!object_svalue_eq(cl->base.ob, current.lambda_origin))
             {
-            	/* We need the FUNCALL */
-            	
+                /* We need the FUNCALL */
+
                 if (current.code_left < 1)
                     realloc_code();
                 current.code_left -= 1;
                 STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
 
-                insert_value_push(item);
+                insert_value_push(rfun);
                 if (current.code_left < 3)
                     realloc_code();
                 current.code_left -= 3;
@@ -4342,123 +4212,148 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
             }
             else
             {
-            	/* We can use the IDENTIFIER */
-            	
+                /* We can use the IDENTIFIER */
+
                 if (current.code_left < 2)
                     realloc_code();
                 current.code_left -= 2;
-                if ((short)l->function.var_index < 0)
+                if ((short)cl->var_index < 0)
                     lambda_error("Variable not inherited\n");
                 STORE_CODE(current.codep, F_IDENTIFIER);
-                STORE_CODE(current.codep, (bytecode_t)l->function.var_index);
+                STORE_CODE(current.codep, (bytecode_t)cl->var_index);
             }
             break;
           } /* CLOSURE_IDENTIFIER */
         } /* switch(type) for type >= CLOSURE_SIMUL_EFUN */
-        break;
-      } /* end of case T_POINTER (block compiling code) */
+    }
+    else
+    {
+        svalue_t *rvalue = get_rvalue(value, NULL);
+        if (rvalue == NULL)
+            rvalue = value;
 
-    case T_QUOTED_ARRAY:                  /* ----- T_QUOTED_ARRAY ----- */
-        /* This compiles into the value itself minus one quote.
-         */
-
-        insert_value_push(rvalue);
-        if (!--current.valuep->x.quotes)
-            current.valuep->type = T_POINTER;
-        break;
-
-    case T_SYMBOL:                              /* ----- T_SYMBOL ----- */
-        /* Symbols with more than one quote compile into the value itself
-         * minus one quote.
-         * Symbols with just one quote compile into 'LOCAL <index>'. This may
-         * create the local variable in the first place.
-         */
-
-        if (rvalue->x.quotes > 1)
+        switch (rvalue->type)
         {
-            insert_value_push(rvalue);
-            --current.valuep->x.quotes;
-        }
-        else
-        {
-            /* Make/find the local variable to the symbol name and
-             * compile the LOCAL instruction.
-             */
-            symbol_t *sym;
-
-            sym = make_symbol(rvalue->u.str);
-            if (sym->index < 0)
-                lambda_error("Symbol '%s' not bound\n"
-                            , get_txt(sym->name));
-            if (current.code_left < 2)
-                realloc_code();
-            STORE_CODE(current.codep, F_LOCAL);
-            STORE_CODE(current.codep, (bytecode_t)sym->index);
-            current.code_left -= 2;
-        }
-        break;
-
-    case T_NUMBER:                              /* ----- T_NUMBER ----- */
-      {
-      	/* Number are compiled as optimal as possible:
-      	 *   num == 0: CONST0
-      	 *       == 1: CONST1
-      	 *   1 < num < 0x100: CLIT <num>
-      	 *   -0x100 < num < 0: NCLIT -<num>
-      	 *
-      	 * Other numbers are compiled as normal values.
-      	 */
-      	
-        mp_int i;
-
-        i = rvalue->u.number;
-        if (i <= -0x100 || i >= 0x100)
-        {
-            insert_value_push(value);
-        }
-        else if (i >= 0)
-        {
-            if (current.code_left < 2)
-                realloc_code();
-            if (!i)
+            case T_LVALUE:
             {
-                if (opt_flags & (VOID_ACCEPTED|ZERO_ACCEPTED))
+                /* Can only be a string or bytes range, otherwise
+                 * we would have gotten an iterator or rvalue.
+                 */
+                svalue_t tmp;
+                struct protected_range_lvalue* r = rvalue->u.protected_range_lvalue;
+
+                assert(rvalue->x.lvalue_type == LVALUE_PROTECTED_RANGE);
+                assert(r->vec.type == T_STRING || r->vec.type == T_BYTES);
+
+                /* Put the substring into the result. */
+                assign_rvalue_no_free(&tmp, rvalue);
+                insert_value_push(&tmp);
+                free_svalue(&tmp);
+                break;
+            }
+
+            case T_QUOTED_ARRAY:
+                /* This compiles into the value itself minus one quote.
+                 */
+
+                insert_value_push(rvalue);
+                if (!--current.valuep->x.quotes)
+                    current.valuep->type = T_POINTER;
+                break;
+
+            case T_SYMBOL:
+                /* Symbols with more than one quote compile into the value itself
+                 * minus one quote.
+                 * Symbols with just one quote compile into 'LOCAL <index>'. This may
+                 * create the local variable in the first place.
+                 */
+
+                if (rvalue->x.quotes > 1)
                 {
-                    /* The caller doesn't really need a value */
-                    result_flags = VOID_GIVEN;
+                    insert_value_push(rvalue);
+                    --current.valuep->x.quotes;
+                }
+                else
+                {
+                    /* Make/find the local variable to the symbol name and
+                     * compile the LOCAL instruction.
+                     */
+                    symbol_t *sym;
+
+                    sym = make_symbol(rvalue->u.str);
+                    if (sym->index < 0)
+                        lambda_error("Symbol '%s' not bound\n"
+                                    , get_txt(sym->name));
+                    if (current.code_left < 2)
+                        realloc_code();
+                    STORE_CODE(current.codep, F_LOCAL);
+                    STORE_CODE(current.codep, (bytecode_t)sym->index);
+                    current.code_left -= 2;
+                }
+                break;
+
+            case T_NUMBER:
+            {
+                /* Number are compiled as optimal as possible:
+                 *   num == 0: CONST0
+                 *       == 1: CONST1
+                 *   1 < num < 0x100: CLIT <num>
+                 *   -0x100 < num < 0: NCLIT -<num>
+                 *
+                 * Other numbers are compiled as normal values.
+                 */
+
+                mp_int i;
+
+                i = rvalue->u.number;
+                if (i <= -0x100 || i >= 0x100)
+                {
+                    insert_value_push(rvalue);
+                }
+                else if (i >= 0)
+                {
+                    if (current.code_left < 2)
+                        realloc_code();
+                    if (!i)
+                    {
+                        if (opt_flags & (VOID_ACCEPTED|ZERO_ACCEPTED))
+                        {
+                            /* The caller doesn't really need a value */
+                            result_flags = VOID_GIVEN;
+                            break;
+                        }
+                        STORE_CODE(current.codep, F_CONST0);
+                        current.code_left--;
+                        break;
+                    }
+                    else if (i == 1)
+                    {
+                        STORE_CODE(current.codep, F_CONST1);
+                        current.code_left--;
+                        break;
+                    }
+                    STORE_CODE(current.codep, F_CLIT);
+                    STORE_UINT8(current.codep, (unsigned char)i);
+                    current.code_left -= 2;
                     break;
                 }
-                STORE_CODE(current.codep, F_CONST0);
-                current.code_left--;
+                else /* -0x100 < i < 0 */
+                {
+                    if (current.code_left < 2)
+                        realloc_code();
+                    STORE_CODE(current.codep, F_NCLIT);
+                    STORE_UINT8(current.codep, (unsigned char)(-i));
+                    current.code_left -= 2;
+                    break;
+                }
                 break;
             }
-            else if (i == 1)
-            {
-                STORE_CODE(current.codep, F_CONST1);
-                current.code_left--;
-                break;
-            }
-            STORE_CODE(current.codep, F_CLIT);
-            STORE_UINT8(current.codep, (unsigned char)i);
-            current.code_left -= 2;
-            break;
-        }
-        else /* -0x100 < i < 0 */
-        {
-            if (current.code_left < 2)
-                realloc_code();
-            STORE_CODE(current.codep, F_NCLIT);
-            STORE_UINT8(current.codep, (unsigned char)(-i));
-            current.code_left -= 2;
-            break;
-        }
-        break;
-      }
 
-    default:                                 /* ----- other value ----- */
-        /* Generate a LAMBDA_(C)CONSTANT for this value. */
-        insert_value_push(rvalue);
-        break;
+            default:
+                /* Generate a LAMBDA_(C)CONSTANT for this value. */
+                insert_value_push(rvalue);
+                break;
+        }
     }
 
     /* Finish up */
@@ -4469,7 +4364,7 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
 
 /*-------------------------------------------------------------------------*/
 static int
-compile_efun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags)
+compile_efun_call (ph_int type, struct range_iterator *args_it, enum compile_value_input_flags opt_flags)
 
 /* Compile a generic efun call.
  */
@@ -4489,10 +4384,10 @@ compile_efun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_val
 
     enum compile_value_output_flags result_flags = 0;
 
-    mp_int i;
     bytecode_p p;
     int f;
     Bool needs_ap;
+    mp_int num_arg;
     mp_int min;
     mp_int max;
     mp_int def;
@@ -4526,7 +4421,8 @@ compile_efun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_val
     }
 
     /* Compile the arguments */
-    for (i = num_arg; --i >= 0; )
+    num_arg = 0;
+    for (svalue_t *arg; (arg = args_it->next_value(args_it)) != NULL;)
     {
         typeflags_t flags = 0;
         if (remaining != 0)
@@ -4546,9 +4442,10 @@ compile_efun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_val
         }
 
         if (flags & TYPE_MOD_LVALUE)
-            compile_lvalue(argp++, PROTECT_LVALUE);
+            compile_lvalue(arg, PROTECT_LVALUE);
         else
-            compile_value(argp++, REF_ACCEPTED);
+            compile_value(arg, REF_ACCEPTED);
+        num_arg++;
     }
 
     /* Get the instruction and check if it received the
@@ -4661,7 +4558,7 @@ compile_efun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_val
 #ifdef USE_PYTHON
 /*-------------------------------------------------------------------------*/
 static int
-compile_python_efun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags)
+compile_python_efun_call (ph_int type, struct range_iterator *args_it, enum compile_value_input_flags opt_flags)
 
 /* Compile a python efun call.
  */
@@ -4687,8 +4584,8 @@ compile_python_efun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum comp
     current.code_left--;
 
     /* Compile the arguments */
-    for (int i = num_arg; --i >= 0; )
-        compile_value(argp++, REF_ACCEPTED);
+    for (svalue_t *arg; (arg = args_it->next_value(args_it)) != NULL;)
+        compile_value(arg, REF_ACCEPTED);
 
     if (current.code_left < 5)
         realloc_code();
@@ -4709,7 +4606,7 @@ compile_python_efun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum comp
 
 /*-------------------------------------------------------------------------*/
 static int
-compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags)
+compile_sefun_call (ph_int type, struct range_iterator *args_it, enum compile_value_input_flags opt_flags)
 
 /* Compile a simul-efun call.
  */
@@ -4731,6 +4628,7 @@ compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_va
     int simul_efun = type - CLOSURE_SIMUL_EFUN;
     function_t *funp = &simul_efun_table[simul_efun].function;
     bool needs_ap = false;
+    mp_int num_arg = args_it->size - 1;
 
     assert(simul_efun != I_GLOBAL_SEFUN_BY_NAME);
     assert(simul_efun < SEFUN_TABLE_SIZE);
@@ -4773,10 +4671,8 @@ compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_va
 
     /* Compile the arguments */
 
-    for (int i = num_arg; --i >= 0; )
-    {
-        compile_value(argp++, REF_ACCEPTED);
-    }
+    for (svalue_t *arg; (arg = args_it->next_value(args_it)) != NULL;)
+        compile_value(arg, REF_ACCEPTED);
 
     /* and the simul-efun instruction */
 
@@ -4819,7 +4715,7 @@ compile_sefun_call (ph_int type, mp_int num_arg, svalue_t *argp, enum compile_va
 
 /*-------------------------------------------------------------------------*/
 static int
-compile_lambda_call (ph_int type, svalue_t* closure, mp_int num_arg, svalue_t *argp, enum compile_value_input_flags opt_flags)
+compile_closure_call (ph_int type, svalue_t* closure, struct range_iterator *args_it, enum compile_value_input_flags opt_flags)
 {
     /* This is compiled as
      *   alien-lfun:             local lfun:
@@ -4837,12 +4733,10 @@ compile_lambda_call (ph_int type, svalue_t* closure, mp_int num_arg, svalue_t *a
      * closures are compiled similar to alien lfuns using
      * F_CALL_CLOSURE.
      */
+    closure_base_t *cl = closure->u.closure;
 
-    lambda_t *l;
-
-    l = closure->u.lambda;
-    if ((type != CLOSURE_UNBOUND_LAMBDA && !object_svalue_eq(l->ob, current.lambda_origin))
-     || (type == CLOSURE_LFUN && !object_svalue_eq(l->ob, l->function.lfun.ob))
+    if ((type != CLOSURE_UNBOUND_LAMBDA && !object_svalue_eq(cl->ob, current.lambda_origin))
+     || (type == CLOSURE_LFUN && !object_svalue_eq(cl->ob, closure->u.lfun_closure->fun_ob))
        )
     {
         /* Compile it like an alien lfun */
@@ -4853,10 +4747,8 @@ compile_lambda_call (ph_int type, svalue_t* closure, mp_int num_arg, svalue_t *a
         STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
 
         insert_value_push(closure); /* Push the closure */
-        for (mp_int i = num_arg; i--; )
-        {
-            compile_value(argp++, REF_ACCEPTED);
-        }
+        for (svalue_t *arg; (arg = args_it->next_value(args_it)) != NULL;)
+            compile_value(arg, REF_ACCEPTED);
         if (current.code_left < 3)
             realloc_code();
         current.code_left -= 3;
@@ -4871,8 +4763,8 @@ compile_lambda_call (ph_int type, svalue_t* closure, mp_int num_arg, svalue_t *a
         }
     }
     else if (type != CLOSURE_LFUN
-     || l->function.lfun.inhProg
-     || l->function.lfun.context_size
+     || closure->u.lfun_closure->inhProg
+     || closure->u.lfun_closure->context_size
        )
     {
         /* Compile it using F_CALL_CLOSURE. */
@@ -4883,10 +4775,8 @@ compile_lambda_call (ph_int type, svalue_t* closure, mp_int num_arg, svalue_t *a
         STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
 
         insert_value_push(closure); /* Push the closure */
-        for (mp_int i = num_arg; i--; )
-        {
-            compile_value(argp++, REF_ACCEPTED);
-        }
+        for (svalue_t *arg; (arg = args_it->next_value(args_it)) != NULL;)
+            compile_value(arg, REF_ACCEPTED);
         if (current.code_left < 4)
             realloc_code();
         current.code_left -= 3;
@@ -4902,22 +4792,21 @@ compile_lambda_call (ph_int type, svalue_t* closure, mp_int num_arg, svalue_t *a
     else
     {
         /* Intra-object call: we can call by address */
+        mp_int num_arg = 0;
 
         if (current.code_left < 1)
             realloc_code();
         current.code_left -= 1;
         STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
 
-        for (mp_int i = num_arg; i--; )
-        {
-            compile_value(argp++, REF_ACCEPTED);
-        }
+        for (svalue_t *arg; (arg = args_it->next_value(args_it)) != NULL; num_arg++)
+            compile_value(arg, REF_ACCEPTED);
 
         if (current.code_left < 7)
             realloc_code();
 
         STORE_CODE(current.codep, F_CALL_FUNCTION);
-        STORE_SHORT(current.codep, l->function.lfun.index);
+        STORE_SHORT(current.codep, closure->u.lfun_closure->fun_index);
         STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
 
         current.code_left -= 4;
@@ -4933,7 +4822,7 @@ compile_lambda_call (ph_int type, svalue_t* closure, mp_int num_arg, svalue_t *a
     }
 
     return 0;
-} /* compile_lambda_call */
+} /* compile_closure_call */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -4946,46 +4835,22 @@ is_lvalue (svalue_t *argp, int flags)
  */
 
 {
-    svalue_t *item = get_rvalue(argp, NULL);
-    struct protected_range_lvalue* r = NULL;
-    if (item == NULL)
-    {
-        r = argp->u.protected_range_lvalue;
-        item = &(r->vec);
-    }
+    struct range_iterator it;
 
-    switch(item->type)
+    if (get_iterator(argp, &it, true))
     {
-    case T_SYMBOL:
-        return item->x.quotes == 1;
-
-    case T_POINTER:
-      {
-        vector_t *block;
-        p_int size;
+        svalue_t *fun = it.next_value(&it);
+        svalue_t *rfun;
         int type;
 
-        block = item->u.vec;
+        if (fun == NULL)
+            return MY_FALSE;
 
-        if (r != NULL)
-        {
-            size = r->index2 - r->index1;
-            argp = block->item + r->index1;
-        }
-        else
-        {
-            size = VEC_SIZE(block);
-            argp = block->item;
-        }
+        rfun = get_rvalue(fun, NULL);
+        if (rfun == NULL || rfun->type != T_CLOSURE)
+            return MY_FALSE;
 
-        if (size < 1)
-            break;
-
-        argp = get_rvalue(argp, NULL);
-        if (argp == NULL || argp->type != T_CLOSURE)
-            break;
-
-        type = argp->x.closure_type;
+        type = rfun->x.closure_type;
         if (type < CLOSURE_LWO)
             type -= CLOSURE_LWO;
 
@@ -5003,7 +4868,7 @@ is_lvalue (svalue_t *argp, int flags)
           case F_S_INDEX +CLOSURE_EFUN:
           case F_SX_INDEX +CLOSURE_EFUN:
           case CLOSURE_IDENTIFIER:
-            if (size != 3)
+            if (it.size != 3)
                 break;
             return MY_TRUE;
 
@@ -5016,21 +4881,53 @@ is_lvalue (svalue_t *argp, int flags)
           case F_RA_RANGE +CLOSURE_EFUN:
           case F_AR_RANGE +CLOSURE_EFUN:
           case F_AA_RANGE +CLOSURE_EFUN:
+          case F_MAP_NX_RANGE +CLOSURE_EFUN:
+          case F_MAP_RX_RANGE +CLOSURE_EFUN:
+          case F_MAP_AX_RANGE +CLOSURE_EFUN:
             if (flags & MAKE_VAR_LVALUE)
                break;
             /* Fallthrough */
           case F_MAP_INDEX +CLOSURE_EFUN:
-            if (size != 4)
+          case F_MAP_RINDEX +CLOSURE_EFUN:
+          case F_MAP_AINDEX +CLOSURE_EFUN:
+            if (it.size != 4)
+                break;
+            return MY_TRUE;
+
+          case F_MAP_RANGE    +CLOSURE_EFUN:
+          case F_MAP_NR_RANGE +CLOSURE_EFUN:
+          case F_MAP_RN_RANGE +CLOSURE_EFUN:
+          case F_MAP_RR_RANGE +CLOSURE_EFUN:
+          case F_MAP_NA_RANGE +CLOSURE_EFUN:
+          case F_MAP_AN_RANGE +CLOSURE_EFUN:
+          case F_MAP_RA_RANGE +CLOSURE_EFUN:
+          case F_MAP_AR_RANGE +CLOSURE_EFUN:
+          case F_MAP_AA_RANGE +CLOSURE_EFUN:
+            if (flags & MAKE_VAR_LVALUE)
+               break;
+            if (it.size != 5)
                 break;
             return MY_TRUE;
         }
-        break;
-      }
+    }
+    else
+    {
+        /* A single value. */
+        svalue_t *item = get_rvalue(argp, NULL);
 
-    case T_CLOSURE:
-        if (item->x.closure_type == CLOSURE_IDENTIFIER)
-            return MY_TRUE;
-        break;
+        if (item == NULL)
+            return MY_FALSE; /* string or byte range. */
+
+        switch (item->type)
+        {
+            case T_SYMBOL:
+                return item->x.quotes == 1;
+
+            case T_CLOSURE:
+                if (item->x.closure_type == CLOSURE_IDENTIFIER)
+                    return MY_TRUE;
+                break;
+        }
     }
 
      /* Default: it's not. */
@@ -5047,13 +4944,7 @@ compile_lvalue (svalue_t *argp, int flags)
  */
 
 {
-    svalue_t *item = get_rvalue(argp, NULL);
-    struct protected_range_lvalue* r = NULL;
-    if (item == NULL)
-    {
-        r = argp->u.protected_range_lvalue;
-        item = &(r->vec);
-    }
+    struct range_iterator it;
 
     /* These 3 flags are exclusive. */
     assert(((flags & PROTECT_LVALUE)?1:0) + ((flags & MAKE_VAR_LVALUE)?1:0) + ((flags & RESEATING_ACCEPTED)?1:0) <= 1);
@@ -5061,77 +4952,31 @@ compile_lvalue (svalue_t *argp, int flags)
     /* Function calls only allowed with PROTECT_LVALUE. */
     assert(!(flags & ALLOW_FUNCTION_CALL) || (flags & PROTECT_LVALUE));
 
-    switch(item->type)
+    if (get_iterator(argp, &it, true))
     {
+        /* ({ indexing operation })
+         */
 
-    /* 'a: Symbol of a local variable.
-     */
-    case T_SYMBOL:
-      /* This compiles to:
-       *
-       *   PUSH_LOCAL_VARIABLE_LVALUE <index>
-       */
+        svalue_t *fun;          /* Pointer to the first element. */
+        svalue_t *cl;           /* The rvalue of fun. */
+        ph_int type;
+        bool is_struct = false;
 
-      {
-        symbol_t *sym;
+        fun = it.next_value(&it);
 
-        if (item->x.quotes > 1)
-            break;
+        /* The first value must be a closure */
+        if (it.size == 0 || fun == NULL)
+            lambda_error("Missing function\n");
 
-        /* Find (or create) the variable for this symbol */
-        sym = make_symbol(item->u.str);
-        if (sym->index < 0)
+        cl = get_rvalue(fun, NULL);
+        if (cl == NULL || cl->type != T_CLOSURE)
+            lambda_error("Missing function\n");
+
+        type = cl->x.closure_type;
+        if (type < CLOSURE_LWO)
+            type -= CLOSURE_LWO;
+        switch (type)
         {
-            sym->index = current.num_locals++;
-            if (current.num_locals > MAX_LOCAL)
-              lambda_error("Too many symbols.\n");
-        }
-
-        if (current.code_left < 4)
-            realloc_code();
-        current.code_left -= 2;
-        STORE_CODE(current.codep, (flags & MAKE_VAR_LVALUE) ? F_PUSH_LOCAL_VARIABLE_VLVALUE : F_PUSH_LOCAL_VARIABLE_LVALUE);
-        STORE_UINT8(current.codep, (bytecode_t)sym->index);
-
-        if (flags & PROTECT_LVALUE)
-        {
-            current.code_left--;
-            STORE_CODE(current.codep, F_MAKE_PROTECTED);
-        }
-        return;
-      }
-
-    /* ({ indexing operation })
-     */
-    case T_POINTER:
-      {
-        argp = item->u.vec->item;
-        p_int size;
-
-        if (r != NULL)
-        {
-            size = r->index2 - r->index1;
-            argp += r->index1;
-        }
-        else
-        {
-            size = VEC_SIZE(item->u.vec);
-        }
-
-        if (size != 0)
-        {
-            bool is_struct = false;
-            ph_int type;
-
-            svalue_t *cl = get_rvalue(argp, NULL);
-            if (cl == NULL || cl->type != T_CLOSURE)
-                break;
-
-            type = cl->x.closure_type;
-            if (type < CLOSURE_LWO)
-                type -= CLOSURE_LWO;
-            switch (type)
-            {
 
             /* ({ #'[, map|array, index [, index] })
              * ({ #'[<, map|array, index })
@@ -5146,7 +4991,7 @@ compile_lvalue (svalue_t *argp, int flags)
             case F_RINDEX+CLOSURE_EFUN:
             case F_AINDEX+CLOSURE_EFUN:
 
-                if (size == 3)
+                if (it.size == 3)
                 {
                     /* Indexing of an array or normal mapping.
                      */
@@ -5154,12 +4999,13 @@ compile_lvalue (svalue_t *argp, int flags)
                     /* If it is a string, we need an lvalue,
                      * but we can't really differentiate here.
                      */
-                    if (!is_struct && is_lvalue(argp+1, 0))
-                        compile_lvalue(argp+1, PROTECT_LVALUE);
+                    svalue_t *vec = it.next_value(&it);
+                    if (!is_struct && is_lvalue(vec, 0))
+                        compile_lvalue(vec, PROTECT_LVALUE);
                     else
-                        compile_value(argp+1, 0);
+                        compile_value(vec, 0);
 
-                    compile_value(argp+2, 0);
+                    compile_value(it.next_value(&it), 0);
 
                     if (current.code_left < 3)
                         realloc_code();
@@ -5203,16 +5049,16 @@ compile_lvalue (svalue_t *argp, int flags)
                         STORE_CODE(current.codep, F_MAKE_PROTECTED);
                     }
                     return;
-                } /* if (size == 3) */
+                } /* if (it.size == 3) */
 
-                if (size == 4
+                if (it.size == 4
                  && type == F_INDEX +CLOSURE_EFUN)
                 {
                     /* Indexing of a wide mapping.
                      */
-                    compile_value(argp+1, 0);
-                    compile_value(argp+2, 0);
-                    compile_value(argp+3, 0);
+                    compile_value(it.next_value(&it), 0);
+                    compile_value(it.next_value(&it), 0);
+                    compile_value(it.next_value(&it), 0);
 
                     if (current.code_left < 2)
                         realloc_code();
@@ -5230,15 +5076,15 @@ compile_lvalue (svalue_t *argp, int flags)
                 /* Otherwise: raise an error */
                 break;
 
-            /* ({#'[..], map/array, index, index })
-             * ({#'[..<], map/array, index, index })
-             * ({#'[<..], map/array, index, index })
-             * ({#'[<..<], map/array, index, index })
-             * ({#'[..>], map/array, index, index })
-             * ({#'[>..], map/array, index, index })
-             * ({#'[<..>], map/array, index, index })
-             * ({#'[>..<], map/array, index, index })
-             * ({#'[>..>], map/array, index, index })
+            /* ({#'[..],   array, index, index })
+             * ({#'[..<],  array, index, index })
+             * ({#'[<..],  array, index, index })
+             * ({#'[<..<], array, index, index })
+             * ({#'[..>],  array, index, index })
+             * ({#'[>..],  array, index, index })
+             * ({#'[<..>], array, index, index })
+             * ({#'[>..<], array, index, index })
+             * ({#'[>..>], array, index, index })
              */
             case F_RANGE    +CLOSURE_EFUN:
             case F_NR_RANGE +CLOSURE_EFUN:
@@ -5249,13 +5095,13 @@ compile_lvalue (svalue_t *argp, int flags)
             case F_RA_RANGE +CLOSURE_EFUN:
             case F_AR_RANGE +CLOSURE_EFUN:
             case F_AA_RANGE +CLOSURE_EFUN:
-              {
+            {
                 int code;
 
                 if (flags & MAKE_VAR_LVALUE)
                     break;
 
-                if (size != 4)
+                if (it.size != 4)
                     break;
 
                 code = F_ILLEGAL;
@@ -5290,9 +5136,9 @@ compile_lvalue (svalue_t *argp, int flags)
                     break;
                 }
 
-                compile_lvalue(++argp, PROTECT_LVALUE);
-                compile_value(++argp, 0);
-                compile_value(++argp, 0);
+                compile_lvalue(it.next_value(&it), PROTECT_LVALUE);
+                compile_value(it.next_value(&it), 0);
+                compile_value(it.next_value(&it), 0);
 
                 if (current.code_left < 2)
                     realloc_code();
@@ -5305,7 +5151,7 @@ compile_lvalue (svalue_t *argp, int flags)
                     STORE_CODE(current.codep, F_MAKE_PROTECTED);
                 }
                 return;
-              }
+            }
 
             /* ({#'[.., array, index })
              * ({#'[<.., array, index })
@@ -5314,13 +5160,13 @@ compile_lvalue (svalue_t *argp, int flags)
             case F_NX_RANGE +CLOSURE_EFUN:
             case F_RX_RANGE +CLOSURE_EFUN:
             case F_AX_RANGE +CLOSURE_EFUN:
-              {
+            {
                 int code;
 
                 if (flags & MAKE_VAR_LVALUE)
                     break;
 
-                if (size != 3)
+                if (it.size != 3)
                     break;
 
                 code = F_ILLEGAL;
@@ -5337,8 +5183,8 @@ compile_lvalue (svalue_t *argp, int flags)
                     break;
                 }
 
-                compile_lvalue(++argp, PROTECT_LVALUE);
-                compile_value(++argp, 0);
+                compile_lvalue(it.next_value(&it), PROTECT_LVALUE);
+                compile_value(it.next_value(&it), 0);
 
                 if (current.code_left < 2)
                     realloc_code();
@@ -5351,23 +5197,43 @@ compile_lvalue (svalue_t *argp, int flags)
                     STORE_CODE(current.codep, F_MAKE_PROTECTED);
                 }
                 return;
-              }
+            }
 
-            /* ({ #'[, mapping, index [,index] })
+            /* ({ #'[,], mapping, index, index })
+             * ({ #'[,<], mapping, index, index })
+             * ({ #'[,>], mapping, index, index })
              */
-            case F_MAP_INDEX +CLOSURE_EFUN:
-                if (size != 4)
+            case F_MAP_INDEX  +CLOSURE_EFUN:
+            case F_MAP_RINDEX +CLOSURE_EFUN:
+            case F_MAP_AINDEX +CLOSURE_EFUN:
+            {
+                int code = F_ILLEGAL;
+
+                if (it.size != 4)
                     break;
 
-                compile_value(++argp, 0);
-                compile_value(++argp, 0);
-                compile_value(++argp, 0);
+                switch(type)
+                {
+                    case F_MAP_INDEX+CLOSURE_EFUN:
+                        code = (flags & MAKE_VAR_LVALUE) ? F_MAP_INDEX_VLVALUE : F_MAP_INDEX_LVALUE;
+                        break;
+                    case F_MAP_RINDEX+CLOSURE_EFUN:
+                        code = (flags & MAKE_VAR_LVALUE) ? F_MAP_RINDEX_VLVALUE : F_MAP_RINDEX_LVALUE;
+                        break;
+                    case F_MAP_AINDEX+CLOSURE_EFUN:
+                        code = (flags & MAKE_VAR_LVALUE) ? F_MAP_AINDEX_VLVALUE : F_MAP_AINDEX_LVALUE;
+                        break;
+                }
+
+                compile_value(it.next_value(&it), 0);
+                compile_value(it.next_value(&it), 0);
+                compile_value(it.next_value(&it), 0);
 
                 if (current.code_left < 2)
                     realloc_code();
 
                 current.code_left--;
-                STORE_CODE(current.codep, (flags & MAKE_VAR_LVALUE) ? F_MAP_INDEX_VLVALUE : F_MAP_INDEX_LVALUE);
+                STORE_CODE(current.codep, code);
 
                 if (flags & PROTECT_LVALUE)
                 {
@@ -5375,6 +5241,132 @@ compile_lvalue (svalue_t *argp, int flags)
                     STORE_CODE(current.codep, F_MAKE_PROTECTED);
                 }
                 return;
+            }
+
+            /* ({#'[,..],   map, key, index, index })
+             * ({#'[,..<],  map, key, index, index })
+             * ({#'[,<..],  map, key, index, index })
+             * ({#'[,<..<], map, key, index, index })
+             * ({#'[,..>],  map, key, index, index })
+             * ({#'[,>..],  map, key, index, index })
+             * ({#'[,<..>], map, key, index, index })
+             * ({#'[,>..<], map, key, index, index })
+             * ({#'[,>..>], map, key, index, index })
+             */
+            case F_MAP_RANGE    +CLOSURE_EFUN:
+            case F_MAP_NR_RANGE +CLOSURE_EFUN:
+            case F_MAP_RN_RANGE +CLOSURE_EFUN:
+            case F_MAP_RR_RANGE +CLOSURE_EFUN:
+            case F_MAP_NA_RANGE +CLOSURE_EFUN:
+            case F_MAP_AN_RANGE +CLOSURE_EFUN:
+            case F_MAP_RA_RANGE +CLOSURE_EFUN:
+            case F_MAP_AR_RANGE +CLOSURE_EFUN:
+            case F_MAP_AA_RANGE +CLOSURE_EFUN:
+            {
+                int code;
+
+                if (flags & MAKE_VAR_LVALUE)
+                    break;
+
+                if (it.size != 5)
+                    break;
+
+                code = F_ILLEGAL;
+                switch(type)
+                {
+                    case F_MAP_RANGE+CLOSURE_EFUN:
+                        code = F_MAP_RANGE_LVALUE;
+                        break;
+                    case F_MAP_NR_RANGE+CLOSURE_EFUN:
+                        code = F_MAP_NR_RANGE_LVALUE;
+                        break;
+                    case F_MAP_RN_RANGE+CLOSURE_EFUN:
+                        code = F_MAP_RN_RANGE_LVALUE;
+                        break;
+                    case F_MAP_RR_RANGE+CLOSURE_EFUN:
+                        code = F_MAP_RR_RANGE_LVALUE;
+                        break;
+                    case F_MAP_NA_RANGE+CLOSURE_EFUN:
+                        code = F_MAP_NA_RANGE_LVALUE;
+                        break;
+                    case F_MAP_AN_RANGE+CLOSURE_EFUN:
+                        code = F_MAP_AN_RANGE_LVALUE;
+                        break;
+                    case F_MAP_RA_RANGE+CLOSURE_EFUN:
+                        code = F_MAP_RA_RANGE_LVALUE;
+                        break;
+                    case F_MAP_AR_RANGE+CLOSURE_EFUN:
+                        code = F_MAP_AR_RANGE_LVALUE;
+                        break;
+                    case F_MAP_AA_RANGE+CLOSURE_EFUN:
+                        code = F_MAP_AA_RANGE_LVALUE;
+                        break;
+                }
+
+                compile_value(it.next_value(&it), 0);
+                compile_value(it.next_value(&it), 0);
+                compile_value(it.next_value(&it), 0);
+                compile_value(it.next_value(&it), 0);
+
+                if (current.code_left < 2)
+                    realloc_code();
+                current.code_left--;
+                STORE_CODE(current.codep, (bytecode_t)code);
+
+                if (flags & PROTECT_LVALUE)
+                {
+                    current.code_left--;
+                    STORE_CODE(current.codep, F_MAKE_PROTECTED);
+                }
+                return;
+            }
+
+            /* ({#'[,..,  map, key, index })
+             * ({#'[,<.., map, key, index })
+             * ({#'[,>.., map, key, index })
+             */
+            case F_MAP_NX_RANGE +CLOSURE_EFUN:
+            case F_MAP_RX_RANGE +CLOSURE_EFUN:
+            case F_MAP_AX_RANGE +CLOSURE_EFUN:
+            {
+                int code;
+
+                if (flags & MAKE_VAR_LVALUE)
+                    break;
+
+                if (it.size != 4)
+                    break;
+
+                code = F_ILLEGAL;
+                switch(type)
+                {
+                    case F_MAP_NX_RANGE+CLOSURE_EFUN:
+                        code = F_MAP_NX_RANGE_LVALUE;
+                        break;
+                    case F_MAP_RX_RANGE+CLOSURE_EFUN:
+                        code = F_MAP_RX_RANGE_LVALUE;
+                        break;
+                    case F_MAP_AX_RANGE+CLOSURE_EFUN:
+                        code = F_MAP_AX_RANGE_LVALUE;
+                        break;
+                }
+
+                compile_value(it.next_value(&it), 0);
+                compile_value(it.next_value(&it), 0);
+                compile_value(it.next_value(&it), 0);
+
+                if (current.code_left < 2)
+                    realloc_code();
+                current.code_left--;
+                STORE_CODE(current.codep, (bytecode_t)code);
+
+                if (flags & PROTECT_LVALUE)
+                {
+                    current.code_left--;
+                    STORE_CODE(current.codep, F_MAKE_PROTECTED);
+                }
+                return;
+            }
 
             /* ({ #'&, lvalue })
              */
@@ -5382,22 +5374,20 @@ compile_lvalue (svalue_t *argp, int flags)
                 if (!(flags & RESEATING_ACCEPTED))
                     break;
 
-                if (size != 2)
+                if (it.size != 2)
                     break;
 
-                compile_lvalue(++argp, MAKE_VAR_LVALUE);
+                compile_lvalue(it.next_value(&it), MAKE_VAR_LVALUE);
                 return;
 
             /* ({ #'global_var })
              */
             case CLOSURE_IDENTIFIER:
-              {
-                if (size != 1)
+                if (it.size != 1)
                     break;
 
                 compile_lvalue(cl, flags);
                 return;
-              }
 
             case CLOSURE_UNBOUND_LAMBDA:
             case CLOSURE_BOUND_LAMBDA:
@@ -5405,7 +5395,7 @@ compile_lvalue (svalue_t *argp, int flags)
             case CLOSURE_LFUN:
                 if (flags & ALLOW_FUNCTION_CALL)
                 {
-                    compile_lambda_call(type, cl, (mp_int)size - 1, argp+1, LEAVE_LVALUE);
+                    compile_closure_call(type, cl, &it, LEAVE_LVALUE);
                     return;
                 }
                 break;
@@ -5422,7 +5412,7 @@ compile_lvalue (svalue_t *argp, int flags)
 #ifdef USE_PYTHON
                     else if (type < (ph_int)CLOSURE_EFUN)       /* Python Efun closure. */
                     {
-                        compile_python_efun_call(type, (mp_int)size - 1, argp+1, LEAVE_LVALUE);
+                        compile_python_efun_call(type, &it, LEAVE_LVALUE);
                         return;
                     }
 #endif
@@ -5432,54 +5422,95 @@ compile_lvalue (svalue_t *argp, int flags)
                         if (!instrs[type - CLOSURE_EFUN].might_return_lvalue)
                             break;
 
-                        compile_efun_call(type, (mp_int)size - 1, argp+1, LEAVE_LVALUE);
+                        compile_efun_call(type, &it, LEAVE_LVALUE);
                         return;
                     }
                     else if (type < (ph_int)CLOSURE_LFUN)       /* Simul-Efun closure. */
                     {
-                        compile_sefun_call(type, (mp_int)size - 1, argp+1, LEAVE_LVALUE);
+                        compile_sefun_call(type, &it, LEAVE_LVALUE);
                         return;
                     }
                 }
                 break;
-            } /* switch(closure_type) */
-        }
-        break;
-      } /* case T_POINTER */
+        } /* switch(closure_type) */
+    }
+    else
+    {
+        svalue_t *item = get_rvalue(argp, NULL);
+        if (item == NULL)
+            item = argp;
 
-    /* precomputed closure: only identifiers in this object are allowed
-     */
-    case T_CLOSURE:
-      {
-        switch (item->x.closure_type)
+        switch (item->type)
         {
-        case CLOSURE_IDENTIFIER:
-          {
-            lambda_t *l;
-
-            l = item->u.lambda;
-            if (!object_svalue_eq(l->ob, current.lambda_origin))
-                break;
-            if (current.code_left < 4)
-                realloc_code();
-            current.code_left -= 2;
-            if ((short)l->function.var_index < 0)
-                lambda_error("Variable not inherited\n");
-            STORE_CODE(current.codep, (flags & MAKE_VAR_LVALUE) ? F_PUSH_IDENTIFIER_VLVALUE : F_PUSH_IDENTIFIER_LVALUE);
-            STORE_CODE(current.codep, (bytecode_t)(l->function.var_index));
-
-            if (flags & PROTECT_LVALUE)
+            /* 'a: Symbol of a local variable.
+             */
+            case T_SYMBOL:
             {
-                current.code_left--;
-                STORE_CODE(current.codep, F_MAKE_PROTECTED);
-            }
-            return;
-          }
-        }
-        break;
-      }
+                /* This compiles to:
+                 *
+                 *   PUSH_LOCAL_VARIABLE_LVALUE <index>
+                 */
 
-    } /* switch(item->type) */
+                symbol_t *sym;
+
+                if (item->x.quotes > 1)
+                    break;
+
+                /* Find (or create) the variable for this symbol */
+                sym = make_symbol(item->u.str);
+                if (sym->index < 0)
+                {
+                    sym->index = current.num_locals++;
+                    if (current.num_locals > MAX_LOCAL)
+                      lambda_error("Too many symbols.\n");
+                }
+
+                if (current.code_left < 4)
+                    realloc_code();
+                current.code_left -= 2;
+                STORE_CODE(current.codep, (flags & MAKE_VAR_LVALUE) ? F_PUSH_LOCAL_VARIABLE_VLVALUE : F_PUSH_LOCAL_VARIABLE_LVALUE);
+                STORE_UINT8(current.codep, (bytecode_t)sym->index);
+
+                if (flags & PROTECT_LVALUE)
+                {
+                    current.code_left--;
+                    STORE_CODE(current.codep, F_MAKE_PROTECTED);
+                }
+                return;
+            }
+
+            /* precomputed closure: only identifiers in this object are allowed
+             */
+            case T_CLOSURE:
+            {
+                switch (item->x.closure_type)
+                {
+                    case CLOSURE_IDENTIFIER:
+                    {
+                        identifier_closure_t *cl = item->u.identifier_closure;
+
+                        if (!object_svalue_eq(cl->base.ob, current.lambda_origin))
+                            break;
+                        if (current.code_left < 4)
+                            realloc_code();
+                        current.code_left -= 2;
+                        if ((short)cl->var_index < 0)
+                            lambda_error("Variable not inherited\n");
+                        STORE_CODE(current.codep, (flags & MAKE_VAR_LVALUE) ? F_PUSH_IDENTIFIER_VLVALUE : F_PUSH_IDENTIFIER_LVALUE);
+                        STORE_CODE(current.codep, (bytecode_t)(cl->var_index));
+
+                        if (flags & PROTECT_LVALUE)
+                        {
+                            current.code_left--;
+                            STORE_CODE(current.codep, F_MAKE_PROTECTED);
+                        }
+                        return;
+                    }
+                }
+                break;
+            }
+        } /* switch(item->type) */
+    }
 
     lambda_error("Illegal lvalue\n");
 } /* compile_lvalue() */
@@ -5588,18 +5619,20 @@ lambda (vector_t *args, svalue_t *block, svalue_t origin)
     code_size = current.code_max - current.code_left;
 
     /* Allocate the memory for values, lambda_t and code */
-    l0 = xalloc(values_size + SIZEOF_LAMBDA(0) - sizeof(l->function) + sizeof(l->function.code) - 1 + code_size);
+    l0 = xalloc(values_size + sizeof(lambda_t) + code_size);
 
     /* Copy the data */
     memcpy(l0, current.valuep, (size_t)values_size);
     l0 += values_size;
     l = (lambda_t *)l0;
-    closure_init_lambda(l, origin);
+    closure_init_base(&(l->base), origin);
 
-    memcpy(l->function.code.program, current.code, (size_t)code_size);
-    l->function.code.num_arg = VEC_SIZE(args);
-    l->function.code.num_locals = current.num_locals + current.max_break_stack - l->function.code.num_arg;
-    l->function.code.num_values = num_values;
+    memcpy(l->program, current.code, (size_t)code_size);
+    l->num_arg = VEC_SIZE(args);
+    l->num_locals = current.num_locals + current.max_break_stack - l->num_arg;
+    l->num_values = num_values;
+    l->num_opt_arg = 0;
+    l->xvarargs = false;
 
     /* Clean up */
     free_symbols();
@@ -5609,12 +5642,20 @@ lambda (vector_t *args, svalue_t *block, svalue_t origin)
     /* If the lambda is to be bound to an object, check if the object's program
      * is scheduled for replacement. If not, mark the object as referenced.
      */
-    if (origin.type == T_OBJECT
-     && (   !(origin.u.ob->prog->flags & P_REPLACE_ACTIVE)
-         || !lambda_ref_replace_program(origin.u.ob, l, CLOSURE_LAMBDA, code_size, args, block)
-    ) )
+    if (origin.type == T_OBJECT)
     {
-        origin.u.ob->flags |= O_LAMBDA_REFERENCED;
+        if (!(origin.u.ob->prog->flags & P_REPLACE_ACTIVE))
+            origin.u.ob->flags |= O_LAMBDA_REFERENCED;
+        else
+        {
+            svalue_t cl;
+            cl.type = T_CLOSURE;
+            cl.x.closure_type = CLOSURE_LAMBDA;
+            cl.u.lambda = l;
+
+            if (!closure_ref_replace_program(origin.u.ob, &cl, code_size, args, block))
+                origin.u.ob->flags |= O_LAMBDA_REFERENCED;
+        }
     }
 
     /* Return the lambda */
@@ -5629,10 +5670,9 @@ free_closure (svalue_t *svp)
  */
 
 {
-    lambda_t *l;
-    int type;
+    int type = svp->x.closure_type;
 
-    if (!CLOSURE_MALLOCED(type = svp->x.closure_type))
+    if (!CLOSURE_MALLOCED(type))
     {
         /* Simple closure */
         if (type < CLOSURE_LWO)
@@ -5641,86 +5681,83 @@ free_closure (svalue_t *svp)
             free_object(svp->u.ob, "free_closure");
         return;
     }
-
-    /* Lambda closure */
-
-    l = svp->u.lambda;
-    if (--l->ref)
-        return;
-
-    if (l->prog_ob)
-        free_object(l->prog_ob, "free_closure: lambda creator");
-
-    if (CLOSURE_HAS_CODE(type))
+    else
     {
-    	/* Free all the values for this lambda, then the memory */
-    	
-        mp_int num_values;
-
-        if (type != CLOSURE_UNBOUND_LAMBDA)
-            free_svalue(&(l->ob));
-
-        svp = (svalue_t *)l;
-        num_values = l->function.code.num_values;
-
-        while (--num_values >= 0)
-            free_svalue(--svp);
-        xfree(svp);
-        return;
-    }
-
-    free_svalue(&(l->ob));
-    if (type == CLOSURE_BOUND_LAMBDA)
-    {
-    	/* BOUND_LAMBDAs are indirections to UNBOUND_LAMBDA structures.
-    	 * Free the BOUND_LAMBDA and then deref/free the referenced
-    	 * UNBOUND_LAMBDA.
-    	 */
-    	
-        mp_int num_values;
-        lambda_t *l2;
-
-        l2 = l->function.lambda;
-        xfree(l);
-
-        if (--l2->ref)
+        closure_base_t *cl = svp->u.closure;
+        if (--cl->ref)
             return;
 
-        if (l2->prog_ob)
-            free_object(l2->prog_ob, "free_closure: unbound lambda creator");
+        if (type != CLOSURE_UNBOUND_LAMBDA)
+            free_svalue(&(cl->ob));
 
-        svp = (svalue_t *)l2;
-        num_values = l2->function.code.num_values;
-
-        while (--num_values >= 0)
-            free_svalue(--svp);
-        xfree(svp);
-        return;
+        if (cl->prog_ob)
+            free_object(cl->prog_ob, "free_closure: closure creator");
     }
 
-    if (type == CLOSURE_LFUN)
+    /* When we are here, we need to deallocate the closure. */
+    switch (type)
     {
-        free_svalue(&(l->function.lfun.ob));
-        if(l->function.lfun.inhProg)
-            free_prog(l->function.lfun.inhProg, MY_TRUE);
-    }
-
-    if (type == CLOSURE_LFUN)
-    {
-        unsigned short num = l->function.lfun.context_size;
-
-        l->function.lfun.context_size = 0; /* ...just in case... */
-        while (num > 0)
+        case CLOSURE_LFUN:
         {
-            num--;
-            free_svalue(&(l->context[num]));
-        }
-    }
+            lfun_closure_t *l = svp->u.lfun_closure;
 
-    /* else CLOSURE_LFUN || CLOSURE_IDENTIFIER:
-     * no further references held.
-     */
-    xfree(l);
+            free_svalue(&(l->fun_ob));
+            if(l->inhProg)
+                free_prog(l->inhProg, MY_TRUE);
+
+            for (unsigned short idx = l->context_size; idx-- > 0;)
+                free_svalue(&(l->context[idx]));
+
+            xfree(l);
+            return;
+        }
+
+        case CLOSURE_IDENTIFIER:
+        {
+            identifier_closure_t *cl = svp->u.identifier_closure;
+
+            xfree(cl);
+            return;
+        }
+
+        case CLOSURE_BOUND_LAMBDA:
+        {
+            /* BOUND_LAMBDAs are indirections to UNBOUND_LAMBDA structures.
+             * Free the BOUND_LAMBDA and then deref/free the referenced
+             * UNBOUND_LAMBDA.
+             */
+            bound_lambda_t *l = svp->u.bound_lambda;
+            svalue_t lv;
+
+            lv.type = T_CLOSURE;
+            lv.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
+            lv.u.lambda = l->lambda;
+
+            xfree(l);
+            free_closure(&lv);
+
+            return;
+        }
+
+        case CLOSURE_LAMBDA:
+        case CLOSURE_UNBOUND_LAMBDA:
+        {
+            /* Free all the values for this lambda, then the memory */
+            lambda_t *l = svp->u.lambda;
+            svalue_t *lv = (svalue_t*)l;
+            mp_int num_values = l->num_values;
+
+            while (--num_values >= 0)
+                free_svalue(--lv);
+
+            /* The block starts with the last lambda value. */
+            xfree(lv);
+            return;
+        }
+
+        default:
+            fatal("(free_closure) Invalid closure type %d!\n", type);
+    }
 } /* free_closure() */
 
 /*-------------------------------------------------------------------------*/
@@ -5743,8 +5780,57 @@ is_undef_closure (svalue_t *sp)
 } /* is_undef_closure() */
 
 /*-------------------------------------------------------------------------*/
+bool
+is_closure_callable (svalue_t *cl, bool expect_code)
+
+/* Returns true if <sp> is a callable closure. If <expect_code> is true,
+ * also identifier closures will not be accepted.
+ */
+
+{
+    assert(cl->type == T_CLOSURE);
+
+    int i = cl->x.closure_type;
+    switch (i)
+    {
+        case CLOSURE_LFUN:
+        case CLOSURE_BOUND_LAMBDA:
+        case CLOSURE_LAMBDA:
+            return true;
+
+        case CLOSURE_UNBOUND_LAMBDA:
+            return false;
+
+        case CLOSURE_IDENTIFIER:
+            return !expect_code;
+
+        default:
+            if (i >= 0)
+                fatal("Invalid closure type: %d.\n",  i);
+            if (i < CLOSURE_LWO)
+                i -= CLOSURE_LWO;
+            switch (i & -0x0800)
+            {
+                case CLOSURE_EFUN:
+                case CLOSURE_SIMUL_EFUN:
+#ifdef USE_PYTHON
+                case CLOSURE_PYTHON_EFUN:
+#endif
+                    return true;
+
+                case CLOSURE_OPERATOR:
+                    return false;
+
+                default:
+                    fatal("Invalid closure type: %d.\n",  cl->x.closure_type);
+            }
+    }
+    return false; /* NOTREACHED */
+} /* is_closure_callable() */
+
+/*-------------------------------------------------------------------------*/
 void
-closure_lookup_lfun_prog ( lambda_t * l
+closure_lookup_lfun_prog ( lfun_closure_t * l
                          , program_t ** pProg
                          , string_t ** pName
                          , Bool * pIsInherited
@@ -5769,13 +5855,13 @@ closure_lookup_lfun_prog ( lambda_t * l
 
     is_inherited = MY_FALSE;
 
-    ix = l->function.lfun.index;
+    ix = l->fun_index;
 
-    switch (l->function.lfun.ob.type)
+    switch (l->fun_ob.type)
     {
         case T_OBJECT:
         {
-            object_t *ob = l->function.lfun.ob.u.ob;
+            object_t *ob = l->fun_ob.u.ob;
 
             /* Get the program resident */
             if (O_PROG_SWAPPED(ob))
@@ -5792,7 +5878,7 @@ closure_lookup_lfun_prog ( lambda_t * l
         }
 
         case T_LWOBJECT:
-            prog = l->function.lfun.ob.u.lwob->prog;
+            prog = l->fun_ob.u.lwob->prog;
             obname = prog->name;
             break;
 
@@ -5801,9 +5887,9 @@ closure_lookup_lfun_prog ( lambda_t * l
             fatal("(closure_lookup_lfun_prog) Invalid closure.\n");
     }
 
-    if (l->function.lfun.inhProg)
+    if (l->inhProg)
     {
-        while (prog != l->function.lfun.inhProg)
+        while (prog != l->inhProg)
         {
             inherit_t *inheritp;
 
@@ -5812,9 +5898,9 @@ closure_lookup_lfun_prog ( lambda_t * l
                 errorf("(closure_lookup_lfun_prog): Couldn't find "
                        "program '%s' in object '%s' with function index %ld. "
                        "Found program '%s' instead.\n"
-                     , get_txt(l->function.lfun.inhProg->name)
+                     , get_txt(l->inhProg->name)
                      , get_txt(obname)
-                     , (long) l->function.lfun.index
+                     , (long) l->fun_index
                      , get_txt(prog->name)
                      );
 #endif
@@ -5842,8 +5928,6 @@ closure_lookup_lfun_prog ( lambda_t * l
     if (*pProg != prog)
         is_inherited = MY_TRUE;
 
-    /* Copy the other result values */
-    *pProg = prog;
     *pIsInherited = is_inherited;
 } /* closure_lookup_lfun_prog() */
 
@@ -5928,38 +6012,40 @@ closure_efun_to_string (int type)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-closure_location (lambda_t *l)
+closure_location (closure_base_t *cl)
 
-/* Return the location the lambda structure <l> was created as
+/* Return the location the closure structure <cl> was created as
  * the string 'from <filename> line <number>".
  */
 
 {
     string_t * rc = NULL;
 
-    if (l && l->prog_ob && !(l->prog_ob->flags & O_DESTRUCTED))
+    if (cl && cl->prog_ob && !(cl->prog_ob->flags & O_DESTRUCTED))
     {
 
-        if (l->prog_ob->flags & O_SWAPPED)
+        if (cl->prog_ob->flags & O_SWAPPED)
         {
-            if (load_ob_from_swap(l->prog_ob) < 0)
+            if (load_ob_from_swap(cl->prog_ob) < 0)
                 errorf("Out of memory\n");
         }
 
-        do {
+        do
+        {
             int          lineno;
             char buf[20];
             string_t   * name = NULL;
 
-            program_t  * prog    = l->prog_ob->prog;
-            bytecode_p   prog_pc = prog->program + l->prog_pc;
+            program_t  * prog    = cl->prog_ob->prog;
+            bytecode_p   prog_pc = prog->program + cl->prog_pc;
 
             if (prog_pc <= prog->program || prog_pc >= PROGRAM_END(*prog))
                 break;
 
-            lineno = get_line_number( l->prog_ob->prog->program + l->prog_pc
-                                    , l->prog_ob->prog
+            lineno = get_line_number( cl->prog_ob->prog->program + cl->prog_pc
+                                    , cl->prog_ob->prog
                                     , &name
+                                    , NULL
                                     );
 
             sprintf(buf, "%d", lineno);
@@ -5988,7 +6074,7 @@ closure_to_string (svalue_t * sp, Bool compact)
 {
     char buf[1024];
     string_t *rc;
-    lambda_t *l;
+    closure_base_t *cl;
     size_t len;
 
     rc = NULL;
@@ -6004,256 +6090,260 @@ closure_to_string (svalue_t * sp, Bool compact)
         return NULL;
     }
 
-    l = NULL;
+    cl = NULL;
       /* Will be set to valid pointer if the closure has a lambda_t structure.
        */
 
     switch(sp->x.closure_type)
     {
-
-    case CLOSURE_IDENTIFIER: /* Variable Closure */
-      {
-        l = sp->u.lambda;
-        switch (l->ob.type)
+        case CLOSURE_IDENTIFIER: /* Variable Closure */
         {
-            case T_OBJECT:
-            {
-                object_t *ob = l->ob.u.ob;
+            identifier_closure_t *ic = sp->u.identifier_closure;
+            cl = &(ic->base);
 
-                if (ob->flags & O_DESTRUCTED)
+            switch (cl->ob.type)
+            {
+                case T_OBJECT:
                 {
+                    object_t *ob = cl->ob.u.ob;
+
+                    if (ob->flags & O_DESTRUCTED)
+                    {
+                        strcat(buf, compact ? "<dest lvar>"
+                                            : "<local variable in destructed object>");
+                        break;
+                    }
+
+                    if (ic->var_index == VANISHED_VARCLOSURE_INDEX)
+                    {
+                        strcat(buf, compact ? "<repl lvar>"
+                                            : "<local variable from replaced program>");
+                        break;
+                    }
+
+                    /* We need the program resident */
+                    if (O_PROG_SWAPPED(ob))
+                    {
+                        ob->time_of_ref = current_time;
+                        if (load_ob_from_swap(ob) < 0)
+                            errorf("Out of memory.\n");
+                    }
+
+                    sprintf(buf, "#'%s->%s"
+                               , get_txt(ob->name)
+                               , get_txt(ob->prog->variables[ic->var_index].name)
+                          );
+                    break;
+                }
+
+                case T_LWOBJECT:
+                    sprintf(buf, "#'/%s->%s"
+                               , get_txt(cl->ob.u.lwob->prog->name)
+                               , get_txt(cl->ob.u.lwob->prog->variables[ic->var_index].name)
+                          );
+                break;
+
+                case T_NUMBER:
+                default:
                     strcat(buf, compact ? "<dest lvar>"
                                         : "<local variable in destructed object>");
                     break;
-                }
+            }
+            break;
+        }
 
-                if (l->function.var_index == VANISHED_VARCLOSURE_INDEX)
+        case CLOSURE_LFUN: /* Lfun closure */
+        {
+            lfun_closure_t *l = sp->u.lfun_closure;
+            program_t      *prog;
+            string_t       *function_name;
+            bool            is_inherited;
+
+            cl = &(l->base);
+
+            /* For alien lfun closures, prepend the object the closure
+             * is bound to.
+             */
+            if (!object_svalue_eq(cl->ob, l->fun_ob))
+            {
+                svalue_t ob = l->fun_ob;
+
+                switch (ob.type)
                 {
-                    strcat(buf, compact ? "<repl lvar>"
-                                        : "<local variable from replaced program>");
-                    break;
-                }
+                    case T_OBJECT:
+                        if (ob.u.ob->flags & O_DESTRUCTED)
+                        {
+                            strcat(buf, compact ? "[<dest obj>]" : "[<destructed object>]");
+                        }
+                        else
+                        {
+                            strcat(buf, "[");
+                            strcat(buf, get_txt(ob.u.ob->name));
+                            strcat(buf, "]");
+                        }
+                        break;
 
-                /* We need the program resident */
-                if (O_PROG_SWAPPED(ob))
-                {
-                    ob->time_of_ref = current_time;
-                    if (load_ob_from_swap(ob) < 0)
-                        errorf("Out of memory.\n");
-                }
+                    case T_LWOBJECT:
+                        strcat(buf, "[/");
+                        strcat(buf, get_txt(ob.u.lwob->prog->name));
+                        strcat(buf, "]");
+                        break;
 
-                sprintf(buf, "#'%s->%s"
-                           , get_txt(ob->name)
-                           , get_txt(ob->prog->variables[l->function.var_index].name)
-                      );
-                break;
+                    case T_NUMBER:
+                    default:
+                        strcat(buf, compact ? "[<dest obj>]" : "[<destructed object>]");
+                        break;
+                }
             }
 
-            case T_LWOBJECT:
-                sprintf(buf, "#'/%s->%s"
-                           , get_txt(l->ob.u.lwob->prog->name)
-                           , get_txt(l->ob.u.lwob->prog->variables[l->function.var_index].name)
-                      );
-                break;
+            closure_lookup_lfun_prog(l, &prog, &function_name, &is_inherited);
 
-            case T_NUMBER:
-            default:
-                strcat(buf, compact ? "<dest lvar>"
-                                    : "<local variable in destructed object>");
-                break;
-        }
-        break;
-      }
-
-    case CLOSURE_LFUN: /* Lfun closure */
-      {
-        program_t *prog;
-        string_t  *function_name;
-        Bool       is_inherited;
-
-        l = sp->u.lambda;
-
-        /* For alien lfun closures, prepend the object the closure
-         * is bound to.
-         */
-        if (!object_svalue_eq(l->ob, l->function.lfun.ob))
-        {
-            svalue_t ob = l->function.lfun.ob;
-
-            switch (ob.type)
+            switch (l->fun_ob.type)
             {
                 case T_OBJECT:
-                    if (ob.u.ob->flags & O_DESTRUCTED)
-                    {
-                        strcat(buf, compact ? "[<dest obj>]" : "[<destructed object>]");
-                    }
+                {
+                    object_t *ob = l->fun_ob.u.ob;
+                    if (ob->flags & O_DESTRUCTED)
+                        strcat(buf, compact ? "<dest lfun>"
+                                            : "<local function in destructed object>");
                     else
-                    {
-                        strcat(buf, "[");
-                        strcat(buf, get_txt(ob.u.ob->name));
-                        strcat(buf, "]");
-                    }
+                        strcat(buf, get_txt(ob->name));
                     break;
+                }
 
                 case T_LWOBJECT:
-                    strcat(buf, "[/");
-                    strcat(buf, get_txt(ob.u.lwob->prog->name));
-                    strcat(buf, "]");
+                    strcat(buf, "/");
+                    strcat(buf, get_txt(l->fun_ob.u.lwob->prog->name));
                     break;
 
                 case T_NUMBER:
                 default:
-                    strcat(buf, compact ? "[<dest obj>]" : "[<destructed object>]");
-                    break;
-            }
-        }
-
-        closure_lookup_lfun_prog(l, &prog, &function_name, &is_inherited);
-
-        switch (l->function.lfun.ob.type)
-        {
-            case T_OBJECT:
-            {
-                object_t *ob = l->function.lfun.ob.u.ob;
-                if (ob->flags & O_DESTRUCTED)
                     strcat(buf, compact ? "<dest lfun>"
                                         : "<local function in destructed object>");
-                else
-                    strcat(buf, get_txt(ob->name));
-                break;
+                    break;
             }
 
-            case T_LWOBJECT:
-                strcat(buf, "/");
-                strcat(buf, get_txt(l->function.lfun.ob.u.lwob->prog->name));
-                break;
-
-            case T_NUMBER:
-            default:
-                strcat(buf, compact ? "<dest lfun>"
-                                    : "<local function in destructed object>");
-                break;
-        }
-
-        if (is_inherited)
-        {
-            strcat(buf, "(");
-            strcat(buf, get_txt(prog->name));
-            buf[strlen(buf)-2] = '\0'; /* Remove the '.c' after the program name */
-            strcat(buf, ")");
-        }
-        strcat(buf, "->");
-        strcat(buf, get_txt(function_name));
-        strcat(buf, "()");
-        break;
-      }
-
-    case CLOSURE_UNBOUND_LAMBDA: /* Unbound-Lambda Closure */
-      {
-        l = sp->u.lambda;
-
-        sprintf(buf, compact ? "<free %p>" : "<free lambda %p>", l);
-        break;
-      }
-
-    case CLOSURE_LAMBDA:         /* Lambda Closure */
-    case CLOSURE_BOUND_LAMBDA:   /* Bound-Lambda Closure */
-      {
-        l = sp->u.lambda;
-
-        if (sp->x.closure_type == CLOSURE_BOUND_LAMBDA)
-            sprintf(buf, compact ? "<bound %p:" : "<bound lambda %p:", l);
-        else
-            sprintf(buf, compact ? "<%p:" : "<lambda %p:", l);
-
-        switch (l->ob.type)
-        {
-            case T_OBJECT:
-                if (l->ob.u.ob->flags & O_DESTRUCTED)
-                    strcat(buf, "{dest}");
-                strcat(buf, "/");
-                strcat(buf, get_txt(l->ob.u.ob->name));
-                strcat(buf, ">");
-                break;
-
-            case T_LWOBJECT:
-                strcat(buf, "/");
-                strcat(buf, get_txt(l->ob.u.lwob->prog->name));
-                strcat(buf, ">");
-                break;
-
-            case T_NUMBER:
-            default:
-                strcat(buf, "{null}>");
-                break;
-        }
-        break;
-      }
-
-    default:
-      {
-        int type = sp->x.closure_type;
-
-        if (type >= 0)
-            errorf("Bad arg 1 to to_string(): closure type %d.\n"
-                 , sp->x.closure_type);
-        else
-        {
-            if (type < CLOSURE_LWO)
-                type -= CLOSURE_LWO;
-
-            switch(type & -0x0800)
+            if (is_inherited)
             {
-#ifdef USE_PYTHON
-            case CLOSURE_PYTHON_EFUN:
-                strcat(buf, closure_python_efun_to_string(type));
-                break;
-#endif
-            case CLOSURE_OPERATOR:
-              {
-                const char *str = closure_operator_to_string(type);
+                strcat(buf, "(");
+                strcat(buf, get_txt(prog->name));
+                buf[strlen(buf)-2] = '\0'; /* Remove the '.c' after the program name */
+                strcat(buf, ")");
+            }
+            strcat(buf, "->");
+            strcat(buf, get_txt(function_name));
+            strcat(buf, "()");
+            break;
+        }
 
-                if (str)
-                {
-                    strcat(buf, str);
+        case CLOSURE_UNBOUND_LAMBDA: /* Unbound-Lambda Closure */
+        {
+            lambda_t *l = sp->u.lambda;
+            cl = &(l->base);
+
+            sprintf(buf, compact ? "<free %p>" : "<free lambda %p>", l);
+            break;
+        }
+
+        case CLOSURE_LAMBDA:         /* Lambda Closure */
+        case CLOSURE_BOUND_LAMBDA:   /* Bound-Lambda Closure */
+        {
+            lambda_t *l = sp->u.lambda;
+            cl = &(l->base);
+
+            if (sp->x.closure_type == CLOSURE_BOUND_LAMBDA)
+                sprintf(buf, compact ? "<bound %p:" : "<bound lambda %p:", l);
+            else
+                sprintf(buf, compact ? "<%p:" : "<lambda %p:", l);
+
+            switch (cl->ob.type)
+            {
+                case T_OBJECT:
+                    if (cl->ob.u.ob->flags & O_DESTRUCTED)
+                        strcat(buf, "{dest}");
+                    strcat(buf, "/");
+                    strcat(buf, get_txt(cl->ob.u.ob->name));
+                    strcat(buf, ">");
                     break;
-                }
 
-                type += CLOSURE_EFUN - CLOSURE_OPERATOR;
-              }
-            /* default action for operators: FALLTHROUGH */
-
-            case CLOSURE_EFUN:
-              {
-                const char *str = closure_efun_to_string(type);
-
-                if (str)
-                {
-                    strcat(buf, str);
+                case T_LWOBJECT:
+                    strcat(buf, "/");
+                    strcat(buf, get_txt(cl->ob.u.lwob->prog->name));
+                    strcat(buf, ">");
                     break;
-                }
-              }
-              /* Shouldn't happen: FALLTHROUGH */
 
-            case CLOSURE_SIMUL_EFUN:
-                strcat(buf, "sefun::");
-                strcat(buf, get_txt(simul_efun_table[type - CLOSURE_SIMUL_EFUN].function.name));
-                break;
+                case T_NUMBER:
+                default:
+                    strcat(buf, "{null}>");
+                    break;
             }
             break;
-        } /* if (type) */
-      } /* case default */
+        }
+
+        default:
+        {
+            int type = sp->x.closure_type;
+
+            if (type >= 0)
+                errorf("Bad arg 1 to to_string(): closure type %d.\n"
+                     , sp->x.closure_type);
+            else
+            {
+                if (type < CLOSURE_LWO)
+                    type -= CLOSURE_LWO;
+
+                switch(type & -0x0800)
+                {
+#ifdef USE_PYTHON
+                    case CLOSURE_PYTHON_EFUN:
+                        strcat(buf, closure_python_efun_to_string(type));
+                        break;
+#endif
+                    case CLOSURE_OPERATOR:
+                    {
+                        const char *str = closure_operator_to_string(type);
+
+                        if (str)
+                        {
+                            strcat(buf, str);
+                            break;
+                        }
+
+                        type += CLOSURE_EFUN - CLOSURE_OPERATOR;
+                    }
+                    /* default action for operators: FALLTHROUGH */
+
+                    case CLOSURE_EFUN:
+                    {
+                        const char *str = closure_efun_to_string(type);
+
+                        if (str)
+                        {
+                            strcat(buf, str);
+                            break;
+                        }
+                    }
+                    /* Shouldn't happen: FALLTHROUGH */
+
+                    case CLOSURE_SIMUL_EFUN:
+                        strcat(buf, "sefun::");
+                        strcat(buf, get_txt(simul_efun_table[type - CLOSURE_SIMUL_EFUN].function.name));
+                        break;
+                }
+                break;
+            } /* if (type) */
+        } /* case default */
     } /* switch(closure_type) */
 
     len = strlen(buf);
-    memsafe(rc = new_n_unicode_mstring(buf, len), len, "converted lambda");
+    memsafe(rc = new_n_unicode_mstring(buf, len), len, "converted closure");
 
-    /* If it's a closure with a lambda structure, we can determine
+    /* If it's a closure with an allocated structure, we can determine
      * where it was created.
      */
-    if (l && l->prog_ob && !(l->prog_ob->flags & O_DESTRUCTED))
+    if (cl && cl->prog_ob && !(cl->prog_ob->flags & O_DESTRUCTED))
     {
-        string_t * rc2 = closure_location(l);
+        string_t * rc2 = closure_location(cl);
         string_t * rc3;
 
         /* Final step: append the created string rc2 to the original
@@ -6318,94 +6408,111 @@ v_bind_lambda (svalue_t *sp, int num_arg)
 
     switch(sp->x.closure_type)
     {
-    case CLOSURE_LAMBDA:
-    case CLOSURE_IDENTIFIER:
-        /* Unbindable closures. Free the ob reference and
-         * throw an error (unless <ob> has been omitted)
-         */
-        free_svalue(&ob);
-        if (num_arg == 1)
-            break;
-        errorf("Bad arg 1 to bind_lambda(): unbindable closure\n");
-        /* NOTREACHED */
-        return sp;
-        break;
-
-    case CLOSURE_LFUN:
-        /* Rebind an lfun to the given object */
-        free_svalue(&(sp->u.lambda->ob));
-        sp->u.lambda->ob = ob;
-        break;
-
-    default:
-        /* efun, simul_efun, operator closures: rebind it */
-        if (sp->x.closure_type < CLOSURE_LWO)
-        {
-            free_lwobject(sp->u.lwob);
-            sp->x.closure_type -= CLOSURE_LWO;
-        }
-        else
-        {
-            free_object(sp->u.ob, "bind_lambda");
-        }
-        if (ob.type == T_LWOBJECT)
-        {
-            sp->u.lwob = ob.u.lwob;
-            sp->x.closure_type += CLOSURE_LWO;
-        }
-        else
-            sp->u.ob = ob.u.ob;
-        break;
-
-    case CLOSURE_BOUND_LAMBDA:
-      {
-        /* Rebind an already bound lambda closure */
-
-        lambda_t *l;
-
-        if ( (l = sp->u.lambda)->ref == 1)
-        {
-            /* We are the only user of the lambda: simply rebind it.
+        case CLOSURE_LAMBDA:
+        case CLOSURE_IDENTIFIER:
+            /* Unbindable closures. Free the ob reference and
+             * throw an error (unless <ob> has been omitted)
              */
-            free_svalue(&(l->ob));
-            l->ob = ob;
+            free_svalue(&ob);
+            if (num_arg == 1)
+                break;
+
+            errorf("Bad arg 1 to bind_lambda(): unbindable closure\n");
+            /* NOTREACHED */
+            return sp;
+
+        case CLOSURE_LFUN:
+            /* Rebind an lfun to the given object */
+            free_svalue(&(sp->u.lfun_closure->base.ob));
+            sp->u.lfun_closure->base.ob = ob;
             break;
-        }
-        else
+
+        case CLOSURE_BOUND_LAMBDA:
         {
-            /* We share the closure with others: create our own
-             * copy, bind it and put it onto the stack in place of
-             * the original one.
-             */
-            lambda_t *l2;
+            /* Rebind an already bound lambda closure */
 
-            l->ref--;
-            l2 = closure_new_lambda(ob, 0, /* raise_error: */ MY_TRUE);
-            l2->function.lambda = l->function.lambda;
-            l->function.lambda->ref++;
-            free_svalue(&ob); /* We adopted the reference */
-            sp->u.lambda = l2;
+            bound_lambda_t *l = sp->u.bound_lambda;
+
+            if (l->base.ref == 1)
+            {
+                /* We are the only user of the lambda: simply rebind it.
+                 */
+                free_svalue(&(l->base.ob));
+                l->base.ob = ob;
+                break;
+            }
+            else
+            {
+                /* We share the closure with others: create our own
+                 * copy, bind it and put it onto the stack in place of
+                 * the original one.
+                 */
+                bound_lambda_t *l2;
+
+                l2 = xalloc(sizeof(bound_lambda_t));
+                if (!l2)
+                    outofmem(sizeof(bound_lambda_t), "bind_lambda");
+
+                closure_init_base(&(l2->base), ob);
+                free_svalue(&ob); /* We created a new reference. */
+
+                l2->lambda = l->lambda;
+                l->lambda->base.ref++;
+                l->base.ref--;
+
+                sp->u.bound_lambda = l2;
+                break;
+            }
+        }
+
+        case CLOSURE_UNBOUND_LAMBDA:
+        {
+            /* Whee, an unbound lambda: create the bound-lambda structure
+             * and put it onto the stack in place of the unbound one.
+             */
+            bound_lambda_t *l;
+
+            l = xalloc(sizeof(bound_lambda_t));
+            if (!l)
+                outofmem(sizeof(bound_lambda_t), "bind_lambda");
+
+            closure_init_base(&(l->base), ob);
+            free_svalue(&ob); /* We created a new reference. */
+
+            l->lambda = sp->u.lambda;
+              /* The ref to the unbound closure is just transferred from
+               * sp to l->function.lambda.
+               */
+            sp->x.closure_type = CLOSURE_BOUND_LAMBDA;
+            sp->u.bound_lambda = l;
             break;
         }
-      }
 
-    case CLOSURE_UNBOUND_LAMBDA:
-      {
-        /* Whee, an unbound lambda: create the bound-lambda structure
-         * and put it onto the stack in place of the unbound one.
-         */
+        default:
+            if (sp->x.closure_type >= 0)
+                errorf("Bad arg 1 to bind_lambda(): closure type %d.\n"
+                     , sp->x.closure_type);
 
-        lambda_t *l;
-        l = closure_new_lambda(ob, 0, /* raise_error: */ MY_TRUE);
-        free_svalue(&ob); /* We adopted the reference */
-        l->function.lambda = sp->u.lambda;
-          /* The ref to the unbound closure is just transferred from
-           * sp to l->function.lambda.
-           */
-        sp->x.closure_type = CLOSURE_BOUND_LAMBDA;
-        sp->u.lambda = l;
-        break;
-      }
+            /* efun, simul_efun, operator closures: rebind it */
+            if (sp->x.closure_type < CLOSURE_LWO)
+            {
+                free_lwobject(sp->u.lwob);
+                sp->x.closure_type -= CLOSURE_LWO;
+            }
+            else
+            {
+                free_object(sp->u.ob, "bind_lambda");
+            }
+
+            if (ob.type == T_LWOBJECT)
+            {
+                sp->u.lwob = ob.u.lwob;
+                sp->x.closure_type += CLOSURE_LWO;
+            }
+            else
+                sp->u.ob = ob.u.ob;
+            break;
+
     }
 
     return sp;
@@ -6438,7 +6545,7 @@ f_lambda (svalue_t *sp)
          * with the null-vector.
          */
         if (sp[-1].type != T_NUMBER || sp[-1].u.number)
-            efun_arg_error(1, T_POINTER, sp->type, sp);
+            efun_arg_error(1, T_POINTER, sp, sp);
         args = ref_array(&null_vector);
     }
     else
@@ -6521,7 +6628,7 @@ f_symbol_function (svalue_t *sp)
         /* Find resp. load the object by name */
         if (sp->type != T_STRING)
         {
-            efun_exp_arg_error(2, TF_STRING|TF_OBJECT|TF_LWOBJECT, sp->type, sp);
+            efun_exp_arg_error(2, TF_STRING|TF_OBJECT|TF_LWOBJECT, sp, sp);
             /* NOTREACHED */
             return sp;
         }
@@ -6596,11 +6703,11 @@ f_symbol_function (svalue_t *sp)
         if (sp->type != T_CLOSURE)
         {
             inter_sp = sp - 1;
-            outofmem(SIZEOF_LAMBDA(0), "symbol_function");
+            outofmem(SIZEOF_LFUN_CLOSURE(0), "symbol_function");
         }
 
-        /* The lambda was bound to the wrong object */
-        assign_current_object(&(sp->u.lambda->ob), "symbol_function");
+        /* The closure was bound to the wrong object */
+        assign_current_object(&(sp->u.lfun_closure->base.ob), "symbol_function");
 
         free_svalue(&target); /* We adopted the reference */
 
@@ -6664,7 +6771,7 @@ f_symbol_variable (svalue_t *sp)
     switch(sp->type)
     {
     default:
-        fatal("Bad arg 1 to symbol_variable(): type %s\n", typename(sp->type));
+        fatal("Bad arg 1 to symbol_variable(): type %s\n", sv_typename(sp));
         break;
 
     case T_NUMBER:  /* The index is given directly */
@@ -6771,7 +6878,7 @@ f_symbol_variable (svalue_t *sp)
     if (sp->type != T_CLOSURE)
     {
         inter_sp = sp - 1;
-        outofmem(SIZEOF_LAMBDA(0), "variable symbol");
+        outofmem(sizeof(identifier_closure_t), "variable symbol");
     }
 
     return sp;
@@ -6810,7 +6917,7 @@ f_unbound_lambda (svalue_t *sp)
     if (sp[-1].type != T_POINTER)
     {
         if (sp[-1].type != T_NUMBER || sp[-1].u.number)
-            efun_gen_arg_error(1, sp->type, sp);
+            efun_gen_arg_error(1, sp, sp);
         args = ref_array(&null_vector);
     }
     else
@@ -6821,7 +6928,7 @@ f_unbound_lambda (svalue_t *sp)
     /* Compile the lambda */
     inter_sp = sp;
     l = lambda(args, sp, const0);
-    l->ob = const0;
+    l->base.ob = const0;
 
     /* Clean up the stack and push the result */
 
@@ -6832,6 +6939,138 @@ f_unbound_lambda (svalue_t *sp)
     sp->u.lambda = l;
     return sp;
 } /* f_unbound_lambda() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+v_compile_string (svalue_t *sp, int num_arg)
+
+/* EFUN compile_string()
+ *
+ *   closure compile_string(symbol* args, string(&) str
+ *                         , struct compile_string_options opts)
+ *
+ * Compile <str> using the LPC compiler into a closure (of type
+ * CLOSURE_LAMBDA). If opts.detect_end is active and <str> is an lvalue,
+ * return the remaining string in <str>.
+ */
+
+{
+    svalue_t *argp = sp - num_arg + 1;
+    code_context_t context;
+    lambda_t *l;
+    struct_t *opts = NULL;
+    string_t *str;
+
+    /* We need to check the struct type of the options,
+     * the interpreter will only check that it is a struct.
+     */
+    if (num_arg > 2)
+    {
+        opts = argp[2].u.strct;
+        test_efun_arg_struct_type("compile_string", 3, opts, STRUCT_COMPILE_STRING_OPTIONS);
+    }
+
+    if (argp->type != T_POINTER)
+    {
+        context.num_args = 0;
+        context.arg_names = NULL;
+    }
+    else
+    {
+        context.num_args = VEC_SIZE(argp->u.vec);
+        context.arg_names = argp->u.vec->item;
+
+        for (int i = 0; i < context.num_args; i++)
+            if (context.arg_names[i].type != T_SYMBOL)
+                errorf("Invalid type for argument name: %s, expected symbol.\n", typename(context.arg_names[i].type));
+    }
+
+    if (opts != NULL
+     && opts->member[STRUCT_COMPILE_STRING_OPTIONS_COMPILE_EXPRESSION].u.number != 0
+     && opts->member[STRUCT_COMPILE_STRING_OPTIONS_COMPILE_BLOCK].u.number != 0)
+        errorf("Options compile_expression and compile_block are set.\n");
+
+    if (current_loc.file)
+        errorf("Compiler is busy with '%s'.\n", current_loc.file->name);
+
+    context.prog = get_current_object_program();
+
+    if (opts != NULL
+     && (opts->member[STRUCT_COMPILE_STRING_OPTIONS_FUNCTIONS].type == T_MAPPING
+      || opts->member[STRUCT_COMPILE_STRING_OPTIONS_FUNCTIONS].type == T_CLOSURE))
+        context.fun_lookup = &opts->member[STRUCT_COMPILE_STRING_OPTIONS_FUNCTIONS];
+    else
+        context.fun_lookup = NULL;
+
+    if (opts != NULL
+     && (opts->member[STRUCT_COMPILE_STRING_OPTIONS_VARIABLES].type == T_MAPPING
+      || opts->member[STRUCT_COMPILE_STRING_OPTIONS_VARIABLES].type == T_CLOSURE))
+        context.var_lookup = &opts->member[STRUCT_COMPILE_STRING_OPTIONS_VARIABLES];
+    else
+        context.var_lookup = NULL;
+
+    if (opts != NULL
+     && (opts->member[STRUCT_COMPILE_STRING_OPTIONS_STRUCTS].type == T_MAPPING
+      || opts->member[STRUCT_COMPILE_STRING_OPTIONS_STRUCTS].type == T_CLOSURE))
+        context.struct_lookup = &opts->member[STRUCT_COMPILE_STRING_OPTIONS_STRUCTS];
+    else
+        context.struct_lookup = NULL;
+
+    context.use_prog_for_functions = opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_USE_OBJECT_FUNCTIONS].u.number != 0;
+    context.use_prog_for_variables = opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_USE_OBJECT_VARIABLES].u.number != 0;
+    context.use_prog_for_structs = opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_USE_OBJECT_STRUCTS].u.number != 0;
+    context.make_async = opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_AS_ASYNC].u.number != 0;
+    context.detect_end = opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_DETECT_END].u.number != 0;
+
+    if (current_object.type == T_OBJECT
+     && (current_object.u.ob->prog->flags & P_REPLACE_ACTIVE)
+     && (context.use_prog_for_functions || context.use_prog_for_variables || context.use_prog_for_structs))
+        errorf("Can't use current object's variables/functions/struct definitions when replace_program() is scheduled.\n");
+
+    if (argp[1].type == T_LVALUE)
+    {
+        /* We need to make a copy of it, so it cannot be changed during compilation. */
+        push_rvalue(argp+1);
+        str = inter_sp->u.str;
+    }
+    else
+        str = argp[1].u.str;
+
+    if (opts != NULL && opts->member[STRUCT_COMPILE_STRING_OPTIONS_COMPILE_BLOCK].u.number != 0)
+        l = compile_block(str, &context);
+    else
+        l = compile_expr(str, &context);
+    if (!l)
+        errorf("%s", context.error_msg[0] ? context.error_msg : "Compilation error.\n");
+    if (context.detect_end && argp[1].type == T_LVALUE)
+    {
+        if (context.end_position < mstrsize(str))
+        {
+            string_t *rest = mstr_extract(str, context.end_position, -1);
+            if (rest)
+            {
+                svalue_t sv = svalue_string(rest);
+                transfer_svalue(argp+1, &sv);
+            }
+        }
+        else
+        {
+            svalue_t sv = svalue_string(STR_EMPTY);
+            assign_svalue(argp+1, &sv);
+        }
+    }
+    if (argp[1].type == T_LVALUE)
+        pop_stack();
+
+    sp = pop_n_elems(num_arg, sp);
+
+    sp++;
+    sp->type = T_CLOSURE;
+    sp->x.closure_type = CLOSURE_LAMBDA;
+    sp->u.lambda = l;
+
+    return sp;
+} /* v_compile_string() */
 
 /*=========================================================================*/
 

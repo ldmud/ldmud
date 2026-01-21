@@ -1204,7 +1204,7 @@ write_lpc_trace (int d, word_t *p, int oneline)
         {
             string_t *file;
 
-            line = get_line_number(pc, prog, &file);
+            line = get_line_number(pc, prog, &file, NULL);
             if (!oneline)
             {
                 dprintf2(d, "  By program: %s line:%d\n", (p_int)get_txt(file), line);
@@ -1423,7 +1423,10 @@ get_stack_direction (void)
 
     if (initial_stack == NULL)  /* initial call */
     {
+DIAGWARN_PUSH
+DIAG_IGNORE_DANGLING_POINTER // This is intended.
         initial_stack = &local;
+DIAGWARN_POP
         get_stack_direction ();  /* recurse once */
     }
     else  /* recursive call */

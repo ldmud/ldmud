@@ -237,6 +237,7 @@
 
 #include "i-current_object.h"
 #include "i-svalue_cmp.h"
+#include "i-svalue_hash.h"
 
 #define TIME_TO_COMPACT (600) /* 10 Minutes */
    /* TODO: Make this configurable.
@@ -695,44 +696,7 @@ mhash (svalue_t * svp)
  */
 
 {
-    mp_int i;
-
-    switch (svp->type)
-    {
-    case T_STRING:
-    case T_BYTES:
-        i = mstr_get_hash(svp->u.str);
-        break;
-
-    case T_CLOSURE:
-        if (CLOSURE_REFERENCES_CODE(svp->x.closure_type))
-        {
-            i = (p_int)(svp->u.lambda) ^ *SVALUE_FULLTYPE(svp);
-        }
-        else if (CLOSURE_MALLOCED(svp->x.closure_type))
-        {
-            i = (svp->u.lambda->ob.type == T_OBJECT
-               ? (p_int)svp->u.lambda->ob.u.ob
-               : (p_int)svp->u.lambda->ob.u.lwob) ^ *SVALUE_FULLTYPE(svp);
-        }
-        else /* Efun, Simul-Efun, Operator closure */
-        {
-            i = *SVALUE_FULLTYPE(svp);
-        }
-        break;
-
-#ifdef FLOAT_FORMAT_2
-    case T_FLOAT:
-        /* We have no additional type information. */
-        i = svp->u.number;
-        break;
-#endif
-
-    default:
-        i = svp->u.number ^ *SVALUE_FULLTYPE(svp);
-        break;
-    }
-
+    int i = svalue_hash(svp, 32);
     i = i ^ i >> 16;
     i = i ^ i >> 8;
 
@@ -867,7 +831,7 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
 
         for (mc = hm->chains[idx]; mc != NULL; mc = mc->next)
         {
-            if (!svalue_eq(&(mc->data[0]), map_index))
+            if (svalue_eq(&(mc->data[0]), map_index))
             {
                 /* Found it */
                 *ppChain = mc;
@@ -2714,20 +2678,20 @@ handle_destructed_key (svalue_t *key)
          * into a single lambda closure bound to the destructed
          * object. This way the GC will treat it correctly.
          */
-        lambda_t *l = key->u.lambda;
+        bound_lambda_t *l = key->u.bound_lambda;
 
         key->x.closure_type = CLOSURE_LAMBDA;
-        key->u.lambda = l->function.lambda;
-        if (!l->ref)
+        key->u.lambda = l->lambda;
+        if (!l->base.ref)
         {
             /* This would have been the first reference to the
              * lambda closure: add it to the stale list and mark
              * it as 'stale'.
              */
-            l->function.lambda->ob = l->ob;
-            l->ref = -1;
-            l->ob.u.lambda = stale_misc_closures;
-            stale_misc_closures = l;
+            l->lambda->base.ob = l->base.ob;
+            l->base.ref = -1;
+            l->base.ob.u.closure = stale_misc_closures;
+            stale_misc_closures = &(l->base);
         }
         else
         {
@@ -2743,7 +2707,7 @@ handle_destructed_key (svalue_t *key)
             if (gc_obj_list_destructed)
                 fatal("gc_obj_list_destructed is NULL\n");
 #endif
-            l->function.lambda->ob.u.ob = gc_obj_list_destructed;
+            l->lambda->base.ob.u.ob = gc_obj_list_destructed;
         }
     }
     count_ref_in_vector(key, 1);
@@ -4323,9 +4287,9 @@ v_m_contains (svalue_t *sp, int num_arg)
     /* Test the arguments */
     for (i = -num_arg; ++i < -1; )
         if (sp[i].type != T_LVALUE)
-            vefun_arg_error(num_arg + i, T_LVALUE, sp[i].type, sp);
+            vefun_arg_error(num_arg + i, T_LVALUE, sp+i, sp);
     if (sp[-1].type != T_MAPPING)
-        vefun_arg_error(num_arg-1, T_MAPPING, sp[-1].type, sp);
+        vefun_arg_error(num_arg-1, T_MAPPING, sp-1, sp);
     if (sp[-1].u.map->num_values != num_arg - 2)
         errorf("Not enough lvalues: given %d, required %"PRIdPINT".\n",
                num_arg-2, sp[-1].u.map->num_values);
@@ -4354,7 +4318,7 @@ v_m_contains (svalue_t *sp, int num_arg)
         }
         else
             /* mapping must not have been freed yet */
-            assign_svalue(sp+i, item++);
+            assign_rvalue(sp+i, item++);
         free_svalue(&sp[i]);
     }
 
@@ -4496,8 +4460,8 @@ v_mkmapping (svalue_t *sp, int num_arg)
         st = sp->u.strct;
         length = struct_size(st);
 
-        if (max_mapping_size && length > (p_int)max_mapping_size)
-            errorf("Illegal mapping size: %ld elements\n", length);
+        if (max_mapping_size && 2*length > (p_int)max_mapping_size)
+            errorf("Illegal mapping size: %ld elements (%ld x 2)\n", 2*length, length);
         if (max_mapping_keys && length > (p_int)max_mapping_keys)
             errorf("Illegal mapping size: %ld entries\n", length);
 
@@ -4531,7 +4495,7 @@ v_mkmapping (svalue_t *sp, int num_arg)
         for (i = -num_arg; ++i <= 0; )
         {
             if ( sp[i].type != T_POINTER )
-                vefun_arg_error(i+num_arg, T_POINTER, sp[i].type, sp);
+                vefun_arg_error(i+num_arg, T_POINTER, sp+i, sp);
             if (length > VEC_SIZE(sp[i].u.vec))
                 length = VEC_SIZE(sp[i].u.vec);
         }
@@ -4579,7 +4543,7 @@ v_mkmapping (svalue_t *sp, int num_arg)
     if (m == NULL)
     {
         fatal("Illegal argument to mkmapping(): %s, expected array/struct.\n"
-             , typename(sp[-num_arg+1].type));
+             , sv_typename(sp-num_arg+1));
     }
 
     /* Clean up the stack and push the result */
@@ -4660,7 +4624,7 @@ f_widthof (svalue_t *sp)
         return sp;
 
     if (sp->type != T_MAPPING)
-        efun_arg_error(1, T_MAPPING, sp->type, sp);
+        efun_arg_error(1, T_MAPPING, sp, sp);
 
     width = sp->u.map->num_values;
     free_mapping(sp->u.map);

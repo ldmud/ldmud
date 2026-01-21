@@ -3,16 +3,20 @@ SYNOPSIS
 
 BESCHREIBUNG
         Erzeugt eine echte Kopie von <arg> und liefert diese zurueck. Fuer
-        Arrays und Mappings bedeutet dies, dass ein neues Array oder Mapping
-        erzeugt wird, das exakte Kopien der Eintraege des Originals enthaelt.
-        Eingebettete Arrays und Mappings werden ebenso echt kopiert.
+        Arrays, Mappings, Structs und leichtgewichtige Objekte heisst das,
+        dass neue Arrays, Mappings, Structs bzw. leichtgewichtige Objekte
+        erzeugt werden, die Kopien der Elemente des Originals enthalten.
+        Eingebettete Arrays, Mappings, Structs oder leichtgewichtige Objekte
+        werden ebenso echt kopiert.
 
-        Fuer andere Typen als Mappings und Arrays bewirkt diese Funktion
-        nichts.
+        Fuer andere Werte von <arg> bewirkt diese Funktion nichts.
+
+        Falls ein leichtgewichtiges Objekt kopiert wurde, wird der Hook
+        H_CREATE_LWOBJECT_COPY zur Vollendung der Initialisierung aufgerufen.
 
         Wenn im Driver DYNAMIC_COST definiert ist, zaehlt jedes eingebettete
-        Mapping oder Array zu den Evaluationskosten sowohl in der Groesse als
-        auch in der Einbettungstiefe.
+        Array, Mapping, Struct oder leichtgewichtiges Objekt zu den Evalua-
+        tionskosten sowohl in der Groesse als auch in der Einbettungstiefe.
 
 BEISPIELE
         mixed *a, *b;

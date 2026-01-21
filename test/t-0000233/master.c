@@ -126,6 +126,22 @@ void run_test()
                         return funcall(d->get_a_var_cl()) == "a";
                     :)
                 }),
+                ({ "Run " + testname + ": Check for program of closure in 'a'.", 0,
+                    (:
+                        return get_type_info(d.get_a_calc_cl(), 3) == "/a";
+                    :)
+                }),
+                ({ "Run " + testname + ": Check for program of closure in 'b'.", 0,
+                    (:
+                        return get_type_info(d.get_b_calc_cl(), 3) == "/b";
+                    :)
+                }),
+                ({ "Run " + testname + ": Check for program of closure in 'c'.", 0,
+                    (:
+                        closure cl = d->get_c_calc_cl();
+                        return cl ? get_type_info(cl, 3) == "/c" : 1;
+                    :)
+                }),
                 ({ "Run " + testname + ": Check for virtual variable lambda closures in 'a'.", 0,
                     (:
                         return funcall(d->get_a_var_cl2()) == "a";
@@ -171,6 +187,11 @@ void run_test()
                 ({ "Run " + testname + ": Check for wildcard calls in 'c'.", 0,
                     (:
                         return d.c_wildcard_calc() == 1;
+                    :)
+                }),
+                ({ "Run " + testname + ": variable_exists() on a_var.", 0,
+                    (:
+                        return funcall(bind_lambda(#'variable_exists, d), "a_var", d) == "/a";
                     :)
                 }),
             }));

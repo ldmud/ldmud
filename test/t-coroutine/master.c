@@ -1,5 +1,6 @@
-#pragma save_types, strong_types, rtt_checks
+#pragma save_types, strong_types, rtt_checks, save_local_names
 
+#include "/sys/driver_info.h"
 #include "/sys/lpctypes.h"
 #include "/inc/base.inc"
 #include "/inc/deep_eq.inc"
@@ -29,6 +30,17 @@ async void data_cr(mixed arg, mixed val = ({ 'me }))
 async mixed return_value(mixed arg)
 {
     return arg;
+}
+
+async void dont_save_out_of_scope_variable()
+{
+    // Checking whether #pragma save_local_names has a problem with
+    // a former local variable.
+    {
+        int i = 10;
+    }
+
+    yield();
 }
 
 coroutine* global_crs;
@@ -75,6 +87,18 @@ void run_test()
     call_out(#'shutdown, 5*__ALARM_TIME__, 1);
 
     errors = run_array_without_callback(({
+        ({ "driver_info(DI_NUM_COROUTINES) without coroutines", 0,
+            function int()
+            {
+                return driver_info(DI_NUM_COROUTINES) == 0;
+            }
+        }),
+        ({ "driver_info(DI_SIZE_COROUTINES) without coroutines", 0,
+            function int()
+            {
+                return driver_info(DI_SIZE_COROUTINES) == 0;
+            }
+        }),
         ({ "creating a coroutine", 0,
             function int()
             {
@@ -197,7 +221,33 @@ void run_test()
                 return 1;
             },
         }),
-        ({ "Errors within coroutine 1", TF_ERROR,
+        ({ "driver_info(DI_NUM_COROUTINES) after some tests", 0,
+            function int()
+            {
+                return driver_info(DI_NUM_COROUTINES) == 0;
+            }
+        }),
+        ({ "driver_info(DI_SIZE_COROUTINES) after some tests", 0,
+            function int()
+            {
+                return driver_info(DI_SIZE_COROUTINES) == 0;
+            }
+        }),
+        ({ "driver_info(DI_NUM_COROUTINES) with a coroutine", 0,
+            function int()
+            {
+                coroutine cr = async function void() {};
+                return driver_info(DI_NUM_COROUTINES) == 1;
+            }
+        }),
+        ({ "driver_info(DI_SIZE_COROUTINES) with a coroutine", 0,
+            function int()
+            {
+                coroutine cr = async function void() {};
+                return driver_info(DI_SIZE_COROUTINES) > 0;
+            }
+        }),
+        ({ "Caught errors within coroutine 1", TF_ERROR,
             function void()
             {
                 coroutine cr1 = async function void()
@@ -211,7 +261,7 @@ void run_test()
                 call_coroutine(cr2);
             }
         }),
-        ({ "Errors within coroutine 2", TF_ERROR,
+        ({ "Caught errors within coroutine 2", TF_ERROR,
             function void()
             {
                 coroutine cr1 = async function void()
@@ -225,7 +275,7 @@ void run_test()
                 call_coroutine(cr2);
             }
         }),
-        ({ "Errors within coroutine 3", 0,
+        ({ "Caught errors within coroutine 3", 0,
             function int()
             {
                 coroutine cr1 = async function void()
@@ -242,6 +292,87 @@ void run_test()
                 };
                 catch(call_coroutine(cr3));
                 return !cr1 && !cr2 && !cr3; /* All are invalid. */
+            }
+        }),
+        ({ "Caught errors within coroutine 4", TF_ERROR,
+            function void()
+            {
+                coroutine cr1 = async function void()
+                {
+                    raise_error("Test error.\n");
+                };
+                coroutine cr2 = async function void()
+                {
+                    call_coroutine(cr1);
+                };
+                call_coroutine(cr2);
+            }
+        }),
+        // The uncaught errors we do with call_out,
+        // not checking whether they are happing,
+        // they just shouldn't crash.
+        ({ "Uncaught errors within coroutine 1", 0,
+            function int()
+            {
+                coroutine cr1 = async function void()
+                {
+                    raise_error("Test error.\n");
+                };
+                coroutine cr2 = async function void()
+                {
+                    yield(0, cr1);
+                };
+                call_out(#'call_coroutine, 0, cr2);
+                return 1;
+            }
+        }),
+        ({ "Uncaught errors within coroutine 2", 0,
+            function int()
+            {
+                coroutine cr1 = async function void()
+                {
+                    raise_error("Test error.\n");
+                };
+                coroutine cr2 = async function void()
+                {
+                    await(cr1);
+                };
+                call_out(#'call_coroutine, 0, cr2);
+                return 1;
+            }
+        }),
+        ({ "Uncaught errors within coroutine 3", 0,
+            function int()
+            {
+                coroutine cr1 = async function void()
+                {
+                    raise_error("Test error.\n");
+                };
+                coroutine cr2 = async function void()
+                {
+                    await(cr1);
+                };
+                coroutine cr3 = async function void()
+                {
+                    await(cr2);
+                };
+                call_out(#'call_coroutine, 0, cr3);
+                return 1;
+            }
+        }),
+        ({ "Uncaught errors within coroutine 4", 0,
+            function int()
+            {
+                coroutine cr1 = async function void()
+                {
+                    raise_error("Test error.\n");
+                };
+                coroutine cr2 = async function void()
+                {
+                    call_coroutine(cr1);
+                };
+                call_out(#'call_coroutine, 0, cr2);
+                return 1;
             }
         }),
         ({ "await() with wrong type", TF_ERROR,
@@ -460,7 +591,7 @@ void run_test()
            function int()
            {
                 call_coroutine(
-                    "ob".sleeping_fun(function void(int success) : int errors = &errors
+                    new_lwobject("/lwob").sleeping_fun(function void(int success) : int errors = &errors
                     {
                         if (!success)
                         {

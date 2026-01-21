@@ -25,7 +25,8 @@ DESCRIPTION
           Control of returned information:
             RETURN_FUNCTION_NAME    include the function name
             RETURN_FUNCTION_FLAGS   include the function flags
-            RETURN_FUNCTION_TYPE    include the return type
+            RETURN_FUNCTION_TYPE    include the return type as an integer
+            RETURN_FUNCTION_LPCTYPE include the return type as lpctype value
             RETURN_FUNCTION_NUMARG  include the number of arguments.
 
             The name RETURN_FUNCTION_ARGTYPE is defined but not implemented.
@@ -46,6 +47,8 @@ DESCRIPTION
             TYPE_MOD_NO_MASK    function is nomask
             TYPE_MOD_PUBLIC     function is public
 
+HISTORY
+        LDMud 3.6.7 introduced RETURN_FUNCTION_LPCTYPE.
 
 SEE ALSO
         inherit_list(E), function_exists(E), variable_list(E),

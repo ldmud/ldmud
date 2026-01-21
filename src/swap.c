@@ -333,9 +333,14 @@ locate_out (program_t *prog)
     prog->update_index_map   = MAKEOFFSET(unsigned short *, update_index_map);
     prog->struct_defs        = MAKEOFFSET(struct_def_t *, struct_defs);
     prog->includes           = MAKEOFFSET(include_t *, includes);
+    if (prog->local_variables)
+        prog->local_variables= MAKEOFFSET(local_variable_dbg_t *, local_variables);
+    if (prog->lwo_call_cache)
+        prog->lwo_call_cache = MAKEOFFSET(call_cache_t *, lwo_call_cache);
+    prog->types              = MAKEOFFSET(lpctype_t **, types);
     if (prog->type_start)
     {
-        prog->argument_types = MAKEOFFSET(lpctype_t **, argument_types);
+        prog->argument_types = MAKEOFFSET(unsigned short *, argument_types);
         prog->type_start     = MAKEOFFSET(unsigned short *, type_start);
     }
     return MY_TRUE;
@@ -379,9 +384,14 @@ locate_in (program_t *prog)
     prog->update_index_map   = MAKEPTR(unsigned short *, update_index_map);
     prog->struct_defs        = MAKEPTR(struct_def_t*, struct_defs);
     prog->includes           = MAKEPTR(include_t*, includes);
+    if (prog->local_variables)
+        prog->local_variables= MAKEPTR(local_variable_dbg_t *, local_variables);
+    if (prog->lwo_call_cache)
+        prog->lwo_call_cache = MAKEPTR(call_cache_t *, lwo_call_cache);
+    prog->types              = MAKEPTR(lpctype_t **, types);
     if (prog->type_start)
     {
-        prog->argument_types = MAKEPTR(lpctype_t **, argument_types);
+        prog->argument_types = MAKEPTR(unsigned short *, argument_types);
         prog->type_start     = MAKEPTR(unsigned short *, type_start);
     }
 
@@ -1073,7 +1083,11 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
         case T_LWOBJECT:
         case T_CLOSURE:
         case T_COROUTINE:
+        case T_LPCTYPE:
         case T_LVALUE:
+#ifdef USE_PYTHON
+        case T_PYTHON:
+#endif
 swap_opaque:
             /* opaque swapped data must be prevented from recursive freeing */
             CHECK_SPACE(sizeof(*svp))
@@ -1233,7 +1247,11 @@ check_swapped_values (mp_int num, unsigned char * p)
         case T_LWOBJECT:
         case T_CLOSURE:
         case T_COROUTINE:
+        case T_LPCTYPE:
         case T_LVALUE:
+#ifdef USE_PYTHON
+        case T_PYTHON:
+#endif
             p += sizeof sv.x;
             p += sizeof sv.u;
             break;
@@ -1397,7 +1415,11 @@ dump_swapped_values (mp_int num, unsigned char * p, int indent)
         case T_LWOBJECT:
         case T_CLOSURE:
         case T_COROUTINE:
+        case T_LPCTYPE:
         case T_LVALUE:
+#ifdef USE_PYTHON
+        case T_PYTHON:
+#endif
             p += sizeof sv.x;
             p += sizeof sv.u;
             fprintf(stderr, " opaque\n");
@@ -1586,7 +1608,11 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_MAPPING:
         case T_NUMBER:
         case T_FLOAT:
+        case T_LPCTYPE:
         case T_LVALUE:
+#ifdef USE_PYTHON
+        case T_PYTHON:
+#endif
 advance:
             /* Opaque storage: skip it */
             p += 1 + sizeof svp->x + sizeof svp->u;
@@ -2100,7 +2126,11 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_LWOBJECT:
         case T_CLOSURE:
         case T_COROUTINE:
+        case T_LPCTYPE:
         case T_LVALUE:
+#ifdef USE_PYTHON
+        case T_PYTHON:
+#endif
             memcpy(&svp->x, p, sizeof svp->x);
             p += sizeof svp->x;
             memcpy(&svp->u, p, sizeof svp->u);

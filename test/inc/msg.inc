@@ -5,7 +5,10 @@
 
 static void msg(string str, varargs mixed *par)
 {
-    debug_message(apply(#'sprintf, str,par), DMSG_STDERR | DMSG_LOGFILE);
+    if (!sizeof(par))
+        debug_message(str, DMSG_STDERR | DMSG_LOGFILE);
+    else
+        debug_message(sprintf(str,par...), DMSG_STDERR | DMSG_LOGFILE);
 }
 
 #endif

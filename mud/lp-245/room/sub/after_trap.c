@@ -21,7 +21,7 @@ void extra_reset() {
 	rat->set_level(3);
 	rat->set_short("An ugly black rat");
 	rat->set_wc(5);
-	rat->set_agressive(1);
+	rat->set_aggressive(1);
 	move_object(rat, this_object());
 	black_stone = clone_object("obj/treasure");
 	black_stone->set_id("stone");

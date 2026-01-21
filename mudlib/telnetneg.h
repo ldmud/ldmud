@@ -84,13 +84,26 @@ private void sb_env(int command, int option, int* optargs);
 private void sb_naws(int command, int option, int* optargs);
 private void sb_status(int command, int option, int* optargs);
 private void sb_line(int command, int option, int* optargs);
+#ifdef __TLS__
+private void sb_tls(int command, int option, int* optargs);
+private void sb_auth(int command, int option, int* optargs);
+#endif
 private int neg_sga(int command, int option);
 private int neg_echo(int command, int option);
 private int neg_bin(int command, int option);
 private int neg_tm(int command, int option);
+#ifdef __MCCP__
+private int neg_mccp(int command, int option);
+#endif
 private void start_sb(int command, int option);
 private void start_eor(int command, int option);
 private void start_lm(int command, int option);
+#ifdef __MCCP__
+private void start_mccp(int command, int option);
+#endif
+#ifdef __TLS__
+private void start_auth(int command, int option);
+#endif
 private void cb_echo(int command, int option);
 private void cb_sga(int command, int option);
 static void modify_prompt(); // std/player/prompt.c
@@ -156,6 +169,7 @@ static void modify_prompt(); // std/player/prompt.c
 #define TELOPT_AUTHENTICATION 37/* authentication */
 #define TELOPT_ENCRYPT  38      /* authentication */
 #define TELOPT_NEWENV   39      /* Environment opt for Port ID */
+#define TELOPT_STARTTLS 46      /* Transport Layer Security */
 
 /* Inofficial, mud specific telnet options */
 #define TELOPT_COMPRESS  85     /* Mud Compression Protocol, v.1 */
@@ -177,7 +191,7 @@ static void modify_prompt(); // std/player/prompt.c
         "3270 REGIME", "X.3 PAD", "NAWS","TSPEED","LFLOW","LINEMODE",\
         "XDISPLOC","ENVIRON","AUTHENTICATION","ENCRYPT","NEWENV",\
         "TELOPT 40", "TELOPT 41", "TELOPT 42", "TELOPT 43",\
-        "TELOPT 44", "TELOPT 45", "TELOPT 46", "TELOPT 47",\
+        "TELOPT 44", "TELOPT 45", "STARTTLS", "TELOPT 47",\
         "TELOPT 48", "TELOPT 49", "TELOPT 50", "TELOPT 51",\
         "TELOPT 52", "TELOPT 53", "TELOPT 54", "TELOPT 55",\
         "TELOPT 56", "TELOPT 57", "TELOPT 58", "TELOPT 59",\
@@ -270,5 +284,50 @@ static void modify_prompt(); // std/player/prompt.c
 #define ENV_VALUE       1
 #define ENV_ESC         2
 #define ENV_USERVAR     3
+
+// AUTHENTICATE methods
+#define AUTH_METHOD_NULL                 0
+#define AUTH_METHOD_KERBEROS_V4          1
+#define AUTH_METHOD_KERBEROS_V5          2
+#define AUTH_METHOD_SPX                  3
+#define AUTH_METHOD_MINK                 4
+#define AUTH_METHOD_SRP                  5
+#define AUTH_METHOD_RSA                  6
+#define AUTH_METHOD_SSL                  7
+#define AUTH_METHOD_LOKI                10
+#define AUTH_METHOD_SSA                 11
+#define AUTH_METHOD_KEA_SJ              12
+#define AUTH_METHOD_KEA_SJ_INTEG        13
+#define AUTH_METHOD_DSS                 14
+#define AUTH_METHOD_NTLM                15
+
+// AUTHENTICATE subnegotiations
+#define AUTH_SB_IS                       0
+#define AUTH_SB_SEND                     1
+#define AUTH_SB_REPLY                    2
+#define AUTH_SB_NAME                     3
+
+// AUTHENTICATE modifiers
+#define AUTH_WHO_MASK                    1
+#define AUTH_WHO_CLIENT_TO_SERVER        0
+#define AUTH_WHO_SERVER_TO_CLIENT        1
+
+#define AUTH_HOW_MASK                    2
+#define AUTH_HOW_ONE_WAY                 0
+#define AUTH_HOW_MUTUAL                  2
+
+#define AUTH_ENCRYPT_MASK               20
+#define AUTH_ENCRYPT_OFF                 0
+#define AUTH_ENCRYPT_USING_TELOPT        4
+#define AUTH_ENCRYPT_AFTER_EXCHANGE     16
+#define AUTH_ENCRYPT_RESERVED           20
+
+#define AUTH_INI_CRED_FWD_MASK           8
+#define AUTH_INI_CRED_FWD_OFF            0
+
+// AUTH_METHOD_SSL codes
+#define AUTH_SSL_START                   1
+#define AUTH_SSL_ACCEPT                  2
+#define AUTH_SSL_REJECT                  3
 
 #endif

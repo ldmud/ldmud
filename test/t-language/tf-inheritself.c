@@ -1,0 +1,1 @@
+inherit "tf-inheritself";

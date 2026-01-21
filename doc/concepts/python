@@ -10,8 +10,23 @@ DESCRIPTION
         or at compile time with the --with-python-script configuration
         option.
 
-        The python script can import the builtin ldmud module.
-        This module provides the following functions:
+        The python script can import the builtin ldmud module for
+        extending LDMud and accessing LDMud information.
+
+STARTUP SCRIPT
+        The startup script can be a single Python script file. This script
+        is executed as the main routine (i.e. __name__ == '__main__') when
+        ldmud starts and before the master object is loaded.
+
+        It's also possible to specify a package with a __main__ module
+        (currently this may be a directory or a zip file). In this case
+        the __main__ submodule will be executed at startup. The package
+        itself will be placed into sys.path, so additional content can
+        be imported.
+
+LDMUD MODULE
+        The ldmud module is only available for Python programs executed
+        inside the ldmud process and provides the following functions:
 
           - register_efun(name, function) -> None
                 Registers a new efun name. This is not allowed during
@@ -28,6 +43,32 @@ DESCRIPTION
                 removal will only affect newly compiled code,
                 already compiled code will produce errors when
                 calling this efun.
+
+          - register_struct(name, base, fields) -> Struct Type
+                Defines a global struct. The base should be an
+                ldmud.Struct type or None. The fields argument should
+                be a list of (field name, field type) pairs.
+
+          - unregister_struct(name) -> None
+                Removes a previously defined struct from registration.
+                The removal will only affect newly compiled code.
+
+          - register_type(name, class) -> None
+                Registers a type for use in LPC. This is not allowed
+                during compilation of an LPC object.
+
+                The type name will then be regarded as a reserved word
+                when compiling LPC code and can be used as a regular
+                LPC type. To actually create objects of the types,
+                additional registration of corresponding efuns is needed.
+
+                For details about the usage, see PYTHON TYPES below.
+
+          - unregister_type(name) -> None
+                Removes a python type from registration. This is not
+                allowed during compilation of an LPC object. The removal
+                will only affect newly compiled code. Already compiled
+                code will still work afterwards.
 
           - register_socket(fd, function [,eventmask]) -> None
                 Registers a socket <fd> to watch for events (like
@@ -65,14 +106,47 @@ DESCRIPTION
                     was received. This could also happen for processes
                     spawned by the driver itself (eg. erq).
 
+                  ON_SIGINT
+                    Called without any argument whenever a SIGINT signal
+                    was received. (This is just informative, the driver
+                    will execute the DC_SIGACTION_SIGINT action also.)
+
+                  ON_SIGTERM
+                    Called without any argument whenever a SIGTERM signal
+                    was received. The driver will terminate afterwards.
+
+                  ON_SIGHUP
+                    Called without any argument whenever a SIGHUP signal
+                    was received. (This is just informative, the driver
+                    will execute the DC_SIGACTION_SIGHUP action also.)
+
+                  ON_SIGUSR1
+                    Called without any argument whenever a SIGUSR1 signal
+                    was received. (This is just informative, the driver
+                    will execute the DC_SIGACTION_SIGUSR1 action also.)
+
+                  ON_SIGUSR2
+                    Called without any argument whenever a SIGUSR2 signal
+                    was received. (This is just informative, the driver
+                    will execute the DC_SIGACTION_SIGUSR2 action also.)
+
+                  BEFORE_INSTRUCTION
+                    Called before a single VM instruction will be executed.
+                    The first argument is the current object, the second
+                    argument is an instruction object that provides the
+                    following properties:
+
+                    name
+                        The name of the instruction.
+
           - unregister_hook(hook, function) -> None
                 Removes a hook function.
 
-          - get_master() - > Object
+          - get_master() -> Object
                 Returns the current master object.
                 Returns None, if there is no master object (yet).
 
-          - get_simul_efun() - > Object
+          - get_simul_efun() -> Object
                 Returns the current simul-efun object
                 (or None if there is none).
 
@@ -89,6 +163,9 @@ DESCRIPTION
                   name
                       The object name
 
+                  program_name
+                      The program name (file name it was created from)
+
                   functions
                       Contains all the visible functions (private functions
                       are excluded) as attributes. They support the call
@@ -96,6 +173,9 @@ DESCRIPTION
 
                       name
                           The name of the function
+
+                      program_name
+                        The program that contains the function
 
                       file_name
                           The file that contains the function's definition
@@ -143,6 +223,9 @@ DESCRIPTION
                           One of the following:
                           VIS_PRIVATE, VIS_PROTECTED, VIS_VISIBLE, VIS_PUBLIC
 
+                For type checks the type object can be subscripted with a
+                filename to create a named object type: Object["/name"]
+
           - LWObject(filename)
                 Corresponds to the LPC lwobject type.
                 On instantiation a filename of a blueprint to create
@@ -162,12 +245,18 @@ DESCRIPTION
                       Contains all variables as attributes. They are similar
                       to the same member of the Object type.
 
+                For type checks the type object can be subscripted with a
+                filename to create a named lwobject type: LWObject["/name"]
+
           - Array([values | size])
                 Corresponds to an LPC array.
                 Can either be initialized with a list of values
                 or to a given size.
 
                 Supports element access with [], len() and __contains__.
+
+                For type checks the type object can be subscripted with an
+                element type to create a concrete array type: Array[Mapping]
 
           - Mapping([values | width])
                 Corresponds to an LPC mapping.
@@ -206,12 +295,146 @@ DESCRIPTION
                           The type as a Python object (maybe missing if
                           unknown or mixed).
 
-          - Closure(object [,name [, lfun_object]])
+                For type checks the type object can be subscripted to create
+                a specific struct type: Struct[program, name], whereas the
+                program can be given as a file name or object. When using this
+                for creating a struct, only values need to be passed.
+
+          - Closure(object, name [, lfun_object])
                 Corresponds to an LPC closure.
                 On initialization a closure bound to <object> will be created,
                 like a call to symbol_function(<name> [, <lfun_object>]).
 
                 Supports function calls.
+
+                This class has several sub-classes depending on the type:
+
+                  - LfunClosure(object, name [, bound_object])
+
+                        Has the following members:
+
+                            object
+                                The object of the lfun
+
+                            lfun
+                                The function to call. This is similar to
+                                elements of the <functions> member of the
+                                Object class.
+
+                            bound_object
+                                The object this closure is bound to. If this
+                                is different from the lfun object, calling
+                                this closure would be regarded as a call from
+                                bound_object.
+
+                            inherited
+                                True, if this closure is pointing to a specific
+                                inherited function.
+
+                  - IdentifierClosure(object, name)
+
+                        Has the following members:
+
+                            object
+                                The object of the variable
+
+                            variable
+                                The variable this closure relates to. This is
+                                similar to elements of the <variables> member
+                                of the Object class.
+
+                            bound_object
+                                The object this closure is bound to. It is
+                                always the same as <object>.
+
+                  - LambdaClosure
+
+                        Has the following members:
+
+                            object
+                                The object that created this lambda closure.
+
+                            bound_object
+                                The object this closure is bound to. It is
+                                always the same as <object>.
+
+                  - UnboundLambdaClosure
+
+                        Has the following members:
+
+                            object
+                                This will always be None.
+
+                            bound_object
+                                This will always be None.
+
+                  - BoundLambdaClosure(object, lambda)
+
+                        Has the following members:
+
+                            object
+                                The object that bound this lambda closure.
+
+                            bound_object
+                                The object this closure is bound to. It is
+                                always the same as <object>.
+
+                            unbound_lambda
+                                The original unbound lambda.
+
+                  - EfunClosure(object, name)
+
+                        Has the following members:
+
+                            object
+                                The object this closure is bound to.
+
+                            efun
+                                An Efun or PythonEfun object (similar to the
+                                the ones in the ldmud.efuns namespace), that
+                                is callable and has the following members
+
+                                    name
+                                        The name of the efun.
+
+                                    function
+                                        For Python-defined efuns only,
+                                        the Python function that was
+                                        registered.
+
+                            bound_object
+                                The object this closure is bound to. It is
+                                always the same as <object>.
+
+                  - SimulEfunClosure(object, name)
+
+                        Has the following members:
+
+                            object
+                                The object this closure is bound to.
+
+                            simul_efun
+                                The simul-efun function to call. This is
+                                similar to elements of the <functions> member
+                                of the Object class.
+
+                            bound_object
+                                The object this closure is bound to. It is
+                                always the same as <object>.
+
+                  - OperatorClosure(object, name)
+
+                        Has the following members:
+
+                            object
+                                The object this closure is bound to.
+
+                            operator_name
+                                The name of the operator.
+
+                            bound_object
+                                The object this closure is bound to. It is
+                                always the same as <object>.
 
           - Coroutine()
                 Corresponds to an LPC coroutine.
@@ -266,13 +489,90 @@ DESCRIPTION
                 the struct members as attributes and will return an Lvalue
                 object to the struct member.
 
+          - LPCType(type)
+                Corresponds to an LPC lpctype value. For basic types this
+                is a no-op and returns the basic type. This type will provide
+                the corresponding LDMud type object for basic python types,
+                and it can be used to construct a union type by passing a
+                tuple of types.
+
+                A union type allows iteration over its basic types and
+                supports __contains__.
+
+          - Integer, Float, String, Bytes
+                These are derived types from Python's int, float, str and
+                bytes. They offer the | (or) operator to create union of
+                types.
+
+
         This module contains the following sub-namespaces:
 
           - efuns
                 This namespace contains all original efuns (without any
-                registered python efuns or simul-efuns). These can be called
+                registered Python efuns or simul-efuns). These can be called
                 as a regular function.
 
+          - registered_efuns
+                Contains all registered Python efuns.
+
+          - registered_types
+                Contains all registered Python types.
+
+          - registered_structs
+                Contains all Python registered struct definitions.
+
+
+        This module contains the following properties:
+
+          - call_stack
+                Contains a list of all call frames with index 0 being the
+                top-level frame. Each entry has the following members:
+
+                type
+                    The type of the frame:
+                      * CALL_FRAME_TYPE_LFUN
+                      * CALL_FRAME_TYPE_ALIEN_LFUN_CLOSURE
+                      * CALL_FRAME_TYPE_EFUN_CLOSURE
+                      * CALL_FRAME_TYPE_PYTHON_EFUN_CLOSURE
+                      * CALL_FRAME_TYPE_SIMUL_EFUN_CLOSURE
+                      * CALL_FRAME_TYPE_CATCH
+                      * CALL_FRAME_TYPE_LAMBDA
+
+                name
+                    The name of the lfun, efun, Python efun or simul-efun.
+                    (None for catch or lambda frames.)
+
+                object
+                    The current object of this frame (ignoring any changes
+                    by set_this_object()).
+
+                program_name
+                    For lfun frames the corresponding program.
+
+                file_name
+                    For lfun frames the file the LPC code was compiled from.
+
+                line_number
+                    For lfun frames the current line.
+
+                eval_cost
+                    The current evaluation cost counter.
+
+                variables
+                    Contains all local variables of this frame as attributes.
+                    This is only available when the code was compiled with
+                    pragma save_local_names. They contain the following
+                    attributes:
+
+                    name
+                        The name of the variable
+
+                    value
+                        The value of the variable. This attribute is writable
+                        to assign a new value.
+
+                    type
+                        The type as a Python object.
 
         There is mapping of LPC values to Python values for the following types:
             int    <-> int(, bool)
@@ -284,6 +584,64 @@ DESCRIPTION
         following mappings are done:
             void   <-> None
             union  <-> tuple of types
+
+PYTHON TYPES
+        Without any special functions Python types are treated opaque in LPC.
+        There is no introspection available, beside what get_type_info()
+        returns, and there is no facility to create those in LPC. Python
+        objects need to be created and processed by a registered Python efun.
+        But those types can be extended with special functions to make them
+        more usable in LPC.
+
+        Regular LPC operations can be applied to those python objects and
+        will call the corresponding special member functions. If those
+        member functions are not available, the corresponding LPC operations
+        aren't either. For compile time type checking those special member
+        functions can have type annotations just like efun functions.
+        The following operations are supported:
+            +, -, *, /, %, <<, >>, &, |, ^, >, >=, ==, !=, <, <=.
+        For each operation the lhs function (i.e. __add__), the rhs function
+        (i.e. __radd__), and the assignment function (i.e. __iadd__) is
+        supported. The rhs function is also supported for the comparison
+        operations (i.e. __rlt__, this is a non-standard extension to the
+        Python functions).
+
+        Python objects can also extend regular efuns. When the first argument
+        to an efun is a Python object, a function named __efun_<name>__ is
+        called in the Python object instead (when available). The function
+        must accept the same number of arguments as the original efun. (And
+        there must not be a registered Python efun of the same name.)
+
+        Additionally a Python type can implement the following support
+        functions for LPC efuns:
+
+            __repr__
+                Used by sprintf() for printing a Python object.
+                Should return a string.
+
+            __copy__
+                Used by copy() and deep_copy() for copying a Python object.
+                (Deep copying a Python object is currently not supported.)
+                Should return a Python object of the same type.
+
+            __save__
+                Used by save_value()/save_object() to save a Python object.
+                Should return an LPC type (e.g. a string).
+
+            __restore__
+                Used by restore_value()/restore_object() to restore a Python
+                object. This should be a static method that gets the value
+                from __save__ as the only argument and will return the
+                restored object.
+
+            __convert__
+                Used by to_type() to convert the Python object into another
+                type. Gets the target type object as its first argument and
+                the to_type_options struct (which may be None) as a second
+                argument. If the conversion is not supported, can either
+                return None or an exception. Only if the function does not
+                exist, __int__, __float__, __str__ or __bytes__ are called
+                if appropriate.
 
 EXAMPLE
         import ldmud

@@ -580,7 +580,7 @@ f_set_extra_wizinfo (svalue_t *sp)
         if (type == T_NUMBER && sp[-1].u.number == 0)
             user = NULL;
         else
-            efun_gen_arg_error(1, sp->type, sp);
+            efun_gen_arg_error(1, sp, sp);
     }
 
     if (!privilege_violation(STR_SET_EXTRA_WIZINFO, sp-1, sp))

@@ -107,15 +107,16 @@ DESCRIPTION
 
         Inheritance:
         ~~~~~~~~~~~~
-        It is also possible to redeclare all variables and/or functions
-        of an inherited object for the own object at the inheriting
+        It is also possible to redeclare all variables, functions and/or
+        structs of an inherited object for the own object at the inheriting
         statement:
 
         private functions nosave variables inherit "complex/room";
         public variables inherit "complex/room";
         private functions inherit "complex/room";
+        private structs inherit "complex/room";
 
-        To redeclare a function or a variable declared public in the
+        To redeclare a function, variable or struct declared public in the
         inherited object to be private or protected is not possible.
 
         The following table shows the result of the combination of
@@ -157,22 +158,23 @@ DESCRIPTION
 
 
         To simplify the adoption of existing code, LPC allows to specify
-        a default visibility for functions and variables, using a syntax
-        similar to the inherit syntax:
+        a default visibility for functions, variables and structs, using
+        a syntax similar to the inherit syntax:
 
           default private;
 
-            All variables and functions are by default private.
+            All variables, functions and structs are by default private.
 
-          default private variables public functions;
+          default private variables public functions public structs;
 
-            All variables are by default private, but functions are public.
+            All variables are by default private, but functions and
+            structs are public.
 
         Only the modifiers 'private', 'protected', 'visible' and 'public'
         (and 'static' for functions only) are allowed here.
 
-        The default visibility thus set affects only variables/functions with
-        no explicit visibility:
+        The default visibility thus set affects only functions/variables/
+        structs with no explicit visibility:
 
           default private;
 
@@ -202,6 +204,8 @@ HISTORY
 
         LDMud 3.5 introduced 'visible' as a name for the default
         visibility.
+
+        LDMud 3.6.6 introduced inheritance and default modifiers for structs.
 
 SEE ALSO
             closures(LPC), inheritance(LPC), functions(LPC), types(LPC)

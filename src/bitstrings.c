@@ -795,12 +795,11 @@ copy_bits ( string_t * dest, p_int deststart
              */
 
             int getmask, getbit;
-            int storemask, storebit;
+            int storemask;
             char src_bits, dest_bits;
 
             getbit = srcstart % 6;
             getmask = 1 << getbit;
-            storebit = 0;
             storemask = 0x01;
 
             src_bits = *pSrc - ' ';
@@ -822,7 +821,7 @@ copy_bits ( string_t * dest, p_int deststart
                 }
 
                 deststart++;
-                storebit++; storemask <<= 1;
+                storemask <<= 1;
 
                 len--;
             }

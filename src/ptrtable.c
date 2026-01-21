@@ -27,9 +27,11 @@
 
 #include "driver.h"
 
+#include <stddef.h>
 #include <sys/types.h>
 
 #include "ptrtable.h"
+#include "interpret.h"
 #include "mempools.h"
 #include "simulate.h"
 
@@ -78,6 +80,48 @@ struct pointer_table
       */
 };
 
+
+/* Cleanup handler structure.
+ */
+struct pointer_table_cleanup_handler
+{
+    error_handler_t head;           /* For push_error_handler. */
+    struct pointer_table ptable;    /* The table to clean up.  */
+};
+
+
+/*-------------------------------------------------------------------------*/
+static void *
+create_pointer_table (size_t size, size_t off)
+
+/* Allocate and initialise a new pointer table and return it.
+ * The pointer table shall be at offset <off> within a
+ * memory block of size <size>. The memory block will be returned.
+ */
+
+{
+    Mempool pool;
+    void *block;
+    struct pointer_table *ptable;
+
+    pool = new_mempool(size_mempool(sizeof(struct pointer_record)));
+    if (!pool)
+        return NULL;
+    block = mempool_alloc(pool, size);
+    if (!block)
+    {
+        mempool_delete(pool);
+        return NULL;
+    }
+
+    ptable = block + off;
+    memset(ptable->hash_usage, 0, sizeof ptable->hash_usage);
+    memset(ptable->table, 0, sizeof ptable->table);
+    ptable->pool = pool;
+
+    return block;
+} /* create_pointer_table() */
+
 /*-------------------------------------------------------------------------*/
 struct pointer_table *
 new_pointer_table (void)
@@ -86,23 +130,7 @@ new_pointer_table (void)
  */
 
 {
-    Mempool pool;
-    struct pointer_table *ptable;
-
-    pool = new_mempool(size_mempool(sizeof(struct pointer_record)));
-    if (!pool)
-        return NULL;
-    ptable = mempool_alloc(pool, sizeof(*ptable));
-    if (!ptable)
-    {
-        mempool_delete(pool);
-        return NULL;
-    }
-    memset(ptable->hash_usage, 0, sizeof ptable->hash_usage);
-    memset(ptable->table, 0, sizeof ptable->table);
-    ptable->pool = pool;
-
-    return ptable;
+    return create_pointer_table(sizeof(struct pointer_table), 0);
 } /* new_pointer_table() */
 
 /*-------------------------------------------------------------------------*/
@@ -115,6 +143,37 @@ free_pointer_table (struct pointer_table *ptable)
 {
     mempool_delete(ptable->pool);
 } /* free_pointer_table() */
+
+/*-------------------------------------------------------------------------*/
+static void
+cleanup_pointer_table (error_handler_t *arg)
+
+/* Cleanup the pointer table.
+ */
+
+{
+    free_pointer_table(&((struct pointer_table_cleanup_handler *)arg)->ptable);
+} /* cleanup_pointer_table() */
+
+/*-------------------------------------------------------------------------*/
+struct pointer_table *
+push_new_pointer_table (void)
+
+/* Allocate and initialize a new pointer table, push it with an cleanup
+ * handler on the stack and return it. Returns NULL when out of memory.
+ */
+
+{
+    struct pointer_table_cleanup_handler *handler =
+        create_pointer_table(sizeof(struct pointer_table_cleanup_handler),
+            offsetof(struct pointer_table_cleanup_handler, ptable));
+
+    if (!handler)
+        return NULL;
+
+    push_error_handler(cleanup_pointer_table, &(handler->head));
+    return &(handler->ptable);
+} /* push_new_pointer_table() */
 
 /*-------------------------------------------------------------------------*/
 struct pointer_record *

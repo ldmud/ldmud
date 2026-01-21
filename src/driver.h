@@ -162,9 +162,6 @@ extern unsigned char _my_ctype[];
 /* A define to point out empty loop bodies. */
 #define NOOP
 
-/* A macro to wrap statements */
-#define MACRO(x) do { x ; } while(0)
-
 /* Determine the minimum of two values.
  * Some systems define this in system includes.
  */

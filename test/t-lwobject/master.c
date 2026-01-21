@@ -1,6 +1,7 @@
 #pragma save_types, strong_types, rtt_checks
 
 #include "/sys/configuration.h"
+#include "/sys/driver_info.h"
 #include "/sys/object_info.h"
 
 #include "/inc/base.inc"
@@ -19,12 +20,42 @@ void run_test()
           "-------------------------------------\n");
 
     run_array(({
+        ({ "driver_info(DI_NUM_LWOBJECTS) without lwobjects", 0,
+            function int()
+            {
+                return driver_info(DI_NUM_LWOBJECTS) == 0;
+            }
+        }),
+        ({ "driver_info(DI_SIZE_LWOBJECTS) without lwobjects", 0,
+            function int()
+            {
+                return driver_info(DI_SIZE_LWOBJECTS) == 0;
+            }
+        }),
         ({ "creating a lightweight object", 0,
             function int()
             {
                 lwobject "/lwo/stack" lwob = new_lwobject("/lwo/stack");
                 return lwob != 0;
             },
+        }),
+        ({ "creating a lightweight object with error during __INIT()", TF_ERROR,
+            function void()
+            {
+                // Foremost we check that nothing leaks.
+                object master = load_object("/lwo/error");
+                master.activate_error_on_init();
+                new_lwobject("/lwo/error");
+            }
+        }),
+        ({ "creating a lightweight object with error during new()", TF_ERROR,
+            function void()
+            {
+                // Foremost we check that nothing leaks.
+                object master = load_object("/lwo/error");
+                master.activate_error_on_new();
+                new_lwobject("/lwo/error");
+            }
         }),
         ({ "checking runtime type", TF_ERROR,
             function void()
@@ -62,6 +93,28 @@ void run_test()
 
                 set_driver_hook(H_CREATE_LWOBJECT, "new"); /* Reset it. */
                 return lwob.pop() == "Y";
+            }
+        }),
+        ({ "closure as H_CREATE_LWOBJECT 3", 0,
+            function int()
+            {
+                lwobject lwob;
+
+                set_driver_hook(H_CREATE_LWOBJECT, function void(lwobject lwob, varargs mixed* values)
+                {
+                    foreach(mixed val: values)
+                        lwob.push(val);
+                });
+                lwob = new_lwobject("/lwo/stack", 11, 22);
+
+                set_driver_hook(H_CREATE_LWOBJECT, "new"); /* Reset it. */
+                return lwob.pop() == 22 && lwob.pop() == 11 && lwob.empty();
+            }
+        }),
+        ({ "checking variable initialization with share_variables", 0,
+            function int()
+            {
+                return new_lwobject("/lwo/share_var").check_lwobject();
             }
         }),
         ({ "call_out()", 0,
@@ -103,7 +156,7 @@ void run_test()
                 return getuid(lwob) == "lwuid" && geteuid(lwob) == "lwuid";
             }
         }),
-        ({ "calling a lightweight object", 0,
+        ({ "calling a lightweight object with .", 0,
             function int()
             {
                 lwobject lwob = new_lwobject("/lwo/stack");
@@ -115,7 +168,7 @@ void run_test()
                 return lwob.pop() == "!";
             }
         }),
-        ({ "calling a lightweight object several times", 0,
+        ({ "calling a lightweight object several times with .", 0,
             function int()
             {
                 /* This is for testing the call cache. */
@@ -125,12 +178,44 @@ void run_test()
                 return lwob.pop() == 2 && lwob.pop() == 1 && lwob.pop() == 0;
             }
         }),
-        ({ "calling a missing function in a lightweight object several times", 0,
+        ({ "calling a missing function in a lightweight object several times with .", 0,
             function int()
             {
                 lwobject "/lwo/stack" lwob = new_lwobject("/lwo/stack");
                 foreach(int i: 3)
                     if (!catch(lwob.append(i)))
+                        return 0;
+                return 1;
+            }
+        }),
+        ({ "calling a lightweight object with ->", 0,
+            function int()
+            {
+                lwobject lwob = new_lwobject("/lwo/stack");
+                lwob->push("Here");
+                lwob->push("I");
+                lwob->push("Am");
+                lwob->push("!");
+
+                return lwob->pop() == "!";
+            }
+        }),
+        ({ "calling a lightweight object several times with ->", 0,
+            function int()
+            {
+                /* This is for testing the call cache. */
+                lwobject "/lwo/stack" lwob = new_lwobject("/lwo/stack");
+                foreach(int i: 3)
+                    lwob->push(i);
+                return lwob->pop() == 2 && lwob->pop() == 1 && lwob->pop() == 0;
+            }
+        }),
+        ({ "calling a missing function in a lightweight object several times with ->", 0,
+            function int()
+            {
+                lwobject "/lwo/stack" lwob = new_lwobject("/lwo/stack");
+                foreach(int i: 3)
+                    if (lwob->append(i))
                         return 0;
                 return 1;
             }
@@ -234,6 +319,28 @@ void run_test()
                 return clone.pop() == "What?" && clone.empty() && !orig.empty();
             }
         }),
+        ({ "copy() with error during __INIT()", TF_ERROR,
+            function void()
+            {
+                // Foremost we check that nothing leaks.
+                object master = load_object("/lwo/error");
+                lwobject orig = new_lwobject("/lwo/error");
+
+                master.activate_error_on_init();
+                copy(orig);
+            }
+        }),
+        ({ "copy() with error during copied()", TF_ERROR,
+            function void()
+            {
+                // Foremost we check that nothing leaks.
+                object master = load_object("/lwo/error");
+                lwobject orig = new_lwobject("/lwo/error");
+
+                master.activate_error_on_copy();
+                copy(orig);
+            }
+        }),
         ({ "deep_copy()", 0,
             function int()
             {
@@ -248,6 +355,28 @@ void run_test()
                 return deep_eq(result, value) && result != value && clone.empty() && !orig.empty();
             }
         }),
+        ({ "deep_copy() with error during __INIT()", TF_ERROR,
+            function void()
+            {
+                // Foremost we check that nothing leaks.
+                object master = load_object("/lwo/error");
+                lwobject orig = new_lwobject("/lwo/error");
+
+                master.activate_error_on_init();
+                deep_copy(({orig}));
+            }
+        }),
+        ({ "deep_copy() with error during copied()", TF_ERROR,
+            function void()
+            {
+                // Foremost we check that nothing leaks.
+                object master = load_object("/lwo/error");
+                lwobject orig = new_lwobject("/lwo/error");
+
+                master.activate_error_on_copy();
+                deep_copy(({orig}));
+            }
+        }),
         ({ "saving and restoring", 0,
             function int()
             {
@@ -257,6 +386,80 @@ void run_test()
                 orig.push("What?");
                 clone = restore_value(save_value(orig));
                 return clone.pop() == "What?" && clone.empty() && !orig.empty();
+            }
+        }),
+        ({ "saving and restoring in a mapping", 0,
+            function int()
+            {
+                lwobject orig = new_lwobject("/lwo/stack");
+                lwobject clone;
+
+                orig.push("What?");
+                clone = restore_value(save_value(([1:orig])))[1];
+                return clone.pop() == "What?" && clone.empty() && !orig.empty();
+            }
+        }),
+        ({ "saving and restoring in an array", 0,
+            function int()
+            {
+                lwobject orig = new_lwobject("/lwo/stack");
+                lwobject clone;
+
+                orig.push("What?");
+                clone = restore_value(save_value(({orig})))[0];
+                return clone.pop() == "What?" && clone.empty() && !orig.empty();
+            }
+        }),
+        ({ "saving and restoring in an lwobject", 0,
+            function int()
+            {
+                lwobject outer = new_lwobject("/lwo/stack");
+                lwobject inner = new_lwobject("/lwo/stack");
+                lwobject clone;
+
+                outer.push(inner);
+                inner.push("What?");
+                clone = restore_value(save_value(outer));
+                return clone.pop().pop() == "What?" && clone.empty() && !outer.empty() && !inner.empty();
+            }
+        }),
+        ({ "saving and restoring with double variables", 0,
+            function int()
+            {
+                lwobject clone;
+
+                // Throwing errors is okay.
+                if (catch(clone = restore_value("(*\"/lwo/stack.c stack,stack\",({\"Stack1\",}),({\"Stack2\",}),*)")))
+                    return 1;
+
+                // Otherwise it must be a valid result.
+                return clone.pop() == "Stack2" && clone.empty();
+            }
+        }),
+        ({ "saving and restoring with error during __INIT()", TF_ERROR,
+            function void()
+            {
+                // Foremost we check that nothing leaks.
+                object master = load_object("/lwo/error");
+                lwobject outer = new_lwobject("/lwo/stack");
+                lwobject inner = new_lwobject("/lwo/error");
+                outer.push(inner);
+
+                master.activate_error_on_init();
+                restore_value(save_value(outer));
+            }
+        }),
+        ({ "saving and restoring with error during restored()", TF_ERROR,
+            function void()
+            {
+                // Foremost we check that nothing leaks.
+                object master = load_object("/lwo/error");
+                lwobject outer = new_lwobject("/lwo/stack");
+                lwobject inner = new_lwobject("/lwo/error");
+                outer.push(inner);
+
+                master.activate_error_on_restore();
+                restore_value(save_value(outer));
             }
         }),
         ({ "blueprint()", 0,
@@ -385,6 +588,28 @@ void run_test()
                    && !object_info(find_object("/lwo/stack"), OI_NO_LIGHTWEIGHT);
             }
         }),
+        ({ "driver_info(DI_NUM_LWOBJECTS) with lwobjects", 0,
+            function int()
+            {
+                int prev = driver_info(DI_NUM_LWOBJECTS);
+                lwobject lwob = new_lwobject("/lwo/stack");
+
+                return driver_info(DI_NUM_LWOBJECTS) == prev + 1;
+            }
+        }),
+        ({ "driver_info(DI_SIZE_LWOBJECTS) with lwobjects", 0,
+            function int()
+            {
+                /* Clear the trace. */
+                foreach (int i: 65536)
+                    this_object()->noop();
+
+                int prev = driver_info(DI_SIZE_LWOBJECTS);
+                lwobject lwob = new_lwobject("/lwo/stack");
+
+                return driver_info(DI_SIZE_LWOBJECTS) > prev;
+            }
+        }),
         ({ "running internal tests", 0,
             function int()
             {
@@ -413,6 +638,8 @@ string *epilog(int eflag)
 {
     set_driver_hook(H_CREATE_OB, "create");
     set_driver_hook(H_CREATE_LWOBJECT, "new");
+    set_driver_hook(H_CREATE_LWOBJECT_COPY, "copied");
+    set_driver_hook(H_CREATE_LWOBJECT_RESTORE, "restored");
     set_driver_hook(H_LWOBJECT_UIDS, unbound_lambda(({}), "lwuid"));
 
     run_test();

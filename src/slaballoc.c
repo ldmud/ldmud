@@ -1183,7 +1183,7 @@ mem_dump_data (strbuf_t *sbuf)
                , s_slab.size
                );
     strbuf_addf(sbuf
-               , "Total storage in use: (b-g-h)     %10lu net available:   %10lu\n"
+               , "Total storage in use: (b-g-h)     %10"PRIuPINT" net available:   %10"PRIuPINT"\n"
                , mem_mem_allocated()
                , mem_mem_used()
                );

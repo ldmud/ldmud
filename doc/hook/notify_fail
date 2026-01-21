@@ -18,8 +18,8 @@ DESCRIPTION
 
         If set to a closure, it is called with the command and the
         command giver as arguments, and the result is used as failure
-        message. Lambda closures are bound to this_player() prior to
-        execution.
+        message. Unbound lambda closures are bound to this_player()
+        prior to execution.
 
         <cmd_giver> is the object which received the command in the
         first place. It is usually identical with this_player(),

@@ -36,17 +36,21 @@
 
 #ifdef USE_IPV6
 
-/* For IPv6 we defined macros for the 'old' sockaddr member names
- * which expand into the ipv6 names.
- */
+#define AF_INET4OR6         AF_INET6
+#define INET4OR6_ADDRSTRLEN INET6_ADDRSTRLEN
+#define IN4OR6ADDR_ANY      in6addr_any
 
-#define sockaddr_in sockaddr_in6
+typedef struct sockaddr_in6 sockaddr_in4or6;
+typedef struct in6_addr in4or6_addr;
 
-#define sin_port    sin6_port
-#define sin_addr    sin6_addr
-#define sin_family  sin6_family
-#define s_addr      s6_addr
-#define in_addr     in6_addr
+/* sockaddr_in6 members */
+#define sin4or6_port    sin6_port
+#define sin4or6_addr    sin6_addr
+#define sin4or6_family  sin6_family
+
+/* in6_addr member */
+#define s4or6_addr      s6_addr
+
 
 #if defined(__APPLE__) && defined(__MACH__) && !defined(s6_addr32)
 
@@ -58,6 +62,23 @@
 #  define s6_addr16 __u6_addr.__u6_addr16
 #  define s6_addr32 __u6_addr.__u6_addr32
 #endif
+
+#else
+
+#define AF_INET4OR6         AF_INET
+#define INET4OR6_ADDRSTRLEN INET_ADDRSTRLEN
+#define IN4OR6ADDR_ANY      (struct in_addr){.s_addr = INADDR_ANY}
+
+typedef struct sockaddr_in sockaddr_in4or6;
+typedef struct in_addr in4or6_addr;
+
+/* sockaddr_in6 members */
+#define sin4or6_port    sin_port
+#define sin4or6_addr    sin_addr
+#define sin4or6_family  sin_family
+
+/* in6_addr member */
+#define s4or6_addr      s_addr
 
 #endif /* USE_IPV6 */
 
@@ -129,6 +150,20 @@ enum input_type_e {
 
 typedef enum input_type_e input_type_t;
 
+/* --- struct listen_port_s: Port designation.
+ *
+ * A port to listen is either an IPv4/v6 port or an inherited socket.
+ * An IP port can optionally be limited to an address.
+ */
+struct listen_port_s
+{
+    enum { LISTEN_PORT_ANY, LISTEN_PORT_ADDR, LISTEN_PORT_INHERITED } type;
+    const char* str;
+    int port;
+    in4or6_addr addr;
+};
+
+
 /* --- struct input_s: Stack of input handlers.
  *
  * input_s represents all pending input handlers, which
@@ -165,7 +200,7 @@ struct interactive_s {
                                    called with next input line */
     object_t *modify_command;   /* modify_command() handler() */
     svalue_t prompt;            /* The prompt to print. */
-    struct sockaddr_in addr;    /* Address of connected user */
+    sockaddr_in4or6 addr;       /* Address of connected user */
 
     CBool closing;              /* True when closing this socket. */
     CBool tn_enabled;           /* True: telnet machine enabled */
@@ -380,6 +415,8 @@ struct interactive_s {
 extern interactive_t *all_players[MAX_PLAYERS];
 extern int num_player;
 extern char *domain_name;
+extern struct listen_port_s port_numbers[];
+extern int numports;
 
 extern p_int write_buffer_max_size;
 
@@ -393,8 +430,11 @@ extern statcounter_t inet_volume_in;
 
 /* --- Prototypes --- */
 
+extern void comm_init();
 extern void initialize_host_name (const char *hname);
 extern void initialize_host_ip_number(const char *, const char *);
+extern bool add_listen_port(const char *port);
+extern bool add_inherited_port(const char *port);
 extern void  prepare_ipc(void);
 extern void  ipc_remove(void);
 extern Bool comm_socket_write (char *msg, size_t size, interactive_t *ip, uint32 flags);
@@ -459,6 +499,6 @@ extern svalue_t *f_users(svalue_t *sp);
 extern svalue_t *f_net_connect (svalue_t *sp);
 extern svalue_t *f_configure_interactive(svalue_t *sp);
 
-extern void refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) );
+extern void refresh_access_data(void (*add_entry)(sockaddr_in4or6 *, int, long*) );
 
 #endif /* COMM_H__ */

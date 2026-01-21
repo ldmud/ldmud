@@ -51,11 +51,27 @@ union u {
     mapping_t *map;
       /* T_MAPPING: pointer to the mapping structure.
        */
+    closure_base_t *closure;
+      /* T_CLOSURE when CLOSURE_MALLOCED: Base closure structure.
+       * This is a common structure for all allocated closure types.
+       */
     lambda_t *lambda;
-      /* T_CLOSURE: allocated closures: the closure structure.
+      /* T_CLOSURE/CLOSURE_(UNBOUND_)LAMBDA: the lambda structure.
+       */
+    bound_lambda_t *bound_lambda;
+      /* T_CLOSURE/CLOSURE_BOUND_LAMBDA: bound lambda structure.
+       */
+    lfun_closure_t *lfun_closure;
+      /* T_CLOSURE/CLOSURE_LFUN: lfun/inline closure structure.
+       */
+    identifier_closure_t *identifier_closure;
+      /* T_CLOSURE/CLOSURE_IDENTIFIER: identifier closure structure.
        */
     coroutine_t *coroutine;
       /* T_COROUTINE: pointer to the coroutine structure.
+       */
+    lpctype_t *lpctype;
+      /* T_LPCTYPE: pointer to the type object.
        */
 #ifdef FLOAT_FORMAT_2
     double  float_number;
@@ -75,6 +91,9 @@ union u {
     void *generic;
       /* Use read-only, this member is used to read the svalue generically
        * as "a pointer". It is mostly used in comparisons.
+       *
+       * T_PYTHON: This is an PyObject* really, but to avoid dependencies
+       *   on the Python library we treat it as void outside pkg-python.
        */
 
     svalue_t *lvalue;
@@ -100,8 +119,13 @@ union u {
        */
 
     struct protected_mapentry_lvalue *protected_mapentry_lvalue;
-      /* T_LVALUE/LVALUE_MAPENTRY: Contains a mapping, key, index
+      /* T_LVALUE/LVALUE_PROTECTED_MAPENTRY: Contains a mapping, key, index
        * and a reference counter.
+       */
+
+    struct protected_map_range_lvalue *protected_map_range_lvalue;
+      /* T_LVALUE/LVALUE_PROTECTED_MAP_RANGE: Contains a mapping, key,
+       * indices and a reference counter.
        */
 
     error_handler_t *error_handler;
@@ -154,6 +178,9 @@ struct svalue_s
 #endif
         ph_int closure_type; /* Type of a T_CLOSURE */
         ph_int lvalue_type;  /* Type of a T_LVALUE */
+#ifdef USE_PYTHON
+        ph_int python_type;  /* Type of a T_PYTHON, i.e. type table index */
+#endif
         ph_int quotes;       /* Number of quotes of a quoted array or symbol */
         ph_int num_arg;      /* used by call_out.c to for vararg callouts */
         ph_int generic;
@@ -196,33 +223,37 @@ struct svalue_s
 #define T_BYTES         0xc  /* a byte string */
 #define T_LWOBJECT      0xd  /* a lightweight object */
 #define T_COROUTINE     0xe
+#ifdef USE_PYTHON
+#define T_PYTHON        0xf  /* a Python object */
+#endif
+#define T_LPCTYPE       0x10
 
-#define T_CALLBACK      0xf
+#define T_CALLBACK      0x11
   /* A callback structure referenced from the stack to allow
    * proper cleanup during error recoveries. The interpreter
    * knows how to free it, but that's all.
    */
 
-#define T_ERROR_HANDLER 0x10
+#define T_ERROR_HANDLER 0x12
   /* Not an actual value, this is used internally for cleanup
    * operations. See the description of the error_handler() member
    * for details.
    */
 
-#define T_BREAK_ADDR    0x11
+#define T_BREAK_ADDR    0x13
   /* Not an actual type, it's used internally for saving
    * the address where break statements within switch statements
    * should branch to.
    */
 
-#define T_ARG_FRAME     0x12
+#define T_ARG_FRAME     0x14
   /* Not an actual type, it's used internally for saving
    * the surrounding argument frame pointer, when a new
    * argument frame is created.
    */
 
 #undef T_NULL /* There is some T_NULL definition in system headers. */
-#define T_NULL          0x13
+#define T_NULL          0x15
   /* Not an actual type, this is used in the efun_lpc_types[] table
    * to encode the acceptance of '0' instead of the real datatype.
    */
@@ -237,13 +268,13 @@ struct svalue_s
   /* The secondary information (.x.closure_type) defines the type
    * of closure and the data structure used in the .u union.
    *
-   * Positive numbers have an allocated data structure in .u.lambda:
+   * Positive numbers have an allocated data structure:
    *
-   *    CLOSURE_LFUN           uses .u.lambda->function.lfun
-   *    CLOSURE_IDENTIFIER     uses .u.lambda->function.var_index
-   *    CLOSURE_BOUND_LAMBDA   uses .u.lambda->function.lambda
-   *    CLOSURE_LAMBDA         uses .u.lambda->function.code
-   *    CLOSURE_UNBOUND_LAMBDA uses .u.lambda->function.code
+   *    CLOSURE_LFUN           uses .u.lfun_closure
+   *    CLOSURE_IDENTIFIER     uses .u.identifier_closure
+   *    CLOSURE_BOUND_LAMBDA   uses .u.bound_lambda
+   *    CLOSURE_LAMBDA         uses .u.lambda
+   *    CLOSURE_UNBOUND_LAMBDA uses .u.lambda
    *
    * Negative numbers consist of an index and the corresponding
    * object in .u.ob or .u.lwob. The index (operator, efun or
@@ -279,10 +310,8 @@ struct svalue_s
 #define CLOSURE_EFUN_OFFS       (CLOSURE_EFUN & 0xffff)
 #define CLOSURE_SIMUL_EFUN_OFFS (CLOSURE_SIMUL_EFUN & 0xffff)
 
-  /* The other closure types are created from actual objects and lambdas,
-   * the detailed information is stored in the u.lambda field.
-   * The first types are 'just' references to existing lfuns and variables,
-   * the others actually point to code.
+  /* The other closure types use an allocated and ref-counted structure
+   * with further information.
    */
 
 #define CLOSURE_LFUN            0  /* lfun in an object */
@@ -333,10 +362,6 @@ struct svalue_s
   /* TRUE if the closure points to actual code.
    */
 
-#define CLOSURE_CALLABLE(c) ((c) >= CLOSURE_EFUN && (c) <= CLOSURE_LAMBDA)
-  /* TRUE if the closure is callable.
-   */
-
 
 /* T_LVALUE secondary information. */
 
@@ -358,6 +383,11 @@ struct svalue_s
    * stored in <current_unprotected_mapentry>
    */
 
+#define LVALUE_UNPROTECTED_MAP_RANGE        0x04
+  /* Doesn't have a value. The mapping, key and indices are
+   * stored in <current_unprotected_map_range>.
+   */
+
 #define LVALUE_PROTECTED                    0x10
   /* .u.protected_lvalue points to the reference counted svalue. */
 
@@ -365,10 +395,13 @@ struct svalue_s
   /* .u.protected_char_lvalue contains the referenced string and index. */
 
 #define LVALUE_PROTECTED_RANGE              0x12
-  /* .u.protected_range contains the referenced vector and indices. */
+  /* .u.protected_range_lvalue contains the referenced vector and indices. */
 
 #define LVALUE_PROTECTED_MAPENTRY           0x13
- /* .u.protected_mapentry contains the referenced mapping and key. */
+ /* .u.protected_mapentry_lvalue contains the referenced mapping and key. */
+
+#define LVALUE_PROTECTED_MAP_RANGE          0x14
+ /* .u.protected_map_range_lvalue contains the referenced mapping, key and indices. */
 
 
 #define LVALUE_IS_UNPROTECTED(l)        ((l) < LVALUE_PROTECTED)
@@ -401,6 +434,7 @@ struct svalue_s
 #define TF_BYTES         (1 << T_BYTES)
 #define TF_LWOBJECT      (1 << T_LWOBJECT)
 #define TF_COROUTINE     (1 << T_COROUTINE)
+#define TF_LPCTYPE       (1 << T_LPCTYPE)
 
 #define TF_ANYTYPE       (~0)
   /* This is used in the efun_lpc_types[]
@@ -463,7 +497,8 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
     }
 
     static INLINE void STORE_DOUBLE(svalue_t *dest, double doublevalue) {
-        dest->u.float_number = doublevalue;
+        /* Convert negative zeros to positive ones before storing. */
+        dest->u.float_number = doublevalue + 0.0;
     }
 #else
 /* --- The portable format, used if no other format is defined */
@@ -480,20 +515,6 @@ static INLINE int32_t SPLIT_DOUBLE(double doublevalue, int *int_p) {
 #endif // FLOAT_FORMAT_2
 
 /* --- svalue helper functions and macros --- */
-
-#define addref_closure(sp, from) \
-  MACRO( svalue_t * p = sp; \
-         if (CLOSURE_MALLOCED(p->x.closure_type)) \
-             p->u.lambda->ref++; \
-         else if (p->x.closure_type < CLOSURE_LWO) \
-            ref_lwobject(p->u.lwob); \
-         else \
-             (void)ref_object(p->u.ob, from); \
-  )
-  /* void addref_closure(sp, from): Add one ref to the closure svalue <sp>
-   *   in the function <from>.
-   */
-
 
 /* svalue_t svalue_<type>(value): Creates a svalue_t value of <type>.
  *
@@ -544,7 +565,7 @@ static INLINE svalue_t svalue_float(const double val)
     return (svalue_t){ T_FLOAT, {}, {.float_number = val } };
 #else
     int exponent;
-    int32_t mantissa = SPLIT_DOUBLE(val, &exponent)
+    int32_t mantissa = SPLIT_DOUBLE(val, &exponent);
 
     return (svalue_t){ T_FLOAT, {.exponent = exponent}, {.mantissa = mantissa } };
 #endif
@@ -629,6 +650,15 @@ static INLINE svalue_t svalue_coroutine(coroutine_t * const cr)
  */
 {
     return (svalue_t){ T_COROUTINE, {}, {.coroutine = cr } };
+}
+
+static INLINE svalue_t svalue_lpctype(lpctype_t * const t)
+                        __attribute__((nonnull(1))) __attribute__((const));
+static INLINE svalue_t svalue_lpctype(lpctype_t * const t)
+/* Return an svalue for the lpctype <t>.
+ */
+{
+    return (svalue_t){ T_LPCTYPE, {}, {.lpctype = t } };
 }
 
 static INLINE svalue_t svalue_callback(callback_t * const cb)
@@ -740,6 +770,15 @@ static INLINE void put_coroutine(svalue_t * const dest, coroutine_t * const cr)
     *dest = svalue_coroutine(cr);
 }
 
+static INLINE void put_lpctype(svalue_t * const dest, lpctype_t * const t)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_lpctype(svalue_t * const dest, lpctype_t * const t)
+/* Put the lpctype <t> into <dest>, which is considered empty.
+ */
+{
+    *dest = svalue_lpctype(t);
+}
+
 static INLINE void put_callback(svalue_t * const dest, callback_t * const cb)
                                                 __attribute__((nonnull(1,2)));
 static INLINE void put_callback(svalue_t * const dest, callback_t * const cb)
@@ -799,6 +838,9 @@ static INLINE void put_callback(svalue_t * const dest, callback_t * const cb)
 
 #define push_coroutine(sp,val) \
     ( (sp)++, put_coroutine(sp,val) )
+
+#define push_lpctype(sp,val) \
+    ( (sp)++, put_lpctype(sp,val) )
 
 #define push_callback(sp,val) \
     ( (sp)++, put_callback(sp,val) )

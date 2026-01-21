@@ -28,9 +28,13 @@ EFUN_CLOSURE      "<efun closure>"
 FATAL_ERROR       "Fatal Error"
 FROM              " from "
 FUNCTIONS         "functions"
+GLOBAL            "global"
 HEART_BEAT        "heart_beat"
+#ifndef KEYWORD_IN
 IN                "in"
+#endif
 LINE              " line "
+LIMIT             "limit"
 MEMORY            "memory"
 MEMDUMP           "memdump"
 MYSQL             "mysql"
@@ -59,6 +63,7 @@ SLABALLOC         "slaballoc"
 SMALLOC           "smalloc"
 SLASH             "/"
 SPACE             " "
+STRUCTS           "structs"
 SYSTEM_MALLOC     "system malloc"
 TRACE             "trace"
 TRACEPREFIX       "traceprefix"
@@ -85,6 +90,7 @@ GET_EXTRA_WIZINFO  "get_extra_wizinfo"
 LIMITED            "limited"
 NET_CONNECT        "net_connect"
 NOMASK_SIMUL_EFUN  "nomask simul_efun"
+PRAGMA_NO_SIMUL_EFUNS  "pragma no_simul_efuns"
 RENAME_OBJECT      "rename_object"
 SET_AUTO_INCLUDE   "set_auto_include_string"
 SET_DRIVER_HOOK    "set_driver_hook"
@@ -241,6 +247,10 @@ SUCCESS         "success"
 #ifdef USE_SQLITE
 SQLITE_OPEN     "sl_open"
 SQLITE_PRAGMA   "sqlite_pragma"
+#endif
+
+#ifdef USE_PYTHON
+PYTHON          "python"
 #endif
 
 /***************************************************************************/

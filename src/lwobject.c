@@ -27,6 +27,10 @@
 #include "../mudlib/sys/lwobject_info.h"
 
 /*-------------------------------------------------------------------------*/
+long num_lwobjects = 0;
+long total_lwobject_size = 0;
+
+/*-------------------------------------------------------------------------*/
 void
 _free_lwobject (lwobject_t *lwob)
 
@@ -36,6 +40,9 @@ _free_lwobject (lwobject_t *lwob)
 
 {
     int num_vars = lwob->prog->num_variables;
+
+    num_lwobjects--;
+    total_lwobject_size -=  sizeof(lwobject_t) + sizeof(svalue_t) * lwob->prog->num_variables;
 
     for (int i = 0; i < num_vars; i++)
         free_svalue(lwob->variables + i);
@@ -65,6 +72,9 @@ create_empty_lwobject (int num_variables)
     for (int i = 0; i < num_variables; i++)
         result->variables[i] = svalue_number(0);
 
+    num_lwobjects++;
+    total_lwobject_size += sizeof(lwobject_t) + sizeof(svalue_t) * num_variables;
+
     return result;
 } /* create_empty_lwobject() */
 
@@ -73,7 +83,7 @@ lwobject_t *
 create_lwobject (object_t *blueprint)
 
 /* Create a lightweight object of the object <blueprint>.
- * The variables will be zero-initialized.
+ * The variables will be initialized with __INIT.
  */
 
 {
@@ -89,6 +99,7 @@ create_lwobject (object_t *blueprint)
 
     push_lwobject(inter_sp, result); /* In case of an error. */
     give_uid_to_lwobject(result, blueprint);
+    sapply_lwob_ign_prot(STR_VARINIT, result, 0);
     inter_sp--;
 
     return result;
@@ -99,7 +110,8 @@ lwobject_t *
 copy_lwobject (lwobject_t *orig, bool copy_variables)
 
 /* Create a copy of <orig>.
- * If <copy_variables> is false, the variables will be left empty.
+ * If <copy_variables> is false, the variables will be left initialized
+ * with __INIT.
  */
 
 {
@@ -112,14 +124,64 @@ copy_lwobject (lwobject_t *orig, bool copy_variables)
     result->user = orig->user;
     result->eff_user = orig->eff_user;
 
+    push_lwobject(inter_sp, result); /* In case of an error. */
+    sapply_lwob_ign_prot(STR_VARINIT, result, 0);
+    inter_sp--;
+
     if (copy_variables)
     {
         for (int i=0; i < result->prog->num_variables; i++)
+        {
+            free_svalue(result->variables+i);
             assign_rvalue_no_free(result->variables+i, orig->variables+i);
+        }
     }
 
     return result;
 } /* copy_lwobject() */
+
+/*-------------------------------------------------------------------------*/
+void
+reset_lwobject (lwobject_t *lwob, int hook, int num_arg)
+
+/* Call the driver hook (one of H_CREATE_LWOBJECT*) on the given lwobject.
+ */
+
+{
+    if (driver_hook[hook].type == T_CLOSURE)
+    {
+        if (driver_hook[hook].x.closure_type != CLOSURE_UNBOUND_LAMBDA
+         || driver_hook[hook].u.lambda->num_arg)
+        {
+            /* Closure accepts at least one argument,
+             * so it gets the target object there and we execute
+             * it in the context of the creator (current object).
+             */
+
+            /* We need to add the lightweight object as an
+             * argument before all the others.
+             */
+            inter_sp++;
+            for (int i = 0; i < num_arg; i++)
+                inter_sp[-i] = inter_sp[-i-1];
+            put_ref_lwobject(inter_sp - num_arg, lwob);
+
+            call_lambda_ob(&driver_hook[hook], num_arg+1, &current_object);
+            pop_stack(); /* Ignore result. */
+        }
+        else
+        {
+            /* No arguments, just bind to target. */
+            svalue_t lwobsv = svalue_lwobject(lwob);
+            call_lambda_ob(&driver_hook[hook], 0, &lwobsv);
+            inter_sp = pop_n_elems(num_arg+1, inter_sp); /* arguments & result */
+        }
+    }
+    else if (driver_hook[hook].type == T_STRING)
+    {
+        sapply_lwob_ign_prot(driver_hook[hook].u.str, lwob, num_arg);
+    }
+} /* reset_lwobject() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -196,43 +258,7 @@ v_new_lwobject (svalue_t *sp, int num_arg)
     sapply_lwob_ign_prot(STR_VARINIT, result, 0);
 
     /* Call the H_CREATE_LWOBJECT hook. */
-    if (driver_hook[H_CREATE_LWOBJECT].type == T_CLOSURE)
-    {
-        lambda_t *l = driver_hook[H_CREATE_LWOBJECT].u.lambda;
-
-        if (l->function.code.num_arg)
-        {
-            /* Closure accepts at least one argument,
-             * so it gets the target object there and we execute
-             * it in the context of the creator (current object).
-             */
-            assign_current_object(&(l->ob), "new_lwobject");
-
-            /* We need to add the lightweight object as an
-             * argument before all the others.
-             */
-            sp++;
-            for (int i = 1; i < num_arg; i++)
-                sp[1-i] = sp[-i];
-            put_ref_lwobject(sp - num_arg + 1, result);
-
-            inter_sp = sp;
-            call_lambda(&driver_hook[H_CREATE_LWOBJECT], num_arg);
-            pop_stack(); /* Ignore result. */
-        }
-        else
-        {
-            /* No arguments, just bind to target */
-            free_svalue(&(l->ob));
-            put_ref_lwobject(&(l->ob), result);
-            call_lambda(&driver_hook[H_CREATE_LWOBJECT], 0);
-            inter_sp = pop_n_elems(num_arg, inter_sp); /* arguments & result */
-        }
-    }
-    else if (driver_hook[H_CREATE_LWOBJECT].type == T_STRING)
-    {
-        sapply_lwob_ign_prot(driver_hook[H_CREATE_LWOBJECT].u.str, result, num_arg-1);
-    }
+    reset_lwobject(result, H_CREATE_LWOBJECT, num_arg - 1);
 
     assert(inter_sp == argp); /* All arguments should be freed by now. */
     return argp;
@@ -451,7 +477,7 @@ f_configure_lwobject (svalue_t *sp)
             else if (sp->type == T_NUMBER && sp->u.number == 0)
                 lwob->eff_user = 0;
             else
-                efun_arg_error(2, T_STRING, sp->type, sp);
+                efun_arg_error(2, T_STRING, sp, sp);
         break;
     }
 
@@ -483,6 +509,9 @@ free_sample_lwobject (lwobject_t* lwob)
 
 {
     xfree(lwob);
+
+    num_lwobjects--;
+    total_lwobject_size -=  sizeof(lwobject_t);
 } /* free_sample_lwobject() */
 
 /*-------------------------------------------------------------------------*/

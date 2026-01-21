@@ -688,8 +688,8 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line
         }
 
         /* Free all argument types. */
-        for (i = progp->num_argument_types; --i >= 0; )
-            free_lpctype(progp->argument_types[i]);
+        for (i = progp->num_types; --i >= 0; )
+            free_lpctype(progp->types[i]);
 
         /* Free the strings, variable names and include filenames. */
         do_free_sub_strings( progp->num_strings, progp->strings
@@ -779,14 +779,14 @@ function_exists (string_t *fun, program_t *progp, funflag_t inacceptable_flags
     *fun_type = header->type;
 
     /* And after all this, the function may be undefined */
-    if (is_undef_function(funstart))
+    if (is_undef_function(header, funstart))
     {
         *fun_flags |= NAME_UNDEFINED;
         return NULL;
     }
 
     if(prog_line && prog_name)
-      *prog_line = get_line_number(funstart, progp, prog_name);
+      *prog_line = get_line_number(funstart, progp, prog_name, NULL);
 
     /* We got it. */
     return progp->name;
@@ -830,35 +830,30 @@ reset_object (object_t *ob, int arg, int num_arg)
 
     if (driver_hook[arg].type == T_CLOSURE)
     {
-        lambda_t *l;
-
         if (arg == H_RESET)
         {
             set_current_object(ob);
             previous_ob = current_object;
         }
 
-        l = driver_hook[arg].u.lambda;
-        if (l->function.code.num_arg && arg != H_RESET)
+        if (driver_hook[arg].x.closure_type != CLOSURE_UNBOUND_LAMBDA
+         || driver_hook[arg].u.lambda->num_arg)
         {
-            /* closure accepts arguments, presumably one, so
-             * give it the target object and bind to the current
-             * object.
+            /* closure accepts arguments, so give it the target object
+             * and if necessary bind to the current object.
              */
-            assign_current_object(&(l->ob), "reset_object");
 
             /* We need to insert the object before the other arguments. */
             inter_sp++;
             memmove(inter_sp - num_arg + 1, inter_sp - num_arg, num_arg * sizeof(*inter_sp));
             put_ref_object(inter_sp - num_arg, ob, "reset");
-            call_lambda(&driver_hook[arg], 1 + num_arg);
+            call_lambda_ob(&driver_hook[arg], 1 + num_arg, &current_object);
         }
         else
         {
-            /* no arguments, just bind to target */
-            free_svalue(&(l->ob));
-            put_ref_object(&(l->ob), ob, "reset_object");
-            call_lambda(&driver_hook[arg], 0);
+            /* No arguments, bind to target. */
+            svalue_t obsv = svalue_object(ob);
+            call_lambda_ob(&driver_hook[arg], 0, &obsv);
             inter_sp = pop_n_elems(num_arg, inter_sp);
         }
 
@@ -1620,7 +1615,7 @@ v_function_exists (svalue_t *sp, int num_arg)
          */
         if (argp[1].type != T_OBJECT && argp[1].type != T_LWOBJECT)
         {
-            errorf("Bad argument 2 to function_exists(): got %s, expected object.\n", typename(argp[1].type));
+            errorf("Bad argument 2 to function_exists(): got %s, expected object.\n", sv_typename(argp+1));
             /* NOTREACHED */
             return sp;
         }
@@ -1790,7 +1785,8 @@ f_functionlist (svalue_t *sp)
  *   Control of returned information:
  *     RETURN_FUNCTION_NAME    include the function name
  *     RETURN_FUNCTION_FLAGS   include the function flags
- *     RETURN_FUNCTION_TYPE    include the return type
+ *     RETURN_FUNCTION_TYPE    include the return type as int
+ *     RETURN_FUNCTION_LPCTYPE include the return type as lpctype
  *     RETURN_FUNCTION_NUMARG  include the number of arguments.
  *
  *     The name RETURN_FUNCTION_ARGTYPE is defined but not implemented.
@@ -2018,6 +2014,11 @@ f_functionlist (svalue_t *sp)
             svp->u.number = header->num_arg;
         }
 
+        if (mode_flags & RETURN_FUNCTION_LPCTYPE) {
+            svp--;
+            put_ref_lpctype(svp, header->type);
+        }
+
         if (mode_flags & RETURN_FUNCTION_TYPE) {
             svp--;
             svp->u.number = get_type_compat_int(header->type);
@@ -2028,7 +2029,7 @@ f_functionlist (svalue_t *sp)
             /* If the function starts with the bytecodes F_UNDEF,
              * it referenced but undefined. But you know that.
              */
-            if (is_undef_function(funstart))
+            if (is_undef_function(header, funstart))
             {
                 active_flags |= NAME_UNDEFINED;
             }
@@ -2135,7 +2136,7 @@ v_variable_exists (svalue_t *sp, int num_arg)
         if (argp[1].type != T_OBJECT && argp[1].type != T_LWOBJECT)
         {
             errorf("Bad argument 2 to variable_exists(): "
-                  "got %s, expected object/lwobject.\n", typename(argp[1].type));
+                  "got %s, expected object/lwobject.\n", sv_typename(argp+1));
             /* NOTREACHED */
             return sp;
         }
@@ -2205,12 +2206,12 @@ v_variable_exists (svalue_t *sp, int num_arg)
         if (ix >= progp->num_variables)
             break;
 
+        /* Is it visible for the caller? */
+        flags = progp->variables[ix].type.t_flags;
+
         virtualvar = (ix < progp->num_virtual_variables);
         if (!virtualvar)
             ix -= progp->num_virtual_variables;
-
-        /* Is it visible for the caller? */
-        flags = progp->variables[ix].type.t_flags;
 
         if (!(mode_flags & NAME_HIDDEN)
          && (   (flags & TYPE_MOD_PRIVATE)
@@ -2227,16 +2228,18 @@ v_variable_exists (svalue_t *sp, int num_arg)
             {
                 inherit_t *ip = &progp->inherit[ic];
 
-                if ((ip->inherit_type == INHERIT_TYPE_NORMAL) == virtualvar)
+                if (ip->inherit_duplicate
+                 || ip->inherit_mapped
+                 || (ip->inherit_type == INHERIT_TYPE_NORMAL) == virtualvar)
                     continue;
 
-                if (ix >= ip->variable_index_offset + ip->prog->num_variables
+                if (ix >= ip->variable_index_offset + ip->prog->num_variables - ip->prog->num_virtual_variables
                  || ix < ip->variable_index_offset
                    )
                     continue;
                 ix -= ip->variable_index_offset;
                 progp = ip->prog;
-                flags = progp->variables[ix].type.t_flags;
+                flags = progp->variables[progp->num_virtual_variables + ix].type.t_flags;
                 virtualvar = false;
             }
         }
@@ -2299,7 +2302,8 @@ f_variable_list (svalue_t *sp)
  *   Control of returned information:
  *     RETURN_FUNCTION_NAME    include the variable name
  *     RETURN_FUNCTION_FLAGS   include the variable flags
- *     RETURN_FUNCTION_TYPE    include the return type
+ *     RETURN_FUNCTION_TYPE    include the return type as int
+ *     RETURN_FUNCTION_LPCTYPE include the return type as lpctype
  *     RETURN_VARIABLE_VALUE   include the variable value
  *
  *   Control of listed variables:
@@ -2513,6 +2517,12 @@ f_variable_list (svalue_t *sp)
         {
             svp--;
             assign_svalue_no_free(svp, variables+i);
+        }
+
+        if (mode_flags & RETURN_FUNCTION_LPCTYPE)
+        {
+            svp--;
+            put_ref_lpctype(svp, var->type.t_type);
         }
 
         if (mode_flags & RETURN_FUNCTION_TYPE)
@@ -3923,13 +3933,13 @@ move_object (void)
 
     if (NULL != ( l = driver_hook[H_MOVE_OBJECT1].u.lambda) )
     {
-        free_svalue(&(l->ob));
-        put_ref_object(&(l->ob), inter_sp[-1].u.ob, "move_object");
+        free_svalue(&(l->base.ob));
+        put_ref_object(&(l->base.ob), inter_sp[-1].u.ob, "move_object");
         call_lambda(&driver_hook[H_MOVE_OBJECT1], 2);
     }
     else if (NULL != ( l = driver_hook[H_MOVE_OBJECT0].u.lambda) )
     {
-        assign_current_object(&(l->ob), "move_object");
+        assign_current_object(&(l->base.ob), "move_object");
         call_lambda(&driver_hook[H_MOVE_OBJECT0], 2);
     }
     else
@@ -4607,7 +4617,7 @@ v_present (svalue_t *sp, int num_arg)
             if (ob != NULL)
             {
                 /* Two objects? No way. */
-                vefun_arg_error(2, T_NUMBER, T_OBJECT, sp);
+                vefun_arg_error(2, T_NUMBER, arg+1, sp);
                 /* NOTREACHED */
                 return sp;
             }
@@ -4816,6 +4826,10 @@ e_say (svalue_t *v, vector_t *avoid)
     case T_POINTER:
     case T_MAPPING:
     case T_STRUCT:
+    case T_LPCTYPE:
+#ifdef USE_PYTHON
+    case T_PYTHON:
+#endif
         /* tell_room()'s evil twin: send <v> to all recipients' catch_msg() lfun */
 
         for (curr_recipient = recipients; NULL != (ob = *curr_recipient++) ; )
@@ -4837,7 +4851,7 @@ e_say (svalue_t *v, vector_t *avoid)
     default:
         errorf("Invalid argument to say(): expected '%s', got '%s'.\n"
               , efun_arg_typename(TF_POINTER|TF_MAPPING|TF_STRUCT|TF_STRING|TF_OBJECT|TF_LWOBJECT)
-              , typename(v->type));
+              , sv_typename(v));
     }
 
     /* Now send the message to all recipients */
@@ -5020,6 +5034,10 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     case T_POINTER:
     case T_MAPPING:
     case T_STRUCT:
+    case T_LPCTYPE:
+#ifdef USE_PYTHON
+    case T_PYTHON:
+#endif
       {
         /* say()s evil brother: send <v> to all recipients'
          * catch_msg() lfun
@@ -5047,7 +5065,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     default:
         errorf("Invalid argument to tell_room(): expected '%s', got '%s'.\n"
               , efun_arg_typename(TF_POINTER|TF_MAPPING|TF_STRUCT|TF_STRING|TF_OBJECT)
-              , typename(v->type));
+              , sv_typename(v));
     }
 
     /* Now send the message to all recipients */
@@ -5487,6 +5505,27 @@ static void register_svalue(svalue_t *);
 #define SAVE_OBJECT_BUFSIZE 4096
   /* Size of the read/write buffer.
    */
+
+#ifdef USE_PYTHON
+static struct python_ob_save_data_s
+{
+    struct python_ob_save_data_s *next;
+        /* Linked list of all save data. */
+
+    string_t *type_name;
+        /* String of the Python type name (not refcounted). */
+
+    svalue_t value;
+        /* Value that should be saved (refcounted). */
+
+} *python_ob_save_data = NULL;
+    /* Saving is done in two passes (register_svalue and save_svalue).
+     * We need to remember the actual data to save for a Python object.
+     * We create this data structure for each object and remember it
+     * in the .data field of the ptrtable record. It is kept in a linked
+     * list so we can free it.
+     */
+#endif
 
 static int save_version = -1;
   /* The version of the savefile to write.
@@ -5990,6 +6029,7 @@ save_lwobject (lwobject_t *lwob)
 
 {
     int num;
+    bool first = true;
 
     /* Recall the struct from the pointer table.
      * If it is a shared one, there's nothing else to do.
@@ -6016,10 +6056,16 @@ save_lwobject (lwobject_t *lwob)
     num = lwob->prog->num_variables;
     for (int i = 0; i < num; i++)
     {
-        if (i)
-            MY_PUTC(',')
-        else
+        if (lwob->prog->variables[i].type.t_flags & TYPE_MOD_STATIC)
+            continue;
+
+        if (first)
+        {
             MY_PUTC(' ')
+            first = false;
+        }
+        else
+            MY_PUTC(',')
 
         save_string(lwob->prog->variables[i].name, -1, -1, true);
     }
@@ -6034,6 +6080,9 @@ save_lwobject (lwobject_t *lwob)
     /* And now ... the variable values. */
     for (int i = 0; i < num; i++)
     {
+        if (lwob->prog->variables[i].type.t_flags & TYPE_MOD_STATIC)
+            continue;
+
         save_svalue(lwob->variables + i, ',', MY_FALSE);
     }
 
@@ -6138,24 +6187,24 @@ save_closure (svalue_t *cl, Bool writable)
     {
     case CLOSURE_LFUN:
       {
-        if (recall_pointer(cl->u.lambda))
+        if (recall_pointer(cl->u.lfun_closure))
             break;
 
-        if (is_current_object(cl->u.lambda->function.lfun.ob)
-         && is_current_object(cl->u.lambda->ob)
+        if (is_current_object(cl->u.lfun_closure->fun_ob)
+         && is_current_object(cl->u.lfun_closure->base.ob)
            )
         {
-            lambda_t       *l;
+            lfun_closure_t *l;
             program_t      *prog, *obprog;
             program_t      *inhProg = 0;
             int             ix;
             char           *source, c;
             svalue_t        ob;
 
-            l = cl->u.lambda;
-            ob = l->function.lfun.ob;
-            ix = l->function.lfun.index;
-            inhProg = l->function.lfun.inhProg;
+            l = cl->u.lfun_closure;
+            ob = l->fun_ob;
+            ix = l->fun_index;
+            inhProg = l->inhProg;
 
             if (ob.type == T_OBJECT)
                 obprog = ob.u.ob->prog;
@@ -6179,7 +6228,7 @@ save_closure (svalue_t *cl, Bool writable)
             {
                 L_PUTC_PROLOG
                 L_PUTC('#');
-                if (l->function.lfun.context_size)
+                if (l->context_size)
                 {
                     L_PUTC('c');
                 }
@@ -6197,18 +6246,18 @@ save_closure (svalue_t *cl, Bool writable)
             if (inhProg)
             {
                 prog = obprog;
-                ix = l->function.lfun.index;
-                
+                ix = l->fun_index;
+
                 while(prog != inhProg)
                 {
                     inherit_t *inheritp;
                     string_t  *progName;
-                    
+
                     inheritp = search_function_inherit(prog, ix);
                     ix -= inheritp->function_index_offset;
                     prog = inheritp->prog;
                     progName = del_dotc(prog->name);
-                    
+
                     {
                         L_PUTC_PROLOG
                         source = get_txt(progName);
@@ -6226,7 +6275,7 @@ save_closure (svalue_t *cl, Bool writable)
                 }
             }
 
-            if (l->function.lfun.context_size)
+            if (l->context_size)
             {
                 int i;
                 svalue_t * val;
@@ -6244,7 +6293,7 @@ save_closure (svalue_t *cl, Bool writable)
                 {
                     svalue_t num;
 
-                    put_number(&num, l->function.lfun.context_size);
+                    put_number(&num, l->context_size);
                     save_svalue(&num, ':', MY_FALSE);
                 }
 
@@ -6256,7 +6305,7 @@ save_closure (svalue_t *cl, Bool writable)
                     L_PUTC_EPILOG
                 }
 
-                for (i = l->function.lfun.context_size
+                for (i = l->context_size
                     , val = l->context
                     ; --i >= 0; )
                 {
@@ -6282,36 +6331,36 @@ save_closure (svalue_t *cl, Bool writable)
 
     case CLOSURE_IDENTIFIER:
       {
-        lambda_t *l;
+        identifier_closure_t *ic;
         program_t *prog = NULL;;
         char * source, c;
 
-        if (recall_pointer(cl->u.lambda))
+        ic = cl->u.identifier_closure;
+        if (recall_pointer(ic))
             break;
 
-        l = cl->u.lambda;
-        if (l->function.var_index == VANISHED_VARCLOSURE_INDEX)
+        if (ic->var_index == VANISHED_VARCLOSURE_INDEX)
         {
             rc = MY_FALSE;
             break;
         }
 
-        switch (l->ob.type)
+        switch (ic->base.ob.type)
         {
             case T_OBJECT:
-                if (l->ob.u.ob->flags & O_DESTRUCTED
-                 || l->ob.u.ob != get_current_object()
+                if (ic->base.ob.u.ob->flags & O_DESTRUCTED
+                 || ic->base.ob.u.ob != get_current_object()
                    )
                    break;
 
-                prog = l->ob.u.ob->prog;
+                prog = ic->base.ob.u.ob->prog;
                 break;
 
             case T_LWOBJECT:
-                if (l->ob.u.lwob != get_current_lwobject())
+                if (ic->base.ob.u.lwob != get_current_lwobject())
                     break;
 
-                prog = l->ob.u.lwob->prog;
+                prog = ic->base.ob.u.lwob->prog;
                 break;
 
             default:
@@ -6324,7 +6373,7 @@ save_closure (svalue_t *cl, Bool writable)
             break;
         }
 
-        source = get_txt(prog->variables[l->function.var_index].name);
+        source = get_txt(prog->variables[ic->var_index].name);
 
         {
             L_PUTC_PROLOG
@@ -6560,14 +6609,6 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
                 if(recall_pointer(r))
                     break;
 
-                /* Only one reference? No need for an lvalue reference here. */
-                if(!lookup_pointer(ptable,r)->ref_count)
-                {
-                    /* Go to the fallback. */
-                    done = false;
-                    break;
-                }
-
                 /* Check whether the variable reference is still valid. */
                 var_valid = (r->var != NULL
                  && ((r->vec.type == T_POINTER && r->var->val.type == T_POINTER && r->vec.u.vec == r->var->val.u.vec)
@@ -6584,6 +6625,14 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
 
                 if (!vec_referenced && var_valid)
                     vec_referenced = lookup_pointer(ptable, r->var)->ref_count;
+
+                /* Only one reference? No need for an lvalue reference here. */
+                if(!vec_referenced && !lookup_pointer(ptable,r)->ref_count)
+                {
+                    /* Go to the fallback. */
+                    done = false;
+                    break;
+                }
 
                 {
                     L_PUTC_PROLOG
@@ -6606,7 +6655,7 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
                             break;
 
                         default:
-                             fatal("(save_lvalue) Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                             fatal("(save_lvalue) Illegal type for range lvalue '%s'.\n", sv_typename(&(r->vec)));
                              break;
                     }
 
@@ -6685,6 +6734,37 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
                 MY_PUTC(')')
                 break;
             }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                /* Format: <1>=&(<2>=map,key,index1..index2-1) */
+                struct protected_map_range_lvalue *r = v->u.protected_map_range_lvalue;
+
+                if(recall_pointer(r))
+                    break;
+
+                {
+                    L_PUTC_PROLOG
+                    L_PUTC('&')
+                    L_PUTC('(')
+                    L_PUTC_EPILOG
+                }
+
+                save_mapping(r->map);
+
+                MY_PUTC(',')
+
+                if (!save_svalue(&(r->key), ',', MY_FALSE))
+                    return MY_FALSE;
+
+                save_number(r->index1);
+                MY_PUTC('.')
+                MY_PUTC('.')
+                save_number(r->index2 - 1);
+
+                MY_PUTC(')')
+                break;
+            }
         } /* switch() */
     }
 
@@ -6725,7 +6805,7 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
                         break;
 
                     default:
-                         fatal("(save_lvalue) Illegal type for range lvalue '%s'.\n", typename(r->vec.type));
+                         fatal("(save_lvalue) Illegal type for range lvalue '%s'.\n", sv_typename(&(r->vec)));
                          break;
                 }
 
@@ -6741,6 +6821,38 @@ save_lvalue (svalue_t *v, char delimiter, Bool writable)
                     save_number(0);
                 else
                     return save_svalue(item + e->index, delimiter, writable);
+                break;
+            }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                /* Save this as an array. */
+                struct protected_map_range_lvalue *r = v->u.protected_map_range_lvalue;
+                svalue_t *item;
+
+                if(recall_pointer(r))
+                    break;
+
+                MY_PUTC('(')
+                MY_PUTC('{')
+
+                item = get_map_value(r->map, &(r->key));
+                if (item == &const0)
+                {
+                    for (mp_int i = r->index1; i < r->index2; i++)
+                    {
+                        MY_PUTC('0');
+                        MY_PUTC(',');
+                    }
+                }
+                else
+                {
+                    for (mp_int i = r->index1; i < r->index2; i++)
+                        save_svalue(item + i, ',', MY_FALSE);
+                }
+
+                MY_PUTC('}')
+                MY_PUTC(')')
                 break;
             }
         } /* switch() */
@@ -6870,6 +6982,62 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         save_string(v->u.str, -1, -1, false);
         break;
       }
+
+    case T_LPCTYPE:
+        if (!recall_pointer(v->u.lpctype))
+        {
+            const char *t = get_lpctype_name(v->u.lpctype);
+            if (t)
+            {
+                L_PUTC_PROLOG
+                L_PUTC('[')
+                while (*t)
+                    L_PUTC(*t++);
+                L_PUTC(']')
+                L_PUTC_EPILOG
+            }
+            else if (writable)
+                rc = MY_FALSE;
+            else
+                MY_PUTC('0');
+        }
+        break;
+
+#ifdef USE_PYTHON
+    case T_PYTHON:
+      {
+        struct python_ob_save_data_s *data;
+
+        if (recall_pointer(v->u.generic))
+            break;
+
+        data = lookup_pointer(ptable,v->u.generic)->data;
+        if (data != NULL)
+        {
+            MY_PUTC('(')
+            MY_PUTC('%')
+
+            save_string(data->type_name, -1, -1, false);
+
+            MY_PUTC(',')
+
+            save_svalue(&data->value, ',', MY_FALSE);
+
+            MY_PUTC('%')
+            MY_PUTC(')')
+        }
+        else if (writable)
+        {
+            rc = MY_FALSE;
+        }
+        else
+        {
+            MY_PUTC('0');
+        }
+
+        break;
+      }
+#endif
 
     case T_CLOSURE:
         if (save_version >= SAVE_FORMAT_CLOSURES)
@@ -7013,7 +7181,7 @@ register_closure (svalue_t *cl)
     {
     case CLOSURE_LFUN:
     case CLOSURE_IDENTIFIER:
-        if (NULL == register_pointer(ptable, cl->u.lambda))
+        if (NULL == register_pointer(ptable, cl->u.closure))
             return;
         break;
 
@@ -7023,24 +7191,84 @@ register_closure (svalue_t *cl)
     }
 
     if (type == CLOSURE_LFUN
-     && is_current_object(cl->u.lambda->function.lfun.ob)
-     && is_current_object(cl->u.lambda->ob)
-     && cl->u.lambda->function.lfun.context_size
+     && is_current_object(cl->u.lfun_closure->fun_ob)
+     && is_current_object(cl->u.lfun_closure->base.ob)
+     && cl->u.lfun_closure->context_size
        )
     {
-        lambda_t  *l;
+        lfun_closure_t *l;
         svalue_t *val;
         long i;
 
-        l = cl->u.lambda;
-        for (i = l->function.lfun.context_size
-            , val = l->context
-            ; --i >= 0; )
+        l = cl->u.lfun_closure;
+        for (i = l->context_size, val = l->context; --i >= 0; )
         {
             register_svalue(val++);
         }
     }
 } /* register_closure() */
+
+#ifdef USE_PYTHON
+/*-------------------------------------------------------------------------*/
+static void
+register_python_ob (svalue_t *svp)
+
+/* Register Python object <svp> in the pointer table. If it was not
+ * in there, get the type name and actual save data and store a pointer
+ * to it in the pointer table.
+ */
+
+{
+    struct pointer_record *record;
+    svalue_t val;
+    string_t *name;
+
+    assert(svp->type == T_PYTHON);
+
+    record = register_pointer(ptable, svp->u.generic);
+    if (record == NULL)
+        return;
+
+    if (save_python_ob(&val, &name, svp))
+    {
+        struct python_ob_save_data_s *data = xalloc(sizeof(struct python_ob_save_data_s));
+        if (data)
+        {
+            data->next = python_ob_save_data;
+            data->type_name = name;
+            data->value = val;
+            python_ob_save_data = data;
+
+            record->data = data;
+
+            register_svalue(&(data->value));
+        }
+        else
+        {
+            free_mstring(name);
+            free_svalue(&val);
+        }
+    }
+} /* register_python_ob() */
+
+/*-------------------------------------------------------------------------*/
+static void
+cleanup_python_save_data ()
+
+/* Free the save data for any Python object.
+ */
+
+{
+    while (python_ob_save_data != NULL)
+    {
+        struct python_ob_save_data_s *data = python_ob_save_data;
+        python_ob_save_data = python_ob_save_data->next;
+
+        free_svalue(&data->value);
+        xfree(data);
+    }
+} /* cleanup_python_save_data() */
+#endif
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -7079,15 +7307,27 @@ register_svalue (svalue_t *svp)
         register_closure(svp);
         break;
 
+      case T_LPCTYPE:
+        register_pointer(ptable, svp->u.lpctype);
+        break;
+
       case T_LVALUE:
         if (save_version < SAVE_FORMAT_LVALUES)
         {
             /* For older format, just do the recursion.
              * And treat ranges as normal arrays. */
-            if (svp->x.lvalue_type == LVALUE_PROTECTED)
-                register_svalue(&(svp->u.protected_lvalue->val));
-            else if (svp->x.lvalue_type == LVALUE_PROTECTED_RANGE)
-                register_pointer(ptable, svp->u.protected_range_lvalue);
+            switch (svp->x.lvalue_type)
+            {
+                case LVALUE_PROTECTED:
+                    register_svalue(&(svp->u.protected_lvalue->val));
+                    break;
+                case LVALUE_PROTECTED_RANGE:
+                    register_pointer(ptable, svp->u.protected_range_lvalue);
+                    break;
+                case LVALUE_PROTECTED_MAP_RANGE:
+                    register_pointer(ptable, svp->u.protected_map_range_lvalue);
+                    break;
+            }
             break;
         }
 
@@ -7139,7 +7379,26 @@ register_svalue (svalue_t *svp)
                 }
                 break;
             }
+
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                struct protected_map_range_lvalue *r = svp->u.protected_map_range_lvalue;
+
+                if (register_pointer(ptable, r) != NULL)
+                {
+                    register_mapping(r->map);
+                    register_svalue(&(r->key));
+                }
+                break;
+            }
         } /* switch (v->x.lvalue_type) */
+        break;
+
+#ifdef USE_PYTHON
+      case T_PYTHON:
+        register_python_ob(svp);
+        break;
+#endif
     } /* switch() */
 } /* register_svalue() */
 
@@ -7239,7 +7498,7 @@ v_save_object (svalue_t *sp, int numarg)
         }
         else
         {
-            vefun_gen_arg_error(1, sp->type, sp);
+            vefun_gen_arg_error(1, sp, sp);
             /* NOTREACHED */
             return sp;
         }
@@ -7247,9 +7506,9 @@ v_save_object (svalue_t *sp, int numarg)
 
     case 2:
         if (sp[-1].type != T_STRING)
-            vefun_arg_error(1, T_STRING, sp[-1].type, sp);
+            vefun_arg_error(1, T_STRING, sp-1, sp);
         if (sp->type != T_NUMBER)
-            vefun_arg_error(2, T_NUMBER, sp->type, sp);
+            vefun_arg_error(2, T_NUMBER, sp, sp);
 
         file = get_txt(sp[-1].u.str);
 
@@ -7444,6 +7703,9 @@ v_save_object (svalue_t *sp, int numarg)
         save_svalue(v, '\n', MY_FALSE);
     }
 
+#ifdef USE_PYTHON
+    cleanup_python_save_data();
+#endif
     free_pointer_table(ptable);
     ptable = NULL;
 
@@ -7621,7 +7883,7 @@ v_save_value (svalue_t *sp, int numarg)
         }
         else
         {
-            vefun_gen_arg_error(2, sp->type, sp);
+            vefun_gen_arg_error(2, sp, sp);
             /* NOTREACHED */
             return sp;
         }
@@ -7691,6 +7953,9 @@ v_save_value (svalue_t *sp, int numarg)
         strbuf_store(&save_string_buffer, sp);
 
     /* Clean up */
+#ifdef USE_PYTHON
+    cleanup_python_save_data();
+#endif
     free_pointer_table(ptable);
     ptable = NULL;
 
@@ -7777,7 +8042,7 @@ skip_element (char **str)
             return true;
         }
 
-        case '(':  /* array, struct or mapping */
+        case '(':  /* array, struct, mapping or lightweight object*/
         {
             /* Lazy way of doing it, a bit inefficient */
             struct rms_parameters tmp_par;
@@ -7786,6 +8051,8 @@ skip_element (char **str)
             tmp_par.str = pt + 2;
             if (pt[1] == '{'
              || pt[1] == '<'
+             || pt[1] == '*'
+             || pt[1] == '%'
                )
                 tsiz = restore_size(&tmp_par.str);
             else if (pt[1] == '[')
@@ -7799,6 +8066,28 @@ skip_element (char **str)
             *str = tmp_par.str;
             return true;
         }
+
+        case '[': /* lpctype */
+            while (true)
+            {
+               /* We look for ']', and skip any strings. */
+                char *end = strchr(pt, ']');
+                char *s = strchr(pt, '"');
+
+                if (!end)
+                    return false;
+
+                if (!s || s > end)
+                {
+                    *str = end+1;
+                    return true;
+                }
+
+                if (!skip_element(&s))
+                    return false;
+                pt = s;
+            }
+            break; /* NOTREACHED */
 
         case '#': /* A closure: skip the header and restart this check
                    * again from the data part.
@@ -8148,6 +8437,10 @@ restore_size (char **str)
         {
         case '}':  /* End of array */
         case '>':  /* End of struct */
+        case '*':  /* End of lightweight object */
+#ifdef USE_PYTHON
+        case '%':  /* End of Python object */
+#endif
           {
             if (pt[1] != ')')
                 return -1;
@@ -8281,7 +8574,8 @@ restore_lwobject (svalue_t *svp, char **str)
     blueprint = get_object(prog_name);
     pop_stack(); /* Freeing prog_name. */
     if ((!blueprint)
-     || (O_PROG_SWAPPED(blueprint) && load_ob_from_swap(blueprint) < 0))
+     || (O_PROG_SWAPPED(blueprint) && load_ob_from_swap(blueprint) < 0)
+     || (blueprint->prog->flags & P_NO_LIGHTWEIGHT))
     {
         pop_stack(); /* Freeing name. */
         return false;
@@ -8321,7 +8615,8 @@ restore_lwobject (svalue_t *svp, char **str)
             int next_var_idx = cur_var_idx;
             while (true)
             {
-                if (prog->variables[next_var_idx].name == var_name)
+                if (!(prog->variables[next_var_idx].type.t_flags & TYPE_MOD_STATIC)
+                 && prog->variables[next_var_idx].name == var_name)
                 {
                     variable = lwob->variables + next_var_idx;
                     vartype = prog->variables[next_var_idx].type.t_type;
@@ -8337,41 +8632,42 @@ restore_lwobject (svalue_t *svp, char **str)
             }
         }
 
+        /* Restore the value and put it on the stack first. */
+        push_number(inter_sp, 0);
+        if (!restore_svalue(inter_sp, str, ','))
+        {
+            inter_sp--;
+            pop_stack();
+            free_svalue(svp);
+            *svp = const0;
+            return false;
+        }
+
         if (!variable)
         {
             /* The variable doesn't exist anymore, read and discard. */
-            svalue_t tmp;
-            if (!restore_svalue(&tmp, str, ','))
-            {
-                pop_stack();
-                free_svalue(svp);
-                *svp = const0;
-                return false;
-            }
-
-            free_svalue(&tmp);
+            pop_stack();
         }
         else
         {
-            if (!restore_svalue(variable, str, ','))
+            if (rtt_checks && !check_rtt_compatibility(vartype, inter_sp))
             {
+                pop_stack();
                 pop_stack();
                 free_svalue(svp);
                 *svp = const0;
                 return false;
             }
 
-            if (rtt_checks && !check_rtt_compatibility(vartype, variable))
-            {
-                pop_stack();
-                free_svalue(svp);
-                *svp = const0;
-                return false;
-            }
+            free_svalue(variable);
+            transfer_svalue_no_free(variable, inter_sp);
+            inter_sp--;
         }
     }
 
     pop_stack(); /* Freeing name. */
+
+    reset_lwobject(lwob, H_CREATE_LWOBJECT_RESTORE, 0);
 
     (*str)++;
     if (**str != ')')
@@ -9036,7 +9332,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
             {
                 svalue_t context = const0;
                 int j;
-                lambda_t * l = svp->u.lambda;
+                lfun_closure_t * l = svp->u.lfun_closure;
 
                 /* Parse the context information */
                 if (!restore_svalue(&context, str, delimiter)
@@ -9044,7 +9340,7 @@ restore_closure (svalue_t *svp, char **str, char delimiter)
                  || VEC_SIZE(context.u.vec) != context_size
                    )
                 {
-                    l->function.lfun.context_size = 0;
+                    l->context_size = 0;
                     free_svalue(svp);
                     free_svalue(&context);
                     *svp = const0;
@@ -9149,6 +9445,7 @@ restore_lvalue (svalue_t *svp, char **str)
         svalue_t key;
         int idx;
         char * cp;
+        bool fail = false;
 
         if (!restore_svalue(&key, str, ','))
         {
@@ -9159,16 +9456,45 @@ restore_lvalue (svalue_t *svp, char **str)
 
         cp = *str;
         idx = strtol(*str, str, 10);
-        if (cp == *str || *((*str)++) != ')')
+        if (cp == *str || idx < 0)
         {
-            free_svalue(&key);
+            fail = true;
+        }
+        else if (**str == ')')
+        {
+            /* Mapping entry. */
+            (*str)++;
+
+            if (idx >= val->u.map->num_values)
+                fail = true;
+            else
+                assign_protected_mapentry_lvalue_no_free(&dummy, val->u.map, &key, idx);
+        }
+        else if (*((*str)++) == '.' && *((*str)++) == '.')
+        {
+            /* Mapping range. */
+            int idx2;
+
+            cp = *str;
+            idx2 = strtol(*str, str, 10);
+            if (cp == *str || *((*str)++) != ')'
+             || idx > val->u.map->num_values
+             || idx2 < -1 || idx2 >= val->u.map->num_values
+             || idx > idx2 + 1)
+                fail = true;
+            else
+                assign_protected_map_range_lvalue_no_free(&dummy, val->u.map, &key, idx, idx2+1);
+        }
+        else
+            fail = true;
+
+        free_svalue(&key);
+        if (fail)
+        {
             free_svalue(svp);
             *svp = const0;
             return false;
         }
-
-        assign_protected_mapentry_lvalue_no_free(&dummy, val->u.map, &key, idx);
-        free_svalue(&key);
     }
     else
     {
@@ -9210,7 +9536,7 @@ restore_lvalue (svalue_t *svp, char **str)
                 return false;
         }
 
-        if (idx1 < 0 || idx1 > size || idx2 <= -1 || idx2 >= size || idx1 > idx2 + 1)
+        if (idx1 < 0 || idx1 > size || idx2 < -1 || idx2 >= size || idx1 > idx2 + 1)
         {
             free_svalue(svp);
             *svp = const0;
@@ -9474,7 +9800,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         break;
       }
 
-    case '(': /* Unshared mapping, struct or array */
+    case '(': /* Unshared complex data structure. */
         *pt = cp+2;
         switch ( cp[1] )
         {
@@ -9512,11 +9838,75 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
             break;
          }
 
+#ifdef USE_PYTHON
+        case '%':
+         {
+            /* Format: (%"name of the Python type",save value,%) */
+
+            svalue_t name, value;
+
+            if (!restore_svalue(&name, pt, ','))
+                return false;
+            if (name.type != T_STRING)
+            {
+                free_svalue(&name);
+                return false;
+            }
+
+            if (!restore_svalue(&value, pt, ','))
+            {
+                free_svalue(&name);
+                return false;
+            }
+
+            if (**pt != '%' || *++*pt != ')')
+            {
+                free_svalue(&name);
+                free_svalue(&value);
+                return false;
+            }
+
+            ++*pt;
+            *svp = const0;
+            if (!restore_python_ob(svp, name.u.str, &value))
+                return false;
+            break;
+         }
+#endif
+
         default:
             *svp = const0;
             return MY_FALSE;
         }
         break;
+
+    case '[': /* lpctype */
+      {
+        lpctype_t *result = NULL;
+        char *end = cp;
+
+        if (skip_element(&end))
+        {
+            const char *s = cp + 1;
+            result = parse_lpctype(&s, end - 1);
+            *pt = end;
+
+            if (s < end - 1)
+            {
+                free_lpctype(result);
+                result = NULL;
+            }
+        }
+
+        if (!result)
+        {
+            *svp = const0;
+            return MY_FALSE;
+        }
+
+        put_lpctype(svp, result);
+        break;
+      }
 
     case '-':  /* A number */
     case '0': case '1': case '2': case '3': case '4':

@@ -116,6 +116,7 @@ extern struct_type_t * struct_new_type ( string_t        *name
                                        , struct_type_t   *base
                                        , int              num_members
                                        , struct_member_t *member);
+extern struct_name_t * struct_new_name (string_t *name, string_t *prog_name);
 extern struct_t * struct_new_anonymous (int num_members);
 extern void struct_free_empty (struct_t *pStruct);
 extern void struct_free (struct_t *pStruct);
@@ -123,6 +124,7 @@ extern void struct_free_type (struct_type_t *pSType);
 extern void struct_free_name (struct_name_t *pSName);
 extern struct_type_t * struct_lookup_type ( struct_type_t * pSType );
 extern void struct_publish_type ( struct_type_t * pSType );
+extern void struct_publish_global_type ( struct_type_t * pSType );
 extern Bool struct_type_equivalent (struct_type_t * pSType1, struct_type_t *pSType2);
 extern void struct_type_update ( struct_type_t * pSType, struct_type_t * pOld, struct_type_t * pNew);
 extern struct_type_t * struct_find (string_t *name, program_t * prog);
@@ -135,6 +137,9 @@ extern string_t * struct_t_unique_name (struct_type_t *pSType);
 #define struct_unique_name(pStruct) struct_t_unique_name(pStruct->type)
 extern int struct_baseof(struct_type_t *base, struct_type_t *st) __attribute__((nonnull(1,2)));
 extern struct_type_t* struct_baseof_name(struct_name_t *base, struct_type_t *st) __attribute__((nonnull(1,2)));
+extern void test_efun_arg_struct_type(const char* efun_name, int pos, struct_t *pStruct, struct_type_t *pSType);
+extern struct_type_t* create_std_struct_type(int std_struct_idx, lpctype_t *lpctype, const char* name, lpctype_t *member_types[], const char *member_names[]);
+extern struct_type_t* get_std_struct_type(int std_struct_idx);
 
 #ifdef GC_SUPPORT
 
@@ -145,6 +150,8 @@ extern void clear_tabled_struct_refs (void);
 extern void count_struct_type_ref (struct_type_t * pSType);
 extern void count_struct_name_ref (struct_name_t * pSName);
 extern void count_struct_ref (struct_t * pStruct);
+extern void clear_std_struct_refs();
+extern void count_std_struct_refs();
 extern void remove_unreferenced_structs (void);
 
 #endif /* GC_SUPPORT */

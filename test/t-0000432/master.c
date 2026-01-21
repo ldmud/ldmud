@@ -400,6 +400,15 @@ void run_test()
                 return capitalize("\u00e4gyptisch") == "\u00c4gyptisch";
             :)
         }),
+        ({ "capitalize with change in length", 0,
+            (:
+                // We're assuming that the current local gives 'S' for '\u017f'.
+                // And we're building an untabled string, so the garbage
+                // collection will detect unreferenced strings.
+                string str = "_"; str[0] = '\u017f';
+                return capitalize(str) == "S";
+            :)
+        }),
         ({ "lower_case", 0,
             (:
                 return lower_case("\u00c4\u00d6\u00dc") == "\u00e4\u00f6\u00fc";
@@ -969,6 +978,16 @@ void run_test()
         }),
         ({ "read_file 3", 0,
             (:
+                return read_file("/data.bin", 2, 1, "ascii//ignore") == "\n";
+            :)
+        }),
+        ({ "read_file 4", 0,
+            (:
+                return read_file("/data.bin", 2, 1, "ascii//replace") == (6*"\ufffd") + "\n";
+            :)
+        }),
+        ({ "read_file 5", 0,
+            (:
                 int success;
 
                 write_file("/test.bin", "", 1);
@@ -981,7 +1000,7 @@ void run_test()
                 return success;
             :)
         }),
-        ({ "read_file 4", 0,
+        ({ "read_file 6", 0,
             (:
                 int success;
 
@@ -995,7 +1014,7 @@ void run_test()
                 return success;
             :)
         }),
-        ({ "read_file 5", 0,
+        ({ "read_file 7", 0,
             (:
                 int success;
 
@@ -1009,7 +1028,7 @@ void run_test()
                 return success;
             :)
         }),
-        ({ "read_file 6", 0,
+        ({ "read_file 8", 0,
             (:
                 int success;
 
@@ -1119,9 +1138,34 @@ void run_test()
             :)
         }),
 #endif
-        ({ "Illegal characters in UTF-8 sequences", TF_ERROR,
+        ({ "Illegal characters in UTF-8 sequences 1", TF_ERROR,
             (:
                 to_text(({0xf8,0x80,0x80,0x80,0x80}), "UTF-8");
+            :)
+        }),
+        ({ "Illegal characters in UTF-8 sequences 1", TF_ERROR,
+            (:
+                to_text(({0xc2}), "UTF-8");
+            :)
+        }),
+        ({ "Illegal characters in UTF-8 sequences with //IGNORE 1", 0,
+            (:
+                return to_text(({0xf8,0x80,0x80,0x80,0x80,0x40}), "UTF-8//IGNORE") == "@";
+            :)
+        }),
+        ({ "Illegal characters in UTF-8 sequences with //IGNORE 2", 0,
+            (:
+                return to_text(({0xc2, 0x40}), "UTF-8//IGNORE") == "@";
+            :)
+        }),
+        ({ "Illegal characters in UTF-8 sequences with //REPLACE 1", 0,
+            (:
+                return to_text(({0xf8,0x80,0x80,0x80,0x80,0x40}), "UTF-8//REPLACE") == "\ufffd\ufffd\ufffd\ufffd\ufffd@";
+            :)
+        }),
+        ({ "Illegal characters in UTF-8 sequences with //REPLACE 2", 0,
+            (:
+                return to_text(({0xc2,0x40}), "UTF-8//REPLACE") == "\ufffd@";
             :)
         }),
         ({ "Illegal characters with to_text(array)", TF_ERROR,

@@ -225,17 +225,24 @@ class SValuePrinter:
     T_BYTES                          = 0xc
     T_LWOBJECT                       = 0xd
     T_COROUTINE                      = 0xe
-    T_CALLBACK                       = 0xf
-    T_ERROR_HANDLER                  = 0x10
-    T_BREAK_ADDR                     = 0x11
-    T_NULL                           = 0x12
+    T_PYTHON                         = 0xf
+    T_LPCTYPE                        = 0x10
+    T_CALLBACK                       = 0x11
+    T_ERROR_HANDLER                  = 0x12
+    T_BREAK_ADDR                     = 0x13
+    T_ARG_FRAME                      = 0x14
+    T_NULL                           = 0x15
 
     LVALUE_UNPROTECTED               = 0x00
     LVALUE_UNPROTECTED_CHAR          = 0x01
     LVALUE_UNPROTECTED_RANGE         = 0x02
+    LVALUE_UNPROTECTED_MAPENTRY      = 0x03
+    LVALUE_UNPROTECTED_MAP_RANGE     = 0x04
     LVALUE_PROTECTED                 = 0x10
     LVALUE_PROTECTED_CHAR            = 0x11
     LVALUE_PROTECTED_RANGE           = 0x12
+    LVALUE_PROTECTED_MAPENTRY        = 0x13
+    LVALUE_PROTECTED_MAP_RANGE       = 0x14
 
     names = {
         T_INVALID:                        "T_INVALID",
@@ -253,9 +260,12 @@ class SValuePrinter:
         T_BYTES:                          "T_BYTES",
         T_LWOBJECT:                       "T_LWOBJECT",
         T_COROUTINE:                      "T_COROUTINE",
+        T_PYTHON:                         "T_PYTHON",
+        T_LPCTYPE:                        "T_LPCTYPE",
         T_CALLBACK:                       "T_CALLBACK",
         T_ERROR_HANDLER:                  "T_ERROR_HANDLER",
         T_BREAK_ADDR:                     "T_BREAK_ADDR",
+        T_ARG_FRAME:                      "T_ARG_FRAME",
         T_NULL:                           "T_NULL",
     }
 
@@ -293,6 +303,14 @@ class SValuePrinter:
                 lvalue = gdb.lookup_global_symbol("current_unprotected_range").value()
                 return [("x.lvalue_type", "LVALUE_UNPROTECTED_RANGE"),
                         ("current_unprotected_range", lvalue)]
+            elif ltype == self.LVALUE_UNPROTECTED_MAPENTRY:
+                lvalue = gdb.lookup_global_symbol("current_unprotected_mapentry").value()
+                return [("x.lvalue_type", "LVALUE_UNPROTECTED_MAPENTRY"),
+                        ("current_unprotected_mapentry", lvalue)]
+            elif ltype == self.LVALUE_UNPROTECTED_MAP_RANGE:
+                lvalue = gdb.lookup_global_symbol("current_unprotected_map_range").value()
+                return [("x.lvalue_type", "LVALUE_UNPROTECTED_MAP_RANGE"),
+                        ("current_unprotected_map_range", lvalue)]
             elif ltype == self.LVALUE_PROTECTED:
                 return [("x.lvalue_type", "LVALUE_PROTECTED"),
                         ("u.protected_lvalue", val["u"]["protected_lvalue"])]
@@ -302,6 +320,12 @@ class SValuePrinter:
             elif ltype == self.LVALUE_PROTECTED_RANGE:
                 return [("x.lvalue_type", "LVALUE_PROTECTED_RANGE"),
                         ("u.protected_range_lvalue", val["u"]["protected_range_lvalue"])]
+            elif ltype == self.LVALUE_PROTECTED_MAPENTRY:
+                return [("x.lvalue_type", "LVALUE_PROTECTED_MAP_ENTRY"),
+                        ("u.protected_mapentry_lvalue", val["u"]["protected_mapentry_lvalue"])]
+            elif ltype == self.LVALUE_PROTECTED_MAP_RANGE:
+                return [("x.lvalue_type", "LVALUE_PROTECTED_MAPRANGE"),
+                        ("u.protected_map_range_lvalue", val["u"]["protected_map_range_lvalue"])]
             else:
                 return [(".x.lvalue_type", ltype)]
         elif stype == self.T_NUMBER:
@@ -334,13 +358,18 @@ class SValuePrinter:
                     (".x.quotes", val["x"]["quotes"])]
         elif stype == self.T_STRUCT:
             return [(".u.strct", val["u"]["strct"])]
+        elif stype == self.T_PYTHON:
+            return [(".u.generic", val["u"]["generic"])]
+        elif stype == self.T_LPCTYPE:
+            return [(".u.lpctype", val["u"]["lpctype"])]
         elif stype == self.T_CALLBACK:
-            return [(".u.cb", val["u"]["cb"]),
-                    (".x.extern_args", val["x"]["extern_args"])]
+            return [(".u.cb", val["u"]["cb"])]
         elif stype == self.T_ERROR_HANDLER:
             return [(".u.error_handler", val["u"]["error_handler"])]
         elif stype == self.T_BREAK_ADDR:
             return [(".u.break_addr", val["u"]["break_addr"])]
+        elif stype == self.T_ARG_FRAME:
+            return [(".u.lvalue", val["u"]["lvalue"])]
         else:
             return []
 
@@ -405,6 +434,49 @@ class ProtRangePrinter:
                 (".vec", val["vec"].address),
                 (".var", val["var"])]
 
+class ProtMapEntryPrinter:
+    "Prints a protected map entry lvalue"
+
+    def __init__(self, val):
+         self.val = val
+
+    def to_string(self):
+        (type,val) = unwind_ptr(self.val)
+
+        return print_ptr(val.address)
+
+    def children(self):
+        (type,val) = unwind_ptr(self.val)
+        if val.address == 0:
+            return []
+
+        return [(".ref", val["ref"]),
+                (".map", val["map"]),
+                (".key", val["key"].address),
+                (".index", val["index"])]
+
+class ProtMapRangePrinter:
+    "Prints a protected map range lvalue"
+
+    def __init__(self, val):
+         self.val = val
+
+    def to_string(self):
+        (type,val) = unwind_ptr(self.val)
+
+        return print_ptr(val.address)
+
+    def children(self):
+        (type,val) = unwind_ptr(self.val)
+        if val.address == 0:
+            return []
+
+        return [(".ref", val["ref"]),
+                (".map", val["map"]),
+                (".key", val["key"].address),
+                (".index1", val["index1"]),
+                (".index2", val["index2"])]
+
 class TypePrinter:
     "Prints a LPC type"
 
@@ -413,6 +485,7 @@ class TypePrinter:
     TCLASS_OBJECT     = 2
     TCLASS_ARRAY      = 3
     TCLASS_UNION      = 4
+    TCLASS_PYTHON     = 5
 
     TYPE_UNKNOWN      =  0
     TYPE_NUMBER       =  1
@@ -425,6 +498,8 @@ class TypePrinter:
     TYPE_SYMBOL       =  8
     TYPE_QUOTED_ARRAY =  9
     TYPE_BYTES        = 10
+    TYPE_COROUTINE    = 11
+    TYPE_LPCTYPE      = 12
 
     OBJECT_REGULAR    =  0
     OBJECT_LIGHTWEIGHT=  1
@@ -441,6 +516,8 @@ class TypePrinter:
         TYPE_SYMBOL:       "symbol",
         TYPE_QUOTED_ARRAY: "quoted_array",
         TYPE_BYTES:        "bytes",
+        TYPE_COROUTINE:    "coroutine",
+        TYPE_LPCTYPE:      "lpctype",
     }
 
     def __init__(self, val):
@@ -494,6 +571,10 @@ class TypePrinter:
                 tclass = int(union["t_class"])
             typestr += self.calc_name(union)
             return "<" + typestr + ">"
+
+        elif tclass == self.TCLASS_PYTHON:
+            return "python type %d" % (int(val["t_python"]["type_id"]),)
+
         else:
             return "lpctype_t with unknown class %d" % (tclass,)
 
@@ -546,9 +627,11 @@ ptr_printers = {
     'interactive_s': lambda val: PtrNamePrinter(val, ["ob", "name"]),
     'wiz_list_s':    lambda val: PtrNamePrinter(val, ["name"]),
     'lpctype_s':     TypePrinter,
-    'protected_lvalue':       ProtLvalPrinter,
-    'protected_char_lvalue':  ProtCharPrinter,
-    'protected_range_lvalue': ProtRangePrinter,
+    'protected_lvalue':           ProtLvalPrinter,
+    'protected_char_lvalue':      ProtCharPrinter,
+    'protected_range_lvalue':     ProtRangePrinter,
+    'protected_mapentry_lvalue':  ProtMapEntryPrinter,
+    'protected_map_range_lvalue': ProtMapRangePrinter,
 }
 
 direct_printers = {

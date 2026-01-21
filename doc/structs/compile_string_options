@@ -1,0 +1,26 @@
+NAME
+        compile_string_options
+
+DEFINITION
+        struct compile_string_options
+        {
+            mapping|closure functions;
+            mapping|closure variables;
+            mapping|closure structs;
+
+            int use_object_functions;
+            int use_object_variables;
+            int use_object_structs;
+
+            int compile_expression;
+            int compile_block;
+            int as_async;
+
+            int detect_end;
+        };
+
+DESCRIPTION
+        This struct is used for passing options to the compile_string() efun.
+
+SEE ALSO
+        compile_string(E)

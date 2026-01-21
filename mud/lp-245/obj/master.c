@@ -54,6 +54,10 @@ static void mudwho_exec(object obfrom, object ob);
 #    define mudwho_exec(a,b)       0
 #endif
 
+#if defined(__TLS__) && defined(TLS_PORT)
+#include "/sys/interactive_info.h"
+#endif
+
 void save_wiz_file(); // forward
 int query_player_level (string what); // forward
 
@@ -712,16 +716,26 @@ object connect ()
 // binding the connection to it. That lfun has to return !=0 to succeed.
 
 {
-    object ob;
-    string ret;
-
-    write("Lars says: Let's get a body for your character ...");
-    ob = clone_object("obj/player");
-    write("\n");
-    if (ret) {
-	write(ret + "\n");
-	return 0;
+    object ob = clone_object("obj/player");
+    if (!ob)
+    {
+        write("Lars says: Couldn't get your body ready ...\n");
+        return 0;
     }
+
+#if defined(__TLS__) && defined(TLS_PORT)
+    // Figure out what port the interactive is connected to.
+    int mud_port = efun::interactive_info(this_interactive(), II_MUD_PORT);
+    // If it's the TLS_PORT, then try to initialize TLS.
+    if (mud_port == TLS_PORT)
+    {
+        // reject connection if TLS is not available
+        if (!tls_available())
+            return 0;
+        tls_init_connection(this_object(), "tls_logon", ob);
+    }
+#endif
+
     mudwho_connect(ob);
     return ob;
 }
@@ -1527,6 +1541,8 @@ int valid_snoop (object snoopee, object snooper)
     */
     if (object_name(previous_object()) == get_simul_efun())
         return 1;
+
+    return 0;
 }
 
 

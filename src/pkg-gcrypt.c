@@ -20,6 +20,7 @@
 
 #include "../mudlib/sys/tls.h"
 
+#if defined(ALLOCATOR_WRAPPERS)
 /*-------------------------------------------------------------------------*/
 static void *
 gcrypt_xalloc (size_t size)
@@ -56,6 +57,7 @@ gcrypt_xfree (void *p)
 {
     return pfree(p);
 } /* tls_xfree() */
+#endif /* ALLOCATOR_WRAPPERS */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -95,8 +97,10 @@ pkg_gcrypt_init (void)
     if (gcry_control(GCRYCTL_ANY_INITIALIZATION_P) == 0)
     {
         gcry_control(GCRYCTL_INITIALIZATION_FINISHED, 0);
+#if defined(ALLOCATOR_WRAPPERS)
         gcry_set_allocation_handler(gcrypt_xalloc, NULL, NULL,
             gcrypt_rexalloc, gcrypt_xfree);
+#endif /* ALLOCATOR_WRAPPERS */
         gcry_set_log_handler(gcrypt_log_message, NULL);
     }
 

@@ -71,7 +71,7 @@ struct coroutine_s
 
     svalue_t ob;                    /* The corresponding object.      */
     program_t *prog;                /* Current program.               */
-    lambda_t *closure;              /* Inline closure.                */
+    svalue_t closure;               /* Closure implementing coroutne. */
     bytecode_p funstart;            /* Start of the function code.    */
     bytecode_p pc;                  /* Program counter.               */
     int function_index_offset;      /* Index of .prog's function block
@@ -92,6 +92,11 @@ struct coroutine_s
     svalue_t *last_frame;           /* Last stack frame.              */
     svalue_t variables[];           /* The variables.                 */
 };
+
+extern long num_coroutines;
+  /* Number of coroutine_s. */
+extern long total_coroutine_size;
+  /* Size of all coroutine_s. */
 
 extern void _free_coroutine(coroutine_t *cr);
 extern coroutine_t *create_coroutine(svalue_t *closure);

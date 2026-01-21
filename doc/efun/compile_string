@@ -1,0 +1,78 @@
+SYNOPSIS
+        #include <compile_string.h>
+
+        closure compile_string(symbol* args, string str)
+        closure compile_string(symbol* args, string str
+                              , struct compile_string_options opts)
+        closure compile_string(symbol* args, string &str
+                              , struct compile_string_options opts)
+
+DESCRIPTION
+        Compiles <str> into a closure. The closure will be bound to the
+        current object. By default the string will be interpreted as an
+        LPC expression. The string may also contain preprocessor directives
+        (which must occur on their own line).
+
+        The argument names are given as the first argument <args>.
+
+        Optionally the function accepts a struct with additional options.
+        All entries in this struct are optional. These are the members:
+
+          functions:
+          variables:
+          structs:
+              A mapping or closure for the lookup of functions, variables,
+              resp. structs during compilation. A mapping is looked up using
+              the name, the closure will be called with the name as its only
+              argument. The name of the function, variable, resp. struct will
+              be given as a symbol. The result (mapping value resp. closure
+              return value) should be:
+                - for <functions> a closure,
+                - for <variables> a reference, and
+                - for <structs> a template struct (i.e. a struct whose data
+                  is irrelevant, only its type will be used).
+
+          use_object_functions:
+          use_object_variables:
+          use_object_structs:
+              If set (integer != 0) the compiled code may reference the
+              current object's functions, variables, resp. structs. However
+              successful lookups in <variables>, <functions>, resp. <structs>
+              have precedence. Private variables, functions and structs
+              cannot be accessed this way.
+
+          compile_expression:
+              If set (integer != 0) the string is interpreted as an expression
+              (eg. "1+1") and therefore must not contain a terminal semicolon.
+              If no compile mode is selected, this is the default.
+
+          compile_block:
+              If set (integer != 0) the string is interpreted as a block (code
+              between braces), the surrounding braces can be omitted. To return
+              a value, the code needs a return statement.
+
+          as_async:
+              If set (integer != 0) the code will be compiled as a coroutine,
+              i.e. the resulting closure will return a coroutine when called.
+
+          detect_end:
+              If set (integer != 0) the driver will try(!) to detect the end
+              of the expression/block and return the remaining string in <str>
+              (<str> needs to be passed as a reference for this).
+              An end is detected if the word or character following a full
+              expression or block is not suitable to continue the expression
+              or block. Also a comma will end an expression.
+
+        When compiling expressions the result of the H_AUTO_INCLUDE_EXPRESSION
+        driver hook will be prepended, for blocks the H_AUTO_INCLUDE_BLOCK
+        hook will be used.
+
+EXAMPLES
+        funcall(compile_string(({'a,'b}), "a+b"), 1, 2);
+
+HISTORY
+        Introduced in LDMud 3.6.7.
+
+SEE ALSO
+        compile_string_options(S), lambda(E), block(LPC),
+        auto_include_expression(H), auto_include_block(H)

@@ -1,4 +1,9 @@
+#pragma save_local_names, rtt_checks
+
+#include "/sys/driver_info.h"
 #include "/inc/base.inc"
+#include "/inc/sefun.inc"
+#include "/inc/deep_eq.inc"
 #include "/inc/testarray.inc"
 #include "/inc/gc.inc"
 
@@ -16,6 +21,10 @@ struct test_struct
     coroutine t_coroutine;
 };
 
+struct other_struct
+{
+};
+
 void run_test()
 {
 #ifdef __PYTHON__
@@ -24,6 +33,24 @@ void run_test()
           "-----------------------------\n");
 
     run_array(({
+        ({ "driver_info(DI_NUM_LPC_PYTHON_REFS) at the beginning", 0,
+            function int()
+            {
+                return driver_info(DI_NUM_LPC_PYTHON_REFS) == 0;
+            }
+        }),
+        ({ "driver_info(DI_NUM_PYTHON_LPC_REFS) at the beginning", 0,
+            function int()
+            {
+                clean_early_ob();
+                /* There should only be the following references:
+                 *  - The master object startup.ob_list.
+                 *  - The sefun object startup.ob_list
+                 *  - The struct type startup.PythonStruct
+                 */
+                return driver_info(DI_NUM_PYTHON_LPC_REFS) == 3;
+            }
+        }),
         ({ "passing int", 0,
             (:
                 return python_return(0) == 0 &&
@@ -76,7 +103,7 @@ void run_test()
                        python_return(arr) == arr;
             :)
         }),
-        ({ "passing arrays", 0,
+        ({ "passing mappings", 0,
             (:
                 mapping m = ([1,2,3]);
                 return python_return(m) == m;
@@ -128,6 +155,33 @@ void run_test()
                 return x == 66606;
             :)
         }),
+        ({ "passing lpctype", 0,
+            (:
+                return python_return([int])                == [int] &&
+                       python_return([string])             == [string] &&
+                       python_return([void])               == [void] &&
+                       python_return([mapping])            == [mapping] &&
+                       python_return([float])              == [float] &&
+                       python_return([closure])            == [closure] &&
+                       python_return([coroutine])          == [coroutine] &&
+                       python_return([symbol])             == [symbol] &&
+                       python_return([bytes])              == [bytes] &&
+                       python_return([lpctype])            == [lpctype] &&
+                       python_return([mixed])              == [mixed] &&
+                       python_return([object])             == [object] &&
+                       python_return([object "/master"])   == [object "/master"] &&
+                       python_return([lwobject])           == [lwobject] &&
+                       python_return([lwobject "/master"]) == [lwobject "/master"] &&
+                       python_return([struct mixed])       == [struct mixed] &&
+                       python_return([struct test_struct]) == [struct test_struct] &&
+                       python_return([mixed*])             == [mixed*] &&
+                       python_return([int*])               == [int*] &&
+                       python_return([symbol*])            == [symbol*] &&
+                       python_return([int|string])         == [int|string] &&
+                       python_return([lpctype])            == [lpctype] &&
+                       python_return([box])                == [box];
+            :)
+        }),
         ({ "passing too many arguments", TF_ERROR,
             (:
                 return funcall(#'python_return, 1, 2);
@@ -172,10 +226,205 @@ void run_test()
             :)
         }),
         ({
+            "Using Python-defined struct", 0,
+            (:
+                return python_sum_struct((<python_struct> value1: 10, value2: 32)) == 42;
+            :)
+        }),
+        ({
+            "using python type 1 (bigint)", 0,
+            (:
+                bigint val = to_bigint(1000);
+
+                // Check that it's really a big integer.
+                if (sprintf("%Q", val << 1000) != "10715086071862673209484250490600018105614048117055336074437503883703510511249361224931983788156958581275946729175531468251871452856923140435984577574698574803934567774824230985421074605062371141877954182153046474983581941267398767559165543946077062914571196477686542167660429831652624386837205668069376000")
+                    return 0;
+
+                // Check comparisons.
+                if (val != 1000
+                 || val > 1000
+                 || val >= 1001
+                 || val < 1000
+                 || val <= 999
+                 || val == 1
+                 || 1000 != val
+                 || 1000 < val
+                 || 1001 <= val
+                 || 1000 > val
+                 || 999 >= val
+                 || 1 == val)
+                    return 0;
+
+                // Check arithmetics
+                if (val + 5 != 1005
+                 || val - 5 != 995
+                 || val * 5 != 5000
+                 || val / 5 != 200
+                 || val % 6 != 4
+                 || val << 2 != 4000
+                 || val >> 2 != 250
+                 || (val & 10) != 8
+                 || (val | 10) != 1002
+                 || (val ^ 10) != 994
+                 || 5 + val != 1005
+                 || 5 - val != -995
+                 || 5 * val != 5000
+                 || 5000 / val != 5
+                 || 5500 % val != 500
+                 || 2 >> val != 0
+                 || (10 & val) != 8
+                 || (10 | val) != 1002
+                 || (10 ^ val) != 994
+                 || -val != -1000
+                 || ~val != -1001)
+                    return 0;
+
+                // Check efun override
+                int i = to_int(val);
+                string s = to_string(val << 1000);
+                if (intp(val)
+                 || !intp(i)
+                 || i != 1000
+                 || s != "10715086071862673209484250490600018105614048117055336074437503883703510511249361224931983788156958581275946729175531468251871452856923140435984577574698574803934567774824230985421074605062371141877954182153046474983581941267398767559165543946077062914571196477686542167660429831652624386837205668069376000")
+                    return 0;
+
+                // Check __int__, __float__ und __str__ working.
+                if (to_type(val, [int]) != 1000
+                 || to_type(val, [string]) != "1000"
+                 || to_type(val, [float]) != 1000.0)
+                    return 0;
+
+                val <<= 1000;
+                bigint val2 = restore_value(save_value(val));
+                if (val != val2)
+                    return 0;
+
+                return 1;
+            :)
+        }),
+        ({
+            "using python type 2 (random_generator)", 0,
+            (:
+                random_generator r = create_random_generator();
+
+                if (r.randint(10,20) < 10
+                 || r.randint(10,20) > 20)
+                     return 0;
+
+                if (r.uniform(20,30) < 20
+                 || r.uniform(20,30) > 30)
+                     return 0;
+
+                string *elems = ({"A","B","C","D"});
+                r.shuffle(elems);
+
+                string elem = r.choice(elems);
+                if (sizeof(elem) != 1 || elem[0] < 'A' || elem[0] > 'D')
+                    return 0;
+
+                /* We cannot save that, but it should not bring an error. */
+                if (restore_value(save_value(r)) != 0)
+                    return 0;
+
+                return 1;
+            :)
+        }),
+        ({
+            "using python type 3 (box)", 0,
+            (:
+                box b = create_box(100);
+                box c = copy(b);
+                box d = deep_copy(b);
+                box e = deep_copy(({b}))[0];
+
+                /* Check that the copy contains the data. */
+                if (b.get_value() != 100
+                 || c.get_value() != 100
+                 || d.get_value() != 100
+                 || e.get_value() != 100)
+                     return 0;
+
+                /* Check that these are independed objects. */
+                b.set_value(101);
+                c.set_value(102);
+                d.set_value(103);
+                e.set_value(104);
+
+                if (b.get_value() != 101
+                 || c.get_value() != 102
+                 || d.get_value() != 103
+                 || e.get_value() != 104)
+                    return 0;
+
+                /* Check that save/restore retains the values. */
+                c = restore_value(save_value(b));
+                d = restore_value(save_value(({b})))[0];
+                e = restore_value(save_value((["A":b])))["A"];
+
+                if (c.get_value() != 101
+                 || d.get_value() != 101
+                 || e.get_value() != 101)
+                    return 0;
+
+                /* Check to_type() using __convert__(). */
+                if (to_type(b, [int|string]) != 101)
+                    return 0;
+
+                /* And works with complex data structures. */
+                b.set_value(({20,30}));
+                c = restore_value(save_value(b));
+                if (!deep_eq(c.get_value(), ({20,30})))
+                    return 0;
+
+                mapping m = ([1:({2})]);
+                b.set_value(m);
+                <mapping|box>* x = restore_value(save_value(({b,m})));
+                if (x[0].get_value() != x[1]
+                 || !deep_eq(x[1],m))
+                    return 0;
+
+                return 1;
+            :)
+        }),
+        ({ "driver_info(DI_NUM_LPC_PYTHON_REFS) after some tests", 0,
+            function int()
+            {
+                return driver_info(DI_NUM_LPC_PYTHON_REFS) == 0;
+            }
+        }),
+        ({ "driver_info(DI_NUM_PYTHON_LPC_REFS) after some tests", 0,
+            function int()
+            {
+                return driver_info(DI_NUM_PYTHON_LPC_REFS) == 3;
+            }
+        }),
+        ({ "driver_info(DI_NUM_LPC_PYTHON_REFS) with a Python object", 0,
+            function int()
+            {
+                box b = create_box(100);
+                return driver_info(DI_NUM_LPC_PYTHON_REFS) == 1;
+            }
+        }),
+        ({ "driver_info(DI_NUM_PYTHON_LPC_REFS) with an LPC reference", 0,
+            function int()
+            {
+                box b = create_box(({100}));
+                return driver_info(DI_NUM_PYTHON_LPC_REFS) == 4;
+            }
+        }),
+        ({
             "Python object hook 1", 0,
             (:
                 object* oblist = python_get_hook_info()[1];
-                return sizeof(oblist) == 1 && oblist[0] == this_object();
+                return sizeof(oblist) == 2 && oblist[0] == this_object() && oblist[1] == find_object("/sefun");
+            :)
+        }),
+        ({
+            "Python BEFORE_INSTRUCTION hook", 0,
+            (:
+                return python_get_last_program_name() == __FILE__ &&
+                       python_get_last_file_name() == __FILE__ &&
+                       python_get_last_line_number() == __LINE__;
             :)
         }),
         ({ "Python GC", 0,
@@ -187,15 +436,35 @@ void run_test()
         }),
         ({ "Python test suite", 0,
             (:
+                string err;
+                int result;
+
                 msg("\n");
-                return python_test();
+                /* For the call_stack test create additional frames. */
+                err = catch(result = funcall(#'funcall, #'python_test));
+                if (err)
+                {
+                    msg("Got error: %s", err);
+                    return 0;
+                }
+                return result;
+            :)
+        }),
+        ({ "Python call frame with destructed objects", 0,
+            (:
+                object ob = clone_object("/testob");
+                return ob.callback(function int()
+                {
+                    destruct(ob);
+                    return python_test_call_stack();
+                });
             :)
         }),
         ({
             "Python object hook 2", 0,
             (:
                 object* oblist = python_get_hook_info()[1];
-                return sizeof(oblist) == 2 && oblist[0] == this_object();
+                return sizeof(oblist) == 3 && oblist[0] == this_object();
             :)
         }),
         ({
@@ -217,12 +486,14 @@ void run_test()
             :)
         })
 
-    }), //#'shutdown);
+    }),
     (:
         if($1)
             shutdown(1);
         else
         {
+            object tmp_ob = clone_object(this_object());
+
             python_set((<test_struct> 
                 705948522,
                 -1000000.0,
@@ -230,7 +501,7 @@ void run_test()
                 this_object(),
                 new_lwobject("/testob"),
                 ({ 5, 3, 1}),
-                ([2,3,5]),
+                ([2:2,3:3,5:5,tmp_ob:({2,3,5})]),
                 quote("abc"+"gc"),
                 quote(({11, 13, 17})),
                 "/testob"->testcoroutine(),
@@ -242,6 +513,9 @@ void run_test()
                 shutdown(1);
                 return 0;
             }
+
+            /* Check whether mapping cleanup works across Python boundary. */
+            destruct(tmp_ob);
 
             start_gc(function void(int result)
             {
@@ -260,7 +534,7 @@ void run_test()
                     val->t_object != this_object() ||
                     !lwobjectp(val->t_lwobject) || program_name(val->t_lwobject) != "/testob.c" ||
                     val->t_array[0] != 5 || val->t_array[1] != 3 || val->t_array[2] != 1 ||
-                    sizeof(val->t_mapping) != 3 || widthof(val->t_mapping) != 0 ||
+                    sizeof(val->t_mapping) != 3 || widthof(val->t_mapping) != 1 ||
                     !member(val->t_mapping, 2) || !member(val->t_mapping, 3) || !member(val->t_mapping, 5) ||
                     unquote(val->t_symbol) != "ab" + "cgc" ||
                     sizeof(unquote(val->t_quoted_array)) != 3 ||
@@ -287,6 +561,13 @@ void run_test()
                     return;
                 }
 
+                if(has_gil_log_message())
+                {
+                    msg("Python GIL was held during backend loop!\n");
+                    shutdown(1);
+                    return;
+                }
+
                 start_gc(#'shutdown);
             });
         }
@@ -298,6 +579,7 @@ void run_test()
 }
 
 int master_fun() { return 54321; }
+int master_var = 98765;
 
 string *epilog(int eflag)
 {

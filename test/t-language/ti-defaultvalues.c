@@ -7,3 +7,5 @@ int ifun(int a, int b = 100*a, int c = 2000)
 {
     return a + b + c;
 }
+
+nomask int iprototype(int a, int b = 100);

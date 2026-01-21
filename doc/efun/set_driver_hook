@@ -32,6 +32,14 @@ DESCRIPTION
             closure), function name.
           Optional hooks for creation/reset/clean up-actions.
 
+        H_CREATE_LWOBJECT
+        H_CREATE_LWOBJECT_COPY
+        H_CREATE_LWOBJECT_RESTORE
+          arg: lambda closure, function name.
+          Optional hooks for creation of lightweight objects
+          with new_lwobject(), copy()/deep_copy() resp.
+          restore_value()/restore_object().
+
         H_DEFAULT_METHOD
           arg: lambda closure, lfun closure, function name.
           Optional hook for default method implementation.
@@ -74,6 +82,12 @@ DESCRIPTION
           arg: lambda closure, lfun closure, string
           Optional hook to specify a string to be included before the
           source of every compiled LPC object.
+
+        H_AUTO_INCLUDE_EXPRESSION
+        H_AUTO_INCLUDE_BLOCK
+          arg: closure, string
+          Optional hook specifying a string to be prepended before
+          the string of a compile_string() call.
 
         H_FILE_ENCODING
           arg: lambda closure, lfun closure, string

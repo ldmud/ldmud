@@ -45,9 +45,6 @@ extern int check_state_level;
 extern Bool check_object_stat;
 #endif
 
-extern int port_numbers[];
-extern int numports;
-
 extern int udp_port;
 
 extern Bool compat_mode;

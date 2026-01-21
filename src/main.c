@@ -69,6 +69,7 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#include "stdstructs.h"
 #include "svalue.h"
 #include "swap.h"
 #include "wiz_list.h"
@@ -166,13 +167,6 @@ Bool synch_heart_beats      = MY_FALSE;
 
 Bool heart_beats_enabled    = MY_TRUE;
   /* heart beats are currently active and will be called. */
-
-int port_numbers[MAXNUMPORTS] = { PORTNO };
-  /* The login port numbers.
-   * Negative numbers are not ports, but the numbers of inherited
-   * socket file descriptors.
-   */
-int numports = 0;  /* Number of specified ports */
 
 int udp_port = UDP_PORT;
   /* Port number for UDP. A negative number disables it. */
@@ -308,6 +302,7 @@ main (int argc, char **argv)
     mb_init();
     init_interpret();
     rx_init();
+    comm_init();
 
     put_number(&const0, 0);
     put_number(&const1, 1);
@@ -576,6 +571,7 @@ main (int argc, char **argv)
            * to throw errors.
            */
         init_compiler();
+        init_std_structs();
 
 #ifdef USE_PYTHON
         pkg_python_init(argv[0]);
@@ -2410,9 +2406,7 @@ eval_arg (int eOption, const char * pValue)
     case cArgument:
         if (numports >= MAXNUMPORTS)
             fprintf(stderr, "Portnumber '%s' ignored.\n", pValue);
-        else if (atoi(pValue))
-              port_numbers[numports++] = atoi(pValue);
-        else
+        else if (!add_listen_port(pValue))
             fprintf(stderr, "Illegal portnumber '%s' ignored.\n", pValue);
         break;
 
@@ -2422,9 +2416,7 @@ eval_arg (int eOption, const char * pValue)
     case cInherited:
         if (numports >= MAXNUMPORTS)
             fprintf(stderr, "fd '%s' ignored.\n", pValue);
-        else if (atoi(pValue))
-              port_numbers[numports++] = -atoi(pValue);
-        else
+        else if (!add_inherited_port(pValue))
             fprintf(stderr, "Illegal fd '%s' ignored.\n", pValue);
         break;
 

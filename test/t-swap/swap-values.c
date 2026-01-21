@@ -1,7 +1,7 @@
 #include "inc/deep_eq.inc"
 #include "inc/msg.inc"
 
-/* Here are the values that shall be swapped out and back in. */
+/* Check whether different LPC values are swapped back in accordingly. */
 int intval = 42;
 
 int lval1 = 100;

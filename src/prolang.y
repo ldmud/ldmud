@@ -1,4 +1,5 @@
 %define lr.type ielr
+%define api.location.type {code_location_t}
 %{
 %line
 /*---------------------------------------------------------------------------
@@ -98,6 +99,7 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#include "stdstructs.h"
 #include "structs.h"
 #include "svalue.h"
 #include "swap.h"
@@ -107,7 +109,10 @@
 #include "xalloc.h"
 
 #include "pkg-python.h"
+#include "i-current_object.h"
 #include "i-eval_cost.h"
+#include "i-svalue_cmp.h"
+#include "i-svalue_hash.h"
 
 #include "../mudlib/sys/driver_hook.h"
 
@@ -120,6 +125,20 @@
 
 #define YYMAXDEPTH        600
 
+#define YYLLOC_DEFAULT(cur, rhs, n)                         \
+    do                                                      \
+    {                                                       \
+        if (n)                                              \
+        {                                                   \
+            (cur).start = YYRHSLOC(rhs, 1).start;           \
+            (cur).end   = YYRHSLOC(rhs, n).end;             \
+        }                                                   \
+        else                                                \
+        {                                                   \
+            (cur).start = (cur).end = YYRHSLOC(rhs, 0).end; \
+        }                                                   \
+    } while (0)
+
 /*-------------------------------------------------------------------------*/
 
 typedef struct block_scope_s       block_scope_t;
@@ -130,6 +149,8 @@ typedef struct efun_shadow_s       efun_shadow_t;
 typedef struct mem_block_s         mem_block_t;
 typedef struct local_variable_s    local_variable_t;
 typedef struct global_variable_s   global_variable_t;
+typedef struct lambda_ident_s      lambda_ident_t;
+typedef struct lambda_struct_ident_s lambda_struct_ident_t;
 
 /*-------------------------------------------------------------------------*/
 /* Exported result variables */
@@ -163,10 +184,6 @@ Bool variables_defined;
   /* TRUE: Variable definitions have been encountered.
    */
 
-bool disable_sefuns;
-  /* TRUE: Sefuns will be ignored.
-   */
-
 /*-------------------------------------------------------------------------*/
 /* Table which hook may be of which type.
  * It is here because make_func has to touch this file anyway, but
@@ -179,32 +196,36 @@ short hook_type_map[NUM_DRIVER_HOOKS] =
 %hookmap \
     H_MOVE_OBJECT0: 0, \
     H_MOVE_OBJECT1: 0, \
-    H_LOAD_UIDS:      SH(T_CLOSURE), \
-    H_CLONE_UIDS:     SH(T_CLOSURE), \
-    H_LWOBJECT_UIDS:  SH(T_CLOSURE), \
-    H_CREATE_SUPER:                 SH(T_STRING), \
-    H_CREATE_OB:                    SH(T_STRING), \
-    H_CREATE_CLONE:                 SH(T_STRING), \
-    H_CREATE_LWOBJECT:              SH(T_STRING), \
-    H_RESET:                        SH(T_STRING), \
-    H_CLEAN_UP:       SH(T_CLOSURE) SH(T_STRING), \
-    H_MODIFY_COMMAND: SH(T_CLOSURE) SH(T_STRING) SH(T_MAPPING), \
-    H_NOTIFY_FAIL:    SH(T_CLOSURE) SH(T_STRING), \
-    H_NO_IPC_SLOT:                  SH(T_STRING), \
-    H_INCLUDE_DIRS:   SH(T_CLOSURE)              SH(T_POINTER), \
-    H_TELNET_NEG:     SH(T_CLOSURE) SH(T_STRING), \
-    H_NOECHO:         SH(T_CLOSURE) SH(T_STRING), \
-    H_ERQ_STOP:       SH(T_CLOSURE), \
-    H_MODIFY_COMMAND_FNAME: SH(T_STRING), \
-    H_COMMAND:        SH(T_CLOSURE) SH(T_STRING), \
-    H_SEND_NOTIFY_FAIL: SH(T_CLOSURE) SH(T_STRING), \
-    H_AUTO_INCLUDE:   SH(T_CLOSURE) SH(T_STRING), \
-    H_FILE_ENCODING:  SH(T_CLOSURE) SH(T_STRING), \
-    H_DEFAULT_METHOD: SH(T_CLOSURE) SH(T_STRING), \
-    H_DEFAULT_PROMPT: SH(T_CLOSURE) SH(T_STRING), \
-    H_PRINT_PROMPT:   SH(T_CLOSURE) SH(T_STRING), \
-    H_REGEXP_PACKAGE: SH(T_NUMBER), \
-    H_MSG_DISCARDED:  SH(T_CLOSURE) SH(T_STRING), \
+    H_LOAD_UIDS:                SH(T_CLOSURE), \
+    H_CLONE_UIDS:               SH(T_CLOSURE), \
+    H_LWOBJECT_UIDS:            SH(T_CLOSURE), \
+    H_CREATE_SUPER:             SH(T_CLOSURE) SH(T_STRING), \
+    H_CREATE_OB:                SH(T_CLOSURE) SH(T_STRING), \
+    H_CREATE_CLONE:             SH(T_CLOSURE) SH(T_STRING), \
+    H_CREATE_LWOBJECT:          SH(T_CLOSURE) SH(T_STRING), \
+    H_CREATE_LWOBJECT_COPY:     SH(T_CLOSURE) SH(T_STRING), \
+    H_CREATE_LWOBJECT_RESTORE:  SH(T_CLOSURE) SH(T_STRING), \
+    H_RESET:                    SH(T_CLOSURE) SH(T_STRING), \
+    H_CLEAN_UP:                 SH(T_CLOSURE) SH(T_STRING), \
+    H_MODIFY_COMMAND:           SH(T_CLOSURE) SH(T_STRING) SH(T_MAPPING), \
+    H_NOTIFY_FAIL:              SH(T_CLOSURE) SH(T_STRING), \
+    H_NO_IPC_SLOT:                            SH(T_STRING), \
+    H_INCLUDE_DIRS:             SH(T_CLOSURE)              SH(T_POINTER), \
+    H_TELNET_NEG:               SH(T_CLOSURE) SH(T_STRING), \
+    H_NOECHO:                   SH(T_CLOSURE) SH(T_STRING), \
+    H_ERQ_STOP:                 SH(T_CLOSURE), \
+    H_MODIFY_COMMAND_FNAME:                   SH(T_STRING), \
+    H_COMMAND:                  SH(T_CLOSURE) SH(T_STRING), \
+    H_SEND_NOTIFY_FAIL:         SH(T_CLOSURE) SH(T_STRING), \
+    H_AUTO_INCLUDE:             SH(T_CLOSURE) SH(T_STRING), \
+    H_AUTO_INCLUDE_EXPRESSION:  SH(T_CLOSURE) SH(T_STRING), \
+    H_AUTO_INCLUDE_BLOCK:       SH(T_CLOSURE) SH(T_STRING), \
+    H_FILE_ENCODING:            SH(T_CLOSURE) SH(T_STRING), \
+    H_DEFAULT_METHOD:           SH(T_CLOSURE) SH(T_STRING), \
+    H_DEFAULT_PROMPT:           SH(T_CLOSURE) SH(T_STRING), \
+    H_PRINT_PROMPT:             SH(T_CLOSURE) SH(T_STRING), \
+    H_REGEXP_PACKAGE:                                       SH(T_NUMBER), \
+    H_MSG_DISCARDED:            SH(T_CLOSURE) SH(T_STRING), \
 
 #undef SH
 
@@ -284,8 +305,9 @@ enum variable_usage
 
 struct local_variable_s
 {
-    fulltype_t          type;   /* The type of the variable.  */
-    enum variable_usage usage;  /* How the variable was used. */
+    fulltype_t          type;   /* The type of the variable.    */
+    enum variable_usage usage;  /* How the variable was used.   */
+    int                 dbg;    /* Index into A_LVARIABLES_DBG. */
 };
 
 /* --- struct global_variable_s: Store info about global variables ---
@@ -300,6 +322,39 @@ struct global_variable_s
     enum variable_usage usage;  /* How the variable was used. */
 };
 
+/* --- struct lambda_ident_s: Identifier during string compilation ---
+ *
+ * This structure records lookup information for string compilation.
+ */
+
+struct lambda_ident_s
+{
+    enum
+    {
+        LAMBDA_IDENT_UNDEF,  /* Did a lookup, found nothing.            */
+        LAMBDA_IDENT_OBJECT, /* Native function of the current program. */
+        LAMBDA_IDENT_VALUE   /* Closure stored as a lambda value.       */
+    } kind;
+
+    union
+    {
+        unsigned short object_index; /* kind == LAMBDA_IDENT_OBJECT     */
+        svalue_t value;              /* kind == LAMBDA_IDENT_VALUE      */
+    };
+};
+
+
+/* --- struct lambda_struct_ident_s: Structs in during string compilation ---
+ *
+ * Needed to record lookup information for structs. We save also the
+ * resulting struct type for easier access to the underlying type.
+ */
+
+struct lambda_struct_ident_s
+{
+    lambda_ident_t index;
+    struct_type_t* type;        /* Refcounted struct type to use. */
+};
 
 /*-------------------------------------------------------------------------*/
 /* Macros */
@@ -351,6 +406,9 @@ enum e_saved_areas {
  , A_VIRTUAL_VAR
     /* (variable_t) The information for all virtual variables.
      */
+ , A_LOCAL_VARIABLES_DBG
+    /* (local_variable_dbg_t) Debugging information for local variables.
+     */
  , A_LINENUMBERS
     /* (char) The linenumber information.
      */
@@ -362,12 +420,16 @@ enum e_saved_areas {
      * variables and functions of an obsolete virtually inherited
      * program.
      */
- , A_ARGUMENT_TYPES
-    /* (lpctype_t*) Types of the arguments of all functions with
-     * typechecking. The argument types for a specific function
-     * can be found using the ARGUMENT_INDEX. All entries
-     * are counted references.
+ , A_TYPES
+    /* (lpctype_t*) Types used in the program. All entries are
+     * counted references.
      */
+
+ , A_ARGUMENT_TYPE_INDEX
+    /* (unsigned short) Index into A_TYPES for every entry in
+     * A_ARGUMENT_TYPES. This is only created during epilog.
+     */
+
  , A_ARGUMENT_INDEX
     /* (unsigned short) Index of the first argument type of function <n>.
      * INDEX_START_NONE is used for functions with no type information.
@@ -385,17 +447,19 @@ enum e_saved_areas {
  , NUMPAREAS  /* Number of saved areas */
 };
 
-typedef bytecode_t     A_PROGRAM_t;
-typedef string_t*      A_STRINGS_t;
-typedef variable_t     A_VARIABLES_t;
-typedef variable_t     A_VIRTUAL_VAR_t;
-typedef char           A_LINENUMBERS_t;
-typedef inherit_t      A_INHERITS_t;
-typedef unsigned short A_UPDATE_INDEX_MAP_t;
-typedef lpctype_t*     A_ARGUMENT_TYPES_t;
-typedef unsigned short A_ARGUMENT_INDEX_t;
-typedef include_t      A_INCLUDES_t;
-typedef struct_def_t   A_STRUCT_DEFS_t;
+typedef bytecode_t           A_PROGRAM_t;
+typedef string_t*            A_STRINGS_t;
+typedef variable_t           A_VARIABLES_t;
+typedef variable_t           A_VIRTUAL_VAR_t;
+typedef local_variable_dbg_t A_LOCAL_VARIABLES_DBG_t;
+typedef char                 A_LINENUMBERS_t;
+typedef inherit_t            A_INHERITS_t;
+typedef unsigned short       A_UPDATE_INDEX_MAP_t;
+typedef lpctype_t*           A_TYPES_t;
+typedef unsigned short       A_ARGUMENT_TYPE_INDEX_t;
+typedef unsigned short       A_ARGUMENT_INDEX_t;
+typedef include_t            A_INCLUDES_t;
+typedef struct_def_t         A_STRUCT_DEFS_t;
 
 enum e_internal_areas {
    A_FUNCTIONS = NUMPAREAS
@@ -420,10 +484,18 @@ enum e_internal_areas {
     * therefore not virtual) global variables.
     */
 
+ , A_ARGUMENT_TYPES
+    /* (lpctype_t*) Types of the arguments of all functions with
+     * typechecking. The argument types for a specific function
+     * can be found using the ARGUMENT_INDEX. All entries
+     * are counted references.
+     */
+
  , A_INLINE_PROGRAM
     /* (bytecode_t, char): Program and linenumbers saved from the compiled
      * but not yet inserted inline closures.
      */
+
  , A_INLINE_CLOSURE
     /* (inline_closure_t): The currently pending inline closures. The lexical
      * nesting is achieved with the .prev/.next pointers in the
@@ -433,6 +505,12 @@ enum e_internal_areas {
  , A_STRUCT_MEMBERS
     /* (struct_member_t) While a struct definition is parsed, the member
      * descriptors are collected here.
+     */
+
+ , A_SEFUN_STRUCT_DEFS
+    /* (unsigned short) The indices into A_STRUCT_DEFS for any simul-efun
+     * struct that was used. (An entry is USHRT_MAX if the sefun struct
+     * was not put into A_STRUCT_DEFS, yet.)
      */
 
  , A_LVALUE_CODE
@@ -454,6 +532,51 @@ enum e_internal_areas {
      * for function <n>. This is only used for function prototypes.
      */
 
+ , A_DEFAULT_LAMBDA_VALUES
+    /* (svalue_t) Area to store any lambda values needed for initialization
+     * of function arguments with their default values.
+     */
+
+ , A_LAMBDA_VALUES
+    /* (svalue_t) Values to be stored in a lambda closure for string
+     * compilation. They are refcounted.
+     */
+
+ , A_LAMBDA_VALUES_TABLE
+    /* (int) Hash table for lambda values. This table maps the hash
+     * to an index into A_LAMBDA_VALUES and A_LAMBDA_VALUES_NEXT.
+     * LAMBDA_VALUE_NEXT(idx) returns the following index in the
+     * hash chain. A table has 0x100 entries, this block may contain
+     * multiple tables when compiling nested closures.
+     */
+
+ , A_LAMBDA_VALUES_NEXT
+    /* (int) All values in A_LAMBDA_VALUES are in the hash table
+     * lambda_values_table. Hash chains are linked using the indices
+     * in this area. A negative value denotes the end of the chain.
+     */
+
+ , A_LAMBDA_FUNCTIONS
+    /* (lambda_ident_t) Function call information when compiling
+     * a lambda closure. This is used instead of A_FUNCTION for
+     * string compilation when looking up u.global.function from
+     * identifiers.
+     */
+
+ , A_LAMBDA_VARIABLES
+    /* (lambda_ident_t) Global variable information when compiling
+     * a lambda closure. This is used instead of (N)V_VARIABLE for
+     * string compilation when looking up u.global.variable from
+     * identifiers.
+     */
+
+ , A_LAMBDA_STRUCTS
+    /* (lambda_ident_t) Struct lookup information when compiling
+     * a lambda closure. This is used instead of STRUCT_DEF for
+     * string compilation when looking up u.global.struct_id from
+     * identifiers.
+     */
+
  , NUMAREAS  /* Total number of areas */
 };
 
@@ -463,12 +586,21 @@ typedef function_t        A_FUNCTIONS_t;
 typedef int               A_STRING_NEXT_t;
 typedef local_variable_t  A_LOCAL_VARIABLES_t;
 typedef global_variable_t A_GLOBAL_VARIABLES_t;
+typedef lpctype_t*        A_ARGUMENT_TYPES_t;
 typedef bytecode_t        A_INLINE_PROGRAM_t;
 typedef inline_closure_t  A_INLINE_CLOSURE_t;
 typedef struct_member_t   A_STRUCT_MEMBERS_t;
+typedef unsigned short    A_SEFUN_STRUCT_DEFS_t;
 typedef bytecode_t        A_LVALUE_CODE_t;
 typedef bytecode_t        A_DEFAULT_VALUES_t;
 typedef p_int             A_DEFAULT_VALUES_POSITION_t;
+typedef svalue_t          A_DEFAULT_LAMBDA_VALUES_t;
+typedef svalue_t          A_LAMBDA_VALUES_t;
+typedef int               A_LAMBDA_VALUES_TABLE_t;
+typedef int               A_LAMBDA_VALUES_NEXT_t;
+typedef lambda_ident_t    A_LAMBDA_FUNCTIONS_t;
+typedef lambda_ident_t    A_LAMBDA_VARIABLES_t;
+typedef lambda_struct_ident_t A_LAMBDA_STRUCTS_t;
 
 /* --- struct mem_block_s: One memory area ---
  * Every mem_block keeps one memory area. As it grows by using realloc(),
@@ -534,6 +666,17 @@ static mem_block_t mem_block[NUMAREAS];
   /* Lookup the start index of the types for function number <n>.
    */
 
+#define PROG_TYPE_COUNT         GET_BLOCK_COUNT(A_TYPES)
+  /* Number of lpctype_t* stored so far in A_TYPES.
+   */
+
+#define PROG_TYPE(n)            GET_BLOCK(A_TYPES)[n]
+  /* Get the lpctype_t* with index <n>.
+   */
+
+#define ARGUMENT_TYPE_INDEX(n)  GET_BLOCK(A_ARGUMENT_TYPE_INDEX)[n]
+  /* Get the index into A_TYPES at position <n>.
+   */
 
 #define ARGTYPE_COUNT           GET_BLOCK_COUNT(A_ARGUMENT_TYPES)
   /* Number of lpctype_t* stored so far in A_ARGUMENT_TYPES.
@@ -561,6 +704,16 @@ static mem_block_t mem_block[NUMAREAS];
   /* Return the variable_t* for the variable <n>, virtual or not.
    */
 
+
+#define LOCAL_VARIABLE_DBG_COUNT GET_BLOCK_COUNT(A_LOCAL_VARIABLES_DBG)
+  /* Number of debugging entries for local variables.
+   */
+
+#define LOCAL_VARIABLE_DBG(n)   GET_BLOCK(A_LOCAL_VARIABLES_DBG)[n]
+  /* Return the debugging information at the given index <n>.
+   * <n> corresponds to the .dbg field in A_LOCAL_VARIABLES.
+   */
+
 #define INHERIT(n)              GET_BLOCK(A_INHERITS)[n]
   /* Index the inherit_t <n>.
    */
@@ -583,6 +736,14 @@ static mem_block_t mem_block[NUMAREAS];
 
 #define STRUCT_MEMBER_COUNT     GET_BLOCK_COUNT(A_STRUCT_MEMBERS)
   /* Return the number of struct members stored.
+   */
+
+#define SEFUN_STRUCT_DEF(n)     GET_BLOCK(A_SEFUN_STRUCT_DEFS)[n]
+  /* The index for a simul-efun struct <n> into our struct definitions.
+   */
+
+#define SEFUN_STRUCT_DEF_COUNT  GET_BLOCK_COUNT(A_SEFUN_STRUCT_DEFS)
+  /* Return the number of entries for sefun struct defs.
    */
 
 #define PROG_STRING(n)          GET_BLOCK(A_STRINGS)[n]
@@ -667,6 +828,67 @@ static mem_block_t mem_block[NUMAREAS];
    * default values.
    */
 
+#define DEFAULT_LAMBDA_VALUE(n)    GET_BLOCK(A_DEFAULT_LAMBDA_VALUES)[n]
+  /* Return the lambda value for the default values code block at
+   * position <n>.
+   */
+
+#define DEFAULT_LAMBDA_VALUES_COUNT GET_BLOCK_COUNT(A_DEFAULT_LAMBDA_VALUES)
+  /* Return the number of lambda values for the default values code block.
+   */
+
+#define LAMBDA_VALUE(n)           GET_BLOCK(A_LAMBDA_VALUES)[n]
+  /* Return the lambda value at position <n>.
+   */
+
+#define LAMBDA_VALUES_COUNT       GET_BLOCK_COUNT(A_LAMBDA_VALUES)
+  /* Return the number of lambda values.
+   */
+
+#define LAMBDA_VALUE_ENTRY(l,h)   GET_BLOCK(A_LAMBDA_VALUES_TABLE)[l*0x100 + (h)]
+  /* Return the index of the first lambda value with the given hash <h>.
+   * The lookup is done in the table at level <l>.
+   */
+
+#define LAMBDA_VALUE_TABLE_SIZE   GET_BLOCK_COUNT(A_LAMBDA_VALUES_TABLE)
+  /* The size of the table. (Should always be a multiple of 0x100).
+   */
+
+#define LAMBDA_VALUE_NEXT(n)      GET_BLOCK(A_LAMBDA_VALUES_NEXT)[n]
+  /* Return the index of the next lambda value with the same has
+   * as the lambda value at position <n>.
+   */
+
+#define LAMBDA_FUNCTION(n)        GET_BLOCK(A_LAMBDA_FUNCTIONS)[n]
+  /* Return the function call information at index <n> when
+   * doing a string compilation.
+   */
+
+#define LAMBDA_FUNCTIONS_COUNT    GET_BLOCK_COUNT(A_LAMBDA_FUNCTIONS)
+  /* Return the number of function call information entries when
+   * doing a string compilation.
+   */
+
+#define LAMBDA_VARIABLE(n)        GET_BLOCK(A_LAMBDA_VARIABLES)[n]
+  /* Return the variable information at index <n> when doing a
+   * string compilation.
+   */
+
+#define LAMBDA_VARIABLES_COUNT    GET_BLOCK_COUNT(A_LAMBDA_VARIABLES)
+  /* Return the number of variable information entries when doing
+   * a string compilation.
+   */
+
+#define LAMBDA_STRUCT(n)          GET_BLOCK(A_LAMBDA_STRUCTS)[n]
+  /* Return the strict information at index <n> when doing a
+   * string compilation.
+   */
+
+#define LAMBDA_STRUCTS_COUNT      GET_BLOCK_COUNT(A_LAMBDA_STRUCTS)
+  /* Return the number of struct information entries when doing
+   * a string compilation.
+   */
+
 #if MAX_LOCAL > 256
   /* There are only 8 bit opcodes for accessing
    * local variables.
@@ -731,6 +953,7 @@ struct inline_closure_s
     mp_uint end;
       /* While compiling the closure: end of the program code before
        * the closure. It is not identical to .start because of alignment.
+       * For pending closures: The original .start.
        */
     mp_uint start;
       /* While compiling the closure: start address of the code in A_PROGRAM.
@@ -747,6 +970,12 @@ struct inline_closure_s
     mp_uint li_length;
       /* Length of the linenumber data.
        */
+    mp_uint lv_start;
+      /* The start index into A_LOCAL_VARIABLES_DBG.
+       */
+    mp_uint lv_length;
+      /* The number of entries in A_LOCAL_VARIABLES_DBG.
+       */
     int function;
       /* Function index
        */
@@ -758,6 +987,9 @@ struct inline_closure_s
        */
     int num_args;
       /* Number of arguments.
+       */
+    int num_opt_args;
+      /* Number of optional arguments.
        */
     Bool parse_context;
       /* TRUE if the context variable definitions are parsed.
@@ -799,6 +1031,10 @@ struct inline_closure_s
        */
     mp_uint full_local_var_size;
       /* Current size of the A_LOCAL_VARIABLES memblocks.
+       */
+
+    mp_uint lambda_values_start;
+      /* Start index of lambda values (when compiling into a lambda).
        */
 };
 
@@ -967,7 +1203,8 @@ static bool warned_deprecated_in;
 
 static funflag_t default_varmod;
 static funflag_t default_funmod;
-  /* Default visibility modifiers for variables resp. function.
+static funflag_t default_structmod;
+  /* Default visibility modifiers for variables, function resp. structs.
    */
 
 static int heart_beat;
@@ -1070,6 +1307,15 @@ static int prog_string_indizes[0x100];
    * for the hash chains.
    */
 
+static int lambda_values_table_level = 0;
+  /* The table to use for lambda value lookup.
+   */
+
+static int lambda_values_offset = 0;
+  /* Offset into the A_LAMBDA_VALUES block. Every current lambda
+   * value index is relative to this offset.
+   */
+
 static string_t *last_string_constant = NULL;
   /* The current (last) string constant, a tabled string.
    * It is also used to optimize "foo"+"bar" constructs.
@@ -1118,6 +1364,16 @@ static const char * compiled_file;
    * the program's name. Set by prolog().
    */
 
+static code_context_t* string_context;
+  /* Context information for compiling a string.
+   * NULL when we are compiling a program.
+   */
+
+static int compiling_decltype;
+  /* The level of decltype() operations that are currently compilied.
+   * When this is > 0, code generation can be omitted.
+   */
+
   /* A few standard types we often need.
    * We'll initialize them later (using the type functions, so all pointers
    * are correctly set) and then put them into a static storage (and set
@@ -1127,12 +1383,13 @@ static const char * compiled_file;
 lpctype_t _lpctype_unknown_array, _lpctype_any_array,    _lpctype_int_float,
           _lpctype_int_array,     _lpctype_string_array, _lpctype_object_array,
           _lpctype_bytes_array,   _lpctype_string_bytes, _lpctype_string_or_bytes_array,
-          _lpctype_string_object, _lpctype_string_object_array,
+          _lpctype_string_object, _lpctype_string_object_lwobject,
+          _lpctype_string_object_lwobject_array,
           _lpctype_lwobject_array,_lpctype_any_object_or_lwobject,
           _lpctype_any_object_or_lwobject_array,
           _lpctype_any_object_or_lwobject_array_array,
           _lpctype_int_or_string, _lpctype_string_or_string_array,
-          _lpctype_catch_msg_arg;
+          _lpctype_symbol_array, _lpctype_catch_msg_arg, _lpctype_mapping_or_closure;
 lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_any_array     = &_lpctype_any_array,
           *lpctype_int_float     = &_lpctype_int_float,
@@ -1143,29 +1400,42 @@ lpctype_t *lpctype_unknown_array = &_lpctype_unknown_array,
           *lpctype_string_bytes  = &_lpctype_string_bytes,
           *lpctype_string_or_bytes_array = &_lpctype_string_or_bytes_array,
           *lpctype_string_object = &_lpctype_string_object,
-          *lpctype_string_object_array = &_lpctype_string_object_array,
+          *lpctype_string_object_lwobject = &_lpctype_string_object_lwobject,
+          *lpctype_string_object_lwobject_array = &_lpctype_string_object_lwobject_array,
           *lpctype_lwobject_array= &_lpctype_lwobject_array,
           *lpctype_any_object_or_lwobject = &_lpctype_any_object_or_lwobject,
           *lpctype_any_object_or_lwobject_array = &_lpctype_any_object_or_lwobject_array,
           *lpctype_any_object_or_lwobject_array_array = &_lpctype_any_object_or_lwobject_array_array,
           *lpctype_int_or_string = &_lpctype_int_or_string,
           *lpctype_string_or_string_array = &_lpctype_string_or_string_array,
-          *lpctype_catch_msg_arg = &_lpctype_catch_msg_arg;
+          *lpctype_symbol_array = &_lpctype_symbol_array,
+          *lpctype_catch_msg_arg = &_lpctype_catch_msg_arg,
+          *lpctype_mapping_or_closure = &_lpctype_mapping_or_closure;
 
+#ifdef USE_PYTHON
+  /* For any Python defined struct, stores the index+1 into the current
+   * program's struct definitions (STRUCT_DEF / LAMBDA_STRUCT). This is
+   * one-based, so we can easily zero out the table for initialization.
+   */
+unsigned short python_struct_index[PYTHON_STRUCT_TABLE_SIZE];
+#endif
 
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
 struct lvalue_s; /* Defined within YYSTYPE aka %union */
 
+static void decrease_lambda_values_table_level();
 static ident_t* define_local_variable (ident_t* name, lpctype_t* actual_type, struct lvalue_s *lv, Bool redeclare, Bool with_init);
 static void init_local_variable (ident_t* name, struct lvalue_s *lv, int assign_op, fulltype_t type2);
 static void use_variable (ident_t* name, enum variable_usage usage);
 static void warn_variable_usage (string_t* name, enum variable_usage usage, const char* prefix);
 static Bool add_lvalue_code (lvalue_block_t lv, int instruction);
 static void insert_pop_value(void);
+static int get_type_index(lpctype_t *t);
+static int ins_prog_type(lpctype_t *t);
 static void add_type_check (lpctype_t *expected, enum type_check_operation op);
-static int insert_inherited(char *, string_t *, program_t **, function_t *, int, bytecode_p);
+static int insert_inherited(char *super_name, string_t *real_name, program_t **super_p, function_t *fun_p, int num_arg);
   /* Returnvalues from insert_inherited(): */
 #  define INHERITED_NOT_FOUND            (-1)
 #  define INHERITED_WILDCARDED_ARGS      (-2)
@@ -1176,9 +1446,12 @@ static void add_new_init_jump(void);
 static void transfer_init_control(void);
 static void copy_structs(program_t *, funflag_t);
 static void new_inline_closure (void);
-static int inherit_program(program_t *from, funflag_t funmodifier, funflag_t varmodifier);
+static int inherit_program(program_t *from, funflag_t funmodifier, funflag_t varmodifier, funflag_t structmodifier);
 static void fix_variable_index_offsets(program_t *);
 static short store_prog_string (string_t *str);
+static int store_lambda_value(svalue_t *svp);
+static int ins_lambda_value(svalue_t *svp);
+static svalue_t* lookup_entity(svalue_t *dict, ident_t* name, ph_int exp_type);
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1195,6 +1468,17 @@ yyerror (const char *str)
     if (num_parse_error > 5)
         return;
     context = lex_error_context();
+
+    if (string_context)
+    {
+        /* Return the error in the context, don't call master. */
+        if (string_context->error_msg[0] == 0)
+            snprintf(string_context->error_msg, sizeof(string_context->error_msg)
+                    , "%s%s\n", str, context);
+        num_parse_error++;
+        return;
+    }
+
     fprintf(stderr, "%s %s line %d: %s%s.\n"
                   , time_stamp(), current_loc.file->name, current_loc.line
                   , str, context);
@@ -1241,6 +1525,14 @@ yywarn (const char *str)
     char *context;
 
     context = lex_error_context();
+
+    if (string_context)
+    {
+        /* Change that to a runtime warning. */
+        warnf("%s%s\n", str, context);
+        return;
+    }
+
     fprintf(stderr, "%s %s line %d: Warning: %s%s.\n"
                   , time_stamp(), current_loc.file->name, current_loc.line
                   , str, context);
@@ -1489,23 +1781,37 @@ add_to_mem_block (int n, void *data, size_t size)
             sizeof(BLOCK_NAME##_t) * count);                      \
     }
 
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_PROG_TYPE, A_TYPES)
 DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_ARGUMENT_TYPE, A_ARGUMENT_TYPES)
 DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_ARGUMENT_INDEX, A_ARGUMENT_INDEX)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_FUNCTION, A_FUNCTIONS)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_VIRTUAL_VAR, A_VIRTUAL_VAR)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_VARIABLE, A_VARIABLES)
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_LOCAL_VARIABLE_DBG, A_LOCAL_VARIABLES_DBG)
 DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_GLOBAL_VARIABLE_INFO, A_GLOBAL_VARIABLES)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_STRUCT_DEF, A_STRUCT_DEFS)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_STRUCT_MEMBER, A_STRUCT_MEMBERS)
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_SEFUN_STRUCT_DEF, A_SEFUN_STRUCT_DEFS)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INLINE_CLOSURE, A_INLINE_CLOSURE)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INCLUDE, A_INCLUDES)
 DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_INHERIT, A_INHERITS)
-DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_DEFAULT_VALUE_POS, A_DEFAULT_VALUES_POSITION);
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_DEFAULT_VALUE_POS, A_DEFAULT_VALUES_POSITION)
+DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_DEFAULT_LAMBDA_VALUE, A_DEFAULT_LAMBDA_VALUES)
+DEFINE_ADD_TO_BLOCK_BY_PTR(ADD_LAMBDA_VALUE, A_LAMBDA_VALUES)
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_LAMBDA_VALUE_NEXT, A_LAMBDA_VALUES_NEXT)
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_LAMBDA_FUNCTION, A_LAMBDA_FUNCTIONS)
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_LAMBDA_VARIABLE, A_LAMBDA_VARIABLES)
+DEFINE_ADD_TO_BLOCK_BY_VALUE(ADD_LAMBDA_STRUCT, A_LAMBDA_STRUCTS)
 
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_FUNCTIONS, A_FUNCTIONS);
+DEFINE_RESERVE_MEM_BLOCK(RESERVE_SEFUN_STRUCT_DEFS, A_SEFUN_STRUCT_DEFS);
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_UPDATE_INDEX_MAP, A_UPDATE_INDEX_MAP);
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_INHERITS, A_INHERITS);
 DEFINE_RESERVE_MEM_BLOCK(RESERVE_DEFAULT_VALUE_POS, A_DEFAULT_VALUES_POSITION);
+DEFINE_RESERVE_MEM_BLOCK(RESERVE_DEFAULT_LAMBDA_VALUES, A_DEFAULT_LAMBDA_VALUES)
+DEFINE_RESERVE_MEM_BLOCK(RESERVE_LAMBDA_VALUES, A_LAMBDA_VALUES)
+DEFINE_RESERVE_MEM_BLOCK(RESERVE_LAMBDA_VALUES_TABLE, A_LAMBDA_VALUES_TABLE)
+DEFINE_RESERVE_MEM_BLOCK(RESERVE_LAMBDA_VALUES_NEXT, A_LAMBDA_VALUES_NEXT)
 
 #define byte_to_mem_block(n, b) \
     ((void)((mem_block[n].current_size == mem_block[n].max_size \
@@ -1598,7 +1904,7 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
     static char *type_name[] = { "unknown", "int", "string", "void",
                                  "mapping", "float", "mixed", "closure",
                                  "symbol", "quoted_array", "bytes",
-                                 "coroutine" };
+                                 "coroutine", "lpctype" };
 
     if (bufsize <= 0)
         return 0;
@@ -1653,7 +1959,7 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
             }
             else // no struct
             {
-                snprintf(buf, bufsize, "unknown struct");
+                snprintf(buf, bufsize, "struct mixed");
                 return strlen(buf);
             }
 
@@ -1666,20 +1972,27 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
 
             if (type->t_object.program_name)
             {
-                size_t proglen =  mstrsize(type->t_object.program_name);
-                size_t len = proglen + obtypenamelen + 4;
-                if (len < bufsize)
+                if (obtypenamelen + 6 < bufsize)
                 {
                     char *bufptr = buf + obtypenamelen;
+                    size_t proglen;
 
                     memcpy(buf, obtypename, obtypenamelen);
                     memcpy(bufptr, " \"/", 3);
                     bufptr += 3;
 
-                    memcpy(bufptr, get_txt(type->t_object.program_name), proglen);
-                    buf[len-1] = '"';
-                    buf[len] = 0;
-                    return len;
+                    proglen = escape_string(get_txt(type->t_object.program_name), mstrsize(type->t_object.program_name),
+                                            bufptr, bufsize - obtypenamelen - 4, true);
+                    if (!proglen || proglen + obtypenamelen + 5 > bufsize)
+                    {
+                        buf[0] = '\0';
+                        return 0;
+                    }
+
+                    bufptr += proglen;
+                    *bufptr++ = '"';
+                    *bufptr = 0;
+                    return bufptr - buf;
                 }
                 else
                 {
@@ -1693,6 +2006,26 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
                 return strlen(buf);
             }
         }
+
+#ifdef USE_PYTHON
+    case TCLASS_PYTHON:
+        {
+            ident_t *name = get_python_type_name(type->t_python.type_id);
+            size_t len = mstrsize(name->name);
+
+            if(len < bufsize)
+            {
+                memcpy(buf, get_txt(name->name), len);
+                buf[len] = 0;
+                return len;
+            }
+            else
+            {
+                buf[0] = '\0';
+                return 0;
+            }
+        }
+#endif
 
     case TCLASS_ARRAY:
         {
@@ -1727,7 +2060,7 @@ get_lpctype_name_buf (lpctype_t *type, char *buf, size_t bufsize)
         {
             lpctype_t *curtype = type;
             char* curbuf = buf;
-            size_t sublen;
+            size_t sublen = 0;
 
             if (bufsize < 5)
             {
@@ -2262,21 +2595,41 @@ binary_op_types_t types_binary_and_assignment[] = {
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                   , NULL                   },
     { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_lpctype,   &_lpctype_lpctype,   &_lpctype_lpctype, NULL                  , NULL                   , NULL                   },
     { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
-/* Operator type table for assignment with the binary or and xor.
+/* Operator type table for assignment with the binary or.
  */
 binary_op_types_t types_binary_or_assignment[] = {
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_sub_array_type   , &get_first_type        , &get_common_array_type },
+    { &_lpctype_lpctype,   &_lpctype_lpctype,   &_lpctype_lpctype, NULL                  , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for assignment with the binary xor.
+ */
+binary_op_types_t types_binary_xor_assignment[] = {
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_sub_array_type   , &get_first_type        , &get_common_array_type },
     { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
-/* Operator type table for the binary or and xor,
- * allowing <int>|<int> and <mixed*>|<mixed*>.
+/* Operator type table for the binary or,
+ * allowing <int>|<int>, <mixed*>|<mixed*> and <lpctype>|<lpctype>
  */
 binary_op_types_t types_binary_or[] = {
+    { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_union_array_type , NULL                   , NULL                   },
+    { &_lpctype_lpctype,   &_lpctype_lpctype,   &_lpctype_lpctype, NULL                  , NULL                   , NULL                   },
+    { NULL, NULL, NULL, NULL, NULL, NULL }
+};
+
+/* Operator type table for the binary xor,
+ * allowing <int>|<int> and <mixed*>|<mixed*>.
+ */
+binary_op_types_t types_binary_xor[] = {
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { &_lpctype_any_array, &_lpctype_any_array, NULL,              &get_union_array_type , NULL                   , NULL                   },
     { NULL, NULL, NULL, NULL, NULL, NULL }
@@ -2292,6 +2645,7 @@ binary_op_types_t types_binary_and[] = {
     { &_lpctype_int,       &_lpctype_int,       &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { &_lpctype_string,    &_lpctype_string,    &_lpctype_string,  NULL                  , NULL                   , NULL                   },
     { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_bytes,   NULL                  , NULL                   , NULL                   },
+    { &_lpctype_lpctype,   &_lpctype_lpctype,   &_lpctype_lpctype, NULL                  , NULL                   , NULL                   },
     { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -2314,6 +2668,7 @@ binary_op_types_t types_in[] = {
     { &_lpctype_int,       &_lpctype_bytes,     &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { &_lpctype_string,    &_lpctype_string,    &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { &_lpctype_bytes,     &_lpctype_bytes,     &_lpctype_int,     NULL                  , NULL                   , NULL                   },
+    { &_lpctype_lpctype,   &_lpctype_lpctype,   &_lpctype_int,     NULL                  , NULL                   , NULL                   },
     { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -2397,6 +2752,13 @@ binary_op_types_t types_division[] = {
     { NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
+/* Operator type table for one's complement.
+ */
+unary_op_types_t types_complement[] = {
+    { &_lpctype_int,                            &_lpctype_int,     NULL                  },
+    { NULL, NULL, NULL }
+};
+
 /* Operator type table for the unary minus, increment and decrement operation.
  */
 unary_op_types_t types_unary_math[] = {
@@ -2429,12 +2791,20 @@ unary_op_types_t types_foreach_iteration[] = {
 
 /*-------------------------------------------------------------------------*/
 static lpctype_t*
+#ifdef USE_PYTHON
+check_unary_op_type (lpctype_t* t, const char* op_name, unary_op_types_t* type_table, enum python_operation python_op, lpctype_t *error_type)
+#else
 check_unary_op_type (lpctype_t* t, const char* op_name, unary_op_types_t* type_table, lpctype_t *error_type)
+#endif
 
 /* Checks the argument <t> against the possible combinations in type_table.
  * The result is the union of all result types of matching entries.
  * If there are no matching entries, a compile error is thrown
  * (unless <op_name> is NULL) and <error_type> is returned.
+ *
+#ifdef USE_PYTHON
+ * For any Python types the types for <python_op> will also be looked up.
+#endif
  */
 
 {
@@ -2483,6 +2853,27 @@ check_unary_op_type (lpctype_t* t, const char* op_name, unary_op_types_t* type_t
         free_lpctype(oldresult);
     }
 
+#ifdef USE_PYTHON
+    /* Check any python types within t for possible result types. */
+    if (python_op != PYTHON_OP_NONE)
+    {
+        void* cur;
+        for (lpctype_t *pytype = get_first_python_type(t, &cur);
+             pytype != NULL;
+             pytype = get_next_python_type(&cur))
+        {
+            python_type_operation_t py_op = get_python_operation(pytype->t_python.type_id, python_op);
+
+            if (py_op.returntype != NULL)
+            {
+                lpctype_t *oldresult = result;
+                result = get_union_type(result, py_op.returntype);
+                free_lpctype(oldresult);
+            }
+        }
+    }
+#endif
+
     if (result != NULL || op_name == NULL)
         return result;
 
@@ -2515,12 +2906,23 @@ check_unary_op_type (lpctype_t* t, const char* op_name, unary_op_types_t* type_t
 
 /*-------------------------------------------------------------------------*/
 static lpctype_t*
+#ifdef USE_PYTHON
+check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary_op_types_t* type_table, enum python_operation left_op, enum python_operation right_op, enum python_operation assign_op, lpctype_t *error_type, lpctype_t **rttc2, bool t2_literal)
+#else
 check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary_op_types_t* type_table, lpctype_t *error_type, lpctype_t **rttc2, bool t2_literal)
+#endif
 
 /* Checks the arguments <t1> and <t2> against the possible combinations
  * in type_table. The result is the union of all result types of
  * matching entries. If there are no matching entries, a compile error
  * is thrown (unless <op_name> is NULL) and <error_type> is returned.
+ *
+#ifdef USE_PYTHON
+ * For any Python types the types for <assign_op> will be looked up.
+ * If <assign_op> is either PYTHON_OP_NONE or not existent for the type,
+ * use <left_op> (for Python object on the left hand side) or <right_op>
+ * (for Python object on the right side).
+#endif
  *
  * If <rttc2> is not NULL a type suitable for a runtime type check on the
  * second argument is stored there (a union of all allowed types for the
@@ -2551,6 +2953,9 @@ check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary
     if (check_unknown_type(t2))
         t2 = lpctype_mixed;
 
+    /* Search for matching entries in the type table and collect
+     * return and rttc2 type.
+     */
     for (binary_op_types_t* entry = type_table; entry->t1; ++entry)
     {
         /* Is there any commonality between our first
@@ -2622,6 +3027,85 @@ check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary
         free_lpctype(oldresult);
     }
 
+#ifdef USE_PYTHON
+    /* Check any python types within t1 for additional options. */
+    if (left_op != PYTHON_OP_NONE || assign_op != PYTHON_OP_NONE)
+    {
+        void* cur;
+        for (lpctype_t *pytype = get_first_python_type(t1, &cur);
+             pytype != NULL;
+             pytype = get_next_python_type(&cur))
+        {
+            python_type_operation_t py_op;
+
+            /* If there is an assignment op, this has precedence. */
+            if (assign_op != PYTHON_OP_NONE)
+            {
+                py_op = get_python_operation(pytype->t_python.type_id, assign_op);
+                if (py_op.returntype == NULL && left_op != PYTHON_OP_NONE)
+                    py_op = get_python_operation(pytype->t_python.type_id, left_op);
+            }
+            else
+                py_op = get_python_operation(pytype->t_python.type_id, left_op);
+
+            if (py_op.returntype != NULL && py_op.argtype != NULL)
+            {
+                lpctype_t *m2 = get_common_type(py_op.argtype, t2);
+
+                t1_matched = MY_TRUE;
+                if (m2 != NULL)
+                {
+                    lpctype_t *oldresult = result;
+                    result = get_union_type(result, py_op.returntype);
+                    free_lpctype(oldresult);
+
+                    if (rttc2)
+                    {
+                        lpctype_t *oldrttc2 = *rttc2;
+                        *rttc2 = get_union_type(*rttc2, py_op.argtype);
+                        free_lpctype(oldrttc2);
+                    }
+
+                    free_lpctype(m2);
+                }
+            }
+        }
+    }
+
+    /* Check any python types within t2 for additional options... */
+    if (right_op != PYTHON_OP_NONE && assign_op == PYTHON_OP_NONE)
+    {
+        void* cur;
+        for (lpctype_t *pytype = get_first_python_type(t2, &cur);
+             pytype != NULL;
+             pytype = get_next_python_type(&cur))
+        {
+            python_type_operation_t py_op = get_python_operation(pytype->t_python.type_id, right_op);
+            if (py_op.returntype != NULL && py_op.argtype != NULL)
+            {
+                lpctype_t *m1 = get_common_type(py_op.argtype, t1);
+
+                if (m1 != NULL)
+                {
+                    lpctype_t *oldresult = result;
+                    result = get_union_type(result, py_op.returntype);
+                    free_lpctype(oldresult);
+
+                    if (rttc2)
+                    {
+                        lpctype_t *oldrttc2 = *rttc2;
+                        *rttc2 = get_union_type(*rttc2, pytype);
+                        free_lpctype(oldrttc2);
+                    }
+
+                    free_lpctype(m1);
+                }
+            }
+        }
+    }
+#endif
+
+    /* Check that all types of a literal is handled. */
     if (t2_literal)
     {
         if (!lpctype_contains(t2, *rttc2))
@@ -2633,6 +3117,7 @@ check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary
         free_lpctype(t2check);
     }
 
+    /* We got a result (everything is fine) or don't want an error message. */
     if (result != NULL || op_name == NULL)
         return result;
 
@@ -2680,6 +3165,35 @@ check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary
             free_lpctype(newexpected);
         }
 
+#ifdef USE_PYTHON
+        if (left_op != PYTHON_OP_NONE || assign_op != PYTHON_OP_NONE)
+        {
+            void* cur;
+            for (lpctype_t *pytype = get_first_python_type(t1, &cur);
+                 pytype != NULL;
+                 pytype = get_next_python_type(&cur))
+            {
+                python_type_operation_t py_op;
+
+                if (assign_op != PYTHON_OP_NONE)
+                {
+                    py_op = get_python_operation(pytype->t_python.type_id, assign_op);
+                    if (py_op.returntype == NULL && left_op != PYTHON_OP_NONE)
+                        py_op = get_python_operation(pytype->t_python.type_id, left_op);
+                }
+                else
+                    py_op = get_python_operation(pytype->t_python.type_id, left_op);
+
+                if (py_op.returntype != NULL && py_op.argtype != NULL)
+                {
+                    lpctype_t *oldexpected = expected;
+                    expected = get_union_type(expected, py_op.argtype);
+                    free_lpctype(oldexpected);
+                }
+            }
+        }
+#endif
+
         get_lpctype_name_buf(expected, expbuff, sizeof(expbuff));
         free_lpctype(expected);
 
@@ -2697,6 +3211,25 @@ check_binary_op_types (lpctype_t* t1, lpctype_t* t2, const char* op_name, binary
             expected = get_union_type(expected, entry->t1);
             free_lpctype(oldexpected);
         }
+
+#ifdef USE_PYTHON
+        if (right_op != PYTHON_OP_NONE && assign_op == PYTHON_OP_NONE)
+        {
+            void* cur;
+            for (lpctype_t *pytype = get_first_python_type(t2, &cur);
+                 pytype != NULL;
+                 pytype = get_next_python_type(&cur))
+            {
+                python_type_operation_t py_op = get_python_operation(pytype->t_python.type_id, right_op);
+                if (py_op.returntype != NULL && py_op.argtype != NULL)
+                {
+                    lpctype_t *oldexpected = expected;
+                    expected = get_union_type(expected, py_op.argtype);
+                    free_lpctype(oldexpected);
+                }
+            }
+        }
+#endif
 
         get_lpctype_name_buf(expected, expbuff, sizeof(expbuff));
         free_lpctype(expected);
@@ -2900,10 +3433,12 @@ check_assignment_types (fulltype_t src, lpctype_t *dest)
 
 /*-------------------------------------------------------------------------*/
 static void
-check_function_call_types (fulltype_t *aargs, int num_aarg, function_t *funp, lpctype_t **dargs)
+check_function_call_types (fulltype_t *aargs, int num_aarg, function_t *funp, unsigned short *dargs, lpctype_t **types)
 
 /* Checks the actual function arguments (<aargs> with <num_aarg> entries)
- * against the function definition <funp> with <dargs> argument type list.
+ * against the function definition <funp> with <dargs> argument type index
+ * list into <types>. If <dargs> is NULL, then a direct lookup into <types>
+ * should be done.
  */
 
 {
@@ -2921,21 +3456,25 @@ check_function_call_types (fulltype_t *aargs, int num_aarg, function_t *funp, lp
 
     for (int argno = 1; argno <= num_darg; argno++)
     {
-        if (!check_assignment_types(*aargs, *dargs))
+        lpctype_t *expected = dargs ? types[*dargs] : *types;
+        if (!check_assignment_types(*aargs, expected))
         {
             yyerrorf("Bad type for argument %d of %s %s",
                 argno,
                 get_txt(funp->name),
-                get_two_lpctypes(*dargs, aargs->t_type));
+                get_two_lpctypes(expected, aargs->t_type));
         }
 
         aargs++;
-        dargs++;
+        if (dargs)
+            dargs++;
+        else
+            types++;
     } /* for (all args) */
 
     if ((funp->flags & TYPE_MOD_XVARARGS) && !missingargs)
     {
-        lpctype_t *flat_type = get_flattened_type(*dargs);
+        lpctype_t *flat_type = get_flattened_type(dargs ? types[*dargs] : *types);
 
         for (int argno = num_darg+1; argno <= num_aarg; argno++)
         {
@@ -2989,6 +3528,60 @@ check_visibility_flags (funflag_t flags, funflag_t default_vis, bool function)
 
     return flags & ~TYPE_MOD_VISIBLE;
 } /* check_visibility_flags() */
+
+/*-------------------------------------------------------------------------*/
+static funflag_t
+combine_visibility_flags (funflag_t orig, funflag_t add)
+
+/* Combines visibility flags of two occurrences (eg. an element inherited
+ * twice with different visibility). Any other non-visibility flags in
+ * <orig> will be kept intact.
+ */
+
+{
+    if ((orig|add) & TYPE_MOD_PUBLIC)
+    {
+        orig &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED | NAME_HIDDEN);
+        orig |= TYPE_MOD_PUBLIC;
+    }
+    else if (!(add&(TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED)))
+    {
+        orig &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED | NAME_HIDDEN);
+    }
+    else if (!(orig&(TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED)))
+    {
+        /* It's already visible. */
+    }
+    else if (add & TYPE_MOD_PROTECTED)
+    {
+        orig &= ~(TYPE_MOD_PRIVATE | NAME_HIDDEN);
+        orig |= TYPE_MOD_PROTECTED;
+    }
+
+    return orig;
+} /* combine_visibility_flags() */
+
+/*-------------------------------------------------------------------------*/
+static funflag_t
+inherit_visibility_flags (funflag_t orig, funflag_t modifier)
+
+/* Calculates the resulting visibility when inheriting an element with <orig>
+ * visibility and applying the visibility modifier <modifier>.
+ */
+
+{
+    if (orig & TYPE_MOD_PUBLIC)
+        modifier &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED);
+    else if (orig & TYPE_MOD_PRIVATE)
+        orig |= NAME_HIDDEN;
+    orig |= modifier;
+    if (orig & (TYPE_MOD_PRIVATE | NAME_HIDDEN))
+        orig &= ~(TYPE_MOD_PROTECTED | TYPE_MOD_PUBLIC);
+    else if (orig & TYPE_MOD_PROTECTED)
+        orig &= ~(TYPE_MOD_PUBLIC);
+
+    return orig;
+} /* inherit_visibility_flags() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -3315,7 +3908,6 @@ read_jump_offset (bc_offset_t offset)
 } /* read_jump_offset() */
 
 /*-------------------------------------------------------------------------*/
-#ifndef FLOAT_FORMAT_2
 static void
 ins_uint32 (uint32_t l)
  // Add the uint32_t <l> to the A_PROGRAM area.
@@ -3332,8 +3924,8 @@ ins_uint32 (uint32_t l)
                 , CURRENT_PROGRAM_SIZE + sizeof(uint32_t));
     }
  } // ins_uint32()
-#endif // FLOAT_FORMAT_2
 /*-------------------------------------------------------------------------*/
+#ifdef FLOAT_FORMAT_2
 static void
 ins_double (double d)
 /* Add the double <d> to the A_PROGRAM area.
@@ -3350,6 +3942,7 @@ ins_double (double d)
                  , CURRENT_PROGRAM_SIZE + sizeof(double));
     }
 } /* ins_double() */
+#endif // FLOAT_FORMAT_2
 /*-------------------------------------------------------------------------*/
 static void upd_uint32 (bc_offset_t offset, uint32_t l) UNUSED;
 static void
@@ -3943,8 +4536,23 @@ free_all_local_names (void)
 
     while (current_number_of_locals > 0 && local_variables)
     {
+        int dbg;
+
         current_number_of_locals--;
         free_fulltype(local_variables[current_number_of_locals].type);
+
+        dbg = local_variables[current_number_of_locals].dbg;
+        if (dbg >= 0)
+        {
+            if (LOCAL_VARIABLE_DBG(dbg).code_start != CURRENT_PROGRAM_SIZE)
+                LOCAL_VARIABLE_DBG(dbg).code_end = CURRENT_PROGRAM_SIZE;
+            else if (LOCAL_VARIABLE_DBG_COUNT == dbg + 1)
+            {
+                free_mstring(LOCAL_VARIABLE_DBG(dbg).name);
+                free_lpctype(LOCAL_VARIABLE_DBG(dbg).type);
+                mem_block[A_LOCAL_VARIABLES_DBG].current_size -= sizeof(A_LOCAL_VARIABLES_DBG_t);
+            }
+        }
     }
 
     /* Free also types of context variables. */
@@ -4004,12 +4612,18 @@ free_local_names (int depth)
         }
         else
         {
+            int dbg;
+
             current_number_of_locals--;
 
             if (pragma_warn_unused_variables)
                 warn_variable_usage(q->name, local_variables[current_number_of_locals].usage, "Local");
 
             free_fulltype(local_variables[current_number_of_locals].type);
+
+            dbg = local_variables[current_number_of_locals].dbg;
+            if (dbg >= 0)
+                LOCAL_VARIABLE_DBG(dbg).code_end = CURRENT_PROGRAM_SIZE;
         }
         free_shared_identifier(q);
     }
@@ -4075,6 +4689,19 @@ if (current_inline && current_inline->block_depth+2 == block_depth
         /* Record the type */
         local_variables[current_number_of_locals].usage = VAR_USAGE_NONE;
         local_variables[current_number_of_locals].type = type;
+        if (pragma_save_local_names)
+        {
+            local_variables[current_number_of_locals].dbg = LOCAL_VARIABLE_DBG_COUNT;
+            ADD_LOCAL_VARIABLE_DBG((A_LOCAL_VARIABLES_DBG_t){
+                .name = ref_mstring(ident->name),
+                .type = ref_lpctype(type.t_type),
+                .code_start = CURRENT_PROGRAM_SIZE,
+                .code_end = CURRENT_PROGRAM_SIZE,
+                .idx = current_number_of_locals
+            });
+        }
+        else
+            local_variables[current_number_of_locals].dbg = -1;
         current_number_of_locals++;
 
         /* And update the scope information */
@@ -4452,11 +5079,13 @@ check_identifier (ident_t *name)
  */
 
 {
+#ifndef KEYWORD_IN
     if (pragma_warn_deprecated && !warned_deprecated_in && mstreq(name->name, STR_IN))
     {
         warned_deprecated_in = true;
         yywarn("Usage of 'in' as an identifier is deprecated, it will be a reserved word in future versions");
     }
+#endif
 } /* check_identifier() */
 
 /*-------------------------------------------------------------------------*/
@@ -4468,7 +5097,7 @@ ins_local_names ()
  */
 
 {
-    if (pragma_save_local_names)
+    if (pragma_save_local_names && !string_context)
     {
         bytecode_t *p;
         ident_t *var;
@@ -4487,7 +5116,7 @@ ins_local_names ()
         CURRENT_PROGRAM_SIZE += 2*current_number_of_locals;
         p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE;
         var = all_locals;
-        for (int i = 0; i < max_number_of_locals; i++)
+        for (int i = 0; i < current_number_of_locals; i++)
         {
             if (!var) /* This shouldn't happen. */
             {
@@ -4610,6 +5239,49 @@ store_argument_types ( int num_arg )
 
     return argument_start_index;
 } /* store_argument_types() */
+
+/*-------------------------------------------------------------------------*/
+static ident_t *
+add_global_name (ident_t *name)
+
+/* Creates a global identifier for <name> or returns <name> if it already is
+ * a global identifier.
+ */
+
+{
+    if (name->type != I_TYPE_UNKNOWN
+     && name->type != I_TYPE_GLOBAL)
+        name = insert_shared_identifier_mstr(name->name, I_TYPE_GLOBAL, 0);
+
+    switch (name->type)
+    {
+        case I_TYPE_UNKNOWN:
+            /* We can adapt this identifier. */
+            init_global_identifier(name, true);
+            name->next_all = all_globals;
+            all_globals = name;
+            return name;
+
+        case I_TYPE_GLOBAL:
+            /* If this is a driver-global identifier, remember this as shadowed,
+             * if we haven't done this already.
+             */
+            if (name->u.global.variable == I_GLOBAL_VARIABLE_WORLDWIDE)
+            {
+                efun_shadow_t *sh = xalloc(sizeof(efun_shadow_t));
+                sh->shadow = name;
+                sh->next = all_efun_shadows;
+                all_efun_shadows = sh;
+
+                name->u.global.variable = I_GLOBAL_VARIABLE_OTHER;
+            }
+            return name;
+
+        default:
+            fatal("insert_shared_identifier_mstr() returned identifier of type %d.\n", name->type);
+            return name; /* NOTREACHED */
+    }
+} /* add_global_name() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -5032,39 +5704,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
     num = FUNCTION_COUNT;
 
-    if (p->type != I_TYPE_GLOBAL)
-    {
-        /* This is the first _GLOBAL use of this identifier:
-         * make an appropriate entry in the identifier table.
-         */
-
-        if (p->type != I_TYPE_UNKNOWN)
-        {
-            /* The ident has been used before otherwise, so
-             * get a fresh structure.
-             */
-            p = make_shared_identifier_mstr(p->name, I_TYPE_GLOBAL, 0);
-        }
-        /* should be I_TYPE_UNKNOWN now. */
-
-        init_global_identifier(p, /* bVariable: */ MY_TRUE);
-        p->next_all = all_globals;
-        all_globals = p;
-    }
-    else if (p->u.global.variable == I_GLOBAL_VARIABLE_FUN)
-    {
-        /* The previous _GLOBAL use is the permanent efun definition:
-         * mark the efun as shadowed.
-         */
-        efun_shadow_t *q;
-
-        q = xalloc(sizeof(efun_shadow_t));
-        q->shadow = p;
-        q->next = all_efun_shadows;
-        all_efun_shadows = q;
-    }
-    /* else: Other cases don't need special treatment */
-
+    p = add_global_name(p);
     p->u.global.function = num;
 
     /* Store the function_t in the functions area */
@@ -5149,44 +5789,7 @@ define_variable (ident_t *name, fulltype_t type)
                 , get_txt(name->name));
     }
 
-    if (name->type != I_TYPE_GLOBAL)
-    {
-        /* This is the first _GLOBAL use of this identifier:
-         * make an appropriate entry in the identifier table.
-         */
-
-        if (name->type != I_TYPE_UNKNOWN)
-        {
-            /* The ident has been used before otherwise, so
-             * get a fresh structure.
-             */
-            name = make_shared_identifier_mstr(name->name, I_TYPE_GLOBAL, 0);
-        }
-
-        init_global_identifier(name, /* bVariable: */ MY_TRUE);
-        name->next_all = all_globals;
-        all_globals = name;
-    }
-    else if (name->u.global.function == I_GLOBAL_FUNCTION_OTHER
-          && (name->u.global.efun != I_GLOBAL_EFUN_OTHER
-           || name->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-#ifdef USE_PYTHON
-           || is_python_efun(name)
-#endif
-             )
-            )
-    {
-        /* The previous _GLOBAL use is the permanent efun definition:
-         * mark the efun as shadowed.
-         */
-        efun_shadow_t *q;
-
-        q = xalloc(sizeof(efun_shadow_t));
-        q->shadow = name;
-        q->next = all_efun_shadows;
-        all_efun_shadows = q;
-    }
-
+    name = add_global_name(name);
     /* Prepare the new variable_t */
 
     if (flags & TYPE_MOD_NOSAVE)
@@ -5198,7 +5801,7 @@ define_variable (ident_t *name, fulltype_t type)
 
     /* If the variable already exists, make sure that we can redefine it */
     n = name->u.global.variable;
-    if (n != I_GLOBAL_VARIABLE_OTHER && n != I_GLOBAL_VARIABLE_FUN)
+    if (n != I_GLOBAL_VARIABLE_OTHER && n != I_GLOBAL_VARIABLE_WORLDWIDE)
     {
         typeflags_t vn_flags = VARIABLE(n)->type.t_flags;
 
@@ -5254,47 +5857,7 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
     typeflags_t varflags;
     variable_t *variable;
 
-    if (name->type != I_TYPE_GLOBAL)
-    {
-        /* This is the first _GLOBAL use of this identifier:
-         * make an appropriate entry in the identifier table.
-         */
-
-        if (name->type != I_TYPE_UNKNOWN)
-        {
-            /* The ident has been used before otherwise, so
-             * get a fresh structure.
-             */
-            name = make_shared_identifier_mstr(name->name, I_TYPE_GLOBAL, 0);
-        }
-
-        init_global_identifier(name, /* bVariable: */ MY_TRUE);
-        name->next_all = all_globals;
-        all_globals = name;
-    }
-    else if (name->u.global.function == I_GLOBAL_FUNCTION_OTHER
-          && (name->u.global.efun != I_GLOBAL_EFUN_OTHER
-           || name->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-#ifdef USE_PYTHON
-           || is_python_efun(name)
-#endif
-             )
-            )
-    {
-        /* The previous _GLOBAL use is the permanent efun definition:
-         * mark the efun as shadowed.
-         */
-        efun_shadow_t *q;
-
-        q = xalloc(sizeof(efun_shadow_t));
-        q->shadow = name;
-
-        q->next = all_efun_shadows;
-        all_efun_shadows = q;
-    }
-    /* else: the variable is inherited after it has been defined
-     * in the child program.
-     */
+    name = add_global_name(name);
 
     /* The variable is hidden, do nothing else */
     if (flags & NAME_HIDDEN)
@@ -5308,7 +5871,7 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
     }
 
     if (name->u.global.variable != I_GLOBAL_VARIABLE_OTHER
-     && name->u.global.variable != I_GLOBAL_VARIABLE_FUN
+     && name->u.global.variable != I_GLOBAL_VARIABLE_WORLDWIDE
      && name->u.global.variable != n)
     {
         check_variable_redefinition(name, flags);
@@ -5323,24 +5886,7 @@ redeclare_variable (ident_t *name, fulltype_t type, int n)
     assert(variable->type.t_type == type.t_type);
 
     /* The most visible modifier wins here. */
-    if ((flags|varflags) & TYPE_MOD_PUBLIC)
-    {
-        varflags &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED | NAME_HIDDEN);
-        varflags |= TYPE_MOD_PUBLIC;
-    }
-    else if (!(flags&(TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED)))
-    {
-        varflags &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED | NAME_HIDDEN);
-    }
-    else if (!(varflags&(TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED)))
-    {
-        /* It's already visible. */
-    }
-    else if (flags & TYPE_MOD_PROTECTED)
-    {
-        varflags &= ~(TYPE_MOD_PRIVATE | NAME_HIDDEN);
-        varflags |= TYPE_MOD_PROTECTED;
-    }
+    varflags = combine_visibility_flags(varflags, flags);
 
     /* Preserve nosave only, if both of them have it. */
     if (!(flags & varflags & TYPE_MOD_STATIC))
@@ -5381,17 +5927,23 @@ get_initialized_variable (ident_t *p)
 
             case I_TYPE_GLOBAL:
                 if (result->u.global.variable != I_GLOBAL_VARIABLE_OTHER
-                 && result->u.global.variable != I_GLOBAL_VARIABLE_FUN)
+                 && result->u.global.variable != I_GLOBAL_VARIABLE_WORLDWIDE)
                 {
                     if (global_variable_initializing == result)
+                    {
+                        result = NULL;
                         foundinitializing = true;
-                    else
-                        break;
+                    }
+                    else if (string_context
+                          && LAMBDA_VARIABLE(result->u.global.variable).kind == LAMBDA_IDENT_UNDEF)
+                        result = NULL;
+                    break;
                 }
 
                 /* FALLTHROUGH */
             default:
-                result = NULL;
+                if (!string_context || !lookup_global_variable(result))
+                    result = NULL;
                 break;
         }
 
@@ -5452,12 +6004,16 @@ define_global_variable (ident_t* name, fulltype_t actual_type, Bool with_init)
         /* If this is the first variable initialization and
          * pragma_share_variables is in effect, insert
          * the check for blueprint/clone initialisation:
-         *    if (clonep(this_object())) return 1;
+         *    if (clonep(this_object()) || lwobjectp(this_object()) return 1;
          */
         if (!variables_initialized && pragma_share_variables)
         {
             ins_f_code(F_THIS_OBJECT);
             ins_f_code(F_CLONEP);
+            ins_f_code(F_BRANCH_WHEN_NON_ZERO);
+            ins_byte(4);
+            ins_f_code(F_THIS_OBJECT);
+            ins_f_code(F_LWOBJECTP);
             ins_f_code(F_BRANCH_WHEN_ZERO);
             ins_byte(2);
             ins_f_code(F_CONST1);
@@ -5607,7 +6163,7 @@ get_function_information (function_t * fun_p, program_t * prog, int ix)
 
     fun_p->num_arg = header->num_arg;
     fun_p->num_opt_arg = header->num_opt_arg;
-    if (is_undef_function(inhprogp->program + (inhprogp->functions[inhfx] & FUNSTART_MASK)))
+    if (is_undef_function(header, inhprogp->program + (inhprogp->functions[inhfx] & FUNSTART_MASK)))
         fun_p->flags |= NAME_UNDEFINED;
 } /* get_function_information() */
 
@@ -5657,14 +6213,6 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident, Bool is_inline)
         returntype.t_flags &= ~TYPE_MOD_NOSAVE;
     }
 
-    if (ident->type == I_TYPE_UNKNOWN)
-    {
-        /* prevent freeing by exotic name clashes */
-        init_global_identifier(ident, /* bVariable: */ MY_TRUE);
-        ident->next_all = all_globals;
-        all_globals = ident;
-    }
-
     /* Store the data */
     if (is_inline)
     {
@@ -5680,37 +6228,22 @@ def_function_typecheck (fulltype_t returntype, ident_t * ident, Bool is_inline)
 
 /*-------------------------------------------------------------------------*/
 static void
-def_function_prototype (int num_args, Bool is_inline)
+def_function_argument_check (bool is_inline)
 
-/* Called after parsing '<type> <name> ( <args> ) of a function definition,
- * this function creates the function prototype entry.
- *
- * If <is_inline> is TRUE, the function to be compiled is an inline closure,
- * which requires a slightly different handling. This function is called
- * after 'func <type> <arguments> <context>' has been parsed.
+/* Check the types of the arguments (the current locals).
+ * Right now we only process varargs arguments, verifying it's an array
+ * type and modifying the function type accordingly.
  */
 
 {
-    ident_t * ident;
     fulltype_t * returntype;
-    bool coroutine;
-    int fun;
 
     if (is_inline)
-    {
-        ident = current_inline->ident;
         returntype = &current_inline->returntype;
-        coroutine = current_inline->coroutine;
-    }
     else
-    {
-        ident = def_function_ident;
         returntype = &def_function_returntype;
-        coroutine = def_function_coroutine;
-    }
 
-    /* We got the complete prototype: define it */
-
+    /* Check the last argument for the varargs modifier. */
     if ( current_number_of_locals
      && (local_variables[current_number_of_locals-1].type.t_flags
          & TYPE_MOD_VARARGS)
@@ -5732,18 +6265,49 @@ def_function_prototype (int num_args, Bool is_inline)
             t->type.t_type = lpctype_mixed;
         }
     }
+} /* def_function_argument_check() */
 
-    /* Define a prototype. If it is a real function, then the
-     * prototype will be updated below.
+/*-------------------------------------------------------------------------*/
+static void
+def_function_prototype (int num_args, Bool is_inline)
+
+/* Called after parsing '<type> <name> ( <args> ) of a function definition,
+ * this function creates the function prototype entry.
+ *
+ * If <is_inline> is TRUE, the function to be compiled is an inline closure,
+ * which requires a slightly different handling. This function is called
+ * after 'func <type> <arguments> <context>' has been parsed.
+ */
+
+{
+    ident_t * ident;
+    fulltype_t returntype;
+    bool coroutine;
+    int fun;
+
+    if (is_inline)
+    {
+        ident = current_inline->ident;
+        returntype = current_inline->returntype;
+        coroutine = current_inline->coroutine;
+    }
+    else
+    {
+        ident = def_function_ident;
+        returntype = def_function_returntype;
+        coroutine = def_function_coroutine;
+    }
+
+    /* We got the complete prototype: Define it.
+     * If it is a real function, then the prototype will be updated below.
      */
     fun = define_new_function( MY_FALSE, ident, num_args, 0, 0
                              , NAME_UNDEFINED|NAME_PROTOTYPE|(coroutine?TYPE_MOD_COROUTINE:0)
-                             , *returntype);
+                             , returntype);
 
     /* Store the data */
     if (is_inline)
     {
-        current_inline->num_args = num_args;
         current_inline->function = fun;
     }
     else
@@ -5754,7 +6318,57 @@ def_function_prototype (int num_args, Bool is_inline)
 
 /*-------------------------------------------------------------------------*/
 static void
-def_function_complete (bool has_code, p_uint body_start, struct statement_s statements, bool is_inline)
+def_function_check_return (fulltype_t returntype, struct statement_s statements)
+
+/* Checks whether the current function needs a return statement and
+ * inserts that in such case.
+ */
+
+{
+    /* Catch a missing return if the function has a return type */
+    if (returntype.t_type != lpctype_void
+     && (   returntype.t_type != lpctype_unknown
+         || pragma_strict_types
+        )
+       )
+    {
+        /* Check if the statement block has a return, or
+         * at least a non-continuing instruction.
+         */
+        if (!statements.may_finish)
+        {
+            /* Good. Just in case our information is wrong,
+             * insert a proper default return as well.
+             */
+            if (pragma_warn_missing_return)
+                ins_f_code(F_DEFAULT_RETURN);
+            else
+                ins_f_code(F_RETURN0);
+        }
+        else
+        {
+            /* There is no 'return' here: most likely it is missing
+             * altogether.
+             * If warn_missing_return is enabled, issue the warning,
+             * but always insert a normal F_RETURN0: with the pragma
+             * active it's no use to warn again at runtime, and without
+             * the pragma no warning is desired anyway.
+             */
+            if (pragma_warn_missing_return)
+                yywarnf("Missing 'return <value>' statement");
+
+            ins_f_code(F_RETURN0);
+        }
+    }
+    else
+    {
+        ins_f_code(F_RETURN0);
+    }
+} /* def_function_check_return() */
+
+/*-------------------------------------------------------------------------*/
+static void
+def_function_complete (bool has_code, p_uint body_start, bool is_inline)
 
 /* Called after completely parsing a function definition,
  * this function updates the function header and closes all scopes..
@@ -5822,46 +6436,6 @@ def_function_complete (bool has_code, p_uint body_start, struct statement_s stat
                             , body_start + FUNCTION_PRE_HDR_SIZE
                             , coroutine?TYPE_MOD_COROUTINE:0
                             , returntype);
-
-        /* Catch a missing return if the function has a return type */
-        if (returntype.t_type != lpctype_void
-         && (   returntype.t_type != lpctype_unknown
-             || pragma_strict_types
-            )
-           )
-        {
-            /* Check if the statement block has a return, or
-             * at least a non-continuing instruction.
-             */
-            if (!statements.may_finish)
-            {
-                /* Good. Just in case our information is wrong,
-                 * insert a proper default return as well.
-                 */
-                if (pragma_warn_missing_return)
-                    ins_f_code(F_DEFAULT_RETURN);
-                else
-                    ins_f_code(F_RETURN0);
-            }
-            else
-            {
-                /* There is no 'return' here: most likely it is missing
-                 * altogether.
-                 * If warn_missing_return is enabled, issue the warning,
-                 * but always insert a normal F_RETURN0: with the pragma
-                 * active it's no use to warn again at runtime, and without
-                 * the pragma no warning is desired anyway.
-                 */
-                if (pragma_warn_missing_return)
-                    yywarnf("Missing 'return <value>' statement");
-
-                ins_f_code(F_RETURN0);
-            }
-        }
-        else
-        {
-            ins_f_code(F_RETURN0);
-        }
     }
 
     /* Clean up for normal functions.
@@ -6004,11 +6578,14 @@ copy_default_value_block (int num_opt, p_int offset, p_int start, size_t size)
 
 /*-------------------------------------------------------------------------*/
 static int
-define_new_struct ( Bool proto, ident_t *p, const char * prog_name, funflag_t flags)
+define_struct (bool proto, ident_t *p, const char * prog_name, funflag_t flags, struct_type_t *stype)
 
 /* Define a new struct <p> with the visibility <flags>.
  * If <proto> is TRUE, the function is called for a struct forward
  * declaration; if <proto> is FALSE, the struct is about to be defined.
+ *
+ * <stype> points to an already existing definition (i.e. an inherited one),
+ * otherwise (for new definitions) it is NULL. The reference is not adopted.
  *
  * Result is the index (id) of the struct in the struct_defs table.
  * If the struct would be a duplicate, -1 is returned instead of the index.
@@ -6016,20 +6593,32 @@ define_new_struct ( Bool proto, ident_t *p, const char * prog_name, funflag_t fl
  * If a prototype is encountered, the struct definition is stored
  * with an additional visibility flag of NAME_PROTOTYPE.
  *
- * If NAME_HIDDEN is set in flags, the struct is added to the program
- * but no visibility checks occur - this is for inherited structs
- * which are no longer visible, but have to be kept in order to
- * keep the struct ids intact.
+ * This function should only be called for visible definitions.
  */
 
 {
     int          num;
     struct_def_t sdef;
+    lpctype_t *  type;
+
+    assert(!(flags & NAME_HIDDEN));
+    assert(!proto || stype == NULL);
+
+    /* Check visibility flags. */
+    flags = check_visibility_flags(flags, default_structmod, false);
+    if (flags & TYPE_MOD_STATIC)
+    {
+        yyerror("Can't declare a struct as static");
+        flags &= ~TYPE_MOD_STATIC;
+    }
+    if (flags & TYPE_MOD_VARARGS)
+    {
+        yyerror("Can't declare a struct as varargs");
+        flags &= ~TYPE_MOD_VARARGS;
+    }
 
     /* If this is a redeclaration, check for consistency. */
-    if (p->type == I_TYPE_GLOBAL && (num = p->u.global.struct_id) != I_GLOBAL_STRUCT_NONE
-     && !(flags & NAME_HIDDEN)
-      )
+    if (p->type == I_TYPE_GLOBAL && (num = p->u.global.struct_id) != I_GLOBAL_STRUCT_NONE)
     {
         struct_def_t *pdef;
 
@@ -6042,14 +6631,8 @@ define_new_struct ( Bool proto, ident_t *p, const char * prog_name, funflag_t fl
             ( TYPE_MOD_NO_MASK \
             | TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC \
             | TYPE_MOD_PROTECTED)
-            funflag_t f1 = pdef->flags;
-            funflag_t f2 = flags;
 
-            /* Smooth out irrelevant differences */
-            if (f1 & TYPE_MOD_STATIC) f1 |= TYPE_MOD_PROTECTED;
-            if (f2 & TYPE_MOD_STATIC) f2 |= TYPE_MOD_PROTECTED;
-
-            if ( ((f1 ^ f2) & TYPE_MOD_VIS) )
+            if ( ((pdef->flags ^ flags) & TYPE_MOD_VIS) )
             {
                 char buff[120];
 
@@ -6085,80 +6668,309 @@ define_new_struct ( Bool proto, ident_t *p, const char * prog_name, funflag_t fl
         return num;
     }
 
-    /* This is a new struct! */
-    flags = check_visibility_flags(flags, 0, false);
-    if (flags & TYPE_MOD_STATIC)
-    {
-        yyerror("Can't declare a struct as static");
-        flags &= ~TYPE_MOD_STATIC;
-    }
-    if (flags & TYPE_MOD_VARARGS)
-    {
-        yyerror("Can't declare a struct as varargs");
-        flags &= ~TYPE_MOD_VARARGS;
-    }
-
-    /* Fill in the struct_def_t */
-    sdef.type  = struct_new_prototype(ref_mstring(p->name)
-                                    , new_unicode_tabled(prog_name));
+    /* This is a new struct!
+     *
+     * Fill in the struct_def_t.
+     */
+    if (stype)
+        sdef.type = ref_struct_type(stype);
+    else
+        sdef.type = struct_new_prototype(ref_mstring(p->name)
+                                       , new_unicode_tabled(prog_name));
     sdef.flags = proto ? (flags | NAME_PROTOTYPE)
                        : (flags & ~NAME_PROTOTYPE);
-    sdef.inh = -1;
-
-    update_struct_type(sdef.type->name->lpctype, sdef.type);
+    sdef.inh = STRUCT_INH_LOCAL;
 
     num = STRUCT_COUNT;
 
-    if (p->type != I_TYPE_GLOBAL)
-    {
-        /* This is the first _GLOBAL use of this identifier:
-         * make an appropriate entry in the identifier table.
-         */
+    p = add_global_name(p);
+    p->u.global.struct_id = num;
 
-        if (p->type != I_TYPE_UNKNOWN)
-        {
-            /* The ident has been used before otherwise, so
-             * get a fresh structure.
-             */
-            p = make_shared_identifier_mstr(p->name, I_TYPE_GLOBAL, 0);
-        }
-        /* should be I_TYPE_UNKNOWN now. */
-
-        init_global_identifier(p, /* bVariable: */ MY_FALSE);
-        p->next_all = all_globals;
-        all_globals = p;
-    }
-
-    if  (!(flags & NAME_HIDDEN))
-        p->u.global.struct_id = num;
-
-    /* Store the function_t in the functions area */
+    /* Store the definition in the struct area */
     ADD_STRUCT_DEF(&sdef);
 
+    /* We keep this reference until the end of compilation. */
+    type = get_struct_type(sdef.type);
+
+    update_struct_type(type, sdef.type);
+    type->t_struct.def_idx = num;
+
     return num;
-} /* define_new_struct() */
+} /* define_struct() */
 
 /*-------------------------------------------------------------------------*/
 static int
-find_struct ( string_t * name )
+add_struct_type (struct_type_t *stype, lpctype_t *lpctype)
 
-/* Find the struct <name> and return its index. Return -1 if not found.
+/* Adds an existing struct type to the program and returns its index.
+ * If it already exists, returns its current index.
+ * The reference for <lpctype> is adopted.
  */
 
 {
-    ident_t * p;
+    unsigned short id;
 
-    p = find_shared_identifier_mstr(name, I_TYPE_GLOBAL, 0);
+    if (string_context)
+    {
+        struct_t *s;
 
+        for (unsigned short i = 0; i < LAMBDA_STRUCTS_COUNT; i++)
+        {
+            if (LAMBDA_STRUCT(i).type == stype)
+            {
+                free_lpctype(lpctype);
+                return i;
+            }
+        }
+
+        /* Add this as a lambda value. */
+        id = LAMBDA_STRUCTS_COUNT;
+        if (id >= STD_STRUCT_OFFSET)
+        {
+            /* Not enough space to do so. */
+            free_lpctype(lpctype);
+            return -1;
+        }
+
+        s = struct_new(stype);
+        if (!s)
+        {
+            free_lpctype(lpctype);
+            return -1;
+        }
+
+        ADD_LAMBDA_STRUCT((lambda_struct_ident_t){
+            .index = {.kind = LAMBDA_IDENT_VALUE, .value = svalue_struct(s)},
+            .type = ref_struct_type(stype)});
+        /* lpctype is freed by epiolog_closure(). */
+    }
+    else
+    {
+        struct_def_t sdef;
+
+        for (unsigned short i = 0; i < STRUCT_COUNT; i++)
+        {
+            if (STRUCT_DEF(i).type == stype)
+            {
+                free_lpctype(lpctype);
+                return i;
+            }
+        }
+
+        /* Add this as a hidden struct to our program. */
+        id = STRUCT_COUNT;
+        if (id >= STD_STRUCT_OFFSET)
+        {
+            /* Not enough space to do so. */
+            free_lpctype(lpctype);
+            return -1;
+        }
+
+        sdef.type = ref_struct_type(stype);
+        sdef.flags = NAME_HIDDEN;
+        sdef.inh = STRUCT_INH_SEFUN;
+
+        ADD_STRUCT_DEF(&sdef);
+    }
+
+    lpctype->t_struct.def_idx = id;
+    /* Note we keep the reference of lpctype
+     * for epilog() to free it.
+     */
+
+    return id;
+} /* add_struct_type() */
+
+/*-------------------------------------------------------------------------*/
+static int
+find_struct ( ident_t * ident, efun_override_t override )
+
+/* Find the struct <name> and return its index. Return -1 if not found.
+ * <override> descibes whether to look at local (OVERRIDE_LFUN),
+ * simul-efun (OVERRIDE_SEFUN) or standard (OVERRIDE_EFUN) structs only.
+ */
+
+{
     /* Find the global struct identifier */
-    while (p != NULL && p->type != I_TYPE_GLOBAL)
-        p = p->inferior;
+    ident_t *name = ident;
+    while (name != NULL && name->type != I_TYPE_GLOBAL)
+        name = name->inferior;
 
-    if (p == NULL || p->u.global.struct_id == I_GLOBAL_STRUCT_NONE)
-        return -1;
-    if (STRUCT_DEF(p->u.global.struct_id).flags & NAME_HIDDEN)
-        return -1;
-    return p->u.global.struct_id;
+    if (string_context && override != OVERRIDE_SEFUN && override != OVERRIDE_EFUN)
+    {
+        if (name == NULL)
+            name = add_global_name(insert_shared_identifier_mstr(ident->name, I_TYPE_GLOBAL, 0));
+        else
+            name = add_global_name(name);
+    }
+    else if (name == NULL)
+            return -1;
+
+    switch (override)
+    {
+        default:
+        case OVERRIDE_LFUN:
+            if (string_context)
+            {
+                if (name->u.global.struct_id == I_GLOBAL_STRUCT_NONE
+                 && string_context->struct_lookup)
+                {
+                    svalue_t *str = lookup_entity(string_context->struct_lookup, name, T_STRUCT);
+                    if (str)
+                    {
+                        svalue_t ref_str;
+
+                        struct_type_t *st = str->u.strct->type;
+                        lpctype_t *lt = get_struct_type(st); /* Freed by epilog_closure() */
+
+                        update_struct_type(lt, st);
+                        lt->t_struct.def_idx = LAMBDA_STRUCTS_COUNT;
+
+                        assign_svalue_no_free(&ref_str, str); /* Add a reference. */
+                        name->u.global.struct_id = LAMBDA_STRUCTS_COUNT;
+                        ADD_LAMBDA_STRUCT((lambda_struct_ident_t){
+                            .index = {.kind = LAMBDA_IDENT_VALUE, .value = ref_str},
+                            .type = ref_struct_type(st)});
+                    }
+                }
+
+                if (name->u.global.struct_id == I_GLOBAL_STRUCT_NONE
+                 && string_context->use_prog_for_structs)
+                {
+                    program_t *prog = get_current_object_program();
+                    for (int idx = 0; idx < prog->num_structs; idx++)
+                    {
+                        struct_type_t *st = prog->struct_defs[idx].type;
+                        if (st->name->name == name->name
+                         && !(prog->struct_defs[idx].flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)))
+                        {
+                            lpctype_t *lt = get_struct_type(st);
+
+                            if (lt->t_struct.def_idx < LAMBDA_STRUCTS_COUNT
+                             && LAMBDA_STRUCT(lt->t_struct.def_idx).index.kind == LAMBDA_IDENT_OBJECT
+                             && LAMBDA_STRUCT(lt->t_struct.def_idx).type == st)
+                            {
+                                name->u.global.struct_id = lt->t_struct.def_idx;
+                                free_lpctype(lt);
+                            }
+                            else
+                            {
+                                update_struct_type(lt, st);
+                                lt->t_struct.def_idx = LAMBDA_STRUCTS_COUNT;
+
+                                name->u.global.struct_id = LAMBDA_STRUCTS_COUNT;
+                                ADD_LAMBDA_STRUCT((lambda_struct_ident_t){
+                                    .index = {.kind = LAMBDA_IDENT_OBJECT, .object_index = idx},
+                                    .type = ref_struct_type(st)});
+                                /* lt is freed by epilog_closure(). */
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                if (name->u.global.struct_id == I_GLOBAL_STRUCT_NONE)
+                {
+                    name->u.global.struct_id = LAMBDA_STRUCTS_COUNT;
+                    ADD_LAMBDA_STRUCT((lambda_struct_ident_t){.index = {LAMBDA_IDENT_UNDEF}, .type = NULL});
+                }
+
+                if (LAMBDA_STRUCT(name->u.global.struct_id).index.kind != LAMBDA_IDENT_UNDEF)
+                    return name->u.global.struct_id;
+            }
+            else if (name->u.global.struct_id != I_GLOBAL_STRUCT_NONE
+                  && !(STRUCT_DEF(name->u.global.struct_id).flags & NAME_HIDDEN))
+                return name->u.global.struct_id;
+
+            if (override == OVERRIDE_LFUN)
+                break;
+            /* else FALLTHROUGH */
+
+        case OVERRIDE_SEFUN:
+            if (name->u.global.sefun_struct_id != I_GLOBAL_SEFUN_STRUCT_NONE && !pragma_no_simul_efuns)
+            {
+                unsigned short sefun_id = name->u.global.sefun_struct_id;
+                unsigned short id = (sefun_id < SEFUN_STRUCT_DEF_COUNT) ? SEFUN_STRUCT_DEF(sefun_id) : USHRT_MAX;
+                if (id == USHRT_MAX)
+                {
+                    struct_type_t *stype;
+                    lpctype_t *lpctype;
+                    int new_id;
+                    unsigned short count = SEFUN_STRUCT_DEF_COUNT;
+
+                    if (sefun_id >= count)
+                    {
+                        /* Fill up the A_SEFUN_STRUCT_DEFS block. */
+                        RESERVE_SEFUN_STRUCT_DEFS(sefun_id - count);
+                        for(; count <= sefun_id; count++)
+                            ADD_SEFUN_STRUCT_DEF(USHRT_MAX);
+                    }
+
+                    /* Let's see if we already got this struct somehow. */
+                    stype = simul_efun_object->prog->struct_defs[sefun_id].type;
+                    lpctype = get_struct_type(stype);
+
+                    id = lpctype->t_struct.def_idx;
+                    if (id != USHRT_MAX
+                     && (string_context ? LAMBDA_STRUCT(id).type : STRUCT_DEF(id).type) == stype)
+                    {
+                        free_lpctype(lpctype);
+                        SEFUN_STRUCT_DEF(sefun_id) = id;
+                        return id;
+                    }
+
+                    new_id = add_struct_type(stype, lpctype);
+                    if (new_id >= 0)
+                        SEFUN_STRUCT_DEF(sefun_id) = new_id;
+                    return new_id;
+                }
+
+                return id;
+            }
+
+            if (override == OVERRIDE_SEFUN)
+                break;
+            /* else FALLTHROUGH */
+
+        case OVERRIDE_EFUN:
+#ifdef USE_PYTHON
+            if (name->u.global.python_struct_id != I_GLOBAL_PYTHON_STRUCT_OTHER)
+            {
+                unsigned short python_id = name->u.global.python_struct_id;
+                unsigned short id = python_struct_index[python_id];
+                struct_type_t *stype;
+
+                if (id != 0)
+                    return id-1;
+
+                stype = get_python_struct_type(python_id);
+                if (stype != NULL)
+                {
+                    /* Let's see if we already got this struct somehow. */
+                    lpctype_t *lpctype = get_struct_type(stype);
+                    int new_id;
+
+                    id = lpctype->t_struct.def_idx;
+                    if (id != USHRT_MAX
+                     && (string_context ? LAMBDA_STRUCT(id).type : STRUCT_DEF(id).type) == stype)
+                    {
+                        free_lpctype(lpctype);
+                        python_struct_index[python_id] = id+1;
+                        return id;
+                    }
+
+                    new_id = add_struct_type(stype, lpctype);
+                    python_struct_index[python_id] = new_id+1;
+                    return new_id;
+                }
+            }
+#endif
+            if (name->u.global.std_struct_id != I_GLOBAL_STD_STRUCT_NONE)
+                return STD_STRUCT_OFFSET + name->u.global.std_struct_id;
+            break;
+    }
+
+    return -1;
 } /* find_struct() */
 
 /*-------------------------------------------------------------------------*/
@@ -6275,10 +7087,12 @@ finish_struct ( int32 prog_id)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
+create_struct_literal ( int sidx, struct_type_t * stype, int length, struct_init_t * list)
 
 /* The compiler has created code for <length> expressions in order
- * to create a struct literal of struct <pdef>.
+ * to create a struct literal of struct type <stype> with index <sidx>.
+ * If <sidx> is -1, then a template struct needs to be on the stack before
+ * the values.
  * Analyze the <list> of member descriptions and generate the appropriate
  * bytecode.
  *
@@ -6309,8 +7123,8 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
         /* Check the types */
         if (exact_types && length > 0)
         {
-            for (member = 0, pmember = pdef->type->member, p = list
-                ; member < length && member < struct_t_size(pdef->type)
+            for (member = 0, pmember = stype->member, p = list
+                ; member < length && member < struct_t_size(stype)
                 ; member++, pmember++, p = p->next
                 )
             {
@@ -6320,7 +7134,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
                              "in struct '%s'"
                             , get_two_lpctypes(pmember->type, p->type.t_type)
                             , get_txt(pmember->name)
-                            , get_txt(struct_t_name(pdef->type))
+                            , get_txt(struct_t_name(stype))
                             );
                     got_error = MY_TRUE;
                 }
@@ -6332,7 +7146,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
         /* The types check out - create the bytecode */
         ins_f_code(F_S_AGGREGATE);
-        ins_short(pdef - &STRUCT_DEF(0));
+        ins_short(sidx);
         ins_byte(length);
 
         return MY_TRUE;
@@ -6342,12 +7156,12 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
     consumed = 0;
 
-    block = xalloc( struct_t_size(pdef->type) * sizeof(*flags)
+    block = xalloc( struct_t_size(stype) * sizeof(*flags)
                   + length * sizeof(*ix));
     flags = (Bool *)block;
-    ix = (int *)((char *)block + struct_t_size(pdef->type) * sizeof(*flags));
+    ix = (int *)((char *)block + struct_t_size(stype) * sizeof(*flags));
 
-    for (i = 0; i < struct_t_size(pdef->type); i++)
+    for (i = 0; i < struct_t_size(stype); i++)
     {
         flags[i] = MY_FALSE;
     }
@@ -6368,7 +7182,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
             {
                 yyerrorf( "Can't mix named and unnamed initializers "
                           "in struct '%s'"
-                        , get_txt(struct_t_name(pdef->type))
+                        , get_txt(struct_t_name(stype))
                         );
                 got_error = MY_TRUE;
             }
@@ -6377,15 +7191,15 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
         consumed++;
         pmember = NULL; /* avoids a warning */
-        member = struct_find_member(pdef->type, p->name);
+        member = struct_find_member(stype, p->name);
         if (member >= 0)
-            pmember = &pdef->type->member[member];
+            pmember = &stype->member[member];
 
         if (member < 0)
         {
             yyerrorf( "No such member '%s' in struct '%s'"
                     , get_txt(p->name)
-                    , get_txt(struct_t_name(pdef->type))
+                    , get_txt(struct_t_name(stype))
                     );
             got_error = MY_TRUE;
         }
@@ -6394,7 +7208,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
             yyerrorf( "Multiple initializations of member '%s' "
                       "in struct '%s'"
                     , get_txt(p->name)
-                    , get_txt(struct_t_name(pdef->type))
+                    , get_txt(struct_t_name(stype))
                     );
             got_error = MY_TRUE;
         }
@@ -6405,7 +7219,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
                      "in struct '%s'"
                     , get_two_lpctypes(pmember->type, p->type.t_type)
                     , get_txt(p->name)
-                    , get_txt(struct_t_name(pdef->type))
+                    , get_txt(struct_t_name(stype))
                     );
             got_error = MY_TRUE;
         }
@@ -6427,7 +7241,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
     if (consumed < length)
     {
         yyerrorf("Too many elements for struct '%s'"
-                , get_txt(struct_t_name(pdef->type))
+                , get_txt(struct_t_name(stype))
                 );
         xfree(block);
         return MY_FALSE;
@@ -6445,7 +7259,7 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 
     /* Finally, create the code */
     ins_f_code(F_S_M_AGGREGATE);
-    ins_short(pdef - &STRUCT_DEF(0));
+    ins_short(sidx);
     ins_byte(length);
     for (i = length-1; i >= 0; i--)
         ins_byte(ix[i]);
@@ -6457,27 +7271,88 @@ create_struct_literal ( struct_def_t * pdef, int length, struct_init_t * list)
 } /* create_struct_literal() */
 
 /*-------------------------------------------------------------------------*/
-static short
-get_struct_index (struct_name_t * pName)
+static int
+get_struct_index (lpctype_t* stype)
 
-/* Return the index of struct name <pName> in this program's A_STRUCT_DEFS.
- * Return -1 if not found.
+/* Return the index of struct <stype> in this program's A_STRUCT_DEFS.
+ * Return -2 if not found and should be an error, -1 if not found and
+ * should not be an error.
  */
 
 {
-    short i;
-
-    for (i = 0; (size_t)i < STRUCT_COUNT; i++)
+    unsigned short idx = stype->t_struct.def_idx;
+    if (idx == USHRT_MAX)
     {
-        if (STRUCT_DEF(i).type->name == pName)
-            return i;
+        if (string_context)
+        {
+            /* We do this even when we should not use the program for structs.
+             * As this is just an optimization (compile-time lookup instead of
+             * runtime lookup). We cannot do this, if a replace_program() is
+             * in progress.
+             */
+            program_t *prog = get_current_object_program();
+
+            if (current_object.type == T_OBJECT
+             && (current_object.u.ob->prog->flags & P_REPLACE_ACTIVE))
+                return -1;
+
+            for (idx = 0; idx < prog->num_structs; idx++)
+            {
+                if ((stype->t_struct.def == NULL)
+                  ? (prog->struct_defs[idx].type->name == stype->t_struct.name)
+                  : (prog->struct_defs[idx].type == stype->t_struct.def))
+                {
+                    if (stype->t_struct.def == NULL)
+                        update_struct_type(stype, prog->struct_defs[idx].type);
+
+                    stype->t_struct.def_idx = LAMBDA_STRUCTS_COUNT;
+                    ADD_LAMBDA_STRUCT((lambda_struct_ident_t){
+                        .index = {.kind = LAMBDA_IDENT_OBJECT, .object_index = idx},
+                        .type = ref_struct_type(stype->t_struct.def)});
+                    ref_lpctype(stype); /* Freed by epilog_closure(). */
+
+                    return idx;
+                }
+            }
+
+            return -1;
+        }
+        else
+        {
+            struct_def_t sdef;
+
+            /* Do we know the exact definition from the name? */
+            if (stype->t_struct.def == NULL)
+                return -2;
+
+            /* Add this as a hidden struct to our program. */
+            idx = STRUCT_COUNT;
+            if (idx == USHRT_MAX)
+                return -2; /* Not enough space to do so. */
+
+            sdef.type = ref_struct_type(stype->t_struct.def);
+            sdef.flags = NAME_HIDDEN;
+            sdef.inh = STRUCT_INH_USAGE;
+
+            ADD_STRUCT_DEF(&sdef);
+            ref_lpctype(stype); /* Epilog will free this. */
+            stype->t_struct.def_idx = idx;
+            return idx;
+        }
     }
-    return -1;
+
+    if (!string_context && idx < STD_STRUCT_OFFSET)
+    {
+        assert(idx < STRUCT_COUNT);
+        assert(STRUCT_DEF(idx).type->name == stype->t_struct.name);
+    }
+
+    return idx;
 } /* get_struct_index() */
 
 /*-------------------------------------------------------------------------*/
 static lpctype_t*
-get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool strict_lookup, short* struct_index, int* member_index)
+get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool strict_lookup, int* struct_index, int* member_index)
 
 /* Determines the result type of a struct member lookup operation
  * <structure> -> <member_name> resp. <structure> . <member_name>.
@@ -6596,10 +7471,33 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool
             break;
 
         case TCLASS_STRUCT:
+            if (!unionmember->t_struct.name)
+            {
+                /* For any struct we can only do runtime lookup. */
+                *struct_index = FSM_AMBIGUOUS;
+                *member_index = -1;
+                fstruct = NULL;
+
+                /* Also we cannot guess the type. */
+                free_lpctype(result);
+                return lpctype_mixed;
+            }
+            else
             {
                 struct_type_t *pdef = unionmember->t_struct.def;
                 if (pdef == NULL)
-                    break;
+                {
+                    int idx;
+
+                    if (!string_context)
+                        break;
+
+                    idx = get_struct_index(unionmember);
+                    if (idx < 0)
+                        break;
+                    pdef = unionmember->t_struct.def;
+                    assert(pdef != NULL);
+                }
 
                 int midx = -1;
 
@@ -6617,9 +7515,9 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool
                 {
                     case FSM_NO_STRUCT:
                         fstruct = pdef;
-                        *struct_index = get_struct_index(fstruct->name);
+                        *struct_index = get_struct_index(unionmember);
                         *member_index = midx;
-                        if (*struct_index == -1)
+                        if (*struct_index == FSM_NO_STRUCT)
                         {
                             yyerrorf("Unknown type in struct dereference: struct %s\n"
                                     , get_txt(fstruct->name->name));
@@ -6637,7 +7535,7 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool
                         if (struct_baseof(pdef, fstruct))
                         {
                             fstruct = pdef;
-                            *struct_index = get_struct_index(fstruct->name);
+                            *struct_index = get_struct_index(unionmember);
                             *member_index = midx;
                             break;
                         }
@@ -6705,6 +7603,36 @@ get_struct_member_result_type (lpctype_t* structure, string_t* member_name, bool
 
 /*-------------------------------------------------------------------------*/
 static void
+record_struct_type (lpctype_t *t)
+
+/* Put all struct types in <t> into the struct definition blocks, so
+ * any inheriting programs have access to the definitions.
+ */
+
+{
+    lpctype_t *head = t;
+    while (true)
+    {
+        lpctype_t *member = head->t_class == TCLASS_UNION ? head->t_union.member : head;
+
+        if (member->t_class == TCLASS_STRUCT)
+        {
+            // If there is 'struct mixed' in there, there won't be another struct.
+            if (!member->t_struct.name)
+                break;
+
+            (void)get_struct_index(member);
+        }
+
+        if (head->t_class == TCLASS_UNION)
+            head = head->t_union.head;
+        else
+            break;
+    }
+} /* record_struct_type() */
+
+/*-------------------------------------------------------------------------*/
+static void
 struct_epilog (void)
 
 /* After a successful parse, make sure that all structs are defined,
@@ -6737,7 +7665,7 @@ struct_epilog (void)
         struct_type_t *pSType = STRUCT_DEF(i).type;
         struct_type_t *pOld;
 
-        if (STRUCT_DEF(i).inh >= 0)
+        if (STRUCT_DEF(i).inh != STRUCT_INH_LOCAL)
             continue;
 
         pOld = struct_lookup_type(pSType);
@@ -6762,10 +7690,30 @@ struct_epilog (void)
      */
     for (i = 0; (size_t)i < STRUCT_COUNT; i++)
     {
-        if (STRUCT_DEF(i).inh < 0)
+        if (STRUCT_DEF(i).inh == STRUCT_INH_LOCAL)
             struct_publish_type(STRUCT_DEF(i).type);
     } /* for(i) */
 
+    /* For all non-private function and variables add their struct type
+     * to our definitions if there aren't there, yet.
+     */
+    for (i = 0; i < FUNCTION_COUNT; i++)
+    {
+        if (!(FUNCTION(i)->flags & (TYPE_MOD_PRIVATE | NAME_HIDDEN)))
+            record_struct_type(FUNCTION(i)->type);
+    }
+    for (i = 0; i < V_VARIABLE_COUNT; i++)
+    {
+        fulltype_t vartype = V_VARIABLE(i | VIRTUAL_VAR_TAG)->type;
+        if (!(vartype.t_flags & (TYPE_MOD_PRIVATE | NAME_HIDDEN)))
+            record_struct_type(vartype.t_type);
+    }
+    for (i = 0; i < NV_VARIABLE_COUNT; i++)
+    {
+        fulltype_t vartype = NV_VARIABLE(i)->type;
+        if (!(vartype.t_flags & (TYPE_MOD_PRIVATE | NAME_HIDDEN)))
+            record_struct_type(vartype.t_type);
+    }
 } /* struct_epilog() */
 
 
@@ -6799,6 +7747,8 @@ printf("DEBUG: new inline #%"PRIuMPINT": prev %"PRIdMPINT"\n", INLINE_CLOSURE_CO
     ict.length = 0;
     ict.li_start = LINENUMBER_SIZE;
     ict.li_length = 0;
+    ict.lv_start = LOCAL_VARIABLE_DBG_COUNT;
+    ict.lv_length = 0;
     ict.function = -1;
     ict.ident = NULL;
     ict.returntype.t_flags = 0;
@@ -6824,6 +7774,7 @@ printf("DEBUG:   start: %"PRIuMPINT", depth %d, locals: %d/%d, break: %d/%d\n",
     ict.full_local_var_start = local_variables - &(LOCAL_VARIABLE(0));
     ict.full_context_var_start = context_variables - &(LOCAL_VARIABLE(0));
     ict.full_local_var_size  = mem_block[A_LOCAL_VARIABLES].current_size;
+    ict.lambda_values_start  = LAMBDA_VALUES_COUNT - lambda_values_offset;
 #ifdef DEBUG_INLINES
 printf("DEBUG:   local types: %"PRIuMPINT", context types: %"PRIuMPINT"\n", 
        ict.full_local_var_start, ict.full_context_var_start);
@@ -6847,6 +7798,8 @@ printf("DEBUG:   type ptrs: %p, %p\n",
 
     max_break_stack_need = current_break_stack_need = 0;
     max_number_of_locals = current_number_of_locals = 0;
+    lambda_values_offset = LAMBDA_VALUES_COUNT;
+    lambda_values_table_level++;
 
     /* Add the structure to the memblock */
     ADD_INLINE_CLOSURE(&ict);
@@ -6890,13 +7843,14 @@ printf("DEBUG:   depth %d, locals: %d/%d, break: %d/%d\n",
     length = current_inline->length;
     end = current_inline->end;
 
-    if (!bAbort)
+    if (!bAbort && !string_context && !compiling_decltype)
     {
         backup_start = INLINE_PROGRAM_SIZE;
 #ifdef DEBUG_INLINES
 printf("DEBUG:   move code to backup %"PRIuMPINT"\n", backup_start);
 #endif /* DEBUG_INLINES */
         add_to_mem_block( A_INLINE_PROGRAM, PROGRAM_BLOCK+start, length);
+        current_inline->end = start;
         current_inline->start = backup_start;
     }
     else
@@ -6934,7 +7888,7 @@ printf("DEBUG:   program size: %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
     /* Move the linenumber data into the backup storage */
     start = current_inline->li_start;
     length = current_inline->li_length;
-    if (!bAbort)
+    if (!bAbort && !string_context && !compiling_decltype)
     {
         backup_start = INLINE_PROGRAM_SIZE;
 #ifdef DEBUG_INLINES
@@ -6985,6 +7939,8 @@ printf("DEBUG:   move li data forward: from %"PRIuMPINT", length %"PRIuMPINT
     current_break_stack_need = current_inline->break_stack_size;
     max_break_stack_need     = current_inline->max_break_stack_size;
     exact_types              = current_inline->exact_types;
+    lambda_values_offset    -= current_inline->lambda_values_start;
+    decrease_lambda_values_table_level();
 
 #ifdef DEBUG_INLINES
 printf("DEBUG:   local types: %"PRIuMPINT", context types: %"PRIuMPINT"\n", 
@@ -7017,6 +7973,10 @@ insert_pending_inline_closures (void)
 
 {
     mp_int ix;
+    mp_uint remove_lv_dbg_length = 0;
+    mp_uint remove_lv_dbg_start = 0;
+    inline_closure_t *last_ict = &(INLINE_CLOSURE(INLINE_CLOSURE_COUNT));
+
 #ifdef DEBUG_INLINES
 if (INLINE_CLOSURE_COUNT != 0) printf("DEBUG: insert_inline_closures(): %"
                                       PRIuMPINT" pending\n", 
@@ -7033,7 +7993,9 @@ printf("DEBUG:   #%"PRIdMPINT": start %"PRIuMPINT", length %"PRIuMPINT
 #endif /* DEBUG_INLINES */
         if (ict->length != 0)
         {
-            CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
+            uint32_t code_start = CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
+            mp_uint lv_length;
+            inline_closure_t * next_ict;
 
             store_line_number_info();
             if (stored_lines > ict->start_line)
@@ -7063,7 +8025,57 @@ printf("DEBUG:        li_start %"PRIuMPINT", li_length %"PRIuMPINT
                             , ict->li_length);
             stored_lines = ict->end_line;
             stored_bytes += ict->length;
+
+            /* Update code range for local variable debugging information. */
+            lv_length = 0;
+            next_ict = ict+1;
+            for (int lv_idx = 0; lv_idx < ict->lv_length; lv_idx++)
+            {
+                A_LOCAL_VARIABLES_DBG_t lvar = LOCAL_VARIABLE_DBG(ict->lv_start + lv_idx);
+
+                /* Check that this variables are not part of a subsequent closure. */
+                while (next_ict < last_ict && next_ict->lv_start + next_ict->lv_length <= ict->lv_start + lv_idx)
+                    next_ict++;
+                if (next_ict < last_ict && next_ict->lv_start <= ict->lv_start + lv_idx)
+                    continue;
+
+                /* We need to adjust the original code_start & code_end, because arguments
+                 * are registered before alignment and removed after the F_CLOSURE code
+                 * was created.
+                 */
+                if (lvar.code_start < ict->end)
+                    lvar.code_start = code_start;
+                else
+                    lvar.code_start += code_start - ict->end;
+                if (lvar.code_end > ict->end + ict->length)
+                    lvar.code_end = code_start + ict->length;
+                else
+                    lvar.code_end += code_start - ict->end;
+                ADD_LOCAL_VARIABLE_DBG(lvar);
+                lv_length++;
+            }
+
+            /* Move any inbetween variables to the front. */
+            if (remove_lv_dbg_length == 0)
+                remove_lv_dbg_start = ict->lv_start;
+            else if (remove_lv_dbg_start + remove_lv_dbg_length < ict->lv_start)
+            {
+                memmove(&(LOCAL_VARIABLE_DBG(remove_lv_dbg_start)),
+                        &(LOCAL_VARIABLE_DBG(remove_lv_dbg_start + remove_lv_dbg_length)),
+                        sizeof(A_LOCAL_VARIABLES_DBG_t) * (ict->lv_start - remove_lv_dbg_start - remove_lv_dbg_length));
+                remove_lv_dbg_start = ict->lv_start - remove_lv_dbg_length;
+            }
+
+            remove_lv_dbg_length += lv_length;
         }
+    }
+
+    if (remove_lv_dbg_length > 0)
+    {
+        memmove(&(LOCAL_VARIABLE_DBG(remove_lv_dbg_start)),
+                &(LOCAL_VARIABLE_DBG(remove_lv_dbg_start + remove_lv_dbg_length)),
+                sizeof(A_LOCAL_VARIABLES_DBG_t) * (LOCAL_VARIABLE_DBG_COUNT - remove_lv_dbg_start - remove_lv_dbg_length));
+        mem_block[A_LOCAL_VARIABLES_DBG].current_size -= remove_lv_dbg_length * sizeof(A_LOCAL_VARIABLES_DBG_t);
     }
 
     /* Empty the datastorages */
@@ -7087,31 +8099,36 @@ prepare_inline_closure (lpctype_t *returntype, bool coroutine)
     fulltype_t funtype;
     ident_t * ident;
 
-    /* Create the name of the new inline function.
-     * We have to make sure the name is really unique.
-     */
-    do
+    if (!string_context && !compiling_decltype)
     {
-        char * start;
-
-        sprintf(name, "__inline_%s_%d_#%04x", current_loc.file->name
-                     , current_loc.line, inline_closure_id++);
-
-        /* Convert all non-alnums (but '#') to '_' */
-        for (start = name; *start != '\0'; start++)
+        /* Create the name of the new inline function.
+         * We have to make sure the name is really unique.
+         */
+        do
         {
-            if (!isalnum((unsigned char)(*start)) && '#' != *start)
-                *start = '_';
-        }
-    } while (    find_shared_identifier(name, 0, 0)
-              && inline_closure_id != 0);
-    if (inline_closure_id == 0)
-    {
-        yyerror("Can't generate unique name for inline closure");
-        return MY_FALSE;
-    }
+            char * start;
 
-    ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
+            sprintf(name, "__inline_%s_%d_#%04x", current_loc.file->name
+                         , current_loc.line, inline_closure_id++);
+
+            /* Convert all non-alnums (but '#') to '_' */
+            for (start = name; *start != '\0'; start++)
+            {
+                if (!isalnum((unsigned char)(*start)) && '#' != *start)
+                    *start = '_';
+            }
+        } while (    find_shared_identifier(name, 0, 0)
+                  && inline_closure_id != 0);
+        if (inline_closure_id == 0)
+        {
+            yyerror("Can't generate unique name for inline closure");
+            return MY_FALSE;
+        }
+
+        ident = add_global_name(make_shared_identifier(name, I_TYPE_UNKNOWN, 0));
+    }
+    else
+        ident = NULL;
 
     /* The lfuns implementing the inline closures should not
      * be callable directly (without the CLOSURE svalue), and also not
@@ -7154,7 +8171,9 @@ inline_closure_prototype (int num_args)
 #ifdef DEBUG_INLINES
 printf("DEBUG: inline_closure_prototype(%d)\n", num_args);
 #endif /* DEBUG_INLINES */
-    def_function_prototype(num_args, MY_TRUE);
+    def_function_argument_check(true);
+    if (!string_context && !compiling_decltype)
+        def_function_prototype(num_args, MY_TRUE);
 
 #ifdef DEBUG_INLINES
 printf("DEBUG:   current_inline->depth: %d: %d\n", current_inline->block_depth, block_scope[current_inline->block_depth-1].num_locals);
@@ -7163,6 +8182,9 @@ printf("DEBUG:               arg depth: %d: %d\n", current_inline->block_depth+2
 printf("DEBUG:           current depth: %d: %d\n", block_depth, block_scope[block_depth].num_locals);
 printf("DEBUG:   Function index: %d\n", current_inline->function);
 #endif /* DEBUG_INLINES */
+
+    current_inline->num_args = num_args;
+    current_inline->num_opt_args = 0;
 
     store_line_number_info();
 
@@ -7237,14 +8259,24 @@ printf("DEBUG:               arg depth: %d: %d\n", current_inline->block_depth+2
 printf("DEBUG:           current depth: %d: %d\n", block_depth, block_scope[block_depth-1].num_locals);
 #endif /* DEBUG_INLINES */
 
+    /* Insert any missing returns. */
+    def_function_check_return(current_inline->returntype, statements);
+
     /* Generate the function header and update the ident-table entry.
      */
-    def_function_complete(true, start, statements, true);
+    if (!string_context && !compiling_decltype)
+    {
+        int fnum = current_inline->ident->u.global.function;
+        FUNCTION(fnum)->num_opt_arg = current_inline->num_opt_args;
+
+        def_function_complete(true, start, true);
+    }
 
     current_inline->length = CURRENT_PROGRAM_SIZE - start;
 
     store_line_number_info();
     current_inline->li_length = LINENUMBER_SIZE - li_start;
+    current_inline->lv_length = LOCAL_VARIABLE_DBG_COUNT - current_inline->lv_start;
     current_inline->end_line = stored_lines;
 
     /* Add the code to push the values of the inherited local
@@ -7333,8 +8365,81 @@ printf("DEBUG:     -> F_LOCAL %d\n", lcmap[i]);
 printf("DEBUG:     -> F_CONTEXT_CLOSURE %d %d %d\n", current_inline->function
       , num_explicit_context, context->num_locals - num_explicit_context);
 #endif /* DEBUG_INLINES */
-        ins_f_code(F_CONTEXT_CLOSURE);
-        ins_short(current_inline->function);
+
+        if (string_context && !compiling_decltype)
+        {
+            /* We are compiling a lambda closure. Therefore we cannot insert
+             * the inline closure into a program and need to make that
+             * a lambda closure as well.
+             */
+
+            int num_values, idx;
+            size_t size;
+            void *block;
+            lambda_t *l;
+            svalue_t cl;
+            svalue_t *values;
+
+            num_values = LAMBDA_VALUES_COUNT - lambda_values_offset
+                       + context->num_locals;
+            size = sizeof(lambda_t) + current_inline->length - FUNCTION_HDR_SIZE
+                                    + num_values * sizeof(svalue_t);
+            if ( !(block = xalloc(size)) )
+            {
+                yyerrorf("Out of memory: closure structure (%zu bytes)", size);
+                leave_block_scope(MY_TRUE);  /* Argument scope */
+                leave_block_scope(MY_TRUE);  /* Context scope */
+                finish_inline_closure(MY_TRUE);
+                return;
+            }
+
+            l = (lambda_t*)(block + num_values * sizeof(svalue_t));
+            closure_init_base(&(l->base), current_object);
+
+            memcpy(l->program, PROGRAM_BLOCK + current_inline->start + FUNCTION_HDR_SIZE
+                             , current_inline->length - FUNCTION_HDR_SIZE);
+
+            l->num_values = num_values;
+            l->num_arg = current_inline->num_args;
+            l->num_opt_arg = current_inline->num_opt_args;
+            l->num_locals = max_number_of_locals - l->num_arg + max_break_stack_need;
+            l->num_values = num_values;
+            l->xvarargs = (current_inline->returntype.t_flags & TYPE_MOD_XVARARGS) != 0;
+
+            /* We need to reverse the order of lambda values. */
+            values = ((svalue_t*) block) + num_values;
+            for (int i = lambda_values_offset; i < LAMBDA_VALUES_COUNT; i++)
+            {
+                values--;
+                *values = LAMBDA_VALUE(i);
+            }
+
+            /* Initialize the slots for the context variables. */
+            memset(values - context->num_locals, 0, context->num_locals * sizeof(svalue_t));
+
+            /* References have been adopted. */
+            GET_BLOCK_SIZE(A_LAMBDA_VALUES) = lambda_values_offset * sizeof(A_LAMBDA_VALUES_t);
+            GET_BLOCK_SIZE(A_LAMBDA_VALUES_NEXT) = lambda_values_offset * sizeof(A_LAMBDA_VALUES_NEXT_t);
+
+            /* Store the closure as a lambda value.
+             * We need to go to the outer scope for that.
+             */
+            lambda_values_offset -= current_inline->lambda_values_start;
+            decrease_lambda_values_table_level();
+            cl = (svalue_t){ T_CLOSURE, {.closure_type = CLOSURE_LAMBDA}, {.lambda = l} };
+            idx = store_lambda_value(&cl);
+            lambda_values_offset += current_inline->lambda_values_start;
+            lambda_values_table_level++;
+
+            ins_f_code(F_CONTEXT_LAMBDA);
+            ins_short(idx);
+            ins_uint32(current_inline->length - FUNCTION_HDR_SIZE);
+        }
+        else
+        {
+            ins_f_code(F_CONTEXT_CLOSURE);
+            ins_short(current_inline->function);
+        }
         ins_byte(context->first_local);
         ins_short(num_explicit_context);
         ins_short(context->num_locals - num_explicit_context);
@@ -7448,37 +8553,47 @@ ins_prog_string (string_t *str)
  * Returns the number of bytes written to the bytecode.
  */
 {
-    PREPARE_INSERT(3);
-    int string_number = store_prog_string(str);
-    if ( string_number <= 0xff )
+    if (string_context)
     {
-        add_f_code(F_CSTRING0);
-        add_byte(string_number);
-    }
-    else if ( string_number <= 0x1ff )
-    {
-        add_f_code(F_CSTRING1);
-        add_byte(string_number);
-    }
-    else if ( string_number <= 0x2ff )
-    {
-        add_f_code(F_CSTRING2);
-        add_byte(string_number);
-    }
-    else if ( string_number <= 0x3ff )
-    {
-        add_f_code(F_CSTRING3);
-        add_byte(string_number);
+        svalue_t sv = str->info.unicode == STRING_BYTES ? svalue_bytes(str) : svalue_string(str);
+
+        last_string_is_new = false;
+        return ins_lambda_value(&sv);
     }
     else
     {
-        add_f_code(F_STRING);
-        add_short(string_number);
-        CURRENT_PROGRAM_SIZE += 3;
-        return 3;
+        PREPARE_INSERT(3);
+        int string_number = store_prog_string(str);
+        if ( string_number <= 0xff )
+        {
+            add_f_code(F_CSTRING0);
+            add_byte(string_number);
+        }
+        else if ( string_number <= 0x1ff )
+        {
+            add_f_code(F_CSTRING1);
+            add_byte(string_number);
+        }
+        else if ( string_number <= 0x2ff )
+        {
+            add_f_code(F_CSTRING2);
+            add_byte(string_number);
+        }
+        else if ( string_number <= 0x3ff )
+        {
+            add_f_code(F_CSTRING3);
+            add_byte(string_number);
+        }
+        else
+        {
+            add_f_code(F_STRING);
+            add_short(string_number);
+            CURRENT_PROGRAM_SIZE += 3;
+            return 3;
+        }
+        CURRENT_PROGRAM_SIZE += 2;
+        return 2;
     }
-    CURRENT_PROGRAM_SIZE += 2;
-    return 2;
 } /* ins_prog_string */
 
 /*-------------------------------------------------------------------------*/
@@ -7512,6 +8627,416 @@ delete_prog_string (void)
 } /* delete_prog_string() */
 
 
+/* ======================   STRING COMPILATION   ========================= */
+
+/*-------------------------------------------------------------------------*/
+static void
+decrease_lambda_values_table_level ()
+
+/* Basically decrements lambda_values_table_level by one, but also invalidates
+ * the corresponding table.
+ */
+
+{
+    size_t target_size = sizeof(A_LAMBDA_VALUES_TABLE_t) * lambda_values_table_level*0x100;
+    if (mem_block[A_LAMBDA_VALUES_TABLE].current_size > target_size)
+        mem_block[A_LAMBDA_VALUES_TABLE].current_size = target_size;
+    lambda_values_table_level--;
+} /* decrease_lambda_values_table_level() */
+
+/*-------------------------------------------------------------------------*/
+static int
+store_lambda_value (svalue_t *svp)
+
+/* Add the value <svp> to the lambda values used for building the closure.
+ * The references from <svp> are adopted.
+ */
+
+{
+    int hash = svalue_hash(svp, 8);
+    int *entry;
+    int result;
+
+    assert(hash < 0x100);
+
+    if (compiling_decltype > 0)
+    {
+        free_svalue(svp);
+        return 0;
+    }
+
+    if (lambda_values_table_level*0x100 + hash >= LAMBDA_VALUE_TABLE_SIZE)
+    {
+        int needed_entries = (lambda_values_table_level+1)*0x100 - LAMBDA_VALUE_TABLE_SIZE;
+        size_t blocksize = needed_entries * sizeof(A_LAMBDA_VALUES_TABLE_t);
+        if (!RESERVE_LAMBDA_VALUES_TABLE(needed_entries))
+        {
+            yyerrorf("Out of memory for lambda values hash table (%zu bytes).",
+                     blocksize);
+            free_svalue(svp);
+            return -1;
+        }
+
+        memset(mem_block[A_LAMBDA_VALUES_TABLE].block + mem_block[A_LAMBDA_VALUES_TABLE].current_size, -1, blocksize);
+        mem_block[A_LAMBDA_VALUES_TABLE].current_size += blocksize;
+    }
+
+    entry = &(LAMBDA_VALUE_ENTRY(lambda_values_table_level, hash));
+
+    /* Check for existing values. */
+    for (int idx = *entry; idx >= 0; idx = LAMBDA_VALUE_NEXT(lambda_values_offset + idx))
+    {
+        if (svalue_eq(svp, &LAMBDA_VALUE(lambda_values_offset + idx)))
+        {
+            free_svalue(svp);
+            return idx;
+        }
+    }
+
+    /* Append to the lambda value list. */
+    result = LAMBDA_VALUES_COUNT - lambda_values_offset;
+
+    if (!RESERVE_LAMBDA_VALUES(1) || !RESERVE_LAMBDA_VALUES_NEXT(1))
+    {
+        yyerrorf("Out of memory for new value (%zu bytes).",
+                sizeof(svalue_t) + sizeof(int));
+        free_svalue(svp);
+        return -1;
+    }
+
+    ADD_LAMBDA_VALUE(svp);
+    ADD_LAMBDA_VALUE_NEXT(*entry);
+    *entry = result;
+
+    return result;
+} /* store_lambda_value() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ins_lambda_value (svalue_t *svp)
+
+/* Add the value <svp> to the lambda values used for building the closure
+ * and insert code using the value into the current bytecode.
+ * The references from <svp> are adopted.
+ * Returns the number of bytes written to the bytecode.
+ */
+{
+    PREPARE_INSERT(3);
+    int idx = store_lambda_value(svp);
+
+    if (idx < 0x100)
+    {
+        add_f_code(F_LAMBDA_CCONSTANT);
+        add_byte(idx);
+        CURRENT_PROGRAM_SIZE += 2;
+        return 2;
+    }
+    else
+    {
+        /* epilog_closure() checks whether the index exceeds its range. */
+        add_f_code(F_LAMBDA_CONSTANT);
+        add_short(idx);
+        CURRENT_PROGRAM_SIZE += 3;
+        return 3;
+    }
+
+    /* NOTREACHED */
+    return 0;
+} /* ins_prog_string */
+
+/*-------------------------------------------------------------------------*/
+static svalue_t *
+lookup_entity (svalue_t *dict, ident_t* name, ph_int exp_type)
+
+/* Looks up the identifier <name> in the mapping or closure <dict>.
+ * <dict> maybe NULL, in which case the lookup won't be successful.
+ * The identifier is converted into a symbol for lookup. For mapping
+ * it's a direct key lookup, for closure it's a call with the name
+ * as the only argument.
+ * The resulting value must be of <exp_type> type. If the lookup
+ * is unsuccessful (or returns 0), NULL is returned. If the lookup
+ * yields another type than <exp_type> an error is thrown (and NULL
+ * is returned). Otherwise the resulting value is returned (with
+ * borrowed references).
+ */
+
+{
+    svalue_t sym = svalue_symbol(name->name, 1);
+    svalue_t *result;
+
+    if (!dict)
+        return NULL;
+
+    switch (dict->type)
+    {
+        case T_MAPPING:
+            result = get_map_value(dict->u.map, &sym);
+            break;
+
+        case T_CLOSURE:
+            if (is_current_object_destructed())
+                return NULL;
+
+            push_svalue(&sym);
+            result = secure_call_lambda(dict, 1, false, NULL);
+            break;
+
+        default:
+            return NULL;
+    }
+
+    if (!result || (result->type == T_NUMBER && result->u.number == 0))
+        return NULL;
+
+    if (result->type != exp_type)
+    {
+        yyerrorf("Bad type returned for '%.50s': got '%s', expected '%s'",
+            get_txt(name->name), typename(result->type), typename(exp_type));
+        return NULL;
+    }
+
+    return result;
+} /* lookup_entity() */
+
+/*-------------------------------------------------------------------------*/
+bool
+lookup_function (ident_t *ident, char* super, efun_override_t override)
+
+/* This function checks whether the given indentifier represents a function.
+ * It handles lookup during string compilation.
+ */
+
+{
+    ident = add_global_name(ident);
+
+    if (string_context && !super
+     && ident->type == I_TYPE_GLOBAL
+     && ident->u.global.function == I_GLOBAL_FUNCTION_OTHER
+     && (override == OVERRIDE_NONE || override == OVERRIDE_LFUN))
+    {
+        /* Unless there is an override, we look up this name.
+         * And we store the result.
+         */
+        /* We haven't seen this function, yet. Let's look it up. */
+        if (string_context->fun_lookup)
+        {
+            svalue_t *fun = lookup_entity(string_context->fun_lookup, ident, T_CLOSURE);
+            if (fun)
+            {
+                svalue_t ref_fun;
+
+                assign_svalue_no_free(&ref_fun, fun); /* Add a reference. */
+                ident->u.global.function = LAMBDA_FUNCTIONS_COUNT;
+                ADD_LAMBDA_FUNCTION((lambda_ident_t){.kind = LAMBDA_IDENT_VALUE, .value = ref_fun});
+            }
+        }
+
+        if (ident->u.global.function == I_GLOBAL_FUNCTION_OTHER
+         && string_context->use_prog_for_functions)
+        {
+            program_t *prog = get_current_object_program();
+            int idx = find_function(ident->name, prog);
+            if (idx >= 0 && !(prog->functions[idx] & (TYPE_MOD_PRIVATE|NAME_HIDDEN)))
+            {
+                ident->u.global.function = LAMBDA_FUNCTIONS_COUNT;
+                ADD_LAMBDA_FUNCTION((lambda_ident_t){.kind = LAMBDA_IDENT_OBJECT, .object_index = idx});
+            }
+        }
+
+        if (ident->u.global.function == I_GLOBAL_FUNCTION_OTHER)
+        {
+            ident->u.global.function = LAMBDA_FUNCTIONS_COUNT;
+            ADD_LAMBDA_FUNCTION((lambda_ident_t){LAMBDA_IDENT_UNDEF});
+        }
+
+        /* The identifier now contains an index, even though it might point
+         * to an undefined entry. We need to be aware of that later on.
+         */
+    }
+
+    if (ident->u.global.function == I_GLOBAL_FUNCTION_OTHER)
+        return false;
+    if (!string_context)
+        return true;
+    return LAMBDA_FUNCTION(ident->u.global.function).kind != LAMBDA_IDENT_UNDEF;
+} /* lookup_function() */
+
+/*-------------------------------------------------------------------------*/
+int
+get_function_index (ident_t *ident)
+
+/* Checks whether the given identifier function is a real lfun to be called.
+ * If so return the function index, otherwise return -1.
+ */
+
+{
+    assert(ident->type == I_TYPE_GLOBAL);
+
+    if (ident->u.global.function == I_GLOBAL_FUNCTION_OTHER)
+        return -1;
+
+    if (!string_context)
+        return ident->u.global.function;
+
+    if (LAMBDA_FUNCTION(ident->u.global.function).kind != LAMBDA_IDENT_OBJECT)
+        return -1;
+
+    return LAMBDA_FUNCTION(ident->u.global.function).object_index;
+} /* get_function_index() */
+
+/*-------------------------------------------------------------------------*/
+int
+get_function_closure (ident_t *ident)
+
+/* Checks whether the given identifier function is a closure to be called.
+ * If so return the lambda value index for the closure, otherwise return -1.
+ */
+
+{
+    svalue_t fun;
+
+    assert(ident->type == I_TYPE_GLOBAL);
+
+    if (!string_context
+     || ident->u.global.function == I_GLOBAL_FUNCTION_OTHER
+     || LAMBDA_FUNCTION(ident->u.global.function).kind != LAMBDA_IDENT_VALUE)
+        return -1;
+
+    assign_svalue_no_free(&fun, &(LAMBDA_FUNCTION(ident->u.global.function).value));
+    return store_lambda_value(&fun);
+} /* get_function_closure() */
+
+/*-------------------------------------------------------------------------*/
+bool
+lookup_global_variable (ident_t *ident)
+
+/* This function checks whether the given indentifier represents a global
+ * variable. It handles lookup during string compilation.
+ */
+
+{
+
+    if (string_context)
+    {
+        bool found = false;
+
+        if (ident->type == I_TYPE_GLOBAL
+         && ident->u.global.variable != I_GLOBAL_VARIABLE_OTHER
+         && ident->u.global.variable != I_GLOBAL_VARIABLE_WORLDWIDE)
+        {
+            return LAMBDA_VARIABLE(ident->u.global.variable).kind != LAMBDA_IDENT_UNDEF;
+        }
+
+        ident = add_global_name(ident);
+
+        if (string_context->var_lookup)
+        {
+            svalue_t *var = lookup_entity(string_context->var_lookup, ident, T_LVALUE);
+            if (var)
+            {
+                ident->u.global.variable = LAMBDA_VARIABLES_COUNT;
+                ADD_LAMBDA_VARIABLE((lambda_ident_t){.kind = LAMBDA_IDENT_VALUE});
+                assign_svalue_no_free(&(LAMBDA_VARIABLE(LAMBDA_VARIABLES_COUNT-1).value), var);
+
+                found = true;
+            }
+        }
+
+        if (!found && string_context->use_prog_for_variables)
+        {
+            program_t *prog = get_current_object_program();
+            for (int idx = 0; idx < prog->num_variables; idx++)
+            {
+                if (prog->variables[idx].name == ident->name
+                 && !(prog->variables[idx].type.t_flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)))
+                {
+                    ident->u.global.variable = LAMBDA_VARIABLES_COUNT;
+                    ADD_LAMBDA_VARIABLE((lambda_ident_t){.kind = LAMBDA_IDENT_OBJECT, .object_index = idx});
+
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        if (!found)
+        {
+            ident->u.global.variable = LAMBDA_VARIABLES_COUNT;
+            ADD_LAMBDA_VARIABLE((lambda_ident_t){.kind = LAMBDA_IDENT_UNDEF});
+        }
+
+        return found;
+    }
+    else
+        return ident->type == I_TYPE_GLOBAL
+            && ident->u.global.variable != I_GLOBAL_VARIABLE_OTHER
+            && ident->u.global.variable != I_GLOBAL_VARIABLE_WORLDWIDE;
+} /* lookup_global_variable() */
+
+/*-------------------------------------------------------------------------*/
+int
+get_global_variable_index (ident_t *ident, bool no_virtual)
+
+/* Checks whether the given identifier variable is a real object variable.
+ * If so return the variable index, otherwise return -1.
+ * If <no_virtual> is true, then return -2 if the variable would is virtual.
+ */
+
+{
+    int idx;
+
+    assert(ident->type == I_TYPE_GLOBAL);
+
+    if (ident->u.global.variable == I_GLOBAL_VARIABLE_OTHER
+     || ident->u.global.variable == I_GLOBAL_VARIABLE_WORLDWIDE)
+        return -1;
+
+    if (!string_context)
+    {
+        if (ident->u.global.variable & VIRTUAL_VAR_TAG)
+        {
+            if (no_virtual)
+                return -2;
+            else
+                return ident->u.global.variable - VIRTUAL_VAR_TAG;
+        }
+        return ident->u.global.variable + num_virtual_variables;
+    }
+
+    if (LAMBDA_VARIABLE(ident->u.global.variable).kind != LAMBDA_IDENT_OBJECT)
+        return -1;
+
+    idx = LAMBDA_VARIABLE(ident->u.global.variable).object_index;
+    if (no_virtual
+     && idx < get_current_object_program()->num_virtual_variables)
+        return -2;
+
+    return idx;
+} /* get_global_variable_index() */
+
+/*-------------------------------------------------------------------------*/
+int
+get_global_variable_lvalue (ident_t *ident)
+
+/* Checks whether the given identifier variable is an lvalue reference.
+ * If so return the lambda value index for the lvalue, otherwise return -1.
+ */
+
+{
+    svalue_t value;
+
+    assert(ident->type == I_TYPE_GLOBAL);
+
+    if (!string_context
+     || ident->u.global.variable == I_GLOBAL_VARIABLE_OTHER
+     || ident->u.global.variable == I_GLOBAL_VARIABLE_WORLDWIDE
+     || LAMBDA_FUNCTION(ident->u.global.variable).kind != LAMBDA_IDENT_VALUE)
+        return -1;
+
+    assign_svalue_no_free(&value, &(LAMBDA_VARIABLE(ident->u.global.variable).value));
+    return store_lambda_value(&value);
+} /* get_global_variable_lvalue() */
+
 /*=========================================================================*/
 
 #if defined(__MWERKS__) && !defined(WARN_ALL)
@@ -7526,10 +9051,11 @@ delete_prog_string (void)
 
 /*-------------------------------------------------------------------------*/
 
+%token L_ARROW
 %token L_ASSIGN
 %token L_ASYNC
-%token L_ARROW
 %token L_AWAIT
+%token L_BEGIN_INLINE
 %token L_BREAK
 %token L_BYTES
 %token L_BYTES_DECL
@@ -7541,28 +9067,36 @@ delete_prog_string (void)
 %token L_CONTINUE
 %token L_COROUTINE
 %token L_DEC
+%token L_DECLTYPE
 %token L_DEFAULT
+%token L_DEPRECATED
 %token L_DO
 %token L_DUMMY
 %token L_ELLIPSIS
 %token L_ELSE
-%token L_EQ
-%token L_FUNC
-%token L_BEGIN_INLINE
 %token L_END_INLINE
+%token L_EQ
+%token L_EOF
 %token L_FLOAT
 %token L_FLOAT_DECL
 %token L_FOR
 %token L_FOREACH
+%token L_FUNC
 %token L_GE
 %token L_IDENTIFIER
 %token L_IF
+%token L_ILLEGAL_CHAR
+%ifdef KEYWORD_IN
+%token L_IN
+%endif
 %token L_INC
 %token L_INHERIT
 %token L_INT
+%token L_LAMBDA_CLOSURE_VALUE
 %token L_LAND
 %token L_LE
 %token L_LOR
+%token L_LPCTYPE
 %token L_LSH
 %token L_LWOBJECT
 %token L_MAPPING
@@ -7570,19 +9104,26 @@ delete_prog_string (void)
 %token L_NE
 %token L_NO_MASK
 %token L_NOSAVE
-%token L_DEPRECATED
 %token L_NOT
 %token L_NUMBER
 %token L_OBJECT
 %token L_PRIVATE
 %token L_PROTECTED
 %token L_PUBLIC
+%ifdef USE_PYTHON
+%token L_PYTHON_TYPE
+%endif
 %token L_QUOTED_AGGREGATE
 %token L_RANGE
 %token L_RETURN
 %token L_RSH
 %token L_RSHL
 %token L_SIMUL_EFUN_CLOSURE
+%token L_START_BLOCK
+%token L_START_BLOCK_END_DETECTION
+%token L_START_EXPR
+%token L_START_EXPR_END_DETECTION
+%token L_START_PROG
 %token L_STATIC
 %token L_STATUS
 %token L_STRING
@@ -7656,10 +9197,12 @@ delete_prog_string (void)
       /* An LPC type without modifiers.
        */
 
-    funflag_t inh_flags[2];
-      /* Inheritance: [0]: code inheritance qualifiers
-       *              [1]: variable inheritance qualifiers
-       */
+    struct
+    {
+        funflag_t funmod;       /* Function inheritance modifiers. */
+        funflag_t varmod;       /* Variable inheritance modifiers. */
+        funflag_t structmod;    /* Struct inheritance modifiers.   */
+    } inh_flags;
 
     svalue_t *initialized;
       /* Position where to store the variable initializer.
@@ -7895,6 +9438,12 @@ delete_prog_string (void)
        */
 
     struct {
+        efun_override_t override; /* Qualifier for name lookup. */
+        ident_t *real;            /* The struct identifier */
+    } struct_name;
+      /* A qualified struct name: "<super>::<name>" */
+
+    struct {
         int length;            /* Number of initializers parsed */
         /* Description of initializers parsed: */
         struct struct_init_s * list;  /* Head of list */
@@ -7931,16 +9480,20 @@ delete_prog_string (void)
 %destructor { free_fulltype($$.type1);
               free_fulltype($$.type2); } <index>
 %destructor { free_lpctype($$.expr_type); } <foreach_expression>
+%destructor { free_mstring($$.name); } <symbol>
 
 /*-------------------------------------------------------------------------*/
 
-%type <number>       L_NUMBER constant
+%type <number>       L_NUMBER L_LAMBDA_CLOSURE_VALUE constant
 %type <float_number> L_FLOAT
 %type <closure>      L_CLOSURE
 %type <symbol>       L_SYMBOL
 %type <number>       L_QUOTED_AGGREGATE
 %type <ident>        L_IDENTIFIER L_SIMUL_EFUN_CLOSURE
 %type <typeflags>    type_modifier type_modifier_list
+%ifdef USE_PYTHON
+%type <number>       L_PYTHON_TYPE
+%endif
 
 %type <number>       optional_stars
 %type <fulltype>     type non_void_type
@@ -7965,7 +9518,7 @@ delete_prog_string (void)
 %type <lvalue>       lvalue name_lvalue name_var_lvalue local_name_lvalue foreach_var_lvalue lvalue_reference
 %type <foreach_variables> foreach_vars
 %type <foreach_expression> foreach_expr
-%type <index>        index_range index_expr
+%type <index>        index_range index_map_range index_expr index_map_expr
 %type <case_label>   case_label
 %type <else_block>   optional_else
 %type <string>       anchestor
@@ -7976,6 +9529,7 @@ delete_prog_string (void)
 %type <sh_string>    struct_member_name
 %type <function_name> function_name
 %type <function_call_result> function_call
+%type <struct_name>  struct_name
 %type <struct_member_operator> member_operator
 
 /* Special uses of <number> */
@@ -8027,7 +9581,11 @@ delete_prog_string (void)
 %left     '|'
 %left     '^'
 %left     '&'
+%ifdef KEYWORD_IN
+%left     L_EQ    L_NE  L_IN
+%else
 %left     L_EQ    L_NE  L_IDENTIFIER
+%endif
 %left     '<'     L_LE  '>' L_GE
 %left     L_LSH   L_RSH L_RSHL
 %left     '+'     '-'
@@ -8035,11 +9593,50 @@ delete_prog_string (void)
 %right    '~'     L_NOT
 %nonassoc L_INC   L_DEC
 %left     '.'     L_ARROW '['
+
+/* Prefer string concatenation (shift) over end detection (reduce). */
+%right    L_BYTES L_STRING
+
+%initial-action
+{
+    @$.start = @$.end = 0;
+};
+
 %%
 
 /*-------------------------------------------------------------------------*/
 
-all: program;
+all:  L_START_PROG program
+    | L_START_BLOCK statements_block
+    | L_START_BLOCK_END_DETECTION statements_block block_detected_end
+      {
+          string_context->end_position = @3.start;
+          if (@3.start >= 0)
+              YYACCEPT;
+          else
+          {
+              yyerror("syntax error");
+              YYABORT;
+          }
+      }
+    | L_START_EXPR comma_expr
+      {
+          free_fulltype($2.type);
+      }
+    | L_START_EXPR_END_DETECTION expr0 expr_detected_end
+      {
+          free_lvalue_block($2.lvalue);
+          free_fulltype($2.type);
+          string_context->end_position = @3.start;
+          if (@3.start >= 0)
+              YYACCEPT;
+          else
+          {
+              yyerror("syntax error");
+              YYABORT;
+          }
+      }
+; /* all */
 
 program:
       program def possible_semi_colon
@@ -8050,6 +9647,136 @@ possible_semi_colon:
     | ';' { yywarn("Extra ';' ignored"); };
 
 note_start: { $$ = CURRENT_PROGRAM_SIZE; };
+
+/* All tokens that could not begin a statement. */
+block_detected_end:
+      /* empty */
+    | '%'
+    | ')'
+    | '*'
+    | '+'
+    | ','
+    | '.'
+    | '/'
+    | ':'
+    | '>'
+    | '?'
+    | ']'
+    | '^'
+    | '|'
+    | '}'
+    | L_ARROW
+    | L_ASSIGN
+    | L_CASE
+    | L_DEFAULT
+    | L_DEPRECATED
+    | L_ELLIPSIS
+    | L_ELSE
+    | L_EQ
+    | L_EOF
+    | L_GE
+    | L_ILLEGAL_CHAR
+%ifdef KEYWORD_IN
+    | L_IN
+%endif
+    | L_INHERIT
+    | L_LAND
+    | L_LE
+    | L_LOR
+    | L_LSH
+    | L_NE
+    | L_NO_MASK
+    | L_NOSAVE
+    | L_PRIVATE
+    | L_PROTECTED
+    | L_PUBLIC
+    | L_RANGE
+    | L_RSH
+    | L_RSHL
+    | L_STATIC
+    | L_VARARGS
+    | L_VIRTUAL
+    | L_VISIBLE
+; /* block_detected_end */
+
+/* All tokens that are not consumed by an expression. */
+expr_detected_end:
+      /* empty */
+    | ')'
+    | ','
+    | ':'
+    | ';'
+    | ']'
+    | '{'
+    | '}'
+    | '~'
+    | L_ASYNC
+    | L_AWAIT
+    | L_BEGIN_INLINE
+    | L_BREAK
+    | L_BYTES
+    | L_BYTES_DECL
+    | L_CASE
+    | L_CATCH
+    | L_CLOSURE
+    | L_CLOSURE_DECL
+    | L_CONTINUE
+    | L_COROUTINE
+    | L_DECLTYPE
+    | L_DEFAULT
+    | L_DEPRECATED
+    | L_DO
+    | L_ELLIPSIS
+    | L_ELSE
+    | L_END_INLINE
+    | L_EOF
+    | L_FLOAT
+    | L_FLOAT_DECL
+    | L_FOR
+    | L_FOREACH
+    | L_FUNC
+%ifdef KEYWORD_IN
+    | L_IDENTIFIER
+%endif
+    | L_IF
+    | L_ILLEGAL_CHAR
+    | L_INHERIT
+    | L_INT
+    | L_LAMBDA_CLOSURE_VALUE
+    | L_LPCTYPE
+    | L_LWOBJECT
+    | L_MAPPING
+    | L_MIXED
+    | L_NO_MASK
+    | L_NOSAVE
+    | L_NOT
+    | L_NUMBER
+    | L_OBJECT
+    | L_PRIVATE
+    | L_PROTECTED
+    | L_PUBLIC
+%ifdef USE_PYTHON
+    | L_PYTHON_TYPE
+%endif
+    | L_QUOTED_AGGREGATE
+    | L_RANGE
+    | L_RETURN
+    | L_SIMUL_EFUN_CLOSURE
+    | L_STATIC
+    | L_STATUS
+    | L_STRING
+    | L_STRING_DECL
+    | L_STRUCT
+    | L_SWITCH
+    | L_SYMBOL { free_mstring($1.name); }
+    | L_SYMBOL_DECL
+    | L_VARARGS
+    | L_VIRTUAL
+    | L_VISIBLE
+    | L_VOID
+    | L_WHILE
+    | L_YIELD
+; /* expr_detected_end */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -8079,7 +9806,7 @@ function_def:
 
       {
           check_identifier($2);
-          def_function_typecheck($1, $2, MY_FALSE);
+          def_function_typecheck($1, add_global_name($2), MY_FALSE);
       }
 
       '(' argument ')'
@@ -8089,6 +9816,7 @@ function_def:
           p_int offset = 0;
           function_t *funp;
 
+          def_function_argument_check(false);
           def_function_prototype($5.num, MY_FALSE);
 
           /* Remember the current size if we need to revert. */
@@ -8263,7 +9991,9 @@ function_def:
                   DEFAULT_VALUES_POS(fnum) = -1;
           }
 
-          def_function_complete($8.has_code, offset, $8.statements, false);
+          if ($8.has_code)
+              def_function_check_return(def_function_returntype, $8.statements);
+          def_function_complete($8.has_code, offset, false);
 
           insert_pending_inline_closures();
           free_fulltype($1);
@@ -8350,6 +10080,8 @@ printf("DEBUG: After inline_opt_type: program size %"PRIuMPINT"\n", CURRENT_PROG
       inline_opt_args
 
       {
+          int num_values;
+
 #ifdef DEBUG_INLINES
 printf("DEBUG: After inline_opt_args: program size %"PRIuMPINT"\n", CURRENT_PROGRAM_SIZE);
 #endif /* DEBUG_INLINES */
@@ -8384,6 +10116,22 @@ printf("DEBUG: After inline_opt_args: program size %"PRIuMPINT"\n", CURRENT_PROG
 
           if ($1 && $5.num > 0)
               yyerror("async inline closure may not have arguments");
+
+          /* For the context we need to go back to the previous context with
+           * regard to lambda values. Save the values for the inline closure.
+           */
+          num_values = LAMBDA_VALUES_COUNT - lambda_values_offset;
+          RESERVE_DEFAULT_LAMBDA_VALUES(num_values);
+          for (int i = lambda_values_offset; i < LAMBDA_VALUES_COUNT; i++)
+              ADD_DEFAULT_LAMBDA_VALUE(&(LAMBDA_VALUE(i)));
+          /* References have been adopted. */
+          GET_BLOCK_SIZE(A_LAMBDA_VALUES) = lambda_values_offset * sizeof(A_LAMBDA_VALUES_t);
+          GET_BLOCK_SIZE(A_LAMBDA_VALUES_NEXT) = lambda_values_offset * sizeof(A_LAMBDA_VALUES_NEXT_t);
+
+          decrease_lambda_values_table_level();
+          lambda_values_offset -= current_inline->lambda_values_start;
+
+          $<number>4 = num_values;
       }
 
       inline_opt_context
@@ -8397,6 +10145,7 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
           block_scope_t *scope = block_scope + current_inline->block_depth;
           inline_closure_t *outer_closure;
           int * outer_max_num_locals;
+          int num_values;
 
           if (scope->num_locals > scope->num_cleared)
           {
@@ -8452,10 +10201,7 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
           if (!$<number>$)
               $5.num_opt = 0;
           else
-          {
-              int fnum = current_inline->ident->u.global.function;
-              FUNCTION(fnum)->num_opt_arg = $5.num_opt;
-          }
+              current_inline->num_opt_args = $5.num_opt;
 
           if ($1)
           {
@@ -8463,6 +10209,25 @@ printf("DEBUG: After inline_opt_context: program size %"PRIuMPINT"\n", CURRENT_P
               ins_local_names();
               ins_f_code(F_POP_VALUE);
           }
+
+          /* Activate the a scope for lambda values. And restore any
+           * values from default value initializers.
+           */
+          current_inline->lambda_values_start = LAMBDA_VALUES_COUNT - lambda_values_offset;
+          lambda_values_table_level++;
+          lambda_values_offset = LAMBDA_VALUES_COUNT;
+
+          num_values = $<number>4;
+          for (int i = 0; i < num_values; i++)
+          {
+              int idx = store_lambda_value(&(DEFAULT_LAMBDA_VALUE(DEFAULT_LAMBDA_VALUES_COUNT - num_values + i)));
+
+              /* This should be the same index as before. */
+              assert(idx == i);
+          }
+
+          /* The references have been adopted. */
+          GET_BLOCK_SIZE(A_DEFAULT_LAMBDA_VALUES) -= num_values * sizeof(A_DEFAULT_LAMBDA_VALUES_t);
       }
 
       inline_block
@@ -8670,7 +10435,7 @@ struct_decl:
       type_modifier_list L_STRUCT L_IDENTIFIER ';'
       {
           check_identifier($3);
-          (void)define_new_struct(MY_TRUE, $3, compiled_file, $1);
+          (void)define_struct(true, $3, compiled_file, $1, NULL);
       }
     | type_modifier_list L_STRUCT L_IDENTIFIER
       {
@@ -8688,7 +10453,7 @@ struct_decl:
           }
           mem_block[A_STRUCT_MEMBERS].current_size = 0;
 
-          current_struct = define_new_struct(MY_FALSE, $3, compiled_file, $1);
+          current_struct = define_struct(false, $3, compiled_file, $1, NULL);
           if (current_struct < 0)
               YYACCEPT;
       }
@@ -8704,8 +10469,6 @@ opt_base_struct:
       {
           /* Look up the struct id for the given identifier */
 
-          int num = -1;
-
           check_identifier($2);
 
           if ($2->type == I_TYPE_UNKNOWN)
@@ -8715,27 +10478,23 @@ opt_base_struct:
           }
           else
           {
-              ident_t *p = $2;
+              int num = find_struct($2, OVERRIDE_NONE);
 
-              /* Find the global struct identifier */
-              while (p != NULL && p->type != I_TYPE_GLOBAL)
-                  p = p->inferior;
-
-              if (p == NULL || (num = p->u.global.struct_id) == I_GLOBAL_STRUCT_NONE)
+              if (num < 0)
               {
                   yyerrorf("Unknown base struct '%s'", get_txt($2->name));
               }
-              else if (STRUCT_DEF(num).flags & NAME_PROTOTYPE)
+              else if (num < STD_STRUCT_OFFSET && STRUCT_DEF(num).flags & NAME_PROTOTYPE)
               {
                   yyerrorf("Undefined base struct '%s'", get_txt($2->name));
               }
-              else if (!struct_t_unique_name(STRUCT_DEF(num).type))
+              else if (num < STD_STRUCT_OFFSET && !struct_t_unique_name(STRUCT_DEF(num).type))
               {
                   yyerrorf("Incomplete base struct '%s'", get_txt($2->name));
               }
               else
               {
-                  struct_type_t *ptype = STRUCT_DEF(num).type;
+                  struct_type_t *ptype = (num >= STD_STRUCT_OFFSET) ? get_std_struct_type(num - STD_STRUCT_OFFSET) : STRUCT_DEF(num).type;
                   struct_type_t *ctype = STRUCT_DEF(current_struct).type;
                   // record pointer to base struct even if the base struct has no members
                   ctype->base = ref_struct_type(ptype);
@@ -8823,26 +10582,45 @@ inheritance:
            * A variable 'nosave' inherit is internally stored as 'static',
            * a functions 'nosave' inherit is not allowed.
            */
-          if ($1[1] & TYPE_MOD_NOSAVE)
+          if ($1.varmod & TYPE_MOD_NOSAVE)
           {
-              $1[1] |= TYPE_MOD_STATIC;
-              $1[1] ^= TYPE_MOD_NOSAVE;
+              $1.varmod |= TYPE_MOD_STATIC;
+              $1.varmod ^= TYPE_MOD_NOSAVE;
           }
 
-          if ($1[0] & TYPE_MOD_NOSAVE)
+          if ($1.funmod & TYPE_MOD_NOSAVE)
           {
-              $1[0] ^= TYPE_MOD_NOSAVE;
+              $1.funmod ^= TYPE_MOD_NOSAVE;
               yyerror("illegal to inherit code as 'nosave'");
           }
 
-          if ($1[1] & TYPE_MOD_VARARGS)
+          if ($1.varmod & TYPE_MOD_VARARGS)
           {
-              $1[1] ^= TYPE_MOD_VARARGS;
+              $1.varmod ^= TYPE_MOD_VARARGS;
               yyerror("illegal to inherit variables as 'varargs'");
           }
 
-          $1[0] = check_visibility_flags($1[0], 0, true);
-          $1[1] = check_visibility_flags($1[1], 0, false);
+          if ($1.structmod & TYPE_MOD_NOSAVE)
+          {
+              $1.structmod ^= TYPE_MOD_NOSAVE;
+              yyerror("illegal to inherit structs as 'nosave'");
+          }
+
+          if ($1.structmod & TYPE_MOD_STATIC)
+          {
+              $1.structmod ^= TYPE_MOD_STATIC;
+              yyerror("illegal to inherit structs as 'static'");
+          }
+
+          if ($1.structmod & TYPE_MOD_VARARGS)
+          {
+              $1.structmod ^= TYPE_MOD_VARARGS;
+              yyerror("illegal to inherit structs as 'varargs'");
+          }
+
+          $1.funmod = check_visibility_flags($1.funmod, 0, true);
+          $1.varmod = check_visibility_flags($1.varmod, 0, false);
+          $1.structmod = check_visibility_flags($1.structmod, 0, false);
 
           /* First, try to call master->inherit_file().
            * Since simulate::load_object() makes sure that the master has been
@@ -8973,7 +10751,7 @@ inheritance:
           /* Copy the functions and variables, and take
            * care of the initializer.
            */
-          int initializer = inherit_program(ob->prog, $1[0], $1[1]);
+          int initializer = inherit_program(ob->prog, $1.funmod, $1.varmod, $1.structmod);
           if (initializer > -1)
           {
               /* We inherited a __INIT() function: create a call */
@@ -9000,21 +10778,23 @@ inheritance_qualifiers:
 
       inheritance_modifier_list
       {
-          $$[0] = $$[1] = $1;
+          $$.funmod = $$.varmod = $$.structmod = $1;
 
           /* Allow 'static nosave inherit foo' as the short form
            * of 'static functions nosave variables inherit foo'; meaning
            * that we have to prevent the qualifier test in the
            * inheritance rule from triggering.
            */
-          $$[0] &= ~TYPE_MOD_NOSAVE;
-          $$[1] &= ~TYPE_MOD_VARARGS;
+          $$.funmod &= ~TYPE_MOD_NOSAVE;
+          $$.varmod &= ~TYPE_MOD_VARARGS;
+          $$.structmod &= ~(TYPE_MOD_STATIC|TYPE_MOD_NOSAVE|TYPE_MOD_VARARGS|TYPE_MOD_VIRTUAL);
       }
 
     | inheritance_qualifier inheritance_qualifiers
       {
-          $$[0] = $1[0] | $2[0];
-          $$[1] = $1[1] | $2[1];
+          $$.funmod = $1.funmod | $2.funmod;
+          $$.varmod = $1.varmod | $2.varmod;
+          $$.structmod = ($1.structmod | $2.structmod) & ~TYPE_MOD_VIRTUAL;
       }
 ; /* inheritance_qualifiers */
 
@@ -9066,7 +10846,7 @@ inheritance_qualifier:
                   if ($2 == last_identifier)
                   {
                       last_identifier = NULL;
-                      $$[0] = $$[1] = 0;
+                      $$.funmod = $$.varmod = $$.structmod = 0;
                       break;
                   }
               }
@@ -9080,19 +10860,27 @@ inheritance_qualifier:
               /* The L_IDENTIFIER must be one of "functions" or "variables" */
               if (mstreq(last_identifier->name, STR_FUNCTIONS))
               {
-                    $$[0] = last_modifier;
-                    $$[1] = 0;
+                    $$.funmod = last_modifier;
+                    $$.varmod = 0;
+                    $$.structmod = 0;
               }
               else if (mstreq(last_identifier->name, STR_VARIABLES))
               {
-                    $$[0] = 0;
-                    $$[1] = last_modifier;
+                    $$.funmod = 0;
+                    $$.varmod = last_modifier;
+                    $$.structmod = 0;
+              }
+              else if (mstreq(last_identifier->name, STR_STRUCTS))
+              {
+                    $$.funmod = 0;
+                    $$.varmod = 0;
+                    $$.structmod = last_modifier;
               }
               else
               {
                   yyerrorf("Unrecognized inheritance modifier '%s'"
                           , get_txt(last_identifier->name));
-                  $$[0] = $$[1] = 0;
+                  $$.funmod = $$.varmod = $$.structmod = 0;
               }
           } while(0);
       }
@@ -9108,8 +10896,8 @@ inheritance_qualifier:
 default_visibility:
     L_DEFAULT inheritance_qualifiers ';'
       {
-          if ($2[0] & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC | TYPE_MOD_VISIBLE
-                       | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC | TYPE_MOD_DEPRECATED)
+          if ($2.funmod & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC | TYPE_MOD_VISIBLE
+                           | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC | TYPE_MOD_DEPRECATED)
              )
           {
               yyerror("Default visibility specification for functions "
@@ -9118,8 +10906,8 @@ default_visibility:
               YYACCEPT;
           }
 
-          if ($2[1] & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC | TYPE_MOD_VISIBLE
-                       | TYPE_MOD_PROTECTED | TYPE_MOD_DEPRECATED)
+          if ($2.varmod & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC | TYPE_MOD_VISIBLE
+                           | TYPE_MOD_PROTECTED | TYPE_MOD_DEPRECATED)
              )
           {
               yyerror("Default visibility specification for variables "
@@ -9129,8 +10917,20 @@ default_visibility:
               YYACCEPT;
           }
 
-          default_funmod = check_visibility_flags($2[0], 0, true);
-          default_varmod = check_visibility_flags($2[1], 0, false);
+          if ($2.structmod & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC | TYPE_MOD_VISIBLE
+                              | TYPE_MOD_PROTECTED | TYPE_MOD_DEPRECATED)
+             )
+          {
+              yyerror("Default visibility specification for structs "
+                      "accepts only 'private', 'protected', 'visible', 'public' "
+                      "or 'deprecated'"
+                      );
+              YYACCEPT;
+          }
+
+          default_funmod = check_visibility_flags($2.funmod, 0, true);
+          default_varmod = check_visibility_flags($2.varmod, 0, false);
+          default_structmod = check_visibility_flags($2.structmod, 0, false);
       }
 ; /* default_visibility */
 
@@ -9203,6 +11003,7 @@ single_basic_non_void_type:
     | L_STRING_DECL  { $$ = pragma_no_bytes_type ? lpctype_string_bytes : lpctype_string; }
     | L_CLOSURE_DECL { $$ = lpctype_closure;    }
     | L_COROUTINE    { $$ = lpctype_coroutine;  }
+    | L_LPCTYPE      { $$ = lpctype_lpctype;    }
     | L_SYMBOL_DECL  { $$ = lpctype_symbol;     }
     | L_FLOAT_DECL   { $$ = lpctype_float;      }
     | L_MAPPING      { $$ = lpctype_mapping;    }
@@ -9221,22 +11022,29 @@ single_basic_non_void_type:
           free_mstring(last_string_constant);
           last_string_constant = NULL;
       }
-    | L_STRUCT identifier
+    | L_STRUCT struct_name
       {
           int num;
 
-          num = find_struct($2);
+          num = find_struct($2.real, $2.override);
           if (num < 0)
           {
-              yyerrorf("Unknown struct '%s'", get_txt($2));
+              yyerrorf("Unknown struct '%s'", get_txt($2.real->name));
               $$ = lpctype_any_struct;
           }
+          else if (num >= STD_STRUCT_OFFSET)
+              $$ = get_struct_type(get_std_struct_type(num - STD_STRUCT_OFFSET));
           else
           {
-              $$ = get_struct_type(STRUCT_DEF(num).type);
+              if (string_context)
+                  $$ = get_struct_type(LAMBDA_STRUCT(num).type);
+              else
+                  $$ = get_struct_type(STRUCT_DEF(num).type);
           }
-
-          free_mstring($2);
+      }
+    | L_STRUCT L_MIXED
+      {
+        $$ = lpctype_any_struct;
       }
     | single_basic_non_void_type '*'
       {
@@ -9247,6 +11055,12 @@ single_basic_non_void_type:
       {
           $$ = $2;
       }
+%ifdef USE_PYTHON
+    | L_PYTHON_TYPE
+      {
+          $$ = get_python_type($1);
+      }
+%endif
 ; /* single_basic_non_void_type */
 
 
@@ -10575,7 +12389,11 @@ foreach:
                    * are only used when iterating over mappings and there we
                    * don't know the type anyway.
                    */
-                  lpctype_t *expected = check_unary_op_type($7.expr_type, "foreach", types_foreach_iteration, lpctype_mixed);
+                  lpctype_t *expected = check_unary_op_type($7.expr_type, "foreach", types_foreach_iteration,
+#ifdef USE_PYTHON
+                                            PYTHON_OP_NONE,
+#endif
+                                            lpctype_mixed);
                   if (!has_common_type(expected, lvtype))
                   {
                       char buf[512];
@@ -10868,6 +12686,9 @@ foreach_expr:
 ; /* foreach_expr */
 
 keyword_in:
+%ifdef KEYWORD_IN
+      L_IN
+%else
       /* The purpose of this rule is to avoid making "in" a reserved word.
        * Instead we require an identifier/local with the name "in".
        */
@@ -10876,6 +12697,7 @@ keyword_in:
           if (!mstreq($1->name, STR_IN))
               yyerror("Expected keyword 'in'");
       }
+%endif
 ; /* keyword_in */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -11142,7 +12964,13 @@ case_label:
               yyerror("Mixed case label list not allowed");
 
           case_state.no_string_labels = MY_FALSE;
-          store_prog_string(last_string_constant);
+          if (string_context)
+          {
+              svalue_t sv = svalue_string(last_string_constant);
+              store_lambda_value(&sv);
+          }
+          else
+              store_prog_string(last_string_constant);
           $$.key = (p_int)last_string_constant;
           $$.numeric = MY_FALSE;
           last_string_constant = NULL;
@@ -11552,6 +13380,9 @@ expr0:
           const char* op_name;
           binary_op_types_t* op_table = NULL;
           lpctype_t *rttc2 = NULL;
+%ifdef USE_PYTHON
+          enum python_operation python_left_op = PYTHON_OP_NONE, python_right_op = PYTHON_OP_NONE, python_assign_op = PYTHON_OP_NONE;
+%endif
 %line
           $$ = $4;
           $$.lvalue = (lvalue_block_t) {0, 0};
@@ -11592,56 +13423,111 @@ expr0:
               case F_ADD_EQ:
                   op_name = "+=";
                   op_table = types_add_assignment;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_ADD;
+                  python_right_op = PYTHON_OP_RADD;
+                  python_assign_op = PYTHON_OP_IADD;
+%endif
                   break;
 
               case F_SUB_EQ:
                   op_name = "-=";
                   op_table = types_sub_assignment;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_SUB;
+                  python_right_op = PYTHON_OP_RSUB;
+                  python_assign_op = PYTHON_OP_ISUB;
+%endif
                   break;
 
               case F_MULT_EQ:
                   op_name = "*=";
                   op_table = types_mul_assignment;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_MUL;
+                  python_right_op = PYTHON_OP_RMUL;
+                  python_assign_op = PYTHON_OP_IMUL;
+%endif
                   break;
 
               case F_DIV_EQ:
                   op_name = "/=";
                   op_table = types_div_assignment;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_DIV;
+                  python_right_op = PYTHON_OP_RDIV;
+                  python_assign_op = PYTHON_OP_IDIV;
+%endif
                   break;
 
               case F_MOD_EQ:
                   op_name = "%=";
                   op_table = types_modulus;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_MOD;
+                  python_right_op = PYTHON_OP_RMOD;
+                  python_assign_op = PYTHON_OP_IMOD;
+%endif
                   break;
 
               case F_AND_EQ:
                   op_name = "&=";
                   op_table = types_binary_and_assignment;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_AND;
+                  python_right_op = PYTHON_OP_RAND;
+                  python_assign_op = PYTHON_OP_IAND;
+%endif
                   break;
 
               case F_OR_EQ:
                   op_name = "|=";
                   op_table = types_binary_or_assignment;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_OR;
+                  python_right_op = PYTHON_OP_ROR;
+                  python_assign_op = PYTHON_OP_IOR;
+%endif
                   break;
 
               case F_XOR_EQ:
                   op_name = "^=";
-                  op_table = types_binary_or_assignment;
+                  op_table = types_binary_xor_assignment;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_XOR;
+                  python_right_op = PYTHON_OP_RXOR;
+                  python_assign_op = PYTHON_OP_IXOR;
+%endif
                   break;
 
               case F_LSH_EQ:
                   op_name = "<<=";
                   op_table = types_shift;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_LSH;
+                  python_right_op = PYTHON_OP_RLSH;
+                  python_assign_op = PYTHON_OP_ILSH;
+%endif
                   break;
 
               case F_RSH_EQ:
                   op_name = ">>=";
                   op_table = types_shift;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_RSH;
+                  python_right_op = PYTHON_OP_RRSH;
+                  python_assign_op = PYTHON_OP_IRSH;
+%endif
                   break;
 
               case F_RSHL_EQ:
                   op_name = ">>>=";
                   op_table = types_shift;
+%ifdef USE_PYTHON
+                  python_left_op = PYTHON_OP_RSH;
+                  python_right_op = PYTHON_OP_RRSH;
+                  python_assign_op = PYTHON_OP_IRSH;
+%endif
                   break;
 
               default:
@@ -11656,8 +13542,12 @@ expr0:
                */
               restype = ref_fulltype(type1);
 
-              free_lpctype(check_binary_op_types(type1.t_type, type2.t_type, op_name, op_table, NULL,
-                pragma_rtt_checks ? &rttc2 : NULL, (type2.t_flags & TYPE_MOD_LITERAL) ? true : false));
+              free_lpctype(check_binary_op_types(type1.t_type, type2.t_type, op_name, op_table,
+%ifdef USE_PYTHON
+                            python_left_op, python_right_op, python_assign_op,
+%endif
+                            NULL, pragma_rtt_checks ? &rttc2 : NULL,
+                            (type2.t_flags & TYPE_MOD_LITERAL) ? true : false));
           }
           else
           {
@@ -11954,7 +13844,11 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '|' expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "|", types_binary_or, lpctype_mixed, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "|", types_binary_or,
+%ifdef USE_PYTHON
+                                PYTHON_OP_OR, PYTHON_OP_ROR, PYTHON_OP_NONE,
+%endif
+                                lpctype_mixed, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -11976,7 +13870,11 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '^' expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "^", types_binary_or, lpctype_mixed, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "^", types_binary_xor,
+%ifdef USE_PYTHON
+                                PYTHON_OP_XOR, PYTHON_OP_RXOR, PYTHON_OP_NONE,
+%endif
+                                lpctype_mixed, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -11998,7 +13896,11 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '&' expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "&", types_binary_and, lpctype_mixed, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "&", types_binary_and,
+%ifdef USE_PYTHON
+                                PYTHON_OP_AND, PYTHON_OP_RAND, PYTHON_OP_NONE,
+%endif
+                                lpctype_mixed, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -12020,7 +13922,11 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_EQ expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, NULL, types_equality, NULL, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, NULL, types_equality,
+%ifdef USE_PYTHON
+                                PYTHON_OP_EQ, PYTHON_OP_REQ, PYTHON_OP_NONE,
+%endif
+                                NULL, NULL, false);
 
           if (result == NULL)
           {
@@ -12049,7 +13955,11 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_NE expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, NULL, types_equality, NULL, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, NULL, types_equality,
+%ifdef USE_PYTHON
+                                PYTHON_OP_NE, PYTHON_OP_RNE, PYTHON_OP_NONE,
+%endif
+                                NULL, NULL, false);
 
           if (result == NULL)
           {
@@ -12078,7 +13988,11 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 keyword_in expr0 %prec L_EQ
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "in", types_in, lpctype_int, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "in", types_in,
+%ifdef USE_PYTHON
+                                PYTHON_OP_NONE, PYTHON_OP_NONE, PYTHON_OP_NONE,
+%endif
+                                lpctype_int, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -12099,7 +14013,11 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '>'  expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, ">", types_comparison, lpctype_int, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, ">", types_comparison,
+%ifdef USE_PYTHON
+                                PYTHON_OP_GT, PYTHON_OP_RGT, PYTHON_OP_NONE,
+%endif
+                                lpctype_int, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -12119,7 +14037,11 @@ expr0:
       }
     | expr0 L_GE  expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, ">=", types_comparison, lpctype_int, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, ">=", types_comparison,
+%ifdef USE_PYTHON
+                                PYTHON_OP_GE, PYTHON_OP_RGE, PYTHON_OP_NONE,
+%endif
+                                lpctype_int, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -12139,7 +14061,11 @@ expr0:
       }
     | expr0 '<'  expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "<", types_comparison, lpctype_int, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "<", types_comparison,
+%ifdef USE_PYTHON
+                                PYTHON_OP_LT, PYTHON_OP_RLT, PYTHON_OP_NONE,
+%endif
+                                lpctype_int, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -12159,7 +14085,11 @@ expr0:
       }
     | expr0 L_LE  expr0
       {
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "<=", types_comparison, lpctype_int, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "<=", types_comparison,
+%ifdef USE_PYTHON
+                                PYTHON_OP_LE, PYTHON_OP_RLE, PYTHON_OP_NONE,
+%endif
+                                lpctype_int, NULL, false);
 
           $$ = $1;
           $$.type = get_fulltype(result);
@@ -12182,10 +14112,14 @@ expr0:
     | expr0 L_LSH expr0
       {
           /* Just check the types. */
-          free_lpctype(check_binary_op_types($1.type.t_type, $3.type.t_type, "<<", types_shift, NULL, NULL, false));
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "<<", types_shift,
+%ifdef USE_PYTHON
+                                PYTHON_OP_LSH, PYTHON_OP_RLSH, PYTHON_OP_NONE,
+%endif
+                                NULL, NULL, false);
 
           $$ = $1;
-          $$.type = get_fulltype(lpctype_int);
+          $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.needs_use = true;
@@ -12204,10 +14138,14 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_RSH expr0
       {
-          free_lpctype(check_binary_op_types($1.type.t_type, $3.type.t_type, ">>", types_shift, NULL, NULL, false));
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, ">>", types_shift,
+%ifdef USE_PYTHON
+                                PYTHON_OP_RSH, PYTHON_OP_RRSH, PYTHON_OP_NONE,
+%endif
+                                NULL, NULL, false);
 
           $$ = $1;
-          $$.type = get_fulltype(lpctype_int);
+          $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.needs_use = true;
@@ -12226,10 +14164,14 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_RSHL expr0
       {
-          free_lpctype(check_binary_op_types($1.type.t_type, $3.type.t_type, ">>>", types_shift, NULL, NULL, false));
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, ">>>", types_shift,
+%ifdef USE_PYTHON
+                                PYTHON_OP_RSH, PYTHON_OP_RRSH, PYTHON_OP_NONE,
+%endif
+                                NULL, NULL, false);
 
           $$ = $1;
-          $$.type = get_fulltype(lpctype_int);
+          $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.needs_use = true;
@@ -12335,7 +14277,11 @@ expr0:
           else
           {
               /* Just add */
-              lpctype_t *result = check_binary_op_types($1.type.t_type, $4.type.t_type, "+", types_addition, lpctype_mixed, NULL, false);
+              lpctype_t *result = check_binary_op_types($1.type.t_type, $4.type.t_type, "+", types_addition,
+%ifdef USE_PYTHON
+                                    PYTHON_OP_ADD, PYTHON_OP_RADD, PYTHON_OP_NONE,
+%endif
+                                    lpctype_mixed, NULL, false);
               $$.type = get_fulltype(result);
 
               ins_f_code(F_ADD);
@@ -12359,7 +14305,11 @@ expr0:
       {
 %line
           $$ = $1;
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "-", types_subtraction, lpctype_mixed, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "-", types_subtraction,
+%ifdef USE_PYTHON
+                                PYTHON_OP_SUB, PYTHON_OP_RSUB, PYTHON_OP_NONE,
+%endif
+                                lpctype_mixed, NULL, false);
           $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
@@ -12379,7 +14329,11 @@ expr0:
     | expr0 '*' expr0
       {
           $$ = $1;
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "*", types_multiplication, lpctype_mixed, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "*", types_multiplication,
+%ifdef USE_PYTHON
+                                PYTHON_OP_MUL, PYTHON_OP_RMUL, PYTHON_OP_NONE,
+%endif
+                                lpctype_mixed, NULL, false);
           $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
@@ -12399,7 +14353,11 @@ expr0:
     | expr0 '%' expr0
       {
           $$ = $1;
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "%", types_modulus, lpctype_int, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "%", types_modulus,
+%ifdef USE_PYTHON
+                                PYTHON_OP_MOD, PYTHON_OP_RMOD, PYTHON_OP_NONE,
+%endif
+                                lpctype_int, NULL, false);
           $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
@@ -12418,7 +14376,11 @@ expr0:
     | expr0 '/' expr0
       {
           $$ = $1;
-          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "/", types_division, lpctype_int, NULL, false);
+          lpctype_t *result = check_binary_op_types($1.type.t_type, $3.type.t_type, "/", types_division,
+%ifdef USE_PYTHON
+                                PYTHON_OP_DIV, PYTHON_OP_RDIV, PYTHON_OP_NONE,
+%endif
+                                lpctype_int, NULL, false);
           $$.type = get_fulltype(result);
           $$.name = NULL;
           $$.lvalue = (lvalue_block_t) {0, 0};
@@ -12609,13 +14571,14 @@ expr0:
     | '~' expr0
       {
 %line
-          $$ = $2;
-          if (!check_unknown_type($2.type.t_type)
-           && exact_types && !lpctype_contains(lpctype_int, $2.type.t_type))
-              fulltype_error("Bad argument to ~", $2.type);
-
           ins_f_code(F_COMPL);
-          $$.type = get_fulltype(lpctype_int);
+
+          $$ = $2;
+          $$.type = get_fulltype(check_unary_op_type($2.type.t_type, "~", types_complement,
+#ifdef USE_PYTHON
+                                    PYTHON_OP_INVERT,
+#endif
+                                    lpctype_mixed));
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.needs_use = true;
 
@@ -12656,7 +14619,11 @@ expr0:
           }
 
           $$ = $2;
-          $$.type = get_fulltype(check_unary_op_type($2.type.t_type, "unary '-'", types_unary_math, lpctype_mixed));
+          $$.type = get_fulltype(check_unary_op_type($2.type.t_type, "unary '-'", types_unary_math,
+#ifdef USE_PYTHON
+                                    PYTHON_OP_NEG,
+#endif
+                                    lpctype_mixed));
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.needs_use = true;
 
@@ -12677,7 +14644,11 @@ expr0:
           }
 
           /* Check the types */
-          $$.type = get_fulltype(check_unary_op_type($1.type, "++", types_unary_math, lpctype_mixed));
+          $$.type = get_fulltype(check_unary_op_type($1.type, "++", types_unary_math,
+#ifdef USE_PYTHON
+                                    PYTHON_OP_NONE,
+#endif
+                                    lpctype_mixed));
           $$.name = $1.name;
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.needs_use = false;
@@ -12699,7 +14670,11 @@ expr0:
           }
 
           /* Check the types */
-          $$.type = get_fulltype(check_unary_op_type($1.type, "--", types_unary_math, NULL));
+          $$.type = get_fulltype(check_unary_op_type($1.type, "--", types_unary_math,
+#ifdef USE_PYTHON
+                                    PYTHON_OP_NONE,
+#endif
+                                    NULL));
           $$.name = $1.name;
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.needs_use = false;
@@ -12764,7 +14739,8 @@ expr0:
             || ((type2.t_flags & TYPE_MOD_LITERAL) && !lpctype_contains(type2.t_type, type1.t_type))))
           {
               yyerrorf("Bad assignment %s", get_two_fulltypes(type1, type2));
-              restype = ref_fulltype(type1);
+              if (!restype.t_type)
+                  restype = ref_fulltype(type1);
           }
 
           /* Special checks for struct assignments */
@@ -13016,14 +14992,25 @@ expr4:
               else if (ix >= CLOSURE_IDENTIFIER_OFFS)
               {
                   // closure to global variable
-                  // the lexxer only creates closure to non-virtual variables - our luck ;)
-                  int varidx = ix - CLOSURE_IDENTIFIER_OFFS - num_virtual_variables;
-                  variable_t *varp = NV_VARIABLE(varidx);
+                  variable_t *varp;
+
+                  if (string_context)
+                  {
+                      int varidx = ix - CLOSURE_IDENTIFIER_OFFS;
+                      program_t *prog = get_current_object_program();
+                      varp = prog->variables+varidx;
+                  }
+                  else
+                  {
+                      // the lexxer only creates closure to non-virtual variables - our luck ;)
+                      int varidx = ix - CLOSURE_IDENTIFIER_OFFS - num_virtual_variables;
+                      varp = NV_VARIABLE(varidx);
+                      GLOBAL_VARIABLE(varidx).usage = VAR_USAGE_READWRITE;
+                  }
 
                   if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
                       yywarnf("Creating closure to deprecated global variable %s.\n",
                               get_txt(varp->name));
-                  GLOBAL_VARIABLE(varidx).usage = VAR_USAGE_READWRITE;
               }
           }
           else if (ix >= CLOSURE_EFUN_OFFS && ix < CLOSURE_SIMUL_EFUN_OFFS)
@@ -13055,7 +15042,7 @@ expr4:
     | L_SIMUL_EFUN_CLOSURE
       {
           int sefun = $1->u.global.sim_efun;
-          function_t *fun = get_simul_efun_header($1);
+          function_t *fun = get_simul_efun_header($1, NULL);
 
           if (fun->flags & TYPE_MOD_DEPRECATED)
           {
@@ -13098,19 +15085,18 @@ expr4:
           $$.name =   NULL;
           $$.needs_use = true;
           quotes = $1.quotes;
-          string_number = store_prog_string($1.name);
-          if (quotes == 1 && string_number < 0x100)
+
+          if (string_context)
           {
-                /* One byte shorter than the other way */
-                ins_f_code(F_CSTRING0);
-                ins_byte(string_number);
-                ins_f_code(F_QUOTE);
+              svalue_t sv = svalue_symbol($1.name, quotes);
+              ins_lambda_value(&sv);
           }
           else
           {
-                ins_f_code(F_SYMBOL);
-                ins_short(string_number);
-                ins_byte(quotes);
+              string_number = store_prog_string($1.name);
+              ins_f_code(F_SYMBOL);
+              ins_short(string_number);
+              ins_byte(quotes);
           }
           $$.type = get_fulltype_flags(lpctype_symbol, TYPE_MOD_LITERAL);
       }
@@ -13136,15 +15122,37 @@ expr4:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | '(' note_start comma_expr ')'        %prec '~'
+    | L_LAMBDA_CLOSURE_VALUE
+      {
+          assert(string_context != NULL);
+
+          $$.start = CURRENT_PROGRAM_SIZE;
+          $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =   NULL;
+          $$.type = get_fulltype_flags(lpctype_closure, TYPE_MOD_LITERAL);
+
+          if ($1 < 0x100)
+          {
+              ins_f_code(F_LAMBDA_CCONSTANT);
+              ins_byte($1);
+          }
+          else
+          {
+              ins_f_code(F_LAMBDA_CONSTANT);
+              ins_short($1);
+          }
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '(' comma_expr ')' %prec '~'
       {
           /* A nested expression */
 
-          $$.type = $3.type;
-          $$.start = $2;
+          $$.type = $2.type;
+          $$.start = $2.start;
           $$.lvalue = (lvalue_block_t) {0, 0};
-          $$.name = $3.name;
-          $$.needs_use = $3.needs_use;
+          $$.name = $2.name;
+          $$.needs_use = $2.needs_use;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13269,18 +15277,37 @@ expr4:
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.name =   NULL;
       }
-    | '(' '<' identifier '>'
+    | '(' '<' struct_name '>'
       {
           int num;
 
-          num = find_struct($3);
+          num = find_struct($3.real, $3.override);
           if (num < 0)
           {
-              yyerrorf("Unknown struct '%s'", get_txt($3));
+              yyerrorf("Unknown struct '%s'", get_txt($3.real->name));
               YYACCEPT;
           }
           $<number>$ = num;
-          free_mstring($3);
+
+          if (string_context && num < STD_STRUCT_OFFSET && LAMBDA_STRUCT(num).index.kind == LAMBDA_IDENT_VALUE)
+          {
+              // Need to put the lambda value as a struct template on the stack.
+              svalue_t str;
+              int idx;
+
+              assign_svalue_no_free(&str, &(LAMBDA_STRUCT(num).index.value));
+              idx = store_lambda_value(&str);
+              if (idx < 0x100)
+              {
+                  ins_f_code(F_LAMBDA_CCONSTANT);
+                  ins_byte(idx);
+              }
+              else
+              {
+                  ins_f_code(F_LAMBDA_CONSTANT);
+                  ins_short(idx);
+              }
+          }
       }
 
       note_start opt_struct_init ')'
@@ -13289,22 +15316,35 @@ expr4:
           /* Generate a literal struct */
 
           int num = $<number>5;
-          struct_def_t *pdef = &(STRUCT_DEF(num));
+          struct_type_t *stype;
+
+          if (num >= STD_STRUCT_OFFSET)
+              stype = get_std_struct_type(num - STD_STRUCT_OFFSET);
+          else if (string_context)
+          {
+              stype = LAMBDA_STRUCT(num).type;
+              if (LAMBDA_STRUCT(num).index.kind == LAMBDA_IDENT_OBJECT)
+                  num = LAMBDA_STRUCT(num).index.object_index;
+              else
+                  num = -1;
+          }
+          else
+              stype = STRUCT_DEF(num).type;
 
           if ($7.length > STRUCT_MAX_MEMBERS
-           || $7.length > struct_t_size(pdef->type))
+           || $7.length > struct_t_size(stype))
           {
               /* Too many elements - create an empty struct */
               yyerrorf("Too many elements for literal struct '%s'"
-                      , get_txt(struct_t_name(pdef->type)));
+                      , get_txt(struct_t_name(stype)));
               CURRENT_PROGRAM_SIZE = $6;
-              create_struct_literal(pdef, 0, NULL);
+              create_struct_literal(num, stype, 0, NULL);
           }
-          else if (!create_struct_literal(pdef, $7.length, $7.list))
+          else if (!create_struct_literal(num, stype, $7.length, $7.list))
           {
               /* Creation failed - create an empty struct */
               CURRENT_PROGRAM_SIZE = $6;
-              create_struct_literal(pdef, 0, NULL);
+              create_struct_literal(num, stype, 0, NULL);
           }
 
           /* Free the list of member descriptors */
@@ -13318,11 +15358,44 @@ expr4:
               xfree(p);
           }
 
-          $$.type = get_fulltype_flags(get_struct_type(pdef->type), TYPE_MOD_LITERAL);
+          $$.type = get_fulltype_flags(get_struct_type(stype), TYPE_MOD_LITERAL);
           $$.start = $6;
           $$.lvalue = (lvalue_block_t) {0, 0};
           $$.name =   NULL;
           $$.needs_use = true;
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' basic_type ']'
+      {
+          $$.type = get_fulltype_flags(lpctype_lpctype, TYPE_MOD_LITERAL);
+          $$.start = CURRENT_PROGRAM_SIZE;
+          $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =  NULL;
+          $$.needs_use = true;
+
+          ins_prog_type($2);
+          free_lpctype($2);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | L_DECLTYPE '('
+      {
+          $<address>$ = CURRENT_PROGRAM_SIZE;
+          compiling_decltype++;
+      }
+      expr0 ')'
+      {
+          compiling_decltype--;
+
+          $$.type = get_fulltype_flags(lpctype_lpctype, TYPE_MOD_LITERAL);
+          $$.start = CURRENT_PROGRAM_SIZE = $<address>3;
+          $$.lvalue = (lvalue_block_t) {0, 0};
+          $$.name =  NULL;
+          $$.needs_use = true;
+
+          ins_prog_type($4.type.t_type);
+          free_fulltype($4.type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13342,7 +15415,7 @@ expr4:
 
           $$.start = current = CURRENT_PROGRAM_SIZE;
 
-          if (!realloc_a_program(3))
+          if (!realloc_a_program(4))
           {
               yyerrorf("Out of memory: program size %"PRIuMPINT"\n", current+3);
               YYACCEPT;
@@ -13353,9 +15426,71 @@ expr4:
           {
               /* A global variable. */
               int i = varident->u.global.variable;
-              variable_t *varp;
+              variable_t *varp = NULL;
 
-              if (i & VIRTUAL_VAR_TAG)
+              if (string_context)
+              {
+                  if (LAMBDA_VARIABLE(i).kind == LAMBDA_IDENT_OBJECT)
+                  {
+                      program_t *prog = get_current_object_program();
+
+                      i = LAMBDA_VARIABLE(i).object_index;
+                      varp = prog->variables+i;
+
+                      /* No special handling for virtual variables required
+                       * here, as lambdas will always be executed with
+                       * variable_index_offset = 0, thus F_IDENTIFIER will
+                       * also serve virtual variables.
+                       */
+                  }
+                  else
+                  {
+                      /* This is a lvalue stored in a lambda value. */
+                      bytecode_p q;
+                      svalue_t lvalue;
+                      int idx;
+
+                      assign_svalue_no_free(&lvalue, &(LAMBDA_VARIABLE(i).value));
+                      idx = store_lambda_value(&lvalue);
+
+                      if (idx < 0x100)
+                      {
+                          $$.lvalue = alloc_lvalue_block(2);
+                          q = LVALUE_BLOCK + $$.lvalue.start;
+
+                          q[0] = F_LAMBDA_CCONSTANT;
+                          q[1] = idx;
+
+                          p[0] = F_LAMBDA_CCONSTANT;
+                          p[1] = idx;
+                          p[2] = F_MAKE_RVALUE;
+
+                          current++;
+                      }
+                      else
+                      {
+                          $$.lvalue = alloc_lvalue_block(3);
+                          q = LVALUE_BLOCK + $$.lvalue.start;
+
+                          q[0] = F_LAMBDA_CONSTANT;
+                          PUT_SHORT(q+1, idx);
+
+                          p[0] = F_LAMBDA_CCONSTANT;
+                          upd_short(current+1, i);
+                          p[3] = F_MAKE_RVALUE;
+                          current += 2;
+                      }
+
+                      $$.type = get_fulltype(lpctype_mixed);
+                      i = -1; /* Finished. */
+                  }
+              }
+
+              if (i < 0)
+              {
+                  /* Already handled above. */
+              }
+              else if (i & VIRTUAL_VAR_TAG)
               {
                   /* Access a virtual variable */
 
@@ -13370,7 +15505,8 @@ expr4:
                   *p++ = F_VIRTUAL_VARIABLE;
                   *p = i;
 
-                  varp = V_VARIABLE(i);
+                  if (!varp)
+                      varp = V_VARIABLE(i);
                   $$.type = ref_fulltype(varp->type);
               }
               else
@@ -13403,11 +15539,12 @@ expr4:
                       *p++ = F_IDENTIFIER;
                       *p = i;
                   }
-                  varp = NV_VARIABLE(i);
+                  if (!varp)
+                      varp = NV_VARIABLE(i);
                   $$.type = ref_fulltype(varp->type);
               }
 
-              if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
+              if (varp && varp->type.t_flags & TYPE_MOD_DEPRECATED)
               {
                   yywarnf("Using deprecated global variable %s.\n",
                           get_txt(varp->name));
@@ -13457,7 +15594,7 @@ expr4:
     | expr4 member_operator struct_member_name %prec L_ARROW
       {
           /* Lookup a struct member */
-          short s_index = -1;
+          int s_index = -1;
           int m_index = -1;
 
 %line
@@ -13559,7 +15696,11 @@ expr4:
           ins_f_code($2.rvalue_inst);
 
           /* Check the types */
-          $$.type = get_fulltype(check_unary_op_type($1.type.t_type, "range index", types_range_index, lpctype_mixed));
+          $$.type = get_fulltype(check_unary_op_type($1.type.t_type, "range index", types_range_index,
+#ifdef USE_PYTHON
+                                    PYTHON_OP_NONE,
+#endif
+                                    lpctype_mixed));
           $$.name = NULL;
           $$.needs_use = true;
 
@@ -13576,7 +15717,7 @@ expr4:
       } /* expr4 index_range */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 '[' expr0 ',' expr0 ']' %prec '['
+    | expr4 index_map_expr %prec '['
       {
 %line
           /* Generate MAP_INDEX/PUSH_INDEXED_MAP_LVALUE */
@@ -13587,37 +15728,58 @@ expr4:
            * a mapping, or a runtime error will occur.
            * Therefore we don't need its lvalue.
            */
-          free_lvalue_block($5.lvalue);
-          free_lvalue_block($3.lvalue);
           free_lvalue_block($1.lvalue);
-          $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, F_MAP_INDEX_LVALUE);
+          $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, $2.lvalue_inst);
           $$.type = get_fulltype(lpctype_mixed);
           $$.name = NULL;
           $$.needs_use = true;
 
-          ins_f_code(F_MAP_INDEX);
+          ins_f_code($2.rvalue_inst);
 
           /* Check and compute types */
-          if ($3.type.t_flags & TYPE_MOD_REFERENCE
-           || $5.type.t_flags & TYPE_MOD_REFERENCE)
-              yyerror("Reference used as index");
-
           check_unknown_type($1.type.t_type);
 
           if (exact_types && !lpctype_contains(lpctype_mapping, $1.type.t_type))
               fulltype_error("Bad type to indexed lvalue", $1.type);
 
-          if (exact_types && !lpctype_contains(lpctype_int, $5.type.t_type))
-              fulltype_error("Bad type of index", $5.type);
+          if (exact_types && !lpctype_contains(lpctype_int, $2.type1.t_type))
+              fulltype_error("Bad type of index", $2.type1);
 
           use_variable($1.name, VAR_USAGE_READ);
-          use_variable($3.name, VAR_USAGE_READ);
-          use_variable($5.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
-          free_fulltype($3.type);
-          free_fulltype($5.type);
+          free_fulltype($2.type1);
       }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | expr4 index_map_range %prec '['
+      {
+%line
+          /* Generate a range expression */
+          $$.start = $1.start;
+
+          free_lvalue_block($1.lvalue);
+          $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, $2.lvalue_inst);
+          $$.type = get_fulltype(lpctype_any_array);
+          $$.name = NULL;
+
+          ins_f_code($2.rvalue_inst);
+
+          use_variable($1.name, VAR_USAGE_READ);
+
+          /* Check the types */
+
+          if (!lpctype_contains(lpctype_mapping, $1.type.t_type))
+              fulltype_error("Bad type to mapping range expression", $1.type);
+          if (!lpctype_contains(lpctype_int, $2.type1.t_type))
+              fulltype_error("Bad type of index", $2.type1);
+          if (!lpctype_contains(lpctype_int, $2.type2.t_type))
+              fulltype_error("Bad type of index", $2.type2);
+
+          free_fulltype($1.type);
+          free_fulltype($2.type1);
+          free_fulltype($2.type2);
+      } /* expr4 index_map_range */
 ; /* expr4 */
 
 
@@ -13638,9 +15800,56 @@ name_lvalue:
           {
               /* A global variable. */
               int i = varident->u.global.variable;
-              variable_t *varp;
+              variable_t *varp = NULL;
 
-              if (i & VIRTUAL_VAR_TAG)
+              if (string_context)
+              {
+                  if (LAMBDA_VARIABLE(i).kind == LAMBDA_IDENT_OBJECT)
+                  {
+                      program_t *prog = get_current_object_program();
+
+                      i = LAMBDA_VARIABLE(i).object_index;
+                      varp = prog->variables+i;
+                  }
+                  else
+                  {
+                      /* This is a lvalue stored in a lambda value. */
+                      bytecode_p q;
+                      svalue_t lvalue;
+                      int idx;
+
+                      assign_svalue_no_free(&lvalue, &(LAMBDA_VARIABLE(i).value));
+                      idx = store_lambda_value(&lvalue);
+
+                      if (idx < 0x100)
+                      {
+                          $$.lvalue = alloc_lvalue_block(2);
+                          q = LVALUE_BLOCK + $$.lvalue.start;
+
+                          q[0] = F_LAMBDA_CCONSTANT;
+                          q[1] = idx;
+                      }
+                      else
+                      {
+                          $$.lvalue = alloc_lvalue_block(3);
+                          q = LVALUE_BLOCK + $$.lvalue.start;
+
+                          q[0] = F_LAMBDA_CONSTANT;
+                          PUT_SHORT(q+1, idx);
+                      }
+
+                      $$.vlvalue_inst = 0;
+                      $$.num_arg = 0;
+                      $$.type = lpctype_mixed;
+                      i = -1; /* Finished. */
+                  }
+              }
+
+              if (i < 0)
+              {
+                  /* Already handled. */
+              }
+              else if (i & VIRTUAL_VAR_TAG)
               {
                   bytecode_p q;
 
@@ -13652,7 +15861,8 @@ name_lvalue:
                   $$.vlvalue_inst = F_PUSH_VIRTUAL_VARIABLE_VLVALUE;
                   $$.num_arg = 1;
 
-                  varp = V_VARIABLE(i);
+                  if (!varp)
+                      varp = V_VARIABLE(i);
                   $$.type = ref_lpctype(varp->type.t_type);
               }
               else
@@ -13683,10 +15893,11 @@ name_lvalue:
                       $$.vlvalue_inst = F_PUSH_IDENTIFIER_VLVALUE;
                       $$.num_arg = 1;
                   }
-                  varp = NV_VARIABLE(i);
+                  if (!varp)
+                      varp = NV_VARIABLE(i);
                   $$.type = ref_lpctype(varp->type.t_type);
               }
-              if (varp->type.t_flags & TYPE_MOD_DEPRECATED)
+              if (varp && varp->type.t_flags & TYPE_MOD_DEPRECATED)
                   yywarnf("Using deprecated global variable %s.\n",
                           get_txt(varp->name));
           }
@@ -13772,7 +15983,7 @@ lvalue:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 '[' expr0 ',' expr0 ']' %prec '['
+    | expr4 index_map_expr %prec '['
       {
           /* Generate/add an PUSH_INDEXED_MAP_LVALUE */
 
@@ -13782,14 +15993,12 @@ lvalue:
            * a mapping, or a runtime error will occur.
            * Therefore we don't need its lvalue.
            */
-          free_lvalue_block($5.lvalue);
-          free_lvalue_block($3.lvalue);
           free_lvalue_block($1.lvalue);
-          $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, F_MAP_INDEX_LVALUE);
+          $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, $2.lvalue_inst);
           $$.type = lpctype_mixed;
           $$.name = NULL;
 
-          $$.vlvalue_inst = F_MAP_INDEX_VLVALUE;
+          $$.vlvalue_inst = $2.vlvalue_inst;
           $$.num_arg = 0;
 
           /* Remove the code from the program block. */
@@ -13797,23 +16006,16 @@ lvalue:
           last_expression = -1;
 
           /* Check and compute types */
-          if ($3.type.t_flags & TYPE_MOD_REFERENCE
-           || $5.type.t_flags & TYPE_MOD_REFERENCE)
-              yyerror("Reference used as index");
-
           if (exact_types && !lpctype_contains(lpctype_mapping, $1.type.t_type))
               fulltype_error("Bad type to indexed lvalue", $1.type);
 
-          if (exact_types && !lpctype_contains(lpctype_int, $5.type.t_type))
-              fulltype_error("Bad type of index", $5.type);
+          if (exact_types && !lpctype_contains(lpctype_int, $2.type1.t_type))
+              fulltype_error("Bad type of index", $2.type1);
 
           use_variable($1.name, VAR_USAGE_READ);
-          use_variable($3.name, VAR_USAGE_READ);
-          use_variable($5.name, VAR_USAGE_READ);
 
           free_fulltype($1.type);
-          free_fulltype($3.type);
-          free_fulltype($5.type);
+          free_fulltype($2.type1);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -13851,7 +16053,11 @@ lvalue:
           last_expression = -1;
 
           /* Compute and check the types */
-          $$.type = check_unary_op_type($1.type.t_type, "range index", types_range_index, lpctype_mixed);
+          $$.type = check_unary_op_type($1.type.t_type, "range index", types_range_index,
+#ifdef USE_PYTHON
+                            PYTHON_OP_NONE,
+#endif
+                            lpctype_mixed);
 
           if (exact_types && !lpctype_contains(lpctype_int, $2.type1.t_type))
               fulltype_error("Bad type of index", $2.type1);
@@ -13866,10 +16072,44 @@ lvalue:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | expr4 index_map_range %prec '['
+      {
+%line
+          /* Generate a range expression for a mapping */
+
+          /* We don't need the mapping as an lvalue. */
+          free_lvalue_block($1.lvalue);
+
+          $$.lvalue = compose_lvalue_block((lvalue_block_t) {0, 0}, 0, $1.start, $2.lvalue_inst);
+          $$.type = lpctype_any_array;
+          $$.name = NULL;
+          $$.vlvalue_inst = 0;
+          $$.num_arg = 0;
+
+          /* Remove the code from the program block. */
+          CURRENT_PROGRAM_SIZE = $1.start;
+          last_expression = -1;
+
+          /* Check the types */
+          if (!lpctype_contains(lpctype_mapping, $1.type.t_type))
+              fulltype_error("Bad type to mapping range expression", $1.type);
+          if (!lpctype_contains(lpctype_int, $2.type1.t_type))
+              fulltype_error("Bad type of index", $2.type1);
+          if (!lpctype_contains(lpctype_int, $2.type2.t_type))
+              fulltype_error("Bad type of index", $2.type2);
+
+          use_variable($1.name, VAR_USAGE_READ);
+
+          free_fulltype($1.type);
+          free_fulltype($2.type1);
+          free_fulltype($2.type2);
+      } /* expr4 index_map_range */
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr4 member_operator struct_member_name %prec L_ARROW
       {
           /* Create a struct member lvalue */
-          short s_index = -1;
+          int s_index = -1;
           int m_index = -1;
 
 %line
@@ -14370,10 +16610,6 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '<' expr0 L_RANGE           ']'
       {
-          /* Simulate an expression yielding <1 for the upper bound.
-           * We pretend that it's part of the lower bound expr.
-           */
-
           if (pragma_range_check)
               ins_byte(F_ARRAY_RANGE_CHECK);
 
@@ -14392,10 +16628,6 @@ index_range :
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '[' '>' expr0 L_RANGE           ']'
       {
-          /* Simulate an expression yielding <1 for the upper bound.
-           * We pretend that it's part of the lower bound expr.
-           */
-
           if (pragma_range_check)
               ins_byte(F_ARRAY_RANGE_CHECK);
 
@@ -14411,6 +16643,442 @@ index_range :
           free_lvalue_block($3.lvalue);
       }
 ; /* index_range */
+
+index_map_range:
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+      '[' expr0 ',' L_RANGE expr0 ']'
+
+      {
+          free_fulltype($2.type);
+
+          /* Simulate an expression yielding 0 for the lower bound.
+           * We pretend that it's part of the upper bound expr.
+           */
+
+          if (!realloc_a_program(1))
+          {
+              yyerrorf("Out of memory: program size %"PRIdPINT"\n", CURRENT_PROGRAM_SIZE+1);
+              free_fulltype($5.type);
+              YYACCEPT;
+          }
+
+          memmove(PROGRAM_BLOCK + $5.start + 1, PROGRAM_BLOCK + $5.start, CURRENT_PROGRAM_SIZE - $5.start);
+          PUT_CODE(PROGRAM_BLOCK + $5.start, F_CONST0);
+          CURRENT_PROGRAM_SIZE++;
+
+          /* Return the data */
+
+          $$.rvalue_inst  = F_MAP_RANGE;
+          $$.lvalue_inst  = F_MAP_RANGE_LVALUE;
+          $$.start        = $2.start;
+          $$.end          = CURRENT_PROGRAM_SIZE;
+          $$.type1        = get_fulltype(lpctype_int);
+          $$.type2        = $5.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' L_RANGE '<' expr0 ']'
+
+      {
+          free_fulltype($2.type);
+
+          /* Simulate an expression yielding 0 for the lower bound.
+           * We pretend that it's part of the upper bound expr.
+           */
+
+          if (!realloc_a_program(1))
+          {
+              yyerrorf("Out of memory: program size %"PRIdPINT"\n", CURRENT_PROGRAM_SIZE+1);
+              free_fulltype($6.type);
+              YYACCEPT;
+          }
+
+          memmove(PROGRAM_BLOCK + $6.start + 1, PROGRAM_BLOCK + $6.start, CURRENT_PROGRAM_SIZE - $6.start);
+          PUT_CODE(PROGRAM_BLOCK + $6.start, F_CONST0);
+          CURRENT_PROGRAM_SIZE++;
+
+          /* Return the data */
+
+          $$.rvalue_inst = F_MAP_NR_RANGE;
+          $$.lvalue_inst = F_MAP_NR_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = get_fulltype(lpctype_int);
+          $$.type2       = $6.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($6.name, VAR_USAGE_READ);
+
+          free_lvalue_block($6.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' L_RANGE '>' expr0 ']'
+
+      {
+          free_fulltype($2.type);
+
+          /* Simulate an expression yielding 0 for the lower bound.
+           * We pretend that it's part of the upper bound expr.
+           */
+
+          if (!realloc_a_program(1))
+          {
+              yyerrorf("Out of memory: program size %"PRIdPINT"\n", CURRENT_PROGRAM_SIZE+1);
+              free_fulltype($6.type);
+              YYACCEPT;
+          }
+
+          memmove(PROGRAM_BLOCK + $6.start + 1, PROGRAM_BLOCK + $6.start, CURRENT_PROGRAM_SIZE - $6.start);
+          PUT_CODE(PROGRAM_BLOCK + $6.start, F_CONST0);
+          CURRENT_PROGRAM_SIZE++;
+
+          /* Return the data */
+
+          $$.rvalue_inst = F_MAP_NA_RANGE;
+          $$.lvalue_inst = F_MAP_NA_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = get_fulltype(lpctype_int);
+          $$.type2       = $6.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($6.name, VAR_USAGE_READ);
+
+          free_lvalue_block($6.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' expr0 L_RANGE expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_RANGE;
+          $$.lvalue_inst = F_MAP_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $4.type;
+          $$.type2       = $6.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($4.name, VAR_USAGE_READ);
+          use_variable($6.name, VAR_USAGE_READ);
+
+          free_lvalue_block($6.lvalue);
+          free_lvalue_block($4.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' expr0 L_RANGE '<' expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_NR_RANGE;
+          $$.lvalue_inst = F_MAP_NR_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $4.type;
+          $$.type2       = $7.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($4.name, VAR_USAGE_READ);
+          use_variable($7.name, VAR_USAGE_READ);
+
+          free_lvalue_block($7.lvalue);
+          free_lvalue_block($4.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '<' expr0 L_RANGE expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_RN_RANGE;
+          $$.lvalue_inst = F_MAP_RN_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = $7.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+          use_variable($7.name, VAR_USAGE_READ);
+
+          free_lvalue_block($7.lvalue);
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '<' expr0 L_RANGE '<' expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_RR_RANGE;
+          $$.lvalue_inst = F_MAP_RR_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = $8.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+          use_variable($8.name, VAR_USAGE_READ);
+
+          free_lvalue_block($8.lvalue);
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' expr0 L_RANGE '>' expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_NA_RANGE;
+          $$.lvalue_inst = F_MAP_NA_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $4.type;
+          $$.type2       = $7.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($4.name, VAR_USAGE_READ);
+          use_variable($7.name, VAR_USAGE_READ);
+
+          free_lvalue_block($7.lvalue);
+          free_lvalue_block($4.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '>' expr0 L_RANGE expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_AN_RANGE;
+          $$.lvalue_inst = F_MAP_AN_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = $7.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+          use_variable($7.name, VAR_USAGE_READ);
+
+          free_lvalue_block($7.lvalue);
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '<' expr0 L_RANGE '>' expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_RA_RANGE;
+          $$.lvalue_inst = F_MAP_RA_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = $8.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+          use_variable($8.name, VAR_USAGE_READ);
+
+          free_lvalue_block($8.lvalue);
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '>' expr0 L_RANGE '<' expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_AR_RANGE;
+          $$.lvalue_inst = F_MAP_AR_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = $8.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+          use_variable($8.name, VAR_USAGE_READ);
+
+          free_lvalue_block($8.lvalue);
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '>' expr0 L_RANGE '>' expr0 ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_AA_RANGE;
+          $$.lvalue_inst = F_MAP_AA_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = $8.type;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+          use_variable($8.name, VAR_USAGE_READ);
+
+          free_lvalue_block($8.lvalue);
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' expr0 L_RANGE ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_NX_RANGE;
+          $$.lvalue_inst = F_MAP_NX_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $4.type;
+          $$.type2       = get_fulltype(lpctype_int);
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($4.name, VAR_USAGE_READ);
+
+          free_lvalue_block($4.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '<' expr0 L_RANGE ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_RX_RANGE;
+          $$.lvalue_inst = F_MAP_RX_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = get_fulltype(lpctype_int);
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '>' expr0 L_RANGE ']'
+      {
+          free_fulltype($2.type);
+
+          $$.rvalue_inst = F_MAP_AX_RANGE;
+          $$.lvalue_inst = F_MAP_AX_RANGE_LVALUE;
+          $$.start       = $2.start;
+          $$.end         = CURRENT_PROGRAM_SIZE;
+          $$.type1       = $5.type;
+          $$.type2       = get_fulltype(lpctype_int);
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+; /* index_map_range */
+
+index_map_expr:
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+      '[' expr0 ',' expr0 ']'
+
+      {
+          if ($2.type.t_flags & TYPE_MOD_REFERENCE
+           || $4.type.t_flags & TYPE_MOD_REFERENCE)
+              yyerror("Reference used as index");
+
+          free_fulltype($2.type);
+
+          $$.rvalue_inst  = F_MAP_INDEX;
+          $$.lvalue_inst  = F_MAP_INDEX_LVALUE;
+          $$.vlvalue_inst = F_MAP_INDEX_VLVALUE;
+          $$.start        = $2.start;
+          $$.end          = CURRENT_PROGRAM_SIZE;
+          $$.type1        = $4.type;
+          $$.type2.t_type = NULL;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($4.name, VAR_USAGE_READ);
+
+          free_lvalue_block($4.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '<' expr0 ']'
+
+      {
+          if ($2.type.t_flags & TYPE_MOD_REFERENCE
+           || $5.type.t_flags & TYPE_MOD_REFERENCE)
+              yyerror("Reference used as index");
+
+          free_fulltype($2.type);
+
+          $$.rvalue_inst  = F_MAP_RINDEX;
+          $$.lvalue_inst  = F_MAP_RINDEX_LVALUE;
+          $$.vlvalue_inst = F_MAP_RINDEX_VLVALUE;
+          $$.start        = $2.start;
+          $$.end          = CURRENT_PROGRAM_SIZE;
+          $$.type1        = $5.type;
+          $$.type2.t_type = NULL;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' expr0 ',' '>' expr0 ']'
+
+      {
+          if ($2.type.t_flags & TYPE_MOD_REFERENCE
+           || $5.type.t_flags & TYPE_MOD_REFERENCE)
+              yyerror("Reference used as index");
+
+          free_fulltype($2.type);
+
+          $$.rvalue_inst  = F_MAP_AINDEX;
+          $$.lvalue_inst  = F_MAP_AINDEX_LVALUE;
+          $$.vlvalue_inst = F_MAP_AINDEX_VLVALUE;
+          $$.start        = $2.start;
+          $$.end          = CURRENT_PROGRAM_SIZE;
+          $$.type1        = $5.type;
+          $$.type2.t_type = NULL;
+
+          use_variable($2.name, VAR_USAGE_READ);
+          use_variable($5.name, VAR_USAGE_READ);
+
+          free_lvalue_block($5.lvalue);
+          free_lvalue_block($2.lvalue);
+      }
+; /* index_map_expr */
 
 
 /* The following rules are used to construct array and
@@ -14593,6 +17261,37 @@ m_expr_values:
 
 
 
+struct_name:
+      L_IDENTIFIER
+      {
+          check_identifier($1);
+          $$.override = OVERRIDE_NONE;
+          $$.real = $1;
+      }
+    | L_COLON_COLON L_IDENTIFIER
+      {
+          check_identifier($2);
+          $$.override = OVERRIDE_LFUN;
+          $$.real = $2;
+      }
+    | L_IDENTIFIER L_COLON_COLON L_IDENTIFIER
+      {
+          check_identifier($3);
+
+          if (mstreq($1->name, STR_EFUN))
+              $$.override = OVERRIDE_EFUN;
+          else if (mstreq($1->name, STR_SEFUN))
+              $$.override = OVERRIDE_SEFUN;
+          else
+          {
+              $$.override = OVERRIDE_NONE;
+              yyerrorf("illegal struct name qualifier '%s'", get_txt($1->name));
+          }
+          $$.real = $3;
+      }
+; /* struct_name */
+
+
 /* Rule used to parse a static or dynamic member name in lookups */
 
 struct_member_name:
@@ -14713,7 +17412,8 @@ function_call:
            */
 
           ident_t *real_name;
-          int efun_idx;
+          int efun_idx, value_idx;
+          bool has_function;
 
           /* Save the (simple) state */
           $<function_call_head>$.start = CURRENT_PROGRAM_SIZE;
@@ -14759,18 +17459,12 @@ function_call:
           function_call_info[argument_level].unlimited_args = false;
           function_call_info[argument_level].remaining_arg_types = 0;
 
-          if (real_name->type == I_TYPE_UNKNOWN)
-          {
-              /* prevent freeing by exotic name clashes */
-              /* also makes life easier below */
-              init_global_identifier(real_name, /* bVariable: */ MY_TRUE);
-              real_name->next_all = all_globals;
-              all_globals = real_name;
-          }
-          else if ( ($1.super ? ( $<function_call_head>$.efun_override == OVERRIDE_SEFUN )
-                              : ( real_name->u.global.function == I_GLOBAL_FUNCTION_OTHER ))
+          has_function = lookup_function(real_name, $1.super, $<function_call_head>$.efun_override);
+
+          if ( ($1.super ? ( $<function_call_head>$.efun_override == OVERRIDE_SEFUN )
+                         : ( !has_function ))
                 && real_name->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-                && !disable_sefuns)
+                && !pragma_no_simul_efuns)
           {
               /* It's a real simul-efun */
 
@@ -14780,21 +17474,13 @@ function_call:
                   /* The simul-efun has to be called by name:
                    * prepare the extra args for the call_other
                    */
-                  PREPARE_INSERT(8)
-                  string_t *p;
-
-                  p = ref_mstring(real_name->name);
-                  add_f_code(F_STRING);
-                  add_short(store_prog_string(
-                    ref_mstring(query_simul_efun_file_name())));
-                  add_f_code(F_STRING);
-                  add_short(store_prog_string(p));
-                  CURRENT_PROGRAM_SIZE += 6;
+                  ins_prog_string(ref_mstring(query_simul_efun_file_name()));
+                  ins_prog_string(ref_mstring(real_name->name));
               }
           }
           else if ( real_name->type == I_TYPE_GLOBAL
                 && ($1.super ? ($<function_call_head>$.efun_override == OVERRIDE_EFUN)
-                             : (defined_function(real_name)) < 0)
+                             : (!has_function))
 %ifdef USE_PYTHON
                 && !is_python_efun(real_name)
 %endif
@@ -14810,6 +17496,25 @@ function_call:
                   function_call_info[argument_level].remaining_arg_types = instrs[efun_idx].max_arg;
               }
           }
+          else if (!$1.super && (value_idx = get_function_closure(real_name)) >= 0)
+          {
+              /* A call to a closure. Need to insert the closure before
+               * the arguments.
+               */
+              PREPARE_INSERT(3);
+              if (value_idx < 0x100)
+              {
+                  add_f_code(F_LAMBDA_CCONSTANT);
+                  add_byte(value_idx);
+                  CURRENT_PROGRAM_SIZE += 2;
+              }
+              else
+              {
+                  add_f_code(F_LAMBDA_CONSTANT);
+                  add_short(value_idx);
+                  CURRENT_PROGRAM_SIZE += 3;
+              }
+          }
       }
 
       '(' arg_expr_list ')'
@@ -14819,10 +17524,8 @@ function_call:
            * proper instructions to call the function.
            */
 %line
-          int         f = 0;             /* Function index */
+          int         f;                 /* Function index */
           int         simul_efun;
-          lpctype_t **arg_types = NULL; /* Argtypes from the program */
-          int         first_arg;         /* Startindex in arg_types[] */
           Bool        ap_needed;         /* TRUE if arg frame is needed */
           Bool        has_ellipsis;      /* TRUE if '...' was used */
 
@@ -14838,6 +17541,15 @@ function_call:
                * is taken for SIMUL_EFUN_VARARG */
               yyerrorf("Too many arguments to function");
 
+          f = ($1.real->u.global.function == I_GLOBAL_FUNCTION_OTHER) ? -1 : $1.real->u.global.function;
+          if (string_context && !$1.super && f >= 0)
+          {
+              if (LAMBDA_FUNCTION(f).kind == LAMBDA_IDENT_OBJECT)
+                  f = LAMBDA_FUNCTION(f).object_index;
+              else
+                  f = -1;
+          }
+
           do {
               /* The function processing is in a big do...while(0)
                * block so we can exit out of it prematurely and
@@ -14845,14 +17557,15 @@ function_call:
                * afterwards
                */
 
-              if ( !disable_sefuns
+              if ( !pragma_no_simul_efuns
                && (simul_efun = $<function_call_head>2.simul_efun) >= 0)
               {
                   /* SIMUL EFUN */
 
                   PREPARE_INSERT(6)
 
-                  function_t *funp = get_simul_efun_header($1.real);
+                  const program_t *progp;
+                  function_t *funp = get_simul_efun_header($1.real, &progp);
 
                   if (!(funp->flags & TYPE_MOD_VARARGS))
                   {
@@ -14885,7 +17598,7 @@ function_call:
                       ap_needed = MY_TRUE;
 
                   if (funp->offset.argtypes != NULL)
-                      check_function_call_types(get_argument_types_start($4), $4, funp, funp->offset.argtypes);
+                      check_function_call_types(get_argument_types_start($4), $4, funp, funp->offset.argtypes, progp->types);
 
                   if (simul_efun == I_GLOBAL_SEFUN_BY_NAME)
                   {
@@ -14919,16 +17632,26 @@ function_call:
                       $$.type = get_fulltype(ref_lpctype(funp->type));
               } /* if (simul-efun) */
 
+              else if (!$1.super && get_function_closure($1.real) >= 0)
+              {
+                  /* CLOSURE during string compilation */
+                  PREPARE_INSERT(2)
+                  add_f_code(F_FUNCALL);
+                  CURRENT_PROGRAM_SIZE++;
+                  ap_needed = MY_TRUE;
+              }
+
               else if ($1.super ? ($<function_call_head>2.efun_override == OVERRIDE_NONE)
-                                : (f = defined_function($1.real)) >= 0
+                                : (f >= 0)
                       )
               {
                   /* LFUN or INHERITED LFUN */
 
-                  PREPARE_INSERT(6)
-
                   function_t *funp;
                   function_t  inherited_function;
+                  unsigned short *arg_types = NULL;  /* arg types from the program */
+                  lpctype_t     **types = NULL;      /* actual types for lookup    */
+                  int             first_arg;         /* Start index in arg_types[] */
 
                   ap_needed = MY_TRUE;
 
@@ -14939,10 +17662,13 @@ function_call:
                       program_t *super_prog;
                       int ix;
 
-                      ix = insert_inherited( $1.super, $1.real->name
-                                           , &super_prog, &inherited_function
-                                           , $4, (bytecode_p)__PREPARE_INSERT__p
-                                           );
+                      if (string_context && !string_context->use_prog_for_functions)
+                          ix = INHERITED_NOT_FOUND;
+                      else
+                          ix = insert_inherited( $1.super, $1.real->name
+                                               , &super_prog, &inherited_function
+                                               , $4
+                                               );
 
                       if (ix < 0)
                       {
@@ -14973,6 +17699,7 @@ function_call:
                        && NULL != (arg_types = super_prog->argument_types))
                       {
                           first_arg = super_prog->type_start[ix];
+                          types = super_prog->types;
                       }
                       else
                       {
@@ -14985,13 +17712,38 @@ function_call:
                   {
                       /* Normal lfun in this program */
 
+                      PREPARE_INSERT(6)
+
                       ap_needed = MY_TRUE;
                       add_f_code(F_CALL_FUNCTION);
                       add_short(f);
-                      funp = FUNCTION(f);
-                      arg_types = GET_BLOCK(A_ARGUMENT_TYPES);
-                      first_arg = ARGUMENT_INDEX(f);
                       CURRENT_PROGRAM_SIZE += 3;
+
+                      if (string_context)
+                      {
+                          program_t *prog = get_current_object_program();
+
+                          inherited_function.flags = prog->functions[f];
+                          if (inherited_function.flags & NAME_INHERITED)
+                            inherited_function.flags &= ~INHERIT_MASK;
+                          else
+                            inherited_function.flags &= ~FUNSTART_MASK;
+                          get_function_information(&inherited_function, prog, f);
+                          arg_types = prog->argument_types;
+                          types = prog->types;
+                          if (arg_types != NULL)
+                              first_arg = prog->type_start[f];
+                          else
+                              first_arg = INDEX_START_NONE;
+                          funp = &inherited_function;
+                      }
+                      else
+                      {
+                          funp = FUNCTION(f);
+                          arg_types = NULL;
+                          types = GET_BLOCK(A_ARGUMENT_TYPES);
+                          first_arg = ARGUMENT_INDEX(f);
+                      }
                   }
 
                   /* Result type */
@@ -15050,7 +17802,13 @@ function_call:
                   /* Check the argument types.
                    */
                   if (exact_types && first_arg != INDEX_START_NONE)
-                      check_function_call_types(get_argument_types_start($4), $4, funp, arg_types + first_arg);
+                  {
+                      if (arg_types)
+                          arg_types += first_arg;
+                      else
+                          types += first_arg;
+                      check_function_call_types(get_argument_types_start($4), $4, funp, arg_types, types);
+                  }
 
               } /* if (inherited lfun) */
 
@@ -15094,6 +17852,9 @@ function_call:
                   PREPARE_INSERT(8)
 
                   fulltype_t *argp;
+%ifdef USE_PYTHON
+                  lpctype_t *first_aargp;
+%endif
                   int min, max, def, num_arg;
                   int f2;
 
@@ -15119,6 +17880,9 @@ function_call:
                              , instrs[f].name, instrs[f].deprecated);
 
                   num_arg = $4;
+%ifdef USE_PYTHON
+                  first_aargp = num_arg > 0 ? get_argument_types_start(num_arg)->t_type : NULL;
+%endif
 
                   /* Check and/or complete number of arguments */
                   if (def && num_arg == min-1 && !has_ellipsis)
@@ -15177,6 +17941,14 @@ function_call:
                                   if ( argp->t_type == NULL )
                                   {
                                       /* Possible types for this arg exhausted */
+
+%ifdef USE_PYTHON
+                                      /* Check for python type efun overrides. */
+                                      if (is_valid_arg_for_python_type_efun(first_aargp, f, argn + 1, aargp->t_type))
+                                        break;
+%endif
+
+                                      /* Nothing matched... */
                                       efun_argument_error(argn+1, f, beginArgp
                                                          , *aargp);
                                       break;
@@ -15240,6 +18012,10 @@ function_call:
                       add_f_code(F_CONST0);
                       CURRENT_PROGRAM_SIZE++;
                   }
+%ifdef USE_PYTHON
+                  else
+                      $$.type.t_type = add_result_for_python_type_efun(first_aargp, f, $$.type.t_type);
+%endif
                   $$.might_lvalue = instrs[f].might_return_lvalue;
               } /* efun */
 
@@ -15247,6 +18023,11 @@ function_call:
               {
                   yyerrorf(($<function_call_head>2.efun_override == OVERRIDE_EFUN)
                       ? "Unknown efun: %s" : "Unknown simul-efun: %s", get_txt($1.real->name));
+                  $$.type = get_fulltype(lpctype_mixed);
+              }
+              else if (string_context)
+              {
+                  yyerrorf("Undefined function '%.50s'", get_txt($1.real->name));
                   $$.type = get_fulltype(lpctype_mixed);
               }
               else
@@ -15339,7 +18120,7 @@ function_call:
            * however yields a faulty grammar.
            */
           {
-              char *p, *q;
+              bytecode_t *p, *q;
               p_int left;
 
               if (!realloc_a_program(1))
@@ -15351,7 +18132,7 @@ function_call:
               }
 
               /* Move the generated code forward by 1 */
-              p = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE - 1;
+              p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE - 1;
               q = p + 1;
               for (left = CURRENT_PROGRAM_SIZE - $1.start
                   ; left > 0
@@ -15389,12 +18170,12 @@ function_call:
            */
 
           sefun = $2.strict_member ? call_strict_sefun : call_other_sefun;
-          if (!disable_sefuns && sefun == I_GLOBAL_SEFUN_BY_NAME)
+          if (!pragma_no_simul_efuns && sefun == I_GLOBAL_SEFUN_BY_NAME)
           {
               /* The simul-efun has to be called by name:
                * insert the extra args for the call_other
                */
-              char *p, *q;
+              bytecode_t *p, *q;
               p_int left;
 
               if (!realloc_a_program(6))
@@ -15406,7 +18187,7 @@ function_call:
               }
 
               /* Move the generated code forward by 6 */
-              p = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE - 1;
+              p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE - 1;
               q = p + 6;
               for (left = CURRENT_PROGRAM_SIZE - $1.start - 1
                   ; left > 0
@@ -15416,12 +18197,28 @@ function_call:
               /* p now points to program[$1.start].
                * Store the first two call-other args there.
                */
-              p[1] = F_STRING;
-              upd_short($1.start+2, store_prog_string(
-                        ref_mstring(query_simul_efun_file_name())));
-              p[4] = F_STRING;
-              upd_short($1.start+5, store_prog_string(ref_mstring(
-                  $2.strict_member ? STR_CALL_STRICT : STR_CALL_OTHER)));
+              if (string_context)
+              {
+                  svalue_t sv;
+
+                  p[1] = F_LAMBDA_CONSTANT;
+                  sv = svalue_string(ref_mstring(query_simul_efun_file_name()));
+                  upd_short($1.start+2, store_lambda_value(&sv));
+
+                  p[4] = F_LAMBDA_CONSTANT;
+                  sv = svalue_string(ref_mstring(
+                      $2.strict_member ? STR_CALL_STRICT : STR_CALL_OTHER));
+                  upd_short($1.start+5, store_lambda_value(&sv));
+              }
+              else
+              {
+                  p[1] = F_STRING;
+                  upd_short($1.start+2, store_prog_string(
+                            ref_mstring(query_simul_efun_file_name())));
+                  p[4] = F_STRING;
+                  upd_short($1.start+5, store_prog_string(ref_mstring(
+                      $2.strict_member ? STR_CALL_STRICT : STR_CALL_OTHER)));
+              }
 
               CURRENT_PROGRAM_SIZE += 6;
           }
@@ -15441,7 +18238,7 @@ function_call:
            * the code and value have been already generated.
            */
 
-          if (!disable_sefuns && sefun >= 0)
+          if (!pragma_no_simul_efuns && sefun >= 0)
           {
               /* Create argument type list for type checking. */
               add_arg_type(ref_fulltype($1.type));
@@ -15465,7 +18262,7 @@ function_call:
           $$.might_lvalue = true;
           $$.needs_use = false;
 
-          if (!disable_sefuns && sefun >= 0)
+          if (!pragma_no_simul_efuns && sefun >= 0)
           {
               /* SIMUL EFUN */
 
@@ -15493,7 +18290,7 @@ function_call:
                               , get_txt(funp->name));
 
                   if (funp->offset.argtypes != NULL)
-                      check_function_call_types(get_argument_types_start(num_arg), num_arg, funp, funp->offset.argtypes);
+                      check_function_call_types(get_argument_types_start(num_arg), num_arg, funp, funp->offset.argtypes, simul_efun_table[sefun].program->types);
 
                   if (!(funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
                    && !has_ellipsis)
@@ -15546,10 +18343,12 @@ function_call:
           {
               int call_instr = $2.strict_member ? F_CALL_STRICT : F_CALL_OTHER;
 
-              if ($1.type.t_type->t_class == TCLASS_OBJECT
+              if ($1.type.t_type != NULL
+               && $1.type.t_type->t_class == TCLASS_OBJECT
                && $1.type.t_type->t_object.type == OBJECT_LIGHTWEIGHT
                && $3
-               && num_lwo_calls <= USHRT_MAX)
+               && num_lwo_calls <= USHRT_MAX
+               && !string_context)
               {
                   /* Call to a single lightweight object with a constant function name
                    * and we have space in the call cache, then we use the cached call
@@ -15568,8 +18367,12 @@ function_call:
               $$.type = get_fulltype(instrs[call_instr].ret_type);
 
               if (!check_unknown_type($1.type.t_type)
-               && !has_common_type(lpctype_string_object, $1.type.t_type)
-               && !has_common_type(lpctype_string_object_array, $1.type.t_type))
+               && !has_common_type(lpctype_string_object_lwobject, $1.type.t_type)
+               && !has_common_type(lpctype_string_object_lwobject_array, $1.type.t_type)
+#ifdef USE_PYTHON
+               && !is_valid_arg_for_python_type_efun($1.type.t_type, call_instr, 2, lpctype_string)
+#endif
+              )
               {
                   efun_argument_error(1, call_instr, efun_arg_types + instrs[call_instr].arg_index, $1.type);
               }
@@ -15672,22 +18475,7 @@ function_name:
 
           check_identifier($1);
           if (fun->type == I_TYPE_LOCAL)
-          {
-              fun = find_shared_identifier_mstr(fun->name, I_TYPE_UNKNOWN, 0);
-
-              /* Search the inferior list for this identifier for a global
-               * (function) definition.
-               */
-
-              while (fun && fun->type > I_TYPE_GLOBAL)
-                  fun = fun->inferior;
-
-              if (!fun || fun->type != I_TYPE_GLOBAL)
-              {
-                  yyerrorf("Undefined function '%.50s'\n", get_txt($1->name));
-                  YYACCEPT;
-              }
-          }
+              fun = insert_shared_identifier_mstr(fun->name, I_TYPE_GLOBAL, 0);
 
           $$.super = NULL;
           $$.real  = fun;
@@ -15707,22 +18495,7 @@ function_name:
 
           check_identifier($3);
           if (fun->type == I_TYPE_LOCAL)
-          {
-              fun = find_shared_identifier_mstr(fun->name, I_TYPE_UNKNOWN, 0);
-
-              /* Search the inferior list for this identifier for a global
-               * (function) definition.
-               */
-
-              while (fun && fun->type > I_TYPE_GLOBAL)
-                  fun = fun->inferior;
-
-              if (!fun || fun->type != I_TYPE_GLOBAL)
-              {
-                  yyerrorf("Undefined function '%.50s'\n", get_txt($3->name));
-                  YYACCEPT;
-              }
-          }
+              fun = insert_shared_identifier_mstr(fun->name, I_TYPE_GLOBAL, 0);
 
           /* Attempt to call an efun directly even though there
            * is a nomask simul-efun for it?
@@ -15730,7 +18503,7 @@ function_name:
           if ( !strcmp($1, "efun")
            && fun->type == I_TYPE_GLOBAL
            && fun->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-           && (get_simul_efun_header(fun)->flags & TYPE_MOD_NO_MASK)
+           && (get_simul_efun_header(fun, NULL)->flags & TYPE_MOD_NO_MASK)
            && master_ob
            && (!EVALUATION_TOO_LONG())
              )
@@ -15742,7 +18515,10 @@ function_name:
               svalue_t *res;
 
               push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
-              push_c_string(inter_sp, current_loc.file->name);
+              if (string_context)
+                  push_current_object(inter_sp, "nomask simul_efun");
+              else
+                  push_c_string(inter_sp, current_loc.file->name);
               push_ref_string(inter_sp, fun->name);
               res = apply_master(STR_PRIVILEGE, 3);
               if (!res || res->type != T_NUMBER || res->u.number < 0)
@@ -15902,10 +18678,10 @@ catch:
           free_fulltype($4.type);
 
           /* If there were code creating modifiers, move their code
-           * before the F_CATCH (currently only 'reserve' does that).
+           * before the F_CATCH (currently only 'reserve' & 'limit' do that).
            * We need to do this before we add the END_CATCH.
            */
-          if (flags & CATCH_FLAG_RESERVE)
+          if (flags & (CATCH_FLAG_RESERVE|CATCH_FLAG_LIMIT))
           {
               shuffle_code(start, modstart, CURRENT_PROGRAM_SIZE);
               start += CURRENT_PROGRAM_SIZE - modstart;
@@ -15969,7 +18745,7 @@ catch:
           ins_f_code(F_RESTORE_ARG_FRAME);
 
           $$.start = origstart;
-          $$.type  = get_fulltype(lpctype_string);
+          $$.type  = get_fulltype(lpctype_mixed);
           $$.name  = NULL;
           $$.needs_use = false;
       }
@@ -16000,6 +18776,20 @@ opt_catch_mod_list :
               yywarnf("Multiple 'reserve' modifiers in catch()");
               insert_pop_value();
           }
+          if ($1 & $3 & CATCH_FLAG_LIMIT)
+          {
+              /* On multiple 'reserve's, use only the first one */
+              yywarnf("Multiple 'limit' modifiers in catch()");
+              insert_pop_value();
+          }
+          else if (($1 & CATCH_FLAG_RESERVE) && $3 == CATCH_FLAG_LIMIT)
+          {
+              /* 'reserve' before 'limit', we need to swap values as F_CATCH
+               * expects them in a different order.
+               * We cannot swap the code, because they might have side effects.
+               */
+              ins_f_code(F_SWAP_VALUES);
+          }
           $$ = $1 | $3;
       }
 
@@ -16021,6 +18811,8 @@ opt_catch_modifier :
               $$ = CATCH_FLAG_PUBLISH;
           else if (mstreq($1, STR_RESERVE))
               yyerrorf("Bad 'reserve' modifier in catch(): missing expression");
+          else if (mstreq($1, STR_LIMIT))
+              yyerrorf("Bad 'limit' modifier in catch(): missing expression");
           else
               yyerrorf("Illegal modifier '%s' in catch() - "
                       "expected 'nolog', 'publish' or 'reserve <expr>'"
@@ -16049,6 +18841,16 @@ opt_catch_modifier :
                           , get_fulltype_name($2.type)
                           );
               $$ = CATCH_FLAG_RESERVE;
+          }
+          else if (mstreq($1, STR_LIMIT))
+          {
+              if (!check_unknown_type($2.type.t_type)
+               && !lpctype_contains(lpctype_int, $2.type.t_type))
+                  yyerrorf("Bad 'limit' expression type to catch(): %s, "
+                           "expected int"
+                          , get_fulltype_name($2.type)
+                          );
+              $$ = CATCH_FLAG_LIMIT;
           }
           else
               yyerrorf("Illegal modifier '%s' in catch() - "
@@ -16428,8 +19230,59 @@ insert_pop_value (void)
 } /* insert_pop_value() */
 
 /*-------------------------------------------------------------------------*/
+static int
+get_type_index (lpctype_t *t)
+
+/* Add <t> to the programs type list.
+ */
+
+{
+    int idx;
+    for (idx = 0; idx < PROG_TYPE_COUNT; idx++)
+        if (PROG_TYPE(idx) == t)
+            break;
+
+    if (idx == PROG_TYPE_COUNT)
+    {
+        if (idx > (long)USHRT_MAX)
+            return -1;
+
+        ADD_PROG_TYPE(ref_lpctype(t));
+    }
+
+    return idx;
+} /* get_type_index() */
+
+/*-------------------------------------------------------------------------*/
+static int
+ins_prog_type (lpctype_t *t)
+
+/* Add the type <t> to the program types and insert codes to put it
+ * on the stack into the current bytecode. The references are not adopted.
+ * Returns the number of bytes written to the bytecode.
+ */
+{
+    if (string_context)
+    {
+        svalue_t sv = svalue_lpctype(ref_lpctype(t));
+        return ins_lambda_value(&sv);
+    }
+    else
+    {
+        PREPARE_INSERT(3);
+
+        add_f_code(F_PUSH_TYPE);
+        add_short(get_type_index(t));
+
+        CURRENT_PROGRAM_SIZE += 3;
+        return 3;
+    }
+} /* ins_prog_type() */
+
+/*-------------------------------------------------------------------------*/
 static void
 add_type_check (lpctype_t *expected, enum type_check_operation op)
+
 /* Adds an instruction for type checking the topmost value
  * on the stack against <expected>.
  */
@@ -16445,28 +19298,22 @@ add_type_check (lpctype_t *expected, enum type_check_operation op)
     if (expected == lpctype_mixed || expected == lpctype_unknown)
         return;
 
-    /* Now get an index for the type in our type list. */
-    for (idx = 0; idx < ARGTYPE_COUNT; idx++)
-        if (ARGUMENT_TYPE(idx) == expected)
-            break;
-
-    if (idx == ARGTYPE_COUNT)
+    if (string_context)
     {
-        /* Check that there is space in the argument type list. */
-        if (arg_types_exhausted)
-            return;
+        /* Store the type as a lambda value. */
+        svalue_t sv = svalue_lpctype(ref_lpctype(expected));
+        idx = store_lambda_value(&sv);
 
-        if (idx > (long)USHRT_MAX)
-        {
-            arg_types_exhausted = true;
-            yywarnf("Type buffer exhausted, cannot store and verify argument types.");
-            return;
-        }
+        ins_f_code(F_LAMBDA_TYPE_CHECK);
+    }
+    else
+    {
+        /* Now get an index for the type in our type list. */
+        idx = get_type_index(expected);
 
-        ADD_ARGUMENT_TYPE(ref_lpctype(expected));
+        ins_f_code(F_TYPE_CHECK);
     }
 
-    ins_f_code(F_TYPE_CHECK);
     ins_byte(op);
     ins_short(idx);
 } /* add_type_check() */
@@ -16577,8 +19424,8 @@ is_function_defined (program_t *progp, int fx)
     const program_t *inhprogp;
     int inh_fx;
 
-    get_function_header_extended(progp, fx, &inhprogp, &inh_fx);
-    return !is_undef_function(inhprogp->program + (inhprogp->functions[inh_fx] & FUNSTART_MASK));
+    function_t *header = get_function_header_extended(progp, fx, &inhprogp, &inh_fx);
+    return !is_undef_function(header, inhprogp->program + (inhprogp->functions[inh_fx] & FUNSTART_MASK));
 } /* is_function_defined */
 
 /*-------------------------------------------------------------------------*/
@@ -16624,17 +19471,37 @@ adjust_virtually_inherited ( unsigned short *pFX, inherit_t **pIP)
             fx -= ip2->function_index_offset;
 
             /* Is there an update for this program? */
-            while (ip->inherit_mapped)
+            if (ip->inherit_mapped)
             {
-                fx = GET_BLOCK(A_UPDATE_INDEX_MAP)[fx + ip->function_map_offset];
-                if (fx == USHRT_MAX)
+                unsigned short *update_index_map;
+                inherit_t *inherits;
+
+                if (string_context)
                 {
-                    /* Not defined anymore. */
-                    *pIP = NULL;
-                    return false;
+                    program_t *prog = get_current_object_program();
+
+                    update_index_map = prog->update_index_map;
+                    inherits = prog->inherit;
+                }
+                else
+                {
+                    update_index_map = GET_BLOCK(A_UPDATE_INDEX_MAP);
+                    inherits = GET_BLOCK(A_INHERITS);
                 }
 
-                ip = GET_BLOCK(A_INHERITS) + ip->updated_inherit;
+                do
+                {
+                    fx = update_index_map[fx + ip->function_map_offset];
+                    if (fx == USHRT_MAX)
+                    {
+                        /* Not defined anymore. */
+                        *pIP = NULL;
+                        return false;
+                    }
+
+                    ip = inherits + ip->updated_inherit;
+                }
+                while (ip->inherit_mapped);
             }
 
             *pFX = fx;
@@ -16649,22 +19516,24 @@ adjust_virtually_inherited ( unsigned short *pFX, inherit_t **pIP)
 
 static unsigned short
 lookup_inherited (const char *super_name, string_t *real_name
-                 , inherit_t **pIP, funflag_t *pFlags)
+                 , inherit_t **pIP, unsigned short * pIIdx
+                 , funflag_t *pFlags)
 
 /* Lookup an inherited function <super_name>::<real_name> and return
- * it's function index, setting *pIP to the inherit_t pointer and
- * *pFlags to the function flags.
+ * it's function index, setting *pIP to the inherit_t pointer, *pIIdx
+ * to the inherit index and *pFlags to the function flags.
  * Return USHRT_MAX if not found, *pIP set to NULL, and *pFlags set to 0.
  *
  * <super_name> can be an empty string or the (partial) name of one
  * of the inherits. <real_name> must be shared string.
  */
 {
-    inherit_t *ip;
+    inherit_t *ip, *inherits;
     int num_inherits, super_length;
 
     *pIP = NULL;
     *pFlags = 0;
+    *pIIdx = 0;
 
     if (!real_name)
         return -1;
@@ -16673,7 +19542,18 @@ lookup_inherited (const char *super_name, string_t *real_name
     while (*super_name == '/')
         super_name++;
     super_length = strlen(super_name);
-    num_inherits = INHERIT_COUNT;
+
+    if (string_context)
+    {
+        program_t *prog = get_current_object_program();
+        inherits = prog->inherit;
+        num_inherits = prog->num_inherited;
+    }
+    else
+    {
+        inherits = GET_BLOCK(A_INHERITS);
+        num_inherits = INHERIT_COUNT;
+    }
 
     /* TODO: Is this really necessary?  real_name should be tabled
      * already.
@@ -16704,7 +19584,7 @@ lookup_inherited (const char *super_name, string_t *real_name
      * from the back in order to get the topmost definition; however,
      * with virtual inherits the order gets messed up.
      */
-    for (ip = GET_BLOCK(A_INHERITS); num_inherits > 0 ; ip++, num_inherits--)
+    for (ip = inherits; num_inherits > 0 ; ip++, num_inherits--)
     {
         inherit_t *foundp;
         unsigned short found_ix;
@@ -16750,6 +19630,7 @@ lookup_inherited (const char *super_name, string_t *real_name
         if (adjust_virtually_inherited(&found_ix, &foundp))
         {
             *pIP = foundp;
+            *pIIdx = foundp - inherits;
             *pFlags = foundp->prog->functions[found_ix];
             return found_ix;
         }
@@ -16789,10 +19670,8 @@ find_inherited_function ( const char * super_name
 
     rname = find_tabled_str(real_name, STRING_UTF8);
 
-    ix =  rname ? lookup_inherited(super_name, rname, &ip, flags) : USHRT_MAX;
-    if (ix != USHRT_MAX) /* Also return the inherit index. */
-        *pInherit = ip - GET_BLOCK(A_INHERITS);
-    else
+    ix =  rname ? lookup_inherited(super_name, rname, &ip, pInherit, flags) : USHRT_MAX;
+    if (ix == USHRT_MAX)
         *pInherit = 0;
     return ix;
 } /* find_inherited_function() */
@@ -16801,7 +19680,7 @@ find_inherited_function ( const char * super_name
 static int
 insert_inherited (char *super_name, string_t *real_name
                  , program_t **super_p, function_t *fun_p
-                 , int num_arg, bytecode_p __prepare_insert__p
+                 , int num_arg
                  )
 
 /* The compiler encountered a <super_name>::<real_name>() call with
@@ -16833,17 +19712,18 @@ insert_inherited (char *super_name, string_t *real_name
     inherit_t *ip;
     funflag_t flags;
     unsigned short found_ix;
+    unsigned short inh_ix;
 
-    found_ix = lookup_inherited(super_name, real_name, &ip, &flags);
+    found_ix = lookup_inherited(super_name, real_name, &ip, &inh_ix, &flags);
 
     if (ip != NULL)
     {
         /* Found it! */
-        bytecode_p __PREPARE_INSERT__p = __prepare_insert__p;
+        PREPARE_INSERT(5)
 
         /* Generate the function call */
         add_f_code(F_CALL_INHERITED);
-        add_short(ip - GET_BLOCK(A_INHERITS));
+        add_short(inh_ix);
         add_short(found_ix);
         CURRENT_PROGRAM_SIZE += 5;
 
@@ -16862,12 +19742,13 @@ insert_inherited (char *super_name, string_t *real_name
     if (strpbrk(super_name, "*?"))
     {
         Bool *was_called;  /* Flags which inh. fun has been called already */
-        inherit_t *ip0;
+        inherit_t *ip0, *inherits;
         int num_inherits;
         int calls = 0;
         int ip_index;
         int first_index;
         unsigned short i;
+        p_uint code_start = CURRENT_PROGRAM_SIZE;
 
         /* Prepare wildcard calls with arguments. */
         if (num_arg)
@@ -16904,8 +19785,7 @@ insert_inherited (char *super_name, string_t *real_name
              * between consecutive calls can be omitted.
              */
 
-            /* 6 bytes are already reserved in the program. */
-            bytecode_p __PREPARE_INSERT__p = __prepare_insert__p;
+            PREPARE_INSERT(5)
 
             /* Create array for the return values. */
             add_f_code(F_ARRAY0);
@@ -16931,7 +19811,18 @@ insert_inherited (char *super_name, string_t *real_name
         }
 
         *super_p = NULL;
-        num_inherits = INHERIT_COUNT;
+
+        if (string_context)
+        {
+            program_t *prog = get_current_object_program();
+            inherits = prog->inherit;
+            num_inherits = prog->num_inherited;
+        }
+        else
+        {
+            inherits = GET_BLOCK(A_INHERITS);
+            num_inherits = INHERIT_COUNT;
+        }
 
         was_called = alloca(sizeof(*was_called)*num_inherits);
         for (i = 0; i < num_inherits; i++)
@@ -16940,7 +19831,7 @@ insert_inherited (char *super_name, string_t *real_name
         /* Test every inherit if the name matches and if
          * it does, generate the function call.
          */
-        ip0 = GET_BLOCK(A_INHERITS);
+        ip0 = inherits;
         first_index = num_inherits > 0 ? INHERITED_WILDCARDED_NOT_FOUND
                                        : INHERITED_NOT_FOUND;
         for (; num_inherits > 0; ip0++, num_inherits--)
@@ -16965,7 +19856,7 @@ insert_inherited (char *super_name, string_t *real_name
             if (ip->inherit_duplicate)
             {
                 /* This is a duplicate inherit, let's search for the original. */
-                for (ip = &(INHERIT(0)); ip < ip0; ip++)
+                for (ip = inherits; ip < ip0; ip++)
                     if (ip->prog == ip0->prog)
                         break;
 
@@ -16984,7 +19875,7 @@ insert_inherited (char *super_name, string_t *real_name
 
             /* Found a match */
             flags = ip->prog->functions[i];
-            ip_index = ip - GET_BLOCK(A_INHERITS);
+            ip_index = ip - inherits;
 
             /* The (new) ip might be duplicate inherit, or point to
              * a virtually inherited function we called already.
@@ -17052,7 +19943,9 @@ insert_inherited (char *super_name, string_t *real_name
         else
         {
             /* Backpatch number of calls. */
-            put_short(__prepare_insert__p+1, calls);
+            bytecode_p orig_code = PROGRAM_BLOCK + code_start;
+
+            put_short(orig_code+1, calls);
 
             /* And now a lot of backpatching, depending on how
              * many calls we made.
@@ -17063,7 +19956,7 @@ insert_inherited (char *super_name, string_t *real_name
                  * remove the arguments and put an empty array
                  * as a result on the stack.
                  */
-                bytecode_p __PREPARE_INSERT__p = __prepare_insert__p;
+                bytecode_p __PREPARE_INSERT__p = orig_code;
 
                 add_f_code(F_POP_N);
                 add_byte(num_arg);
@@ -17077,10 +19970,10 @@ insert_inherited (char *super_name, string_t *real_name
                  * call above and patch the F_PUT_ARRAY_ELEMENT
                  * accordingly.
                  */
-                memmove(__prepare_insert__p + 5,  __prepare_insert__p + 9, 9);
-                put_short(__prepare_insert__p + 11,  1);
-                put_uint8(__prepare_insert__p + 14, instrs[F_MOVE_VALUE].opcode);
-                put_uint8(__prepare_insert__p + 15, 0);
+                memmove(orig_code + 5, orig_code + 9, 9);
+                put_short(orig_code + 11,  1);
+                put_uint8(orig_code + 14, instrs[F_MOVE_VALUE].opcode);
+                put_uint8(orig_code + 15, 0);
 
                 CURRENT_PROGRAM_SIZE -= 2;
             }
@@ -17217,21 +20110,31 @@ copy_structs (program_t *from, funflag_t flags)
         struct_def_t *pdef = from->struct_defs + struct_id;
         funflag_t f;
 
-        /* Combine the visibility flags. */
-        f = flags | pdef->flags;
-        if (pdef->flags & TYPE_MOD_PUBLIC)
-            f &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED);
-        else if (pdef->flags & TYPE_MOD_PRIVATE)
-            f |= NAME_HIDDEN;
+        if (pdef->flags & (TYPE_MOD_PRIVATE | NAME_HIDDEN))
+        {
+            /* Ignore it for now. Just record the definition in
+             * the type object (if there is one), so we can find
+             * it later on.
+             */
+            if (pdef->type->name->lpctype != NULL
+             && pdef->type->name->lpctype->t_struct.def_idx == USHRT_MAX)
+                update_struct_type(pdef->type->name->lpctype, pdef->type);
 
-        if (f & (TYPE_MOD_PRIVATE | NAME_HIDDEN))
-            f &= ~(TYPE_MOD_PROTECTED | TYPE_MOD_PUBLIC);
-        else if (f & TYPE_MOD_PROTECTED)
-            f &= ~(TYPE_MOD_PUBLIC);
+            continue;
+        }
+
+        /* Combine the visibility flags. */
+        f = inherit_visibility_flags(pdef->flags, flags);
+        assert(!(f & NAME_HIDDEN));
+
+        /* Create an identifier, if there isn't one. */
+        p = make_global_identifier(get_txt(struct_t_name(pdef->type)), I_TYPE_GLOBAL);
+        if (p == NULL)
+            continue;
 
         /* Duplicate definition? */
-        id = find_struct(struct_t_name(pdef->type));
-        if (!(f & NAME_HIDDEN) && id >= 0)
+        id = find_struct(p, OVERRIDE_LFUN);
+        if (id >= 0)
         {
             /* We have a struct with this name. Check if we just
              * inherited it again, or if it's a name clash.
@@ -17256,23 +20159,19 @@ copy_structs (program_t *from, funflag_t flags)
                             );
                 continue;
             }
-
-            f |= NAME_HIDDEN;
+            else
+            {
+                /* Just combine visibility flags. */
+                STRUCT_DEF(id).flags = combine_visibility_flags(STRUCT_DEF(id).flags, f);
+                continue;
+            }
         }
-
-        /* New struct */
-        p = make_global_identifier(get_txt(struct_t_name(pdef->type)), I_TYPE_GLOBAL);
-        if (p == NULL)
-            continue;
 
         /* Create a new struct entry, then replace the struct prototype
          * type with the one we inherited.
          */
-        current_struct = define_new_struct( MY_FALSE, p, get_txt(struct_t_pname(pdef->type)), f);
-        free_struct_type(STRUCT_DEF(current_struct).type);
-        STRUCT_DEF(current_struct).type = ref_struct_type(pdef->type);
+        current_struct = define_struct( MY_FALSE, p, get_txt(struct_t_pname(pdef->type)), f, pdef->type);
         STRUCT_DEF(current_struct).inh = INHERIT_COUNT;
-        update_struct_type(STRUCT_DEF(current_struct).type->name->lpctype, pdef->type);
     }
 } /* copy_structs() */
 
@@ -17340,7 +20239,8 @@ inherit_functions (program_t *from, uint32 inheritidx)
         A_ARGUMENT_INDEX_t argindex = INDEX_START_NONE; /* Presume not available. */
         if (from->type_start != 0)
         {
-            if (from->type_start[i] != INDEX_START_NONE)
+            unsigned short arg_type_idx = from->type_start[i];
+            if (arg_type_idx != INDEX_START_NONE)
             {
                 /* They are available for function number 'i'. Copy types of
                  * all arguments, and remember where they started.
@@ -17348,18 +20248,9 @@ inherit_functions (program_t *from, uint32 inheritidx)
                 argindex = ARGTYPE_COUNT;
                 if (fun_p->num_arg)
                 {
-                    int ix;
-
-                    ix = ARGTYPE_COUNT;
-
-                    add_to_mem_block(
-                      A_ARGUMENT_TYPES,
-                      &from->argument_types[from->type_start[i]],
-                      (sizeof (A_ARGUMENT_TYPES_t)) * fun_p->num_arg
-                    );
-
-                    for ( ; (size_t)ix < ARGTYPE_COUNT; ix++)
-                        ref_lpctype(ARGUMENT_TYPE(ix));
+                    reserve_mem_block(A_ARGUMENT_TYPES, sizeof(A_ARGUMENT_TYPES_t) * fun_p->num_arg);
+                    for (int pos = 0; pos < fun_p->num_arg; pos++)
+                        ADD_ARGUMENT_TYPE(ref_lpctype(from->types[from->argument_types[arg_type_idx+pos]]));
                 }
 
             }
@@ -17392,30 +20283,13 @@ inherit_variable (variable_t *variable, funflag_t varmodifier, int redeclare)
 
 {
     ident_t *p;
-    funflag_t new_type = varmodifier;
 
     p = make_global_identifier(get_txt(variable->name), I_TYPE_GLOBAL);
     if (!p)
         return false;
 
-    /* 'public' variables should not become private when inherited
-     * 'private'.
-     */
-    if (variable->type.t_flags & TYPE_MOD_PUBLIC)
-        new_type &= ~(TYPE_MOD_PRIVATE | TYPE_MOD_PROTECTED);
-
     fulltype_t vartype = variable->type;
-
-    vartype.t_flags |= new_type 
-                    | (variable->type.t_flags & TYPE_MOD_PRIVATE
-                       ? (NAME_HIDDEN|NAME_INHERITED)
-                       :  NAME_INHERITED
-                      );
-    /* The most restrictive visibility wins. */
-    if (vartype.t_flags & (TYPE_MOD_PRIVATE | NAME_HIDDEN))
-        vartype.t_flags &= ~(TYPE_MOD_PROTECTED | TYPE_MOD_PUBLIC);
-    else if (vartype.t_flags & TYPE_MOD_PROTECTED)
-        vartype.t_flags &= ~(TYPE_MOD_PUBLIC);
+    vartype.t_flags = inherit_visibility_flags(vartype.t_flags, varmodifier) | NAME_INHERITED;
 
     if (redeclare >= 0)
         redeclare_variable(p, vartype, VIRTUAL_VAR_TAG | redeclare);
@@ -18293,7 +21167,7 @@ inherit_obsoleted_variables  (inherit_t *newinheritp, program_t *from, int first
 
 /*-------------------------------------------------------------------------*/
 static int
-inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
+inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier, funflag_t structmodifier)
 
 /* Copies struct definitions, functions and variables from the program <from>
  * into our program. Functions are copied with visibility <funmodifier>,
@@ -18659,6 +21533,8 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
          */
         do
         {
+            int32 n; /* existing function index */
+
             /* Ignore cross defines.
              * They are the only complete invisible entries.
              */
@@ -18670,234 +21546,172 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
             if (!p)
                 break;
 
-            if (p->type != I_TYPE_UNKNOWN)
+            p = add_global_name(p);
+            n = p->u.global.function;
+
+            /* If the identifier is (also) an lfun, handle it, even if
+             * it's overloaded by something else as well. If we didn't
+             * subsequent inheritors would receive illegal function
+             * start offsets.
+             */
+            if ( n != I_GLOBAL_FUNCTION_OTHER && n != first_func_index + i)
             {
-                /* We got this ident already somewhere */
-
-                int32 n; /* existing function index */
-
-                n = p->u.global.function;
-
-                /* If the identifier is (also) an lfun, handle it, even if
-                 * it's overloaded by something else as well. If we didn't
-                 * subsequent inheritors would receive illegal function
-                 * start offsets.
+                /* Already inherited from somewhere else.
+                 * Don't try to resolve cross-references inside the
+                 * currently inherited program; not only is this superflous,
+                 * but it can also lead to circular cross-inheritance
+                 * when there was a misplaced prototype or an explicit
+                 * directive to inherit a multiply inherited function
+                 * from a particular base class (the latter is not
+                 * implemented). In these cases, the information that lead
+                 * to the non-standard preference would be very hard to
+                 * reconstruct.
                  */
-                if ( n != I_GLOBAL_FUNCTION_OTHER && n != first_func_index + i)
+                if ((uint32)n < first_func_index || (uint32)n >= first_func_index + from->num_functions)
                 {
-                    /* Already inherited from somewhere else.
-                     * Don't try to resolve cross-references inside the
-                     * currently inherited program; not only is this superflous,
-                     * but it can also lead to circular cross-inheritance
-                     * when there was a misplaced prototype or an explicit
-                     * directive to inherit a multiply inherited function
-                     * from a particular base class (the latter is not
-                     * implemented). In these cases, the information that lead
-                     * to the non-standard preference would be very hard to
-                     * reconstruct.
+                    /* We already have a function definition/prototype
+                     * for this name.
                      */
-                    if ((uint32)n < first_func_index || (uint32)n >= first_func_index + from->num_functions)
+
+                    function_t *OldFunction = FUNCTION(n);
+
+                    if ( !(OldFunction->flags & NAME_INHERITED) )
                     {
-                        /* We already have a function definition/prototype
-                         * for this name.
+                        /* Since inherits are not possible after functions
+                         * have been compiled, there are two options:
+                         * 1. We had a prototype for the function.
+                         * 2. Virtual inherit update made an inherited
+                         *    function undefined.
+                         * In both cases we'll cross-define to the new
+                         * function.
                          */
-
-                        function_t *OldFunction = FUNCTION(n);
-
-                        if ( !(OldFunction->flags & NAME_INHERITED) )
-                        {
-                            /* Since inherits are not possible after functions
-                             * have been compiled, there are two options:
-                             * 1. We had a prototype for the function.
-                             * 2. Virtual inherit update made an inherited
-                             *    function undefined.
-                             * In both cases we'll cross-define to the new
-                             * function.
-                             */
-                            if (OldFunction->flags & NAME_PROTOTYPE)
-                                yywarnf(
-                                    "Misplaced prototype for %s in %s ignored.\n"
-                                    , get_txt(fun.name), current_loc.file->name
-                                );
-
-                            /* The function name was a counted reference,
-                             * but after cross-definition it shouldn't be.
-                             */
-                            free_mstring(OldFunction->name);
-
-                            cross_define( &fun, OldFunction
-                                        , current_func_index - n );
-                            p->u.global.function = current_func_index;
-                        }
-                        else if ( (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
-                                    == (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
-                        {
-                            /* There is already one function with this
-                            * name. Ignore the private one, as we
-                            * only need it for useful error messages.
-                            */
-
-                            break;
-                        }
-                        else if ( (OldFunction->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
-                                     == (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
-                        {
-                            /* The old one was invisible, ignore it
-                             * and take this one.
-                             */
-
-                            p->u.global.function = current_func_index;
-                        }
-                        else if ((fun.flags | funmodifier) & TYPE_MOD_VIRTUAL
-                              && OldFunction->flags & TYPE_MOD_VIRTUAL
-                          &&    get_virtual_function_id(funprogp, funprogidx)
-  == get_virtual_function_id(INHERIT(OldFunction->offset.inherit).prog
-                , n - INHERIT(OldFunction->offset.inherit).function_index_offset
-                     )
-                                 )
-                        {
-                            /* Entries denote the same function and both
-                             * entries are visible. We have to use
-                             * cross_define nonetheless, to get consistant
-                             * redefinition (and to avoid the nomask
-                             * checking that comes next), and we prefer
-                             * the first one.
-                             *
-                             * It is important, that both entries are
-                             * indeed visible, because otherwise invisible
-                             * (i.e. private) functions would be made
-                             * visible again by another visible occurrence
-                             * of the same function. The originally invisible
-                             * occurrence would then be subject to
-                             * redefinition and nomask checking.
-                             */
-                            OldFunction->flags |= fun.flags &
-                                (TYPE_MOD_PUBLIC|TYPE_MOD_NO_MASK);
-                            OldFunction->flags &= fun.flags |
-                                ~(TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|NAME_HIDDEN);
-                            cross_define( OldFunction, &fun
-                                        , n - current_func_index );
-                        }
-                        else if ( (fun.flags & OldFunction->flags & TYPE_MOD_NO_MASK)
-                             &&  !( (fun.flags|OldFunction->flags) & NAME_UNDEFINED ) )
-                        {
-                            yyerrorf(
-                              "Illegal to inherit 'nomask' function '%s' twice",
-                              get_txt(fun.name));
-                        }
-                        else if ((   fun.flags & TYPE_MOD_NO_MASK
-                                  || OldFunction->flags & NAME_UNDEFINED )
-                              && !(fun.flags & NAME_UNDEFINED)
-                                )
-                        {
-                            /* This function is visible and existing, but the
-                             * inherited one is not, or this one is also nomask:
-                             * prefer this one one.
-                             */
-                            cross_define( &fun, OldFunction
-                                        , current_func_index - n );
-                            p->u.global.function = current_func_index;
-                        }
-                        else
-                        {
-                            /* At least one of the functions is visible
-                             * or redefinable: prefer the first one.
-                             */
-
-                            cross_define( OldFunction, &fun
-                                        , n - current_func_index );
-                        }
-                    } /* if (n < first_func_index) */
-                    else if ( (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
-                                != (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
-                    {
-                        /* This is the dominant definition in the superclass,
-                         * inherit this one.
-                         */
-#ifdef DEBUG
-                        /* The definition we picked before can't be
-                         * cross-defined, because cross-defines won't
-                         * be registered as global identifiers.
-                         * So the previous definition should be
-                         * nominally invisible so we can redefine it.
-                         */
-                        if ( (FUNCTION(n)->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
-                                != (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
-                        {
-                            fatal(
-                              "Inconsistent definition of %s() within "
-                              "superclass '%s'.\n"
-                            , get_txt(fun.name), get_txt(from->name)
+                        if (OldFunction->flags & NAME_PROTOTYPE)
+                            yywarnf(
+                                "Misplaced prototype for %s in %s ignored.\n"
+                                , get_txt(fun.name), current_loc.file->name
                             );
-                        }
-#endif
+
+                        /* The function name was a counted reference,
+                         * but after cross-definition it shouldn't be.
+                         */
+                        free_mstring(OldFunction->name);
+
+                        cross_define( &fun, OldFunction
+                                    , current_func_index - n );
                         p->u.global.function = current_func_index;
                     }
-                }
+                    else if ( (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                                == (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
+                    {
+                        /* There is already one function with this
+                        * name. Ignore the private one, as we
+                        * only need it for useful error messages.
+                        */
 
-                /* Handle the non-lfun aspects of the identifier */
-                {
-                    if (n != I_GLOBAL_FUNCTION_OTHER
-                     || (p->u.global.efun == I_GLOBAL_EFUN_OTHER
-                      && p->u.global.sim_efun == I_GLOBAL_SEFUN_OTHER
-#ifdef USE_PYTHON
-                      && !is_python_efun(p)
-#endif
-                        )
-                     || (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
-                       )
-                     {
-                        /* This is not an inherited private function shadowing
-                         * a (simul-)efun.
-                         */
-
-                        if (p->u.global.efun != I_GLOBAL_EFUN_OTHER
-                         || p->u.global.sim_efun != I_GLOBAL_SEFUN_OTHER
-#ifdef USE_PYTHON
-                         || is_python_efun(p)
-#endif
-                           )
-                        {
-                            /* This inherited function shadows an efun */
-
-                            efun_shadow_t *q;
-
-                            q = xalloc(sizeof(efun_shadow_t));
-                            if (!q) {
-                                yyerrorf("Out of memory: efun shadow (%zu bytes)"
-                                        , sizeof(efun_shadow_t));
-                                break;
-                            }
-                            q->shadow = p;
-                            q->next = all_efun_shadows;
-                            all_efun_shadows = q;
-                        }
-
-                        /* Update the symbol table entry to point
-                         * to the newly read function, unless of course
-                         * the code above already took care of that change.
-                         */
-                        if (p->u.global.function == I_GLOBAL_FUNCTION_OTHER)
-                            p->u.global.function = current_func_index;
+                        break;
                     }
-                    /* else: inherited private defined function must not hide
-                     * the (simul-)efun and is thusly not added to
-                     * the symbol-table.
+                    else if ( (OldFunction->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                                 == (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
+                    {
+                        /* The old one was invisible, ignore it
+                         * and take this one.
+                         */
+
+                        p->u.global.function = current_func_index;
+                    }
+                    else if ((fun.flags | funmodifier) & TYPE_MOD_VIRTUAL
+                          && OldFunction->flags & TYPE_MOD_VIRTUAL
+                      &&    get_virtual_function_id(funprogp, funprogidx)
+                              == get_virtual_function_id(INHERIT(OldFunction->offset.inherit).prog
+                                , n - INHERIT(OldFunction->offset.inherit).function_index_offset
+                     ))
+                    {
+                        /* Entries denote the same function and both
+                         * entries are visible. We have to use
+                         * cross_define nonetheless, to get consistant
+                         * redefinition (and to avoid the nomask
+                         * checking that comes next), and we prefer
+                         * the first one.
+                         *
+                         * It is important, that both entries are
+                         * indeed visible, because otherwise invisible
+                         * (i.e. private) functions would be made
+                         * visible again by another visible occurrence
+                         * of the same function. The originally invisible
+                         * occurrence would then be subject to
+                         * redefinition and nomask checking.
+                         */
+                        OldFunction->flags |= fun.flags &
+                            (TYPE_MOD_PUBLIC|TYPE_MOD_NO_MASK);
+                        OldFunction->flags &= fun.flags |
+                            ~(TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|TYPE_MOD_PROTECTED|NAME_HIDDEN);
+                        cross_define( OldFunction, &fun
+                                    , n - current_func_index );
+                    }
+                    else if ( (fun.flags & OldFunction->flags & TYPE_MOD_NO_MASK)
+                         &&  !( (fun.flags|OldFunction->flags) & NAME_UNDEFINED ) )
+                    {
+                        yyerrorf(
+                          "Illegal to inherit 'nomask' function '%s' twice",
+                          get_txt(fun.name));
+                    }
+                    else if ((   fun.flags & TYPE_MOD_NO_MASK
+                              || OldFunction->flags & NAME_UNDEFINED )
+                          && !(fun.flags & NAME_UNDEFINED)
+                            )
+                    {
+                        /* This function is visible and existing, but the
+                         * inherited one is not, or this one is also nomask:
+                         * prefer this one one.
+                         */
+                        cross_define( &fun, OldFunction
+                                    , current_func_index - n );
+                        p->u.global.function = current_func_index;
+                    }
+                    else
+                    {
+                        /* At least one of the functions is visible
+                         * or redefinable: prefer the first one.
+                         */
+
+                        cross_define( OldFunction, &fun
+                                    , n - current_func_index );
+                    }
+                } /* if (n < first_func_index) */
+                else if ( (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                            != (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
+                {
+                    /* This is the dominant definition in the superclass,
+                     * inherit this one.
                      */
+#ifdef DEBUG
+                    /* The definition we picked before can't be
+                     * cross-defined, because cross-defines won't
+                     * be registered as global identifiers.
+                     * So the previous definition should be
+                     * nominally invisible so we can redefine it.
+                     */
+                    if ( (FUNCTION(n)->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                            != (TYPE_MOD_PRIVATE|NAME_HIDDEN) )
+                    {
+                        fatal(
+                          "Inconsistent definition of %s() within "
+                          "superclass '%s'.\n"
+                        , get_txt(fun.name), get_txt(from->name)
+                        );
+                    }
+#endif
+                    p->u.global.function = current_func_index;
                 }
-            } /* if (p != I_TYPE_UNKNOWN) */
-
-            if (p->type == I_TYPE_UNKNOWN)
-            {
-                /* First time this function-ident was ever encountered.
-                 * Just make a new global.
-                 */
-
-                init_global_identifier(p, /* bVariable: */ MY_TRUE);
-                p->u.global.function  = current_func_index;
-                p->next_all = all_globals;
-                all_globals = p;
             }
+
+            /* Update the symbol table entry to point
+             * to the newly read function, unless of course
+             * the code above already took care of that change.
+             */
+            if (p->u.global.function == I_GLOBAL_FUNCTION_OTHER
+             && (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0)
+                p->u.global.function = current_func_index;
 
             /* Done with re/crossdefinition, now handle visibility.
              * Especially: public functions should not become private
@@ -18940,7 +21754,7 @@ inherit_program (program_t *from, funflag_t funmodifier, funflag_t varmodifier)
         fun_p[i] = fun;
     } /* for (inherited functions), pass 2 */
 
-    copy_structs(from, funmodifier & ~(TYPE_MOD_STATIC|TYPE_MOD_VIRTUAL));
+    copy_structs(from, structmodifier);
 
     if (from->flags & P_USE_NONLW_EFUNS)
     {
@@ -19278,19 +22092,22 @@ init_compiler ()
     make_static_type(get_array_type(lpctype_mixed),                 &_lpctype_any_array);
     make_static_type(get_union_type(lpctype_int, lpctype_float),    &_lpctype_int_float);
     make_static_type(get_array_type(lpctype_int),                   &_lpctype_int_array);
+    make_static_type(get_array_type(lpctype_symbol),                &_lpctype_symbol_array);
     make_static_type(get_array_type(lpctype_string),                &_lpctype_string_array);
     make_static_type(get_array_type(lpctype_any_object),            &_lpctype_object_array);
     make_static_type(get_array_type(lpctype_bytes),                 &_lpctype_bytes_array);
     make_static_type(get_union_type(lpctype_string, lpctype_bytes), &_lpctype_string_bytes);
     make_static_type(get_union_type(lpctype_string_array, lpctype_bytes_array), &_lpctype_string_or_bytes_array);
     make_static_type(get_union_type(lpctype_string, lpctype_any_object),&_lpctype_string_object);
-    make_static_type(get_array_type(lpctype_string_object),         &_lpctype_string_object_array);
-    make_static_type(get_array_type(lpctype_any_lwobject),          &_lpctype_lwobject_array);
     make_static_type(get_union_type(lpctype_any_object, lpctype_any_lwobject), &_lpctype_any_object_or_lwobject);
+    make_static_type(get_union_type(lpctype_string_object, lpctype_any_lwobject),&_lpctype_string_object_lwobject);
+    make_static_type(get_array_type(lpctype_string_object_lwobject), &_lpctype_string_object_lwobject_array);
+    make_static_type(get_array_type(lpctype_any_lwobject),          &_lpctype_lwobject_array);
     make_static_type(get_array_type(lpctype_any_object_or_lwobject), &_lpctype_any_object_or_lwobject_array);
     make_static_type(get_array_type(lpctype_any_object_or_lwobject_array), &_lpctype_any_object_or_lwobject_array_array);
     make_static_type(get_union_type(lpctype_int, lpctype_string),   &_lpctype_int_or_string);
     make_static_type(get_union_type(lpctype_string, lpctype_string_array), &_lpctype_string_or_string_array);
+    make_static_type(get_union_type(lpctype_mapping, lpctype_closure), &_lpctype_mapping_or_closure);
 
     temp1 = get_union_type(lpctype_any_object_or_lwobject, lpctype_any_struct);
     temp2 = get_union_type(temp1, lpctype_mapping);
@@ -19314,7 +22131,7 @@ get_simul_efun_index (string_t *name)
  */
 
 {
-    if (!disable_sefuns)
+    if (!pragma_no_simul_efuns)
     {
         ident_t *id = make_shared_identifier_mstr(name, I_TYPE_UNKNOWN, 0);
 
@@ -19335,7 +22152,7 @@ get_simul_efun_index (string_t *name)
                 return id->u.global.sim_efun;
             }
         }
-    } /* if (!disable_sefuns) */
+    } /* if (!pragma_no_simul_efuns) */
 
     return -1;
 } /* get_simul_efun_index() */
@@ -19347,7 +22164,8 @@ prolog (const char * fname, Bool isMasterObj)
 /* Initialize the compiler environment prior to a compile.
  * <fname> is the name of the top LPC file to be compiled.
  * <isMasterObj> is TRUE if this compile is part of the compilation of
- * the master object (in which case sefuns are disabled).
+ * the master object (in which case the master applied lfun
+ * declarations will be checked)).
  */
 
 {
@@ -19363,7 +22181,6 @@ prolog (const char * fname, Bool isMasterObj)
 
     /* Initialize all the globals */
     variables_defined = MY_FALSE;
-    disable_sefuns   = isMasterObj;
     last_expression  = -1;
     compiled_prog    = NULL;  /* NULL means fail to load. */
     heart_beat       = -1;
@@ -19374,8 +22191,13 @@ prolog (const char * fname, Bool isMasterObj)
     block_depth      = 0;
     default_varmod = 0;
     default_funmod = 0;
+    default_structmod = 0;
     current_inline = NULL;
     inline_closure_id = 0;
+    string_context = NULL;
+    lambda_values_table_level = 0;
+    lambda_values_offset = 0;
+    compiling_decltype = 0;
 
     free_all_local_names();   /* In case of earlier error */
 
@@ -19418,6 +22240,10 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", local_variables, context_variables 
     max_number_of_init_locals = 0;
     num_lwo_calls = 0;
     uses_non_lightweight_efuns = false;
+
+#ifdef USE_PYTHON
+    memset(python_struct_index, 0, sizeof(python_struct_index));
+#endif
 
     /* Check if call_other() has been replaced by a sefun.
      */
@@ -19467,6 +22293,142 @@ printf("DEBUG: prolog: type ptrs: %p, %p\n", local_variables, context_variables 
 
 /*-------------------------------------------------------------------------*/
 static void
+epilog_cleanup (void)
+
+/* Basic cleanup of parser structures after parsing.
+ */
+
+{
+#ifdef DEBUG
+    if (num_parse_error == 0 && type_of_arguments.current_size != 0)
+        fatal("Failed to deallocate argument type stack\n");
+#endif
+
+    if (last_string_constant)
+    {
+        free_mstring(last_string_constant);
+        last_string_constant = NULL;
+    }
+
+    free_case_blocks();
+
+    for (size_t i = 0; i < STRUCT_MEMBER_COUNT; i++)
+    {
+        free_struct_member_data(&STRUCT_MEMBER(i));
+    }
+    mem_block[A_STRUCT_MEMBERS].current_size = 0;
+
+    free_all_local_names();
+
+    for (ident_t *g, *q = all_globals; NULL != (g = q); )
+    {
+         q = g->next_all;
+         free_shared_identifier(g);
+    }
+
+    while(last_yalloced)
+    {
+        yfree(last_yalloced);
+        debug_message("%s freeing lost block\n", time_stamp());
+    }
+
+    if (all_efun_shadows)
+    {
+        efun_shadow_t *s, *t;
+
+        for (t = all_efun_shadows; NULL != (s = t); )
+        {
+            s->shadow->u.global.function = I_GLOBAL_FUNCTION_OTHER;
+            s->shadow->u.global.variable = I_GLOBAL_VARIABLE_WORLDWIDE;
+            s->shadow->u.global.struct_id = I_GLOBAL_STRUCT_NONE;
+            t = s->next;
+            xfree(s);
+        }
+        all_efun_shadows = NULL;
+    }
+
+    all_globals = NULL;
+
+    remove_unknown_identifier();
+
+} /* epilog_cleanup() */
+
+/*-------------------------------------------------------------------------*/
+static void
+epilog_free_all (void)
+
+/* Free all memory. This function assumes, that all references are
+ * intact and not have been adopted by a compiled program.
+ */
+
+{
+    function_t *functions;
+
+    /* Free all function names and type data. */
+    functions = FUNCTION(0);
+    for (size_t i = 0; i < FUNCTION_COUNT; i++, functions++)
+    {
+        if ( !(functions->flags & NAME_INHERITED) && functions->name )
+        {
+            /* The other references have been adopted. */
+            free_mstring(functions->name);
+        }
+        free_lpctype(functions->type);
+    }
+
+    do_free_sub_strings( STRING_COUNT
+                       , GET_BLOCK(A_STRINGS)
+                       , V_VARIABLE_COUNT
+                       , GET_BLOCK(A_VIRTUAL_VAR)
+                       , INCLUDE_COUNT
+                       , GET_BLOCK(A_INCLUDES)
+                       , STRUCT_COUNT
+                       , GET_BLOCK(A_STRUCT_DEFS)
+                       );
+
+    /* Free the type information */
+    for (size_t i = 0; i < PROG_TYPE_COUNT; i++)
+        free_lpctype(PROG_TYPE(i));
+
+    for (size_t i = 0; i < ARGTYPE_COUNT; i++)
+        free_lpctype(ARGUMENT_TYPE(i));
+
+    for (int i = 0; i < DEFAULT_LAMBDA_VALUES_COUNT; i++)
+        free_svalue(&DEFAULT_LAMBDA_VALUE(i));
+
+    for (int i = 0; i < LAMBDA_VALUES_COUNT; i++)
+        free_svalue(&LAMBDA_VALUE(i));
+
+    for (size_t i = 0; i < LAMBDA_VARIABLES_COUNT; i++)
+        if (LAMBDA_VARIABLE(i).kind == LAMBDA_IDENT_VALUE)
+            free_svalue(&(LAMBDA_VARIABLE(i).value));
+
+    for (size_t i = 0; i < LAMBDA_FUNCTIONS_COUNT; i++)
+        if (LAMBDA_FUNCTION(i).kind == LAMBDA_IDENT_VALUE)
+            free_svalue(&(LAMBDA_FUNCTION(i).value));
+
+    for (size_t i = 0; i < LAMBDA_STRUCTS_COUNT; i++)
+        if (LAMBDA_STRUCT(i).index.kind == LAMBDA_IDENT_VALUE)
+            free_svalue(&(LAMBDA_STRUCT(i).index.value));
+
+    for (size_t i = 0; i < LOCAL_VARIABLE_DBG_COUNT; i++)
+    {
+        free_mstring(LOCAL_VARIABLE_DBG(i).name);
+        free_lpctype(LOCAL_VARIABLE_DBG(i).type);
+    }
+
+    compiled_prog = NULL;
+
+    for (int i = 0; i < NUMAREAS; i++)
+        xfree(mem_block[i].block);
+
+    local_variables = NULL;
+    context_variables = NULL;
+    return;
+} /* epilog_free_all() */
+
+/*-------------------------------------------------------------------------*/
+static void
 epilog (void)
 
 /* The parser finished - now collect the information and generate
@@ -19481,33 +22443,11 @@ epilog (void)
     mp_int       num_variables;
     mp_int       num_function_headers;
     bytecode_p   p;
-    ident_t     *g, *q;
     function_t  *f;
     function_t  *funname_start1;  /* The name chains (to sort) */
     function_t  *funname_start2;
     mp_int       num_function_names;
     program_t   *prog;
-
-    /* First, clean up */
-#ifdef DEBUG
-    if (num_parse_error == 0 && type_of_arguments.current_size != 0)
-        fatal("Failed to deallocate argument type stack\n");
-#endif
-
-    if (last_string_constant)
-
-    {
-        free_mstring(last_string_constant);
-        last_string_constant = NULL;
-    }
-
-    free_case_blocks();
-
-    for (i = 0; (size_t)i < STRUCT_MEMBER_COUNT; i++)
-    {
-        free_struct_member_data(&STRUCT_MEMBER(i));
-    }
-    mem_block[A_STRUCT_MEMBERS].current_size = 0;
 
     /* If the parse was successful, Make sure that all structs are defined and
      * reactivate old structs where possible.
@@ -19518,6 +22458,9 @@ epilog (void)
     {
         struct_epilog();
     }
+
+    /* These should only be used with string compilations. */
+    assert(LAMBDA_VALUES_COUNT == 0);
 
     /* Append the non-virtual variable block to the virtual ones,
      * and take care of the initializers.
@@ -19562,11 +22505,16 @@ epilog (void)
             F_RETURN;
     } /* if (has initializer) */
 
+    epilog_cleanup();
+
     /* Check the string block. We don't have to count the include file names
      * as those won't be accessed from the program code.
      */
     if (STRING_COUNT > 0x10000)
         yyerror("Too many strings");
+
+    if (STRUCT_COUNT >= STD_STRUCT_OFFSET)
+        yyerror("Too many structs");
 
     /* Get and check the numbers of functions, strings, and variables */
     num_functions = FUNCTION_COUNT;
@@ -19630,6 +22578,19 @@ epilog (void)
             printf("(defined)\n");
     }
     printf("DEBUG: ------\n");
+
+    printf("DEBUG: ----- Variable list for %s: -----\n", current_loc.file->name);
+    for(i = 0; i < num_variables; i++)
+    {
+        variable_t *v = V_VARIABLE(i + VIRTUAL_VAR_TAG);
+
+        printf("DEBUG: [%03d: %08x] %-32s %-10s ", i, v->type.t_flags, get_txt(v->name), get_lpctype_name(v->type.t_type));
+        if (v->type.t_flags & NAME_INHERITED)
+            printf("(inherited)\n");
+        else
+            printf("(defined)\n");
+    }
+    printf("DEBUG: ------\n");
 #endif
 
     num_function_names = 0;
@@ -19672,8 +22633,10 @@ epilog (void)
              */
             if ((f->flags & (NAME_UNDEFINED|NAME_INHERITED)) == NAME_UNDEFINED)
             {
+                int opt_arg_table = sizeof(short) * f->num_opt_arg;
+
                 CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
-                if (!realloc_a_program(FUNCTION_HDR_SIZE + 2))
+                if (!realloc_a_program(FUNCTION_HDR_SIZE + 2 + opt_arg_table))
                 {
                     yyerrorf("Out of memory: program size %"PRIuMPINT"\n"
                             , CURRENT_PROGRAM_SIZE + FUNCTION_HDR_SIZE + 2);
@@ -19693,10 +22656,18 @@ epilog (void)
                         f->flags &= ~NAME_UNDEFINED;
                         *p++ = F_CONST1;
                         *p   = F_RETURN;
-                    } else {
+                    }
+                    else
+                    {
+                        /* We don't want to have optional arg initializers with
+                         * possible side effects in undefined functions.
+                         * Therefore put jump offsets of 0 in there.
+                         */
+                        memset(p, 0, opt_arg_table);
+                        p += opt_arg_table;
                         *p = F_UNDEF;
                     }
-                    CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE + 2;
+                    CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE + 2 + opt_arg_table;
                 }
 
                 /* We'll include prototype in the function_names list,
@@ -19881,42 +22852,32 @@ epilog (void)
 
     } /* if (parse successful) */
 
-    /* Free unneeded memory */
-    free_all_local_names();
-
-    for (q = all_globals; NULL != (g = q); )
+    /* Save argument types into A_TYPES. */
+    if (pragma_save_types)
     {
-         q = g->next_all;
-         free_shared_identifier(g);
+        extend_mem_block(A_ARGUMENT_TYPE_INDEX, ARGTYPE_COUNT * sizeof(A_ARGUMENT_TYPE_INDEX_t));
+        for (i = 0; i < ARGTYPE_COUNT; i++)
+            ARGUMENT_TYPE_INDEX(i) = get_type_index(ARGUMENT_TYPE(i));
     }
+    else
+        mem_block[A_ARGUMENT_INDEX].current_size = 0;
 
-    while(last_yalloced)
-    {
-        yfree(last_yalloced);
-        debug_message("%s freeing lost block\n", time_stamp());
-    }
+    if (PROG_TYPE_COUNT > USHRT_MAX)
+        yyerror("Too many types");
+    for (i = 0; (size_t)i < ARGTYPE_COUNT; i++)
+        free_lpctype(ARGUMENT_TYPE(i));
+    mem_block[A_ARGUMENT_TYPES].current_size = 0;
 
-    if (all_efun_shadows)
-    {
-        efun_shadow_t *s, *t;
-
-        for (t = all_efun_shadows; NULL != (s = t); )
-        {
-            s->shadow->u.global.function = I_GLOBAL_FUNCTION_OTHER;
-            s->shadow->u.global.variable = I_GLOBAL_VARIABLE_FUN;
-            t = s->next;
-            xfree(s);
-        }
-        all_efun_shadows = NULL;
-    }
-
-    all_globals = NULL;
-    
-    remove_unknown_identifier();
-
-    /* Remove the concrete struct definition from the lpctype object. */
+    /* Remove the concrete struct definition from the lpctype object
+     * and free the reference we took.
+     */
     for (i = 0; (size_t)i < STRUCT_COUNT; i++)
-        clean_struct_type(STRUCT_DEF(i).type->name->lpctype);
+    {
+        lpctype_t *t = STRUCT_DEF(i).type->name->lpctype;
+        clean_struct_type(t);
+        t->t_struct.def_idx = USHRT_MAX;
+        free_lpctype(t);
+    }
 
     /* Now create the program structure */
     switch (0) { default:
@@ -19970,13 +22931,6 @@ epilog (void)
 
         size = align(sizeof (program_t));
 
-        if (!pragma_save_types)
-        {
-            for (i = 0; (size_t)i < ARGTYPE_COUNT; i++)
-                free_lpctype(ARGUMENT_TYPE(i));
-            mem_block[A_ARGUMENT_TYPES].current_size = 0;
-            mem_block[A_ARGUMENT_INDEX].current_size = 0;
-        }
         for (i = 0; i< NUMPAREAS; i++)
         {
             if (i != A_LINENUMBERS)
@@ -20115,6 +23069,17 @@ epilog (void)
 
         p += align(mem_block[A_VIRTUAL_VAR].current_size);
 
+        prog->num_local_variables = LOCAL_VARIABLE_DBG_COUNT;
+        if (LOCAL_VARIABLE_DBG_COUNT)
+        {
+            prog->local_variables = (A_LOCAL_VARIABLES_DBG_t *)p;
+            memcpy(p, mem_block[A_LOCAL_VARIABLES_DBG].block,
+                      mem_block[A_LOCAL_VARIABLES_DBG].current_size);
+            p += align(mem_block[A_LOCAL_VARIABLES_DBG].current_size);
+        }
+        else
+            prog->local_variables = NULL;
+
         /* Add the inheritance information, and don't forget
          * to delete our internal flags.
          */
@@ -20162,20 +23127,34 @@ epilog (void)
             prog->includes = NULL;
         p += align(mem_block[A_INCLUDES].current_size);
 
-        /* Add the argument type information
+        /* Add the type information
          */
-        if (pragma_save_types)
+        prog->num_types = PROG_TYPE_COUNT;
+        if (prog->num_types)
         {
-            if (mem_block[A_ARGUMENT_TYPES].current_size)
-                memcpy(p, mem_block[A_ARGUMENT_TYPES].block,
-                       mem_block[A_ARGUMENT_TYPES].current_size);
-            prog->argument_types = (A_ARGUMENT_TYPES_t *)p;
-            prog->num_argument_types = ARGTYPE_COUNT;
-            p += align(mem_block[A_ARGUMENT_TYPES].current_size);
+            memcpy(p, mem_block[A_TYPES].block
+                    , mem_block[A_TYPES].current_size);
+            prog->types = (A_TYPES_t *)p;
+        }
+        else
+        {
+            assert(GET_BLOCK_COUNT(A_ARGUMENT_TYPE_INDEX) == 0);
+            prog->types = NULL;
+        }
+        p += align(mem_block[A_TYPES].current_size);
+
+        /* Add argument type information.
+         */
+        if (GET_BLOCK_COUNT(A_ARGUMENT_TYPE_INDEX))
+        {
+            memcpy(p, mem_block[A_ARGUMENT_TYPE_INDEX].block
+                    , mem_block[A_ARGUMENT_TYPE_INDEX].current_size);
+            prog->argument_types = (A_ARGUMENT_TYPE_INDEX_t *)p;
+            p += align(mem_block[A_ARGUMENT_TYPE_INDEX].current_size);
 
             if (mem_block[A_ARGUMENT_INDEX].current_size)
-                memcpy(p, mem_block[A_ARGUMENT_INDEX].block,
-                       mem_block[A_ARGUMENT_INDEX].current_size);
+                memcpy(p, mem_block[A_ARGUMENT_INDEX].block
+                        , mem_block[A_ARGUMENT_INDEX].current_size);
             prog->type_start = (A_ARGUMENT_INDEX_t *)p;
             p += align(mem_block[A_ARGUMENT_INDEX].current_size);
         }
@@ -20183,10 +23162,6 @@ epilog (void)
         {
             prog->argument_types = NULL;
             prog->type_start = NULL;
-            prog->num_argument_types = 0;
-
-            for (i = 0; (size_t)i < ARGTYPE_COUNT; i++)
-                free_lpctype(ARGUMENT_TYPE(i));
         }
 
         /* Add the lightweight object call cache.
@@ -20268,49 +23243,116 @@ epilog (void)
     /* If we come here, the program couldn't be created - just
      * free all memory.
      */
+    epilog_free_all();
+
+} /* epilog() */
+
+/*-------------------------------------------------------------------------*/
+static lambda_t *
+epilog_closure (int num_args)
+
+/* The parser finished with an expression or block,
+ * generate a closure for it, if parsing was successful.
+ */
+
+{
+    lambda_t *l = NULL;
+
+    /* Some things should not be possible within an expression or block .*/
+    assert(STRING_COUNT == 0);
+    assert(STRUCT_COUNT == 0);
+    assert(NV_VARIABLE_COUNT == 0);
+    assert(V_VARIABLE_COUNT == 0);
+    assert(FUNCTION_COUNT == 0);
+    assert(INHERIT_COUNT == 0);
+    assert(last_initializer_end < 0);
+    assert(inherit_file == NULL);
+    assert(num_lwo_calls == 0);
+
+    /* Check the string block. We don't have to count the include file names
+     * as those won't be accessed from the program code.
+     */
+    if (LAMBDA_VALUES_COUNT > 0x10000)
+        yyerror("Too many values");
+
+    if (!num_parse_error &&CURRENT_PROGRAM_SIZE > FUNSTART_MASK)
+        yyerror("Program too large");
+
+    /* Now create the closure. */
+    while (1)
     {
-        function_t *functions;
+        size_t size, num_values;
+        svalue_t *values;
+        void *block;
 
-        /* Free all function names and type data. */
-        functions = FUNCTION(0);
-        for (i = num_functions; --i >= 0; functions++)
+        /* On error, don't create anything */
+        if (num_parse_error > 0)
+            break;
+
+        /* Compute the size of the closure.
+         */
+        assert(lambda_values_table_level == 0);
+        assert(lambda_values_offset == 0);
+        num_values = LAMBDA_VALUES_COUNT;
+        size = sizeof(lambda_t) + CURRENT_PROGRAM_SIZE + num_values * sizeof(svalue_t);
+
+        /* Allocate the lambda structure. */
+        if ( !(block = xalloc(size)) )
         {
-            if ( !(functions->flags & NAME_INHERITED) && functions->name )
-            {
-                /* The other references have been adopted. */
-                free_mstring(functions->name);
-            }
-            free_lpctype(functions->type);
+            yyerrorf("Out of memory: closure structure (%zd bytes)", size);
+            break;
         }
 
-        do_free_sub_strings( num_strings
-                           , GET_BLOCK(A_STRINGS)
-                           , num_variables
-                           , GET_BLOCK(A_VIRTUAL_VAR)
-                           , INCLUDE_COUNT
-                           , GET_BLOCK(A_INCLUDES)
-                           , STRUCT_COUNT
-                           , GET_BLOCK(A_STRUCT_DEFS)
-                           );
+        /* Fill the lambda structure. */
+        l = (lambda_t*)(block + num_values * sizeof(svalue_t));
 
-        /* Free the type information */
-        for (i = 0; (size_t)i < ARGTYPE_COUNT; i++)
-            free_lpctype(ARGUMENT_TYPE(i));
+        closure_init_base(&(l->base), current_object);
 
-        compiled_prog = NULL;
+        memcpy(l->program, mem_block[A_PROGRAM].block, CURRENT_PROGRAM_SIZE);
 
-        for (i = 0; i < NUMAREAS; i++)
+        l->num_values = num_values;
+        l->num_arg = num_args;
+        l->num_opt_arg = 0;
+        l->num_locals = max_number_of_locals - num_args + max_break_stack_need;
+        l->num_values = num_values;
+        l->xvarargs = false;
+
+        /* We need to reverse the order of lambda values. */
+        values = (svalue_t*) block;
+        for (int i = LAMBDA_VALUES_COUNT; i > 0; i--)
         {
-            xfree(mem_block[i].block);
+            *values = LAMBDA_VALUE(i-1);
+            values++;
         }
+        /* References have been adopted. */
+        GET_BLOCK_SIZE(A_LAMBDA_VALUES) = 0;
+        GET_BLOCK_SIZE(A_LAMBDA_VALUES_NEXT) = 0;
 
-        local_variables = NULL;
-        context_variables = NULL;
-        return;
+        break;
     }
 
-    /* NOTREACHED */
-} /* epilog() */
+    epilog_cleanup();
+
+    /* Remove the concrete struct definition from the lpctype object
+     * and free the reference we took.
+     */
+    for (int i = 0; i < LAMBDA_STRUCTS_COUNT; i++)
+    {
+        lpctype_t *t;
+
+        if (LAMBDA_STRUCT(i).type == NULL)
+            continue;
+
+        t = LAMBDA_STRUCT(i).type->name->lpctype;
+        clean_struct_type(t);
+        t->t_struct.def_idx = USHRT_MAX;
+        free_lpctype(t);
+    }
+
+    epilog_free_all();
+
+    return l;
+} /* epilog_closure() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -20322,6 +23364,7 @@ compile_file (int fd, const char * fname,  Bool isMasterObj)
 {
     prolog(fname, isMasterObj);
     start_new_file(fd, fname);
+    pragma_no_simul_efuns = isMasterObj;
     yyparse();
     /* If the parse failed, either num_parse_error != 0
      * or inherit_file != NULL here.
@@ -20331,14 +23374,109 @@ compile_file (int fd, const char * fname,  Bool isMasterObj)
 } /* compile_file() */
 
 /*-------------------------------------------------------------------------*/
-Bool
-is_undef_function (bytecode_p fun)
+static lambda_t *
+compile_string (string_t *expr, code_context_t *context, bool block)
 
-/* Return TRUE if <fun> points to a referenced but undefined function.
+/* Compile an LPC expression (block==false) or code block (block==true).
+ * This is compiled into a closure, but using the regular LPC compiler.
+ * So we need to initialize everything to simulate a simple program.
  */
 
 {
-    return GET_CODE(fun) == F_UNDEF;
+    lambda_t* l;
+
+    prolog(NULL, false);
+    string_context = context;
+    string_context->error_msg[0] = 0;
+
+    if (block)
+        start_new_block(expr, context->detect_end);
+    else
+        start_new_expr(expr, context->detect_end);
+    pragma_no_simul_efuns = false;
+
+    block_depth = 1;
+    init_scope(block_depth);
+
+    for (int i = 0; i < context->num_args; i++)
+    {
+        string_t *name = context->arg_names[i].u.str;
+        ident_t *ident, *var;
+
+        /* The caller checks the type of the names to be symbols. */
+        assert(context->arg_names[i].type == T_SYMBOL);
+
+        ident = make_shared_identifier_mstr(context->arg_names[i].u.str, I_TYPE_UNKNOWN, 0);
+        if (ident->type == I_TYPE_LOCAL)
+            yyerrorf("Argument '%.*s' was given twice", (int)mstrsize(name), get_txt(name));
+        else
+        {
+            var = add_local_name(ident, get_fulltype(lpctype_mixed), 1);
+            use_variable(var, VAR_USAGE_READWRITE);
+        }
+    }
+
+    enter_block_scope();
+    exact_types = lpctype_mixed;
+
+    if (context->make_async)
+    {
+        ins_f_code(F_TRANSFORM_TO_COROUTINE);
+        ins_local_names();
+        /* The first call_coroutine() value will be ignored. */
+        ins_f_code(F_POP_VALUE);
+
+        def_function_coroutine = true;
+    }
+    else
+        def_function_coroutine = false;
+
+    yyparse();
+    if (!num_parse_error)
+        ins_f_code(block ? F_RETURN0 : F_RETURN);
+
+    leave_block_scope(false);
+    block_depth = 0;
+    l = epilog_closure(context->num_args);
+    if (block)
+        end_new_block();
+    else
+        end_new_expr();
+
+    return l;
+} /* compile_string() */
+
+/*-------------------------------------------------------------------------*/
+lambda_t *
+compile_expr (string_t *expr, code_context_t *context)
+
+/* Compile an LPC expression into a closure.
+ */
+
+{
+    return compile_string(expr, context, false);
+} /* compile_expr() */
+
+/*-------------------------------------------------------------------------*/
+lambda_t *
+compile_block (string_t *block, code_context_t *context)
+
+/* Compile an LPC code block into a closure.
+ */
+
+{
+    return compile_string(block, context, true);
+} /* compile_block() */
+
+/*-------------------------------------------------------------------------*/
+bool
+is_undef_function (function_t *header, bytecode_p funstart)
+
+/* Return TRUE if the function points to a referenced but undefined function.
+ */
+
+{
+    return GET_CODE(funstart + sizeof(unsigned short) * header->num_opt_arg) == F_UNDEF;
 } /* is_undef_function() */
 
 /*-------------------------------------------------------------------------*/
@@ -20399,7 +23537,8 @@ clear_compiler_refs (void)
     clear_lpctype_ref(lpctype_string_bytes);
     clear_lpctype_ref(lpctype_string_or_bytes_array);
     clear_lpctype_ref(lpctype_string_object);
-    clear_lpctype_ref(lpctype_string_object_array);
+    clear_lpctype_ref(lpctype_string_object_lwobject);
+    clear_lpctype_ref(lpctype_string_object_lwobject_array);
     clear_lpctype_ref(lpctype_lwobject_array);
     clear_lpctype_ref(lpctype_any_object_or_lwobject);
     clear_lpctype_ref(lpctype_any_object_or_lwobject_array);
@@ -20407,6 +23546,7 @@ clear_compiler_refs (void)
     clear_lpctype_ref(lpctype_int_or_string);
     clear_lpctype_ref(lpctype_string_or_string_array);
     clear_lpctype_ref(lpctype_catch_msg_arg);
+    clear_lpctype_ref(lpctype_mapping_or_closure);
 }
 
 void
@@ -20431,13 +23571,15 @@ count_compiler_refs (void)
     count_lpctype_ref(lpctype_string_bytes);
     count_lpctype_ref(lpctype_string_or_bytes_array);
     count_lpctype_ref(lpctype_string_object);
-    count_lpctype_ref(lpctype_string_object_array);
+    count_lpctype_ref(lpctype_string_object_lwobject);
+    count_lpctype_ref(lpctype_string_object_lwobject_array);
     count_lpctype_ref(lpctype_lwobject_array);
     count_lpctype_ref(lpctype_any_object_or_lwobject);
     count_lpctype_ref(lpctype_any_object_or_lwobject_array);
     count_lpctype_ref(lpctype_any_object_or_lwobject_array_array);
     count_lpctype_ref(lpctype_int_or_string);
     count_lpctype_ref(lpctype_string_or_string_array);
+    count_lpctype_ref(lpctype_mapping_or_closure);
 
     /* lpctype_catch_msg_arg has non-static union members,
      * we need to handle them explicitly.

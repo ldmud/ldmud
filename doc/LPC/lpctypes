@@ -1,0 +1,48 @@
+CONCEPT
+        lpctypes
+
+INTRODUCTION
+        An lpctype variable stores an LPC type like int or string*.
+        They are mainly used in the check_types() efun, but also for
+        introspection with functionlist() and variable_list().
+
+DEFINITION
+        An lpctype literal can be created either by writing the type
+        in brackets or using the decltype(LPC) operator:
+
+            lpctype t1 = [int];
+            lpctype t2 = decltype(t1);    /* t2 will be [lpctype] */
+
+        The type in brackets can be any type declaration, similar to
+        the type declarations of variable or function result.
+
+OPERATIONS
+        lpctypes support the following operations:
+
+        t1 | t2
+
+            Create a union type of both types.
+
+        t1 & t2
+
+            Create the intersection of both types. If the intersection
+            is empty [void] will be returned.
+
+        t1 in t2
+
+            Yields 1 if t1 is a subset of t2.
+
+EXAMPLE
+        void process(mixed value)
+        {
+            if (check_type(value, [int|float]))
+                process_number(value);
+            else
+                process_anything(value);
+        }
+
+HISTORY
+        The type was introduced in LDMud 3.6.7.
+
+SEE ALSO
+        check_type(E), decltype(LPC)

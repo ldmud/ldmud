@@ -9,6 +9,6 @@ DESCRIPTION
         a.g. referencep(&x).
 
 SEE ALSO
-        references(LPC), bytesp(E), clonep(E), closurep(E), floatp(E),
-        mappingp(E), objectp(E), intp(E), pointerp(E), stringp(E),
-        symbolp(E), structp(E)
+        references(LPC), bytesp(E), clonep(E), closurep(E), coroutinep(E),
+        floatp(E), intp(E), lpctypep(E), lwobjectp(E), mappingp(E),
+        objectp(E), pointerp(E), stringp(E), structp(E), symbolp(E)

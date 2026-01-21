@@ -383,6 +383,21 @@ struct variable_s
 };
 
 
+/* --- struct local_variable_dbg_s: information of a local variable
+ *
+ * This structure is only used during runtime for debugging.
+ */
+
+struct local_variable_dbg_s
+{
+    string_t  *name;    /* Name of the variable. */
+    lpctype_t *type;    /* Type of the variable. */
+    uint32_t   code_start, code_end;
+                        /* The code block where this variable occurs. */
+    uint8_t   idx;      /* Index on the stack relative to fp. */
+};
+
+
 /* Constants for inherit_type in inherit_s */
 enum inherit_types {
     INHERIT_TYPE_NORMAL    = 0x0000,  /* Type: Normal inherit */
@@ -486,6 +501,14 @@ struct struct_def_s
     int             inh;    /* -1, or the index of the inherit where this
                              * struct came from.
                              */
+};
+
+/* --- enum struct_special_inh: Special values for struct_def_s->inh. */
+enum struct_special_inh
+{
+    STRUCT_INH_LOCAL = -1,  /* Local defined structs.                   */
+    STRUCT_INH_USAGE = -2,  /* Usage-only structs, derived from a type. */
+    STRUCT_INH_SEFUN = -3,  /* Structs taken from the simul-efun.       */
 };
 
 
@@ -626,6 +649,11 @@ struct program_s
       /* Array [.num_variables] with the flags, types and names of all
        * variables.
        */
+    local_variable_dbg_t *local_variables;
+      /* Array [.num_local_variables] with information for all local variables.
+       * This can be NULL when not enabled. The entries are sorted by
+       * .code_start and .code_end.
+       */
     call_cache_t *lwo_call_cache;
       /* The cache for lightweight object calls. The index is given
        * with the F_CALL_OTHER/STRICT_CACHED opcode.
@@ -646,16 +674,24 @@ struct program_s
       /* Index of the heart beat function. -1 means no heart beat
        */
 
-    /* The types of all function arguments are saved in the
-     * .argument_types[]. To look up the arguments types for
-     * function <n>, retrieve the start index from the .type_start[]
-     * as .type_start[n]. If this index is INDEX_START_NONE, the function
-     * has no type information.
+    lpctype_t **types;
+      /* A list of all types used in the program.
+       */
+
+    /* The types of all function arguments are saved in the .argument_types[].
+     * To look up the arguments types for function <n>:
+     *  - Retrieve the start index from the .type_start[] as i=.type_start[n].
+     *    If this index is INDEX_START_NONE, the function has no type
+     *    information.
+     *  - Get the type indices from .argument_types[] for the arguments
+     *    starting with i as j=.argument_types[i+x] (x is argument position).
+     *  - Get the type from .types as .types[j].
      *
+     * This is also used for foreach() variables.
      * Both arrays will only be allocated if '#pragma save_types' has
      * been specified.
      */
-    lpctype_t **argument_types;
+    unsigned short *argument_types;
     unsigned short *type_start;
       /* TODO: Some code relies on this being unsigned short */
 
@@ -700,8 +736,10 @@ struct program_s
       /* Number of (directly) inherited programs */
     unsigned short num_structs;
       /* Number of listed struct definitions */
-    unsigned int   num_argument_types;
-      /* Number of argument types in .argument_types */
+    unsigned int   num_types;
+      /* Number of types in .types */
+    uint32_t       num_local_variables;
+      /* Number of entries in .local_variables. */
 };
 
 /* Constants for flags in program_s. */
@@ -802,7 +840,7 @@ struct function_s
         uint32 fx;       /* Function index, this is not an offset. */
 
         /* These entries are used by simul_efun.c. */
-        lpctype_t **argtypes;
+        unsigned short *argtypes;
            /* Argument types for this simul_efun. */
 
         uint32 next_sefun;
@@ -911,9 +949,9 @@ static INLINE intptr_t CROSSDEF_NAME_OFFSET(const funflag_t flags)
    * the real functions index from the flags.
    */
 {
-    // flags is unsigned, but the offset _must_ be signed
+    // flags and INHERIT_MASK is unsigned, but the offset _must_ be signed.
     return ((sfunflag_t)(flags & INHERIT_MASK)) - 
-                          ((INHERIT_MASK + 1) >> 1);
+            (sfunflag_t)((INHERIT_MASK + 1) >> 1);
 }
 
 static INLINE intptr_t GET_CROSSDEF_OFFSET(const funflag_t value)
@@ -924,8 +962,9 @@ static INLINE intptr_t GET_CROSSDEF_OFFSET(const funflag_t value)
    * is supposed to be the plain number, not a real function flags word.
    */
 {
-    // value is unsigned, but the offset _must_ be signed
-    return ((sfunflag_t)(value)) - ((INHERIT_MASK + 1) >> 1);
+    // value and INHERIT_MASK is unsigned, but the offset _must_ be signed.
+    return ((sfunflag_t)(value)) -
+            (sfunflag_t)((INHERIT_MASK + 1) >> 1);
 }
 
 static INLINE funflag_t MAKE_CROSSDEF_OFFSET(const intptr_t value)
@@ -935,7 +974,6 @@ static INLINE funflag_t MAKE_CROSSDEF_OFFSET(const intptr_t value)
    * in the function flags.
    */
 {
-    // flags is unsigned, but the offset _must_ be signed
     return ((value) + ((INHERIT_MASK + 1) >> 1));
 }
 
@@ -947,7 +985,6 @@ static INLINE funflag_t MAKE_CROSSDEF_ROFFSET(const intptr_t value)
    * TODO: What is this exactly?
    */
 {
-    // flags is unsigned, but the offset _must_ be signed
     return ((value) - ((INHERIT_MASK + 1) >> 1));
 }
 

@@ -66,6 +66,13 @@ Memory management
 * max. size of single large block in slaballo.c and smalloc.c:
   0x07ffffff (134217727, defined by M_MASK)
 
+Ref-counted entities
+====================
+
+* Reference counters for entities with ref-counters (arrays, objects,
+  mappings, structs, closures etc.) overflow at 4294967295 users
+  pointing to them (268435455 for strings). When this happens, these
+  entities could be erroneously free'd.
 
 Language
 ========

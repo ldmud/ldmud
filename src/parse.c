@@ -661,7 +661,7 @@ stack_put (svalue_t *pval, svalue_t *sp, size_t pos, int max)
 
 {
     if (pval && pos < (size_t)max && sp[pos].type == T_LVALUE)
-        transfer_svalue(sp[pos].u.lvalue, pval);
+        transfer_svalue(sp + pos, pval);
 } /* stack_put() */
 
 /*-------------------------------------------------------------------------*/
@@ -1345,15 +1345,17 @@ prepos_parse (vector_t *wvec, size_t *cix_in, Bool *fail, svalue_t *prepos)
 {
   static svalue_t stmp;
 
+  svalue_t *rv;
   vector_t *pvec, *tvec;
   string_t *tmp;
   size_t    pix, tix;
 
   /* Determine list to match against */
-  if (!prepos || prepos->type != T_POINTER)
+  rv = prepos ? get_rvalue_no_collapse(prepos, NULL) : NULL;
+  if (!rv || rv->type != T_POINTER)
       pvec = gPrepos_list;
   else
-      pvec = prepos->u.vec;
+      pvec = rv->u.vec;
 
   for (pix = 0; (p_int)pix < VEC_SIZE(pvec); pix++)
   {
@@ -1404,7 +1406,6 @@ prepos_parse (vector_t *wvec, size_t *cix_in, Bool *fail, svalue_t *prepos)
       stmp = pvec->item[0];
       pvec->item[0] = pvec->item[pix];
       pvec->item[pix] = stmp;
-      ref_array(pvec); /* The caller will free the prepos at some point. */
       *fail = MY_FALSE;
   }
   else
@@ -1647,7 +1648,7 @@ v_parse_command (svalue_t *sp, int num_arg)
 
     pattern = trim_all_spaces(argp[2].u.str);
     free_mstring(argp[2].u.str);
-    argp[2].u.str = cmd;
+    argp[2].u.str = pattern;
 
     ob_or_array = argp + 1;
 
@@ -1710,7 +1711,7 @@ v_parse_command (svalue_t *sp, int num_arg)
     old->previous = gPrevious_context;
     gPrevious_context = old;
 
-    push_error_handler(parse_error_handler, &error_handler_addr);
+    sp = push_error_handler(parse_error_handler, &error_handler_addr);
 
     /* Make space for the list arrays */
 
@@ -1792,8 +1793,7 @@ v_parse_command (svalue_t *sp, int num_arg)
                 do {
                     fail = MY_FALSE;
                     pval = sub_parse(obvec, patvec, &pix, wvec, &cix, &fail
-                                     , (six < (size_t)num_arg) ? argp[six].u.lvalue
-                                                       : 0);
+                                     , (six < (size_t)num_arg) ? argp + six : 0);
                     if (fail)
                     {
                         cix = ++ocix;
@@ -1819,7 +1819,7 @@ v_parse_command (svalue_t *sp, int num_arg)
         {
             /* Everything else is handled by sub_parse() */
             pval = sub_parse( obvec, patvec, &pix, wvec, &cix, &fail
-                            , (six < (size_t)num_arg) ? argp[six].u.lvalue : 0);
+                            , (six < (size_t)num_arg) ? argp + six : 0);
         }
 
         if (!fail && pval)

@@ -1,0 +1,31 @@
+SYNOPSIS
+        #include <sys/driver_hooks.h>
+
+        set_driver_hook(H_CREATE_LWOBJECT_RESTORE, value)
+
+        <value> being:
+
+          void <name>    ()
+          void <closure> ()
+          void <closure> (lwobject obj_to_init)
+
+DESCRIPTION
+        Optional hook to finish initialization of a restored lightweight
+        object. Hook setting can be any closure, or the name of the
+        function (static or public) to call in the object.
+
+        If the hook is an unbound lambda closure expecting arguments, it is
+        bound to the current object and called with the created object as
+        the first argument. If the hook is an unbound lambda closure without
+        arguments, it is bound to the object to be initalized and called.
+        If the hook is any other type of closure, it is called with the
+        created object as the first argument.
+
+        If the hook is defined as the name of an lfun in the lightweight
+        object, it is called in the new lwobject.
+
+HISTORY
+        Introduced in LDMud 3.6.6.
+
+SEE ALSO
+        hooks(C), create_lwobject(H), restore_value(E), restore_object(E)

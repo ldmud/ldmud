@@ -57,3 +57,8 @@ closure get_a_var_cl4()
 {
     return lambda(0, ({symbol_variable("a_var")}));
 }
+
+closure get_a_calc_cl()
+{
+    return #'calc;
+}

@@ -23,6 +23,7 @@ int deep_eq(mixed arg1, mixed arg2)
         case T_OBJECT:
         case T_LWOBJECT:
         case T_COROUTINE:
+        case T_LPCTYPE:
             return arg1 == arg2;
 
         case T_POINTER:
@@ -60,7 +61,7 @@ int deep_eq(mixed arg1, mixed arg2)
             if (CLOSURE_IS_BOUND_LAMBDA(t) ||
                 CLOSURE_IS_LAMBDA(t) ||
                 CLOSURE_IS_UNBOUND_LAMBDA(t))
-                raise_error("Don't know how to compare lambda closures.\n");
+                return arg1 == arg2;
             if (CLOSURE_IS_SIMUL_EFUN(t))
                 return 1;
             if (CLOSURE_IS_EFUN(t))

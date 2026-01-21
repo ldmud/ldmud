@@ -7,7 +7,7 @@
 void run_server()
 {
     add_action("test_action", "test");
-    ed("/dummy","ed_ends");
+    ed("/dummy-0000522","ed_ends");
 }
 
 void ed_ends()
@@ -36,7 +36,7 @@ void test_input_to(string str)
 
 void receive(string str, int nr)
 {
-    if(!strstr(str, "\"dummy\" ") || !strstr(str, "/dummy,"))
+    if(!strstr(str, "\"dummy-0000522\" ") || !strstr(str, "/dummy-0000522,"))
     {
         input_to("receive", 0, nr);
         return;

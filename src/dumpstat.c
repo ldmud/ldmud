@@ -102,6 +102,7 @@ svalue_size (svalue_t *v, mp_int * pTotal)
     case T_OBJECT:
     case T_NUMBER:
     case T_FLOAT:
+    case T_LPCTYPE:
         return 0;
 
     case T_STRING:
@@ -287,30 +288,33 @@ svalue_size (svalue_t *v, mp_int * pTotal)
         if (!CLOSURE_REFERENCES_CODE(v->x.closure_type))
         {
             if (v->x.closure_type == CLOSURE_LFUN)
-                composite = SIZEOF_LAMBDA(v->u.lambda->function.lfun.context_size);
+                composite = SIZEOF_LFUN_CLOSURE(v->u.lfun_closure->context_size);
             else /* CLOSURE_IDENTIFIER */
-                composite = sizeof *v->u.lambda;
+                composite = sizeof *v->u.identifier_closure;
 
             composite += sizeof(char *);
             *pTotal = composite;
-            return composite / v->u.lambda->ref;
+            return composite / v->u.closure->ref;
         }
         /* CLOSURE_LAMBDA */
         composite = overhead = 0;
-        l = v->u.lambda;
         if (v->x.closure_type == CLOSURE_BOUND_LAMBDA)
         {
-            total = sizeof *l - sizeof l->function + sizeof l->function.lambda;
+            bound_lambda_t *bl = v->u.bound_lambda;
+
+            total = sizeof *bl;
             *pTotal += total;
-            composite += total / l->ref;
-            l = l->function.lambda;
+            composite += total / bl->base.ref;
+            l = bl->lambda;
         }
-        num_values = l->function.code.num_values;
+        else
+            l = v->u.lambda;
+        num_values = l->num_values;
         svp = (svalue_t *)l - num_values;
         if (NULL == register_pointer(ptable, svp)) return 0;
         overhead = sizeof(svalue_t) * num_values + sizeof (char *);
         {
-            bytecode_p p = l->function.code.program;
+            bytecode_p p = l->program;
             do {
                 switch(GET_CODE(p++)) {
                   case F_RETURN:
@@ -332,8 +336,8 @@ svalue_size (svalue_t *v, mp_int * pTotal)
         }
 
         *pTotal += overhead;
-        if (l->ref)
-            return (overhead + composite) / l->ref;
+        if (l->base.ref)
+            return (overhead + composite) / l->base.ref;
         else
             return 0;
     }
@@ -544,7 +548,56 @@ svalue_size (svalue_t *v, mp_int * pTotal)
                     return 0;
             }
 
+            case LVALUE_PROTECTED_MAP_RANGE:
+            {
+                struct protected_map_range_lvalue *lv = v->u.protected_map_range_lvalue;
+
+                if (lv->ref)
+                {
+                    struct pointer_record* record = find_add_pointer(ptable, lv, MY_TRUE);
+                    if (record->ref_count < 0)
+                    {
+                        /* New entry, determine the size. */
+                        svalue_t m = { T_MAPPING };
+                        mp_int total2;
+
+                        record->ref_count = 1;
+                        record->id_number = 0;
+
+                        m.u.map = lv->map;
+
+                        overhead = sizeof *lv;
+                        composite = svalue_size(&(lv->key), &total);
+                        composite += svalue_size(&m, &total2);
+
+                        *pTotal = total + total2 + overhead;
+
+                        /* Record it for later occurrences. */
+                        record->id_number = overhead + composite;
+                        return record->id_number * record->ref_count / lv->ref;
+                    }
+                    else
+                    {
+                        /* We have seen it. Don't need to add to the total,
+                         * but the the shared result.
+                         */
+                        record->ref_count++;
+                        return record->id_number / lv->ref;
+                    }
+                }
+                else
+                    return 0;
+            }
+
         } /* switch */
+
+#ifdef USE_PYTHON
+    case T_PYTHON:
+        /* Difficult to determine the memory consumption of a Python object,
+         * so we don't do that here.
+         */
+        return 0;
+#endif
 
     default:
         fatal("Illegal type: %d\n", v->type);

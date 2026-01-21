@@ -116,6 +116,14 @@
 #    include SOCKET_INC
 #endif
 
+#ifdef USE_ANL
+#    ifdef HAS_C_ARES
+#        include <ares.h>
+#    else
+#        undef USE_ANL
+#    endif
+#endif
+
 #include "comm.h"
 #include "access_check.h"
 #include "actions.h"
@@ -204,6 +212,10 @@ extern int socketpair(int, int, int, int[2]);
 #    define INET_ADDRSTRLEN 16
 #endif
 
+#if defined(ERQ_DEMON) || defined(USE_ANL)
+#    define LOOKUP_IP_ADRESS
+#endif
+
 /* Amazing how complicated networking can be, hm? */
 
 /*-------------------------------------------------------------------------*/
@@ -284,6 +296,10 @@ statcounter_t inet_volume_in = 0;
 
 #endif
 
+#ifdef USE_ANL
+ares_channel anl_channel;
+#endif
+
 /*-------------------------------------------------------------------------*/
 
 #ifdef ERQ_DEMON
@@ -340,6 +356,9 @@ static erq_callback_t pending_erq[MAX_PENDING_ERQ+1];
 static erq_callback_t *free_erq;
   /* The first free entry in the freelist in pending_erq[] */
 
+#endif /* ERQ_DEMON */
+
+#ifdef LOOKUP_IP_ADRESS
 /* The size of the IPTABLE depends on the number of users,
  * and is at least 200.
  */
@@ -354,7 +373,7 @@ static erq_callback_t *free_erq;
 #endif
 
 static struct ipentry {
-    struct in_addr  addr;  /* The address (only .s_addr is significant) */
+    in4or6_addr     addr;  /* The address (only .s_addr is significant) */
     string_t       *name;  /* tabled string with the hostname for <addr> */
 } iptable[IPSIZE];
   /* Cache of known names for given IP addresses.
@@ -371,7 +390,7 @@ static int ipcur = 0;
   /* Index of the next entry to use in the iptable[].
    */
 
-#endif /* ERQ_DEMON */
+#endif /* LOOKUP_IP_ADRESS */
 
 /*-------------------------------------------------------------------------*/
 
@@ -390,12 +409,12 @@ static char host_name[MAXHOSTNAMELEN+1];
   /* This computer's hostname, used for query_host_name() efun.
    */
 
-static struct in_addr host_ip_number;
+static in4or6_addr host_ip_number;
   /* This computer's numeric IP address only, used for
    * the query_host_ip_number() efun.
    */
 
-static struct sockaddr_in host_ip_addr_template;
+static sockaddr_in4or6 host_ip_addr_template;
   /* The template address of this computer. It is copied locally
    * and augmented with varying port numbers to open the driver's ports.
    */
@@ -403,6 +422,15 @@ static struct sockaddr_in host_ip_addr_template;
 char * domain_name = NULL;
   /* This computer's domain name, as needed by lex.c::get_domainname().
    */
+
+#define STRINGIFY(s) #s
+#define TO_STRING(s) STRINGIFY(s)
+struct listen_port_s port_numbers[MAXNUMPORTS] = { { LISTEN_PORT_ANY, TO_STRING(PORTNO), PORTNO } };
+  /* The login port numbers.
+   * Negative numbers are not ports, but the numbers of inherited
+   * socket file descriptors.
+   */
+int numports = 0;  /* Number of specified ports */
 
 static int min_nfds = 0;
   /* The number of fds used by the driver's sockets (udp, erq, login).
@@ -478,18 +506,32 @@ static interactive_t *first_player_for_flush = NULL;
 
 typedef enum {
       ocNotUsed    /* Entry not used */
+    , ocNameResolutionInThread
+                   /* Name resolution is performed for the connection,
+                    * the efun is still running an will return the status.
+                    */
+    , ocNameResolutionOutsideThread
+                   /* Name resolution is performed for the connection,
+                    * status needs to be passed to the logon() function.
+                    */
     , ocUsed       /* Entry holds pending connection */
     , ocLoggingOn  /* Entry is doing the LPC logon protocol.
                     * This value should not appear outside of
                     * check_for_out_connections(), if it does, it
                     * means that LPC logon threw an error.
                     */
+    , ocFailure    /* When ocNameResolutionInThread used to
+                    * report a failure.
+                    */
 } OutConnStatus;
 
 struct OutConn {
-    struct sockaddr_in   target;   /* Address connected to (allocated) */
+    sockaddr_in4or6      target;   /* Address connected to (allocated) */
     object_t           * curr_obj; /* Associated object */
-    int                  socket;   /* Socket on our side */
+    union {
+        int              socket;   /* Socket on our side */
+        int              error;    /* Error code for .ocFailure */
+    };
     OutConnStatus        status;   /* Status of this entry */
 } outconn[MAX_OUTCONN];
 
@@ -510,7 +552,7 @@ static void send_dont(int);
 static void add_flush_entry(interactive_t *ip);
 static void remove_flush_entry(interactive_t *ip);
 static void clear_message_buf(interactive_t *ip);
-static void new_player(object_t *receiver, SOCKET_T new_socket, struct sockaddr_in *addr, size_t len, int login_port);
+static void new_player(object_t *receiver, SOCKET_T new_socket, sockaddr_in4or6 *addr, size_t len, int login_port);
 
 #ifdef ERQ_DEMON
 
@@ -518,13 +560,18 @@ static long read_32(char *);
 static Bool send_erq(int handle, int request, const char *arg, size_t arglen);
 static void shutdown_erq_demon(void);
 static void stop_erq_demon(Bool);
-static string_t * lookup_ip_entry (struct in_addr addr, Bool useErq);
-static void add_ip_entry(struct in_addr addr, const char *name);
+static void add_ip_entry(in4or6_addr addr, const char *name);
 #ifdef USE_IPV6
 static void update_ip_entry(const char *oldname, const char *newname);
 #endif
 
 #endif /* ERQ_DEMON */
+
+#ifdef LOOKUP_IP_ADRESS
+
+static string_t * lookup_ip_entry (in4or6_addr addr, Bool useErq);
+
+#endif /* LOOKUP_IP_ADRESS */
 
 static INLINE ssize_t comm_send_buf(char *msg, size_t size, interactive_t *ip);
 
@@ -550,78 +597,12 @@ static INLINE ssize_t comm_send_buf(char *msg, size_t size, interactive_t *ip);
 #  define s6_addr32 __u6_addr.__u6_addr32
 #endif
 
-static inline void CREATE_IPV6_MAPPED(struct in_addr *v6, uint32 v4) {
+static inline void CREATE_IPV6_MAPPED(struct in6_addr *v6, uint32 v4) {
   v6->s6_addr32[0] = 0;
   v6->s6_addr32[1] = 0;
   v6->s6_addr32[2] = htonl(0x0000ffff);
   v6->s6_addr32[3] = v4;
 }
-
-/* These are the typical IPv6 structures - we use them transparently.
- *
- * --- arpa/inet.h ---
- *
- * struct in6_addr {
- *         union {
- *                 u_int32_t u6_addr32[4];
- * #ifdef notyet
- *                 u_int64_t u6_addr64[2];
- * #endif
- *                 u_int16_t u6_addr16[8];
- *                 u_int8_t  u6_addr8[16];
- *         } u6_addr;
- * };
- * #define s6_addr32       u6_addr.u6_addr32
- * #ifdef notyet
- * #define s6_addr64       u6_addr.u6_addr64
- * #endif
- * #define s6_addr16       u6_addr.u6_addr16
- * #define s6_addr8        u6_addr.u6_addr8
- * #define s6_addr         u6_addr.u6_addr8
- *
- * --- netinet/in.h ---
- *
- * struct sockaddr_in6 {
- *    u_char                sin6_len;
- *    u_char                sin6_family;
- *    u_int16_t        sin6_port;
- *    u_int32_t        sin6_flowinfo;
- *    struct                 in6_addr        sin6_addr;
- * };
- *
- */
-
-/*-------------------------------------------------------------------------*/
-static char *
-inet6_ntoa (struct in6_addr in)
-
-/* Convert the ipv6 address <in> into a string and return it.
- * Note: the string is stored in a local buffer.
- */
-
-{
-    static char str[INET6_ADDRSTRLEN+1];
-
-    if (NULL == inet_ntop(AF_INET6, &in, str, INET6_ADDRSTRLEN))
-    {
-        perror("inet_ntop");
-    }
-    return str;
-} /* inet6_ntoa() */
-
-/*-------------------------------------------------------------------------*/
-static struct in6_addr
-inet6_addr (const char *to_host)
-
-/* Convert the name <to_host> into a ipv6 address and return it.
- */
-
-{
-    struct in6_addr addr;
-
-    inet_pton(AF_INET6, to_host, &addr);
-    return addr;
-} /* inet6_addr() */
 
 #endif /* USE_IPV6 */
 
@@ -865,11 +846,9 @@ set_socket_nonblocking (SOCKET_T new_socket)
  */
 
 {
-    int tmp;
-
-    tmp = 1;
-
 # ifdef USE_IOCTL_FIONBIO
+    int tmp = 1;
+
     if (socket_ioctl(new_socket, FIONBIO, &tmp) == -1) {
         perror("ioctl socket FIONBIO");
         abort();
@@ -929,6 +908,129 @@ set_socket_own (SOCKET_T new_socket)
 #endif
     new_socket = 0; /* Prevent 'not used' warning */
 } /* set_socket_own() */
+
+/*-------------------------------------------------------------------------*/
+bool
+add_listen_port (const char *port)
+
+{
+    if (numports < MAXNUMPORTS)
+    {
+        const char* colon = strrchr(port, ':');
+        if (colon == NULL)
+        {
+            int p = atoi(port);
+            if (p <= 0)
+                return false;
+            port_numbers[numports++] = (struct listen_port_s){ LISTEN_PORT_ANY, port, p };
+            return true;
+        }
+        else
+        {
+            char* addr;
+            int length;
+            int p = atoi(colon+1);
+
+            if (p <= 0)
+                return false;
+
+            addr = strdup(port);
+            if (!addr)
+                return false;
+
+            length = colon - port;
+            addr[length] = 0;
+
+            port_numbers[numports] = (struct listen_port_s){ LISTEN_PORT_ADDR, port, p };
+
+            if (length == 0)
+            {
+                port_numbers[numports].addr = IN4OR6ADDR_ANY;
+            }
+            else if (addr[0] == '[' && addr[length-1] == ']')
+            {
+                addr[length-1] = 0;
+                if (!inet_pton(AF_INET4OR6, addr+1, &(port_numbers[numports].addr)))
+                {
+                    free(addr);
+                    return false;
+                }
+            }
+#ifndef USE_IPV6 // Only IPv4 allowed without []
+            else if (!inet_pton(AF_INET, addr, &(port_numbers[numports].addr)))
+            {
+                free(addr);
+                return false;
+            }
+#endif
+            else
+            {
+                free(addr);
+                return false;
+            }
+
+            numports++;
+            free(addr);
+            return true;
+        }
+    }
+
+    return false;
+} /* add_listen_port() */
+
+/*-------------------------------------------------------------------------*/
+bool
+add_inherited_port (const char *port)
+
+{
+    int p = atoi(port);
+    if (p && numports < MAXNUMPORTS)
+    {
+        port_numbers[numports++] = (struct listen_port_s){ LISTEN_PORT_INHERITED, port, p };
+        return true;
+    }
+    else
+        return false;
+} /* add_inherited_port() */
+
+/*-------------------------------------------------------------------------*/
+#if defined(USE_ANL) && defined(ALLOCATOR_WRAPPERS)
+static void* comm_malloc (size_t size)             { return pxalloc(size); }
+static void  comm_free (void* ptr)                 { pfree(ptr); }
+static void* comm_realloc (void* ptr, size_t size) { return prexalloc(ptr, size); }
+#endif
+/*-------------------------------------------------------------------------*/
+void
+comm_init ()
+
+/* General initialization of communications functions.
+ */
+
+{
+#ifdef LOOKUP_IP_ADRESS
+    /* Initialize the IP name lookup table */
+    memset(iptable, 0, sizeof(iptable));
+#endif
+
+#ifdef USE_ANL
+    int res;
+
+#  ifdef ALLOCATOR_WRAPPERS
+    res = ares_library_init_mem(ARES_LIB_INIT_ALL, comm_malloc, comm_free, comm_realloc);
+#  else
+    res = ares_library_init(ARES_LIB_INIT_ALL);
+#  endif
+    if (res)
+        fatal("Initialization of C-Ares failed: %s\n", ares_strerror(res));
+
+    res = ares_init(&anl_channel);
+    if (res)
+        fatal("Initialization of C-Ares channel failed: %s\n", ares_strerror(res));
+#endif
+
+    for (int i = 0; i < MAX_OUTCONN; i++)
+        outconn[i].status = ocNotUsed;
+} /* comm_init() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1016,112 +1118,101 @@ initialize_host_ip_number (const char *hname, const char * haddr)
     memset(&host_ip_addr_template, 0, sizeof host_ip_addr_template);
     if (haddr != NULL)
     {
-#ifndef USE_IPV6
-        host_ip_number.s_addr = inet_addr(haddr);
-        host_ip_addr_template.sin_family = AF_INET;
-        host_ip_addr_template.sin_addr = host_ip_number;
-#else
-        host_ip_number = inet6_addr(haddr);
-        host_ip_addr_template.sin_family = AF_INET6;
-        host_ip_addr_template.sin_addr = host_ip_number;
-#endif
-
-        /* Find the domain part of the hostname */
-        domain = strchr(host_name, '.');
+        inet_pton(AF_INET4OR6, haddr, &host_ip_number);
+        host_ip_addr_template.sin4or6_family = AF_INET4OR6;
+        host_ip_addr_template.sin4or6_addr = host_ip_number;
     }
     else
     {
-        struct hostent *hp;
+        struct addrinfo *addr, *current;
+        struct addrinfo hints = {
+            .ai_family = AF_INET4OR6,
+            .ai_socktype = SOCK_STREAM,
+            .ai_protocol = 0,
+            .ai_flags = AI_V4MAPPED | AI_ADDRCONFIG | AI_CANONNAME
+        };
+        int res;
 
-#ifndef USE_IPV6
-        hp = gethostbyname(host_name);
-        if (!hp) {
-            fprintf(stderr, "%s gethostbyname: unknown host '%s'.\n"
+        res = getaddrinfo(host_name, NULL, &hints, &addr);
+        if (res)
+        {
+            fprintf(stderr, "%s getaddrinfo: unknown host '%s': %s\n"
+                          , time_stamp(), host_name, gai_strerror(res));
+            exit(1);
+        }
+
+        for (current = addr; current != NULL; current = current->ai_next)
+            if (current->ai_family == AF_INET4OR6)
+                break;
+
+        if (!current)
+        {
+            freeaddrinfo(addr);
+            fprintf(stderr, "%s getaddrinfo: No suitable address for host '%s' found.\n"
                           , time_stamp(), host_name);
             exit(1);
         }
-        memcpy(&host_ip_addr_template.sin_addr, hp->h_addr, (size_t)hp->h_length);
-        host_ip_addr_template.sin_family = (unsigned short)hp->h_addrtype;
-#else
-        hp = gethostbyname2(host_name, AF_INET6);
-        if (!hp)
-            hp = gethostbyname2(host_name, AF_INET);
-        if (!hp)
+
+        if (current->ai_addrlen != sizeof(host_ip_addr_template))
         {
-            fprintf(stderr, "%s gethostbyname2: unknown host '%s'.\n"
+            freeaddrinfo(addr);
+            fprintf(stderr, "%s getaddrinfo: Wrong format for address of host '%s'.\n"
                           , time_stamp(), host_name);
             exit(1);
         }
-        memcpy(&host_ip_addr_template.sin_addr, hp->h_addr, (size_t)hp->h_length);
 
-        if (hp->h_addrtype == AF_INET)
-        {
-            CREATE_IPV6_MAPPED(&host_ip_addr_template.sin_addr, *(u_int32_t*)hp->h_addr_list[0]);
-        }
-        host_ip_addr_template.sin_family = AF_INET6;
-#endif
-
-        host_ip_number = host_ip_addr_template.sin_addr;
+        memcpy(&host_ip_addr_template, current->ai_addr, current->ai_addrlen);
+        host_ip_number = host_ip_addr_template.sin4or6_addr;
 
         /* Now set the template to the proper _ANY value */
-        memset(&host_ip_addr_template.sin_addr, 0, sizeof(host_ip_addr_template.sin_addr));
-#ifndef USE_IPV6
-        host_ip_addr_template.sin_addr.s_addr = INADDR_ANY;
-        host_ip_addr_template.sin_family = AF_INET;
-#else
-        host_ip_addr_template.sin_addr = in6addr_any;
-        host_ip_addr_template.sin_family = AF_INET6;
-#endif
+        memset(&host_ip_addr_template.sin4or6_addr, 0, sizeof(host_ip_addr_template.sin4or6_addr));
+        host_ip_addr_template.sin4or6_addr = IN4OR6ADDR_ANY;
+        host_ip_addr_template.sin4or6_family = AF_INET4OR6;
 
-        /* Find the domain part of the hostname */
-        if (hname == NULL)
-            domain = strchr(hp->h_name, '.');
-        else
-            domain = strchr(host_name, '.');
+        domain = strchr(addr->ai_canonname, '.');
+        if (domain)
+            domain_name = strdup(domain+1);
+
+        freeaddrinfo(addr);
     }
 
-#ifndef USE_IPV6
-    printf("%s Hostname '%s' address '%s'\n"
-          , time_stamp(), host_name, inet_ntoa(host_ip_number));
-    debug_message("%s Hostname '%s' address '%s'\n"
-                 , time_stamp(), host_name, inet_ntoa(host_ip_number));
-#else
-    printf("%s Hostname '%s' address '%s'\n"
-          , time_stamp(), host_name, inet6_ntoa(host_ip_number));
-    debug_message("%s Hostname '%s' address '%s'\n"
-                 , time_stamp(), host_name, inet6_ntoa(host_ip_number));
-#endif
+    {
+        char buf[INET4OR6_ADDRSTRLEN+1];
+
+        printf("%s Hostname '%s' address '%s'\n"
+            , time_stamp(), host_name, inet_ntop(AF_INET4OR6, &host_ip_number, buf, sizeof(buf)));
+    }
 
     /* Put the domain name part of the hostname into domain_name, then
      * strip it off the host_name[] (as only query_host_name() is going
      * to need it).
-     * Note that domain might not point into host_name[] here, so we
-     * can't just stomp '\0' in there.
      */
-    if (domain)
-    {
-        domain_name = strdup(domain+1);
-    }
-    else
-        domain_name = strdup("unknown");
-
     domain = strchr(host_name, '.');
     if (domain)
+    {
+        // Given argument has precedence over name lookup.
+        if (domain_name)
+            free(domain_name);
+
+        domain_name = strdup(domain+1);
         *domain = '\0';
+    }
+    else if (!domain_name)
+        domain_name = strdup("unknown");
 
     /* Initialize udp at an early stage so that the master object can use
      * it in inaugurate_master() , and the port number is known.
      */
     if (udp_port != -1)
     {
-        struct sockaddr_in host_ip_addr;
+        sockaddr_in4or6 host_ip_addr;
 
         memcpy(&host_ip_addr, &host_ip_addr_template, sizeof(host_ip_addr));
 
-        host_ip_addr.sin_port = htons((u_short)udp_port);
+        host_ip_addr.sin4or6_port = htons((u_short)udp_port);
         debug_message("%s UDP recv-socket requested for port: %d\n"
                      , time_stamp(), udp_port);
-        udp_s = socket(host_ip_addr.sin_family, SOCK_DGRAM, 0);
+        udp_s = socket(host_ip_addr.sin4or6_family, SOCK_DGRAM, 0);
         if (udp_s == -1)
         {
             perror("socket(udp_socket)");
@@ -1150,8 +1241,8 @@ initialize_host_ip_number (const char *hname, const char * haddr)
                                   , time_stamp(), udp_port);
                     debug_message("%s UDP port %d already bound!\n"
                                   , time_stamp(), udp_port);
-                    if (host_ip_addr.sin_port) {
-                        host_ip_addr.sin_port = 0;
+                    if (host_ip_addr.sin4or6_port) {
+                        host_ip_addr.sin4or6_port = 0;
                         continue;
                     }
                     close(udp_s);
@@ -1169,14 +1260,14 @@ initialize_host_ip_number (const char *hname, const char * haddr)
      * initialise it.
      */
     if (udp_s >= 0) {
-        struct sockaddr_in host_ip_addr;
+        sockaddr_in4or6 host_ip_addr;
 
         tmp = sizeof(host_ip_addr);
         if (!getsockname(udp_s, (struct sockaddr *)&host_ip_addr, &tmp))
         {
             int oldport = udp_port;
 
-            udp_port = ntohs(host_ip_addr.sin_port);
+            udp_port = ntohs(host_ip_addr.sin4or6_port);
             if (oldport != udp_port)
                 debug_message("%s UDP recv-socket on port: %d\n"
                              , time_stamp(), udp_port);
@@ -1217,14 +1308,6 @@ prepare_ipc(void)
     int i;
     struct sigaction sa; // for installing the signal handlers
 
-#ifdef ERQ_DEMON
-    /* Initialize the IP name lookup table */
-    memset(iptable, 0, sizeof(iptable));
-#endif
-
-    for (i = 0; i < MAX_OUTCONN; i++)
-        outconn[i].status = ocNotUsed;
-
     /* Initialize the telnet machine unless mudlib_telopts() already
      * did that.
      */
@@ -1237,16 +1320,19 @@ prepare_ipc(void)
      */
     for (i = 0; i < numports; i++)
     {
-        struct sockaddr_in host_ip_addr;
+        sockaddr_in4or6 host_ip_addr;
 
         memcpy(&host_ip_addr, &host_ip_addr_template, sizeof(host_ip_addr));
 
-        if (port_numbers[i] > 0)
+        if (port_numbers[i].type != LISTEN_PORT_INHERITED)
         {
             /* Real port number */
 
-            host_ip_addr.sin_port = htons((u_short)port_numbers[i]);
-            sos[i] = socket(host_ip_addr.sin_family, SOCK_STREAM, 0);
+            host_ip_addr.sin4or6_port = htons((u_short)port_numbers[i].port);
+            if (port_numbers[i].type == LISTEN_PORT_ADDR)
+                host_ip_addr.sin4or6_addr = port_numbers[i].addr;
+
+            sos[i] = socket(host_ip_addr.sin4or6_family, SOCK_STREAM, 0);
             if ((int)sos[i] == -1) {
                 perror("socket");
                 exit(1);
@@ -1259,10 +1345,10 @@ prepare_ipc(void)
             }
             if (bind(sos[i], (struct sockaddr *)&host_ip_addr, sizeof host_ip_addr) == -1) {
                 if (errno == EADDRINUSE) {
-                    fprintf(stderr, "%s Port %d already bound!\n"
-                                  , time_stamp(), port_numbers[i]);
-                    debug_message("%s Port %d already bound!\n"
-                                 , time_stamp(), port_numbers[i]);
+                    fprintf(stderr, "%s Port %s already bound!\n"
+                                  , time_stamp(), port_numbers[i].str);
+                    debug_message("%s Port %s already bound!\n"
+                                 , time_stamp(), port_numbers[i].str);
                     exit(errno);
                 } else {
                     perror("bind");
@@ -1274,10 +1360,14 @@ prepare_ipc(void)
 
             /* Existing socket */
 
-            sos[i] = -port_numbers[i];
+            sos[i] = port_numbers[i].port;
             tmp = sizeof(host_ip_addr);
             if (!getsockname(sos[i], (struct sockaddr *)&host_ip_addr, &tmp))
-                port_numbers[i] = ntohs(host_ip_addr.sin_port);
+            {
+                port_numbers[i].type = LISTEN_PORT_ADDR;
+                port_numbers[i].port = ntohs(host_ip_addr.sin4or6_port);
+                port_numbers[i].addr = host_ip_addr.sin4or6_addr;
+            }
         }
 
         /* Initialise the socket */
@@ -1332,6 +1422,10 @@ ipc_remove (void)
     shutdown_erq_demon();
 #endif
 
+#ifdef USE_ANL
+    ares_destroy(anl_channel);
+    ares_library_cleanup();
+#endif
 } /* ipc_remove() */
 
 /*-------------------------------------------------------------------------*/
@@ -1594,15 +1688,9 @@ add_discarded_message (interactive_t *ip)
 
     if (driver_hook[H_MSG_DISCARDED].type == T_CLOSURE)
     {
-        if (driver_hook[H_MSG_DISCARDED].x.closure_type == CLOSURE_LAMBDA)
-        {
-            free_svalue(&(driver_hook[H_MSG_DISCARDED].u.lambda->ob));
-            put_ref_object(&(driver_hook[H_MSG_DISCARDED].u.lambda->ob), ip->ob, "add_discarded_message");
-        }
-
         push_ref_valid_object(inter_sp, ip->ob, "add_discarded_message");
 
-        call_lambda(&driver_hook[H_MSG_DISCARDED], 1);
+        call_lambda_ob(&driver_hook[H_MSG_DISCARDED], 1, inter_sp);
 
         if (inter_sp->type == T_STRING)
         {
@@ -2194,7 +2282,7 @@ get_message (char *buff, size_t *bufflength)
 
     while(MY_TRUE)
     {
-        struct sockaddr_in addr;
+        sockaddr_in4or6 addr;
         length_t length; /* length of <addr> */
         struct timeval timeout;
 
@@ -2264,6 +2352,11 @@ get_message (char *buff, size_t *bufflength)
                 }
 
             } /* for (all players) */
+            for (i = 0; i < MAX_OUTCONN; i++)
+            {
+                if (outconn[i].status == ocUsed)
+                    FD_SET(outconn[i].socket, &writefds);
+            }
 #ifdef ERQ_DEMON
             if (erq_demon >= 0)
             {
@@ -2279,7 +2372,12 @@ get_message (char *buff, size_t *bufflength)
             pg_setfds(&readfds, &writefds, &nfds);
 #endif
 #ifdef USE_PYTHON
-           python_set_fds(&readfds, &writefds, &pexceptfds, &nfds);
+            python_set_fds(&readfds, &writefds, &pexceptfds, &nfds);
+#endif
+#ifdef USE_ANL
+            i = ares_fds(anl_channel, &readfds, &writefds);
+            if (i > nfds)
+                nfds = i;
 #endif
 
             /* select() until time is up or there is data */
@@ -2363,7 +2461,10 @@ get_message (char *buff, size_t *bufflength)
             pg_process_all();
 #endif
 #ifdef USE_PYTHON
-            python_handle_fds(&readfds, &writefds, &exceptfds, nfds);
+            python_handle_fds(&readfds, &writefds, &pexceptfds, nfds);
+#endif
+#ifdef USE_ANL
+            ares_process(anl_channel, &readfds, &writefds);
 #endif
 
             /* Initialise the user scan */
@@ -2474,7 +2575,7 @@ get_message (char *buff, size_t *bufflength)
 #endif
                             } else {
                                 uint32 naddr;
-                                struct in_addr net_addr;
+                                in4or6_addr net_addr;
 
                                 memcpy((char*)&naddr, rp+8, sizeof(naddr));
 #ifndef USE_IPV6
@@ -2614,6 +2715,8 @@ get_message (char *buff, size_t *bufflength)
 
 #endif /* ERQ_DEMON */
 
+            check_for_out_connections();
+
             /* --- Try to get a new player --- */
             for (i = 0; i < numports; i++)
             {
@@ -2626,7 +2729,7 @@ get_message (char *buff, size_t *bufflength)
                                               , &length);
                     if ((int)new_socket != -1)
                         new_player( NULL, new_socket, &addr, (size_t)length
-                                  , port_numbers[i]);
+                                  , port_numbers[i].port);
                     else if ((int)new_socket == -1
                       && errno != EWOULDBLOCK && errno != EINTR
                       && errno != EAGAIN && errno != EPROTO )
@@ -2640,13 +2743,13 @@ get_message (char *buff, size_t *bufflength)
                         int errorno = errno;
                         fprintf( stderr
                                , "%s comm: Can't accept on socket %d "
-                                 "(port %d): %s\n"
-                               , time_stamp(), sos[i], port_numbers[i]
+                                 "(port %s): %s\n"
+                               , time_stamp(), sos[i], port_numbers[i].str
                                , strerror(errorno)
                                );
                         debug_message("%s comm: Can't accept on socket %d "
-                                      "(port %d): %s\n"
-                                     , time_stamp(), sos[i], port_numbers[i]
+                                      "(port %s): %s\n"
+                                     , time_stamp(), sos[i], port_numbers[i].str
                                      , strerror(errorno)
                                      );
                         /* TODO: Was: perror(); abort(); */
@@ -2678,7 +2781,6 @@ get_message (char *buff, size_t *bufflength)
         if (udp_s >= 0 && FD_ISSET(udp_s, &readfds))
 #endif
         {
-            char *ipaddr_str;
             int cnt;
 
             length = sizeof addr;
@@ -2696,18 +2798,16 @@ get_message (char *buff, size_t *bufflength)
                 }
                 else
                 {
+                    char buf[INET4OR6_ADDRSTRLEN+1];
+
                     command_giver = NULL;
                     current_interactive = NULL;
                     clear_current_object();
                     trace_level = 0;
-#ifndef USE_IPV6
-                    ipaddr_str = inet_ntoa(addr.sin_addr);
-#else
-                    ipaddr_str = inet6_ntoa(addr.sin_addr);
-#endif
-                    push_c_string(inter_sp, ipaddr_str);
+
+                    push_c_string(inter_sp, inet_ntop(AF_INET4OR6, &addr.sin4or6_addr, buf, sizeof(buf)));
                     push_bytes(inter_sp, udp_data); /* adopts the ref */
-                    push_number(inter_sp, ntohs(addr.sin_port));
+                    push_number(inter_sp, ntohs(addr.sin4or6_port));
                     RESET_LIMITS;
                     callback_master(STR_RECEIVE_UDP, 3);
                     CLEAR_EVAL_COST;
@@ -3299,7 +3399,7 @@ remove_interactive (object_t *ob, Bool force)
 
 /*-------------------------------------------------------------------------*/
 void
-refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) )
+refresh_access_data(void (*add_entry)(sockaddr_in4or6 *, int, long*) )
 
 /* Called from access_check after the ACCESS_FILE has been (re)read, this
  * function has to call the passed callback function add_entry for every
@@ -3316,13 +3416,13 @@ refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) )
         this = *user;
         if (this)
         {
-            struct sockaddr_in addr;
+            sockaddr_in4or6 addr;
             int port;
             length_t length;
 
             length = sizeof(addr);
             getsockname(this->socket, (struct sockaddr *)&addr, &length);
-            port = ntohs(addr.sin_port);
+            port = ntohs(addr.sin4or6_port);
             (*add_entry)(&this->addr, port, &this->access_class);
         }
     }
@@ -3330,7 +3430,7 @@ refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) )
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-set_default_conn_charset (char charset[32])
+set_default_conn_charset (char charset[16])
 
 /* Set the default connection charset bitmask in <charset>.
  */
@@ -3342,7 +3442,7 @@ set_default_conn_charset (char charset[32])
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-set_default_combine_charset (char charset[32])
+set_default_combine_charset (char charset[16])
 
 /* Set the default combine charset bitmask in <charset>.
  */
@@ -3418,7 +3518,7 @@ set_encoding (interactive_t *ip, const char* encoding)
 /*-------------------------------------------------------------------------*/
 static void
 new_player ( object_t *ob, SOCKET_T new_socket
-           , struct sockaddr_in *addr, size_t addrlen
+           , sockaddr_in4or6 *addr, size_t addrlen
            , int login_port
            )
 
@@ -3466,15 +3566,14 @@ new_player ( object_t *ob, SOCKET_T new_socket
     {
         FILE *log_file = fopen (access_log, "a");
 
-        if (log_file) {
+        if (log_file)
+        {
+            char buf[INET4OR6_ADDRSTRLEN+1];
+
             FCOUNT_WRITE(log_file);
             fprintf(log_file, "%s %s: %s\n"
                    , time_stamp()
-#ifndef USE_IPV6
-                   , inet_ntoa(addr->sin_addr)
-#else
-                   , inet6_ntoa(addr->sin_addr)
-#endif
+                   , inet_ntop(AF_INET4OR6, &addr->sin4or6_addr, buf, sizeof(buf))
                    , message ? "denied" : "granted");
             fclose(log_file);
         }
@@ -3683,8 +3782,8 @@ new_player ( object_t *ob, SOCKET_T new_socket
     {
         new_interactive->snoop_on->snoop_by = ob;
     }
-#ifdef ERQ_DEMON
-    (void) lookup_ip_entry(new_interactive->addr.sin_addr, MY_TRUE);
+#ifdef LOOKUP_IP_ADRESS
+    (void) lookup_ip_entry(new_interactive->addr.sin4or6_addr, MY_TRUE);
     /* TODO: We could pass the retrieved hostname right to login */
 #endif
 #ifdef USE_TLS
@@ -3778,15 +3877,8 @@ set_noecho (interactive_t *ip, char noecho, Bool local_change, Bool external)
                 push_number(inter_sp,  local_change ? 1 : 0);
                 if (driver_hook[H_NOECHO].type == T_STRING)
                     secure_apply_ob(driver_hook[H_NOECHO].u.str, ob, 3, external);
-                else 
-                {
-                    if (driver_hook[H_NOECHO].x.closure_type == CLOSURE_LAMBDA)
-                    {
-                        free_svalue(&(driver_hook[H_NOECHO].u.lambda->ob));
-                        put_ref_object(&(driver_hook[H_NOECHO].u.lambda->ob), ob, "set_noecho");
-                    }
-                    secure_call_lambda(&driver_hook[H_NOECHO], 3, external);
-                }
+                else
+                    secure_call_lambda(&driver_hook[H_NOECHO], 3, external, inter_sp-1);
                 if (~confirm & old & CHARMODE_MASK)
                 {
                     reset_input_buffer(ip);
@@ -4223,25 +4315,28 @@ print_prompt_string (string_t *prompt)
         previous_ob = const0;
         set_current_object(command_giver);
 
-        /* Check if the object the closure is bound to still exists.
-         * If not, erase the hook, print the prompt using add_message(),
-         * then throw an error.
-         */
-        ob = get_bound_object(*hook);
-        if (ob.type == T_OBJECT && (ob.u.ob->flags & O_DESTRUCTED))
+        if (hook->x.closure_type != CLOSURE_UNBOUND_LAMBDA)
         {
-            free_svalue(hook);
-            put_number(hook, 0);
-            clear_current_object(); /* So that catch_tell() can see it */
-            add_message_str(prompt);
-            errorf("H_PRINT_PROMPT for %s was a closure bound to a "
-                   "now-destructed object - hook removed.\n", 
-                   get_txt(command_giver->name));
-            /* NOTREACHED */
+            /* Check if the object the closure is bound to still exists.
+             * If not, erase the hook, print the prompt using add_message(),
+             * then throw an error.
+             */
+            ob = get_bound_object(*hook);
+            if (ob.type == T_OBJECT && (ob.u.ob->flags & O_DESTRUCTED))
+            {
+                free_svalue(hook);
+                put_number(hook, 0);
+                clear_current_object(); /* So that catch_tell() can see it */
+                add_message_str(prompt);
+                errorf("H_PRINT_PROMPT for %s was a closure bound to a "
+                       "now-destructed object - hook removed.\n", 
+                       get_txt(command_giver->name));
+                /* NOTREACHED */
+            }
         }
 
         push_ref_string(inter_sp, prompt);
-        call_lambda(hook, 1);
+        call_lambda_ob(hook, 1, &current_object);
         free_svalue(inter_sp--);
     }
     else if (hook->type == T_STRING)
@@ -4308,19 +4403,23 @@ print_prompt (void)
          * If not, restore the prompt to the default (this also works with
          * the default prompt driver hook), then throw an error.
          */
-        ob = get_bound_object(*prompt);
-        if (ob.type == T_OBJECT && (ob.u.ob->flags & O_DESTRUCTED))
+        if (!usingDefaultPrompt
+         || prompt->x.closure_type != CLOSURE_UNBOUND_LAMBDA)
         {
-            free_svalue(prompt);
-            put_ref_string(prompt, STR_DEFAULT_PROMPT);
-            print_prompt_string(prompt->u.str);
-            errorf("Prompt of %s was a closure bound to a now-destructed "
-                   "object - default prompt restored.\n", 
-                   get_txt(command_giver->name));
-            /* NOTREACHED */
+            ob = get_bound_object(*prompt);
+            if (ob.type == T_OBJECT && (ob.u.ob->flags & O_DESTRUCTED))
+            {
+                free_svalue(prompt);
+                put_ref_string(prompt, STR_DEFAULT_PROMPT);
+                print_prompt_string(prompt->u.str);
+                errorf("Prompt of %s was a closure bound to a now-destructed "
+                       "object - default prompt restored.\n", 
+                       get_txt(command_giver->name));
+                /* NOTREACHED */
+            }
         }
 
-        call_lambda(prompt, 0);
+        call_lambda_ob(prompt, 0, &current_object);
         prompt = inter_sp;
         if (prompt->type != T_STRING)
         {
@@ -4778,12 +4877,8 @@ h_telnet_neg (int n)
     }
     else if (driver_hook[H_TELNET_NEG].type == T_CLOSURE)
     {
-        if (driver_hook[H_TELNET_NEG].x.closure_type == CLOSURE_LAMBDA)
-        {
-            free_svalue(&(driver_hook[H_TELNET_NEG].u.lambda->ob));
-            put_ref_object(&(driver_hook[H_TELNET_NEG].u.lambda->ob), command_giver, "h_telnet_neg");
-        }
-        svp = secure_callback_lambda(&driver_hook[H_TELNET_NEG], n);
+        svalue_t cgsv = svalue_object(command_giver);
+        svp = secure_callback_lambda_ob(&driver_hook[H_TELNET_NEG], n, &cgsv);
     }
     else
     {
@@ -5686,8 +5781,8 @@ start_erq_demon (const char *suffix, size_t suffixlen)
 
     /* Close inherited sockets first. */
     for (i = 0; i < numports; i++)
-        if (port_numbers[i] < 0)
-            set_close_on_exec(-port_numbers[i]);
+        if (port_numbers[i].type == LISTEN_PORT_INHERITED)
+            set_close_on_exec(port_numbers[i].port);
 
     if ((pid = fork()) == 0)
     {
@@ -5828,8 +5923,10 @@ stop_erq_demon (Bool notify)
     {
         RESET_LIMITS;
         CLEAR_EVAL_COST;
-        if (driver_hook[H_ERQ_STOP].type == T_CLOSURE) {
-            secure_callback_lambda(&driver_hook[H_ERQ_STOP], 0);
+        if (driver_hook[H_ERQ_STOP].type == T_CLOSURE)
+        {
+            svalue_t master_sv = svalue_object(master_ob);
+            secure_callback_lambda_ob(&driver_hook[H_ERQ_STOP], 0, &master_sv);
         }
     }
 } /* stop_erq_demon() */
@@ -5912,7 +6009,7 @@ f_attach_erq_demon (svalue_t *sp)
         if (privilege_violation4(STR_ATTACH_ERQ_DEMON,
             const0, suffix, sp[1].u.number, sp+1))
         {
-            char *native = convert_path_str_to_native_or_throw(suffix);
+            char *native = convert_path_str_to_native_or_throw(ref_mstring(suffix));
             if (erq_demon != FLAG_NO_ERQ)
             {
                 if (sp[1].u.number & 1) {
@@ -6049,7 +6146,7 @@ f_send_erq (svalue_t *sp)
             {
                 xfree(arg);
                 errorf("Bad arg 2 to send_erq(): got %s*, "
-                      "expected string/int*.\n", typename(svp[-1].type));
+                      "expected string/int*.\n", sv_typename(svp-1));
                 /* NOTREACHED */
                 return sp;
             }
@@ -6129,7 +6226,7 @@ read_32 (char *str)
 
 /*-------------------------------------------------------------------------*/
 static void
-add_ip_entry (struct in_addr addr, const char *name)
+add_ip_entry (in4or6_addr addr, const char *name)
 
 /* Add a new IP address <addr>/hostname <name> pair to the cache iptable[].
  * If the <addr> already exists in the table, replace the old tabled name
@@ -6144,7 +6241,7 @@ add_ip_entry (struct in_addr addr, const char *name)
     new_entry = MY_FALSE;
     for (i = 0; i < IPSIZE; i++)
     {
-        if (!memcmp(&(iptable[i].addr.s_addr), &addr.s_addr, sizeof(iptable[i].addr.s_addr)))
+        if (!memcmp(&(iptable[i].addr.s4or6_addr), &addr.s4or6_addr, sizeof(iptable[i].addr.s4or6_addr)))
         {
             ix = i;
             break;
@@ -6190,23 +6287,49 @@ update_ip_entry (const char *oldname, const char *newname)
 } /* update_ip_entry() */
 
 /*-------------------------------------------------------------------------*/
-
 #endif /* USE_IPV6 */
-    
+#endif /* ERQ_DEMON */
+
+#ifdef LOOKUP_IP_ADRESS
+/*-------------------------------------------------------------------------*/
+
+#ifdef USE_ANL
+static void
+lookup_ip_callback (void *arg, int status, int timeouts, char *node, char *service)
+
+/* Callback from C-Ares with a reverse lookup result.
+ * If successful, we just enter it into the IP table.
+ */
+
+{
+    struct ipentry* entry = (struct ipentry*) arg;
+    if (node != NULL)
+    {
+         free_mstring(entry->name);
+         entry->name = new_tabled(node, STRING_ASCII);
+    }
+    else if (d_flag > 1)
+    {
+        debug_message("%s Host lookup failed for %s.\n", time_stamp(), get_txt(entry->name));
+    }
+} /* lookup_ip_callback() */
+#endif
 /*-------------------------------------------------------------------------*/
 static string_t *
-lookup_ip_entry (struct in_addr addr, Bool useErq)
+lookup_ip_entry (in4or6_addr addr, Bool use_async_lookup)
 
 /* Lookup the IP address <addr> and return an uncounted pointer to
  * a shared string with the hostname. The function looks first in the
- * iptable[], then, if not found there and <useErq> is true, asks the ERQ.
+ * iptable[], then, if not found there and <use_async_lookup> is true,
+ * an asynchronous name lookup (either C-Ares or ERQ) is initiated.
  * If the hostname can not be found, NULL is returned.
  */
 
 {
     int i;
     string_t *ipname;
-    struct in_addr tmp;
+    in4or6_addr tmp;
+    char buf[INET4OR6_ADDRSTRLEN+1];
 
     /* Search for the address backwards from the last added entry,
      * hoping that its one of the more recently added ones.
@@ -6217,7 +6340,7 @@ lookup_ip_entry (struct in_addr addr, Bool useErq)
         if (i < 0)
             i += IPSIZE;
 
-        if (!memcmp(&(iptable[i].addr.s_addr), &addr.s_addr, sizeof(iptable[i].addr.s_addr))
+        if (!memcmp(&(iptable[i].addr.s4or6_addr), &addr.s4or6_addr, sizeof(iptable[i].addr.s4or6_addr))
          && iptable[i].name)
         {
             return iptable[i].name;
@@ -6235,31 +6358,53 @@ lookup_ip_entry (struct in_addr addr, Bool useErq)
         free_mstring(iptable[ipcur].name);
 
     memcpy(&tmp, &addr, sizeof(tmp));
-#ifndef USE_IPV6
-    ipname = new_tabled(inet_ntoa(tmp), STRING_ASCII);
-#else
-    ipname = new_tabled(inet6_ntoa(tmp), STRING_ASCII);
-#endif
-
+    ipname = new_tabled(inet_ntop(AF_INET4OR6, &tmp, buf, sizeof(buf)), STRING_ASCII);
     iptable[ipcur].name = ipname;
-
     ipcur = (ipcur+1) % IPSIZE;
 
     /* If we have the erq and may use it, lookup the real hostname */
-    if (erq_demon >= 0 && useErq)
+    if (use_async_lookup)
     {
-#ifndef USE_IPV6
-        send_erq(ERQ_HANDLE_RLOOKUP, ERQ_RLOOKUP, (char *)&addr.s_addr, sizeof(addr.s_addr));
-#else
-        send_erq(ERQ_HANDLE_RLOOKUPV6, ERQ_RLOOKUPV6, get_txt(ipname)
-                , mstrsize(ipname));
+#ifdef USE_ANL
+        sockaddr_in4or6 saddr;
+        struct sockaddr* paddr = (struct sockaddr*) &saddr;
+        size_t paddrlen = sizeof(saddr);
+
+#  ifdef USE_IPV6
+        struct sockaddr_in mapped_addr;
+        if (IN6_IS_ADDR_V4MAPPED(&addr))
+        {
+            mapped_addr.sin_family = AF_INET;
+            mapped_addr.sin_addr.s_addr = ((uint32_t*)&addr)[3];
+
+            paddr = (struct sockaddr*) &mapped_addr;
+            paddrlen = sizeof(mapped_addr);
+        }
+        else
+#  endif
+        {
+            memset(&saddr, 0, sizeof(saddr));
+            saddr.sin4or6_family = AF_INET4OR6;
+            saddr.sin4or6_addr = addr;
+        }
+
+        ares_getnameinfo(anl_channel, paddr, paddrlen, ARES_NI_LOOKUPHOST|ARES_NI_NAMEREQD, lookup_ip_callback, iptable + i);
+#else /* ERQ_DEMON */
+        if (erq_demon >= 0)
+        {
+#  ifndef USE_IPV6
+            send_erq(ERQ_HANDLE_RLOOKUP, ERQ_RLOOKUP, (char *)&addr.s_addr, sizeof(addr.s_addr));
+#  else
+            send_erq(ERQ_HANDLE_RLOOKUPV6, ERQ_RLOOKUPV6, get_txt(ipname), mstrsize(ipname));
+#  endif
+        }
 #endif
     }
 
-    return iptable[ipcur].name;
+    return iptable[i].name;
 }
 
-#endif /* ERQ_DEMON */
+#endif /* LOOKUP_IP_ADRESS */
 
 /* End of ERQ Support */
 /*=========================================================================*/
@@ -6438,12 +6583,14 @@ count_comm_refs (void)
         }
     }
 
-#ifdef ERQ_DEMON
+#ifdef LOOKUP_IP_ADRESS
     for(i = 0; i < IPSIZE; i++) {
         if (iptable[i].name)
             count_ref_from_string(iptable[i].name);
     }
+#endif /* LOOKUP_IP_ADRESS*/
 
+#ifdef ERQ_DEMON
     for (i = sizeof (pending_erq) / sizeof (*pending_erq); --i >= 0;)
     {
         count_ref_in_vector(&pending_erq[i].fun, 1);
@@ -6529,15 +6676,12 @@ get_host_ip_number (void)
  */
 
 {
-#ifndef USE_IPV6
-    char buf[INET_ADDRSTRLEN+3];
+    char buf[INET4OR6_ADDRSTRLEN+3];
 
-    sprintf(buf, "\"%s\"", inet_ntoa(host_ip_number));
-#else
-    char buf[INET6_ADDRSTRLEN+3];
+    buf[0] = '"';
+    inet_ntop(AF_INET4OR6, &host_ip_number, buf+1, sizeof(buf)-2);
+    strcat(buf, "\"");
 
-    sprintf(buf, "\"%s\"", inet6_ntoa(host_ip_number));
-#endif
     return string_copy(buf);
 } /* query_host_ip_number() */
 
@@ -6630,6 +6774,12 @@ count_comm_extra_refs (void)
             count_extra_ref_in_object(ob);
         count_extra_ref_in_vector(&all_players[i]->prompt, 1);
     }
+
+    for (i = 0; i < MAX_OUTCONN; i++)
+    {
+        if (outconn[i].status != ocNotUsed && outconn[i].curr_obj)
+            count_extra_ref_in_object(outconn[i].curr_obj);
+    }
 } /* count_comm_extra_refs() */
 
 #endif /* DEBUG */
@@ -6655,15 +6805,11 @@ f_send_udp (svalue_t *sp)
  */
 
 {
-    char *to_host = NULL;
+    const char *to_host;
     int to_port;
     char *msg;
     size_t msglen;
-#ifndef USE_IPV6
-    int ip1, ip2, ip3, ip4;
-#endif /* USE_IPV6 */
-    struct sockaddr_in name;
-    struct hostent *hp;
+    sockaddr_in4or6 name;
     int ret = 0;
     svalue_t *firstarg; /* store the first argument */
     
@@ -6702,7 +6848,7 @@ f_send_udp (svalue_t *sp)
                 if (item == NULL || item->type != T_NUMBER)
                 {
                     errorf("Bad arg 3 to send_udp(): got %s*, "
-                          "expected string/int*.\n", typename(svp[-1].type));
+                          "expected string/int*.\n", sv_typename(svp-1));
                     /* NOTREACHED */
                     return sp;
                 }
@@ -6720,57 +6866,33 @@ f_send_udp (svalue_t *sp)
             break;
 
         /* Determine the destination address */
-
-        {
-            size_t adrlen;
-
-            adrlen = mstrsize(firstarg->u.str);
-            /* as there are no runtime error raised below, we just xallocate
-             * and don't bother with an error handler. */
-            to_host = xalloc(adrlen+1);
-            if (!to_host)
-            {
-                errorf("Out of memory (%zu bytes) in send_udp() for host address\n"
-                     , (adrlen+1));
-                /* NOTREACHED */
-            }
-            memcpy(to_host, get_txt(firstarg->u.str), adrlen);
-            to_host[adrlen] = '\0';
-        }
+        to_host = get_txt(firstarg->u.str);
         to_port = (sp-1)->u.number;
 
-#ifndef USE_IPV6
-        if (sscanf(to_host, "%d.%d.%d.%d", &ip1, &ip2, &ip3, &ip4) == 4)
         {
-            name.sin_addr.s_addr = inet_addr(to_host);
-            name.sin_family = AF_INET;
+            struct addrinfo *addr;
+            struct addrinfo hints = {
+                .ai_family = AF_INET4OR6,
+                .ai_socktype = SOCK_STREAM,
+                .ai_protocol = 0,
+                .ai_flags = AI_V4MAPPED | AI_ADDRCONFIG
+            };
+            int res = getaddrinfo(to_host, NULL, &hints, &addr);
+
+            if (res)
+                break;
+            if (addr->ai_family != AF_INET4OR6
+             || addr->ai_addrlen != sizeof(name))
+            {
+                freeaddrinfo(addr);
+                break;
+            }
+
+            memcpy(&name, addr->ai_addr, sizeof(name));
+            name.sin4or6_port = htons(to_port);
+
+            freeaddrinfo(addr);
         }
-        else
-        {
-            /* TODO: Uh-oh, blocking DNS in the execution thread */
-            hp = gethostbyname(to_host);
-            if (hp == 0)
-                break;            
-            memcpy(&name.sin_addr, hp->h_addr, (size_t)hp->h_length);
-            name.sin_family = AF_INET;
-        }
-
-#else /* USE_IPV6 */
-
-        /* TODO: Uh-oh, blocking DNS in the execution thread */
-        hp = gethostbyname2(to_host, AF_INET6);
-        if (hp == 0) hp = gethostbyname2(to_host, AF_INET);
-        if (hp == 0) break;
-        memcpy(&name.sin_addr, hp->h_addr, (size_t)hp->h_length);
-
-        if (hp->h_addrtype == AF_INET)
-        {
-            CREATE_IPV6_MAPPED(&name.sin_addr, *(u_int32_t*)hp->h_addr_list[0]);
-        }
-        name.sin_family = AF_INET6;
-#endif /* USE_IPV6 */
-
-        name.sin_port = htons(to_port);
 
         /* Send the message. */
 #ifndef SENDTO_BROKEN
@@ -6785,8 +6907,7 @@ f_send_udp (svalue_t *sp)
      * (including) to sp.
      */
     sp = pop_n_elems((sp-firstarg)+1, sp);
-    xfree(to_host);
-    
+
     /*Return the result */
     sp++;
     put_number(sp, ret);
@@ -6852,7 +6973,7 @@ f_binary_message (svalue_t *sp)
             {
                 free_mstring(msg);
                 errorf("Bad arg 1 to binary_message(): got %s*, "
-                      "expected string/int*.\n", typename(svp->type));
+                      "expected string/int*.\n", sv_typename(svp));
                 /* NOTREACHED */
                 return sp;
             }
@@ -7238,6 +7359,7 @@ v_input_to (svalue_t *sp, int num_arg)
     else if (arg[0].type == T_CLOSURE)
         error_index = setup_closure_callback(&(it->fun), arg
                                             , extra, extra_arg
+                                            , true
                                             );
     else
         error_index = 1;
@@ -7496,7 +7618,7 @@ v_find_input_to (svalue_t *sp, int num_arg)
             switch (arg[1].type)
             {
             case T_STRING:
-                if (!it->fun.is_lambda
+                if (!it->fun.is_closure
                  && mstreq(it->fun.function.named.name, arg[1].u.str))
                     found = MY_TRUE;
                 break;
@@ -7505,7 +7627,7 @@ v_find_input_to (svalue_t *sp, int num_arg)
                 if (num_arg > 2)
                 {
                     if (object_svalue_eq(callback_object(&(it->fun)), arg[1])
-                     && !it->fun.is_lambda
+                     && !it->fun.is_closure
                      && it->fun.function.named.name == arg[2].u.str
                        )
                         found = MY_TRUE;
@@ -7518,8 +7640,8 @@ v_find_input_to (svalue_t *sp, int num_arg)
                 break;
 
             case T_CLOSURE:
-                if (it->fun.is_lambda
-                 && closure_eq(&(it->fun.function.lambda), arg+1))
+                if (it->fun.is_closure
+                 && closure_eq(&(it->fun.function.closure), arg+1))
                     found = MY_TRUE;
                 break;
 
@@ -7650,7 +7772,7 @@ v_remove_input_to (svalue_t *sp, int num_arg)
             switch (arg[1].type)
             {
             case T_STRING:
-                if (!it->fun.is_lambda
+                if (!it->fun.is_closure
                  && mstreq(it->fun.function.named.name, arg[1].u.str))
                     found = MY_TRUE;
                 break;
@@ -7659,7 +7781,7 @@ v_remove_input_to (svalue_t *sp, int num_arg)
                 if (num_arg > 2)
                 {
                     if (object_svalue_eq(callback_object(&(it->fun)), arg[1])
-                     && !it->fun.is_lambda
+                     && !it->fun.is_closure
                      && it->fun.function.named.name == arg[2].u.str
                        )
                         found = MY_TRUE;
@@ -7672,8 +7794,8 @@ v_remove_input_to (svalue_t *sp, int num_arg)
                 break;
 
             case T_CLOSURE:
-                if (it->fun.is_lambda
-                 && closure_eq(&(it->fun.function.lambda), arg+1))
+                if (it->fun.is_closure
+                 && closure_eq(&(it->fun.function.closure), arg+1))
                     found = MY_TRUE;
                 break;
 
@@ -7799,13 +7921,13 @@ f_input_to_info (svalue_t *sp)
 
             vv = allocate_array(2 + it->fun.num_arg);
 
-            if (it->fun.is_lambda)
+            if (it->fun.is_closure)
             {
-                if (it->fun.function.lambda.x.closure_type == CLOSURE_LFUN)
-                    assign_object_svalue_no_free(vv->item, it->fun.function.lambda.u.lambda->function.lfun.ob, "input_to_info");
+                if (it->fun.function.closure.x.closure_type == CLOSURE_LFUN)
+                    assign_object_svalue_no_free(vv->item, it->fun.function.closure.u.lfun_closure->fun_ob, "input_to_info");
                 else
                     assign_object_svalue_no_free(vv->item, ob, "input_to_info");
-                assign_svalue_no_free(&vv->item[1], &it->fun.function.lambda);
+                assign_svalue_no_free(&vv->item[1], &it->fun.function.closure);
             }
             else
             {
@@ -8097,8 +8219,16 @@ check_for_out_connections (void)
 
     for (i = 0; i < MAX_OUTCONN; i++)
     {
-        if (outconn[i].status == ocNotUsed)
+        if (outconn[i].status == ocNotUsed
+         || outconn[i].status == ocNameResolutionOutsideThread)
             continue;
+
+        if (outconn[i].status == ocFailure /* shouldn't happen */
+         || outconn[i].status == ocNameResolutionInThread)
+        {
+            outconn[i].status = ocNotUsed;
+            continue;
+        }
 
         if (!outconn[i].curr_obj) /* shouldn't happen */
         {
@@ -8194,6 +8324,201 @@ check_for_out_connections (void)
 } /* check_for_out_connections() */
 
 /*-------------------------------------------------------------------------*/
+static void
+net_connect_error (struct OutConn* conn, int error)
+
+/* Report an error either to the caller of net_connect() or via logon().
+ */
+
+{
+    if (conn->status == ocNameResolutionInThread)
+    {
+        conn->status = ocFailure;
+        conn->error = error;
+    }
+    else
+    {
+        conn->status = ocLoggingOn;
+        logon_object(conn->curr_obj, -1);
+
+        conn->status = ocNotUsed;
+        free_object(conn->curr_obj, "net_connect");
+    }
+} /* net_connect_error() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef USE_ANL
+#define FREEADDRINFO ares_freeaddrinfo
+static void
+net_connect_callback (void *arg, int status, int timeouts, struct ares_addrinfo *result)
+
+/* This function is called when a name lookup completed.
+ */
+{
+    struct OutConn* conn = (struct OutConn*)arg;
+    struct ares_addrinfo_node *entry;
+
+    if (status)
+    {
+        ares_freeaddrinfo(result);
+        net_connect_error(conn, NC_EUNKNOWNHOST);
+        return;
+    }
+
+    if (!conn->curr_obj || (conn->curr_obj->flags & O_DESTRUCTED))
+    {
+        free_object(conn->curr_obj, "net_connect");
+        conn->status = ocNotUsed;
+        return;
+    }
+
+    entry = result->nodes;
+
+#else
+#define FREEADDRINFO freeaddrinfo
+static void
+net_connect_continue (struct OutConn* conn, struct addrinfo *result)
+
+/* Called from f_net_connect() after name resolution to continue connection.
+ */
+{
+    // try each address until we successfully connect or run out of
+    // addresses. In case of errors, close the socket.
+    struct addrinfo *entry = result;
+#endif
+
+    int last_error = NC_EUNKNOWNHOST;
+    for (; entry != NULL; entry = entry->ai_next)
+    {
+        object_t *user;
+        int ret, sfd;
+
+#if defined(USE_ANL) && defined(USE_IPV6)
+#  define target_addrlen sizeof(target_mapped_addr)
+#  define target_family  AF_INET6
+#  define target_addr    &target_mapped_addr
+        struct sockaddr_in6 target_mapped_addr;
+        if (entry->ai_family == AF_INET)
+        {
+            struct sockaddr_in *addr4 = (struct sockaddr_in*)entry->ai_addr;
+
+            memset(&target_mapped_addr, 0, sizeof(target_mapped_addr));
+            target_mapped_addr.sin6_family = AF_INET6;
+            target_mapped_addr.sin6_port = addr4->sin_port;
+            CREATE_IPV6_MAPPED(&target_mapped_addr.sin6_addr, addr4->sin_addr.s_addr);
+        }
+        else if (entry->ai_family == AF_INET6)
+            target_mapped_addr = *(struct sockaddr_in6*)entry->ai_addr;
+        else
+            continue;
+#else
+#  define target_addr    entry->ai_addr
+#  define target_addrlen entry->ai_addrlen
+#  define target_family  entry->ai_family
+#endif
+
+        sfd = socket(target_family, entry->ai_socktype, entry->ai_protocol);
+        if (sfd==-1)
+        {
+            if (errno == EMFILE || errno == ENFILE
+             || errno == ENOBUFS || errno == ENOMEM)
+            {
+                // insufficient system ressources, probably transient error,
+                // but it is unlikely to be different for the next address.
+                // We exit here, the caller should try again.
+                FREEADDRINFO(result);
+                net_connect_error(conn, NC_ENORESSOURCES);
+                return;
+            }
+
+            last_error = NC_ENOSOCKET;
+            continue; // try next address
+        }
+
+        set_socket_nonblocking(sfd);
+        set_socket_nosigpipe(sfd);
+
+        /* On multihomed machines it is important to bind the socket to
+         * the proper IP address.
+         */
+        ret = bind(sfd, (struct sockaddr *) &host_ip_addr_template, sizeof(host_ip_addr_template));
+        if (ret==-1)
+        {
+            if (errno==ENOBUFS)
+            {
+                // insufficient system ressources, probably transient error,
+                // but unlikely to be different for the next address. Caller
+                // should try again later.
+                FREEADDRINFO(result);
+                socket_close(sfd);
+                net_connect_error(conn, NC_ENORESSOURCES);
+                return;
+            }
+
+            socket_close(sfd);
+            last_error = NC_ENOBIND;
+            continue;
+        }
+
+        ret = connect(sfd, target_addr, target_addrlen);
+        if (ret == -1 && errno != EINPROGRESS)
+        {
+            // no succes connecting. :-( Store last error in rc.
+            if (errno==ECONNREFUSED)
+            {
+                // no one listening at remote end... happens, no real error...
+                last_error = NC_ECONNREFUSED;
+            }
+            else
+            {
+                last_error = NC_ENOCONNECT;
+            }
+            socket_close(sfd);
+            continue;
+        }
+
+        last_error = NC_SUCCESS;
+
+        /* Store the connection in the outconn[] table even if
+         * we can complete it immediately. For the reason see below.
+         */
+        conn->socket = sfd;
+        conn->target = *((sockaddr_in4or6 *)target_addr);
+
+        // no longer need the results from getaddrinfo()
+        FREEADDRINFO(result);
+
+        if (errno == EINPROGRESS)
+        {
+            /* Can't complete right now */
+            conn->status = ocUsed;
+            return;
+        }
+
+        /* Attempt the logon. By setting the outconn[].status to
+         * ocLoggingOn, any subsequent call to check_for_out_connections()
+         * will clean up for us.
+         */
+        conn->status = ocLoggingOn;
+
+        user = command_giver;
+        new_player(conn->curr_obj, sfd, &(conn->target), sizeof(conn->target), 0);
+        command_giver = user;
+
+        /* All done - clean up */
+        conn->status = ocNotUsed;
+        free_object(conn->curr_obj, "net_connect");
+        return;
+    }
+
+    FREEADDRINFO(result);
+    net_connect_error(conn, last_error);
+#undef target_addr
+#undef target_addrlen
+#undef target_family
+} /* net_connect_callback/net_connect_continue() */
+
+/*-------------------------------------------------------------------------*/
 svalue_t *
 f_net_connect (svalue_t *sp)
 
@@ -8240,10 +8565,14 @@ f_net_connect (svalue_t *sp)
     /* Try the connection */
     rc = 0;
     do {
-        int sfd, n, ret;
-        object_t *user;
+        int n;
+#ifdef USE_ANL
+        struct ares_addrinfo_hints hints;
+#else
         struct addrinfo hints;
-        struct addrinfo *result, *rp;
+        struct addrinfo *result;
+        int ret;
+#endif
         char port_string[6];
 
         // port is needed as a string
@@ -8268,16 +8597,40 @@ f_net_connect (svalue_t *sp)
             break;
         }
 
-        /* Attempt the connection */
-        
-        memset(&hints, 0, sizeof(struct addrinfo));
+        /* Reserve the connection entry. */
+        outconn[n].curr_obj = ref_object(ob, "net_conect");
+        outconn[n].status = ocNameResolutionInThread;
+
+        /* Lookup the address */
+#ifdef USE_ANL
+        memset(&hints, 0, sizeof(hints));
 #ifndef USE_IPV6
-        hints.ai_family = AF_INET;      // Allow only IPv4
+        hints.ai_family = AF_INET;
+#else
+        // C-Ares does not (yet?) support V4 mapping, so we're doing it ourselves.
+        hints.ai_family = AF_UNSPEC;
+#endif
+        hints.ai_flags = ARES_AI_ADDRCONFIG|ARES_AI_NUMERICSERV;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = 0;
+
+#ifdef INSIDE_TRAVIS
+        // The Travis-CI environment only has loopback devices activated,
+        // the AI_ADDRCONFIG would therefore never find a name.
+        hints.ai_flags &= ~ARES_AI_ADDRCONFIG;
+#endif
+
+        ares_getaddrinfo(anl_channel, host, port_string, &hints, net_connect_callback, &(outconn[n]));
+        if (outconn[n].status == ocNameResolutionInThread)
+            outconn[n].status = ocNameResolutionOutsideThread;
+#else
+        memset(&hints, 0, sizeof(struct addrinfo));
+        hints.ai_family = AF_INET4OR6;
+#ifndef USE_IPV6
         // only IPv4 if at least one interface with IPv4 and
         // only IPv6 if at least one interface with IPv6
         hints.ai_flags = AI_ADDRCONFIG|AI_NUMERICSERV;
 #else
-        hints.ai_family = AF_INET6;      // Allow only IPv6
         // only IPv6 if at least one interface with IPv6.
         // And list IPv4 addresses as IPv4-mapped IPv6 addresses if no IPv6 addresses could be found.
         hints.ai_flags = AI_ADDRCONFIG|AI_V4MAPPED|AI_NUMERICSERV;
@@ -8291,128 +8644,29 @@ f_net_connect (svalue_t *sp)
         hints.ai_flags &= ~AI_ADDRCONFIG;
 #endif
 
-        /* TODO: Uh-oh, blocking DNS in the execution thread.
-         * TODO:: Better would be to start an ERQ lookup and fill in the
-         * TODO:: data in the background.
+        /* Uh-oh, blocking DNS in the execution thread.
          */
         ret = getaddrinfo(host, port_string, &hints, &result);
         if (ret != 0)
         {
             rc = NC_EUNKNOWNHOST;
-            break;
-        }
-        // try each address until we successfully connect or run out of
-        // addresses. In case of errors, close the socket.
-        for (rp = result; rp != NULL; rp = rp->ai_next)
-        {
-            sfd = socket (rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-            if (sfd==-1)
-            {
-                if (errno == EMFILE || errno == ENFILE
-                    || errno == ENOBUFS || errno == ENOMEM)
-                {
-                    // insufficient system ressources, probably transient error,
-                    // but it is unlikely to be different for the next address.
-                    // We exit here, the caller should try again.
-                    rc = NC_ENORESSOURCES;
-                    rp = NULL;
-                    break;
-                }
-                else
-                {
-                    // store only last error
-                    rc = NC_ENOSOCKET;
-                }
-                continue; // try next address
-            }
-            
-            set_socket_nonblocking(sfd);
-            set_socket_nosigpipe(sfd);
-
-            /* On multihomed machines it is important to bind the socket to
-             * the proper IP address.
-             */
-            ret = bind(sfd, (struct sockaddr *) &host_ip_addr_template, sizeof(host_ip_addr_template));
-            if (ret==-1)
-            {
-                if (errno==ENOBUFS)
-                {
-                    // insufficient system ressources, probably transient error,
-                    // but unlikely to be different for the next address. Caller
-                    // should try again later.
-                    rc = NC_ENORESSOURCES;
-                    rp = NULL;
-                    socket_close(sfd);
-                    break;
-                }
-                else
-                {
-                    // store only last error.
-                    rc = NC_ENOBIND;
-                }
-                socket_close(sfd);
-                continue;
-            }
-            
-            ret = connect(sfd, rp->ai_addr, rp->ai_addrlen);
-            if (ret != -1 || errno == EINPROGRESS)
-                break;  // success! no need to try further
-
-            // no succes connecting. :-( Store last error in rc.
-            if (errno==ECONNREFUSED)
-            {
-                // no one listening at remote end... happens, no real error...
-                rc = NC_ECONNREFUSED;
-            }
-            else
-            {
-                rc = NC_ENOCONNECT;
-            }
-            socket_close(sfd);
-        }
-
-        if (rp == NULL)
-        {
-            // No address succeeded, rc contains the last 'error', we just
-            // exit here.
-            freeaddrinfo(result);
-            break;
-        }
-        // at this point we a connected socket
-
-        rc = NC_SUCCESS;
-
-        /* Store the connection in the outconn[] table even if
-         * we can complete it immediately. For the reason see below.
-         */
-        outconn[n].socket = sfd;
-        outconn[n].target = *((struct sockaddr_in *)rp->ai_addr);
-        outconn[n].curr_obj = ref_object(ob, "net_conect");
-
-        // no longer need the results from getaddrinfo()
-        freeaddrinfo(result);
-
-        if (errno == EINPROGRESS)
-        {
-            /* Can't complete right now */
-            outconn[n].status = ocUsed;
+            outconn[n].status = ocNotUsed;
+            free_object(outconn[n].curr_obj, "net_connect");
             break;
         }
 
-        /* Attempt the logon. By setting the outconn[].status to
-         * ocLoggingOn, any subsequent call to check_for_out_connections()
-         * will clean up for us.
-         */
-        outconn[n].status = ocLoggingOn;
+        /* Attempt the connection */
+        net_connect_continue(&(outconn[n]), result);
+#endif
 
-        user = command_giver;
-        inter_sp = sp;
-        new_player(ob, sfd, (struct sockaddr_in *)rp->ai_addr, sizeof(struct sockaddr_in), 0);
-        command_giver = user;
-
-        /* All done - clean up */
-        outconn[n].status = ocNotUsed;
-        free_object(outconn[n].curr_obj, "net_connect");
+        if (outconn[n].status == ocFailure)
+        {
+            rc = outconn[n].error;
+            outconn[n].status = ocNotUsed;
+            free_object(outconn[n].curr_obj, "net_connect");
+        }
+        else
+            rc = 0;
     }while(0);
 
     /* Return the result */
@@ -8481,7 +8735,7 @@ f_configure_interactive (svalue_t *sp)
             int max;
 
             if (sp->type != T_NUMBER)
-                efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+                efun_exp_arg_error(3, TF_NUMBER, sp, sp);
 
             max = sp->u.number;
             if (max < 0)
@@ -8498,7 +8752,7 @@ f_configure_interactive (svalue_t *sp)
         if (!ip)
             errorf("Default value for IC_SOCKET_BUFFER_SIZE is not supported.\n");
         if (sp->type != T_NUMBER)
-            efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+            efun_exp_arg_error(3, TF_NUMBER, sp, sp);
 #ifdef SO_SNDBUF
         {
             int size = sp->u.number;
@@ -8514,7 +8768,7 @@ f_configure_interactive (svalue_t *sp)
         {
             case T_NUMBER:
                 if (sp->u.number != 0)
-                    efun_exp_arg_error(3, TF_STRING, sp->type, sp);
+                    efun_exp_arg_error(3, TF_STRING, sp, sp);
                 set_default_combine_charset(ip->combine_cset);
                 break;
 
@@ -8523,7 +8777,7 @@ f_configure_interactive (svalue_t *sp)
                 break;
 
             default:
-                efun_exp_arg_error(3, TF_STRING, sp->type, sp);
+                efun_exp_arg_error(3, TF_STRING, sp, sp);
         }
 
         /* Never combine \n or \0. */
@@ -8538,7 +8792,7 @@ f_configure_interactive (svalue_t *sp)
         {
             case T_NUMBER:
                 if (sp->u.number != 0)
-                    efun_exp_arg_error(3, TF_POINTER, sp->type, sp);
+                    efun_exp_arg_error(3, TF_POINTER, sp, sp);
                 set_default_combine_charset(ip->combine_cset);
                 break;
 
@@ -8547,7 +8801,7 @@ f_configure_interactive (svalue_t *sp)
                 break;
 
             default:
-                efun_exp_arg_error(3, TF_POINTER, sp->type, sp);
+                efun_exp_arg_error(3, TF_POINTER, sp, sp);
         }
 
         /* Never combine \n or \0. */
@@ -8562,7 +8816,7 @@ f_configure_interactive (svalue_t *sp)
         {
             case T_NUMBER:
                 if (sp->u.number != 0)
-                    efun_exp_arg_error(3, TF_STRING, sp->type, sp);
+                    efun_exp_arg_error(3, TF_STRING, sp, sp);
                 set_default_conn_charset(ip->charset);
                 break;
 
@@ -8571,7 +8825,7 @@ f_configure_interactive (svalue_t *sp)
                 break;
 
             default:
-                efun_exp_arg_error(3, TF_STRING, sp->type, sp);
+                efun_exp_arg_error(3, TF_STRING, sp, sp);
         }
         break;
 
@@ -8582,7 +8836,7 @@ f_configure_interactive (svalue_t *sp)
         {
             case T_NUMBER:
                 if (sp->u.number != 0)
-                    efun_exp_arg_error(3, TF_POINTER, sp->type, sp);
+                    efun_exp_arg_error(3, TF_POINTER, sp, sp);
                 set_default_conn_charset(ip->charset);
                 break;
 
@@ -8591,7 +8845,7 @@ f_configure_interactive (svalue_t *sp)
                 break;
 
             default:
-                efun_exp_arg_error(3, TF_POINTER, sp->type, sp);
+                efun_exp_arg_error(3, TF_POINTER, sp, sp);
         }
         break;
 
@@ -8600,7 +8854,7 @@ f_configure_interactive (svalue_t *sp)
             errorf("Default value for IC_QUOTE_IAC is not supported.\n");
 
         if (sp->type != T_NUMBER)
-            efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+            efun_exp_arg_error(3, TF_NUMBER, sp, sp);
 
         ip->quote_iac = (char)sp->u.number;
         break;
@@ -8610,7 +8864,7 @@ f_configure_interactive (svalue_t *sp)
             errorf("Default value for IC_TELNET_ENABLED is not supported.\n");
 
         if (sp->type != T_NUMBER)
-            efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+            efun_exp_arg_error(3, TF_NUMBER, sp, sp);
 
         ip->tn_enabled = (sp->u.number != 0);
         break;
@@ -8621,7 +8875,7 @@ f_configure_interactive (svalue_t *sp)
             errorf("Default value for IC_MCCP is not supported.\n");
 
         if (sp->type != T_NUMBER)
-            efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+            efun_exp_arg_error(3, TF_NUMBER, sp, sp);
         else if(sp->u.number == 0)
         {
             /* Deactivating MCCP */
@@ -8659,7 +8913,7 @@ f_configure_interactive (svalue_t *sp)
             errorf("Default value for IC_PROMPT is not supported.\n");
 
         if (sp->type != T_STRING && sp->type != T_CLOSURE)
-            efun_exp_arg_error(3, TF_STRING|TF_CLOSURE, sp->type, sp);
+            efun_exp_arg_error(3, TF_STRING|TF_CLOSURE, sp, sp);
 
         if (sp->type == T_CLOSURE && sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA)
             errorf("Bad arg 3 for configure_interactive with IC_PROMPT: lambda closure not bound\n");
@@ -8686,7 +8940,7 @@ f_configure_interactive (svalue_t *sp)
             errorf("Default value for IC_MAX_COMMANDS is not supported.\n");
 
         if (sp->type != T_NUMBER)
-            efun_exp_arg_error(3, TF_NUMBER, sp->type, sp);
+            efun_exp_arg_error(3, TF_NUMBER, sp, sp);
 
         if (sp->u.number < 0)
             ip->maxNumCmds = -1;
@@ -8699,7 +8953,7 @@ f_configure_interactive (svalue_t *sp)
             errorf("Default value for IC_MODIFY_COMMAND is not supported.\n");
 
         if (sp->type != T_OBJECT && (sp->type != T_NUMBER || sp->u.number != 0))
-            efun_exp_arg_error(3, TF_OBJECT, sp->type, sp);
+            efun_exp_arg_error(3, TF_OBJECT, sp, sp);
 
         if (ip->modify_command)
             free_object(ip->modify_command, "configure_interactive(IC_MODIFY_COMMAND)");
@@ -8712,7 +8966,7 @@ f_configure_interactive (svalue_t *sp)
 
     case IC_ENCODING:
         if (sp->type != T_STRING)
-            efun_exp_arg_error(3, TF_STRING, sp->type, sp);
+            efun_exp_arg_error(3, TF_STRING, sp, sp);
 
         if (mstrsize(sp->u.str) >= sizeof(default_player_encoding))
             errorf("Illegal value to arg 3 of configure_interactive with IC_ENCODING: Encoding name too long.\n");
@@ -8924,11 +9178,11 @@ f_interactive_info (svalue_t *sp)
 
     /* Connection information */
     case II_IP_NAME:
-#ifdef ERQ_DEMON
+#ifdef LOOKUP_IP_ADRESS
         {
             string_t * hname;
 
-            hname = lookup_ip_entry(ip->addr.sin_addr, MY_FALSE);
+            hname = lookup_ip_entry(ip->addr.sin4or6_addr, MY_FALSE);
             if (hname)
             {
                 put_ref_string(&result, hname);
@@ -8941,13 +9195,9 @@ f_interactive_info (svalue_t *sp)
     case II_IP_NUMBER:
         {
             string_t *haddr;
+            char buf[INET4OR6_ADDRSTRLEN+1];
 
-#ifndef USE_IPV6
-            haddr = new_mstring(inet_ntoa(ip->addr.sin_addr), STRING_ASCII);
-#else
-            haddr = new_mstring(inet6_ntoa(ip->addr.sin_addr), STRING_ASCII);
-#endif
-
+            haddr = new_mstring(inet_ntop(AF_INET4OR6, &(ip->addr.sin4or6_addr), buf, sizeof(buf)), STRING_ASCII);
             if (!haddr)
                 errorf("Out of memory for IP address\n");
 
@@ -8956,7 +9206,7 @@ f_interactive_info (svalue_t *sp)
         }
 
     case II_IP_PORT:
-        put_number(&result, ntohs(ip->addr.sin_port));
+        put_number(&result, ntohs(ip->addr.sin4or6_port));
         break;
 
     case II_IP_ADDRESS:
@@ -8985,11 +9235,11 @@ f_interactive_info (svalue_t *sp)
 
     case II_MUD_PORT:
         {
-            struct sockaddr_in addr;
+            sockaddr_in4or6 addr;
             length_t length = sizeof(addr);
 
             getsockname(ip->socket, (struct sockaddr *)&addr, &length);
-            put_number(&result, ntohs(addr.sin_port));
+            put_number(&result, ntohs(addr.sin4or6_port));
             break;
         }
 

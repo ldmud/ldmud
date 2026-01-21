@@ -10,5 +10,21 @@ DESCRIPTION
         efun::function() to bypass the simul_efun (unless the
         simul_efun object has defined the function as "nomask").
 
+        Similarly any (non-private) struct definitions of the simul-efun
+        will be available in every object.
+
+CONSEQUENCES OF SIMUL-EFUN CHANGES
+        When the simul-efun is recompiled (i.e. destructed and then
+        automatically being reloaded), all objects will call the new
+        simul-efun functions. If a function vanished then any call to
+        this function will result in an error. Added simul-efun
+        funtions are available to any newly compiled program.
+
+        Struct definitions will persist with the object that used them.
+        If an object creates structs from simul-efun definitions it will
+        create structs with the struct layout from the old simul-efun
+        (until the object itself recompiled and uses the newer struct
+        definitions).
+
 SEE ALSO
         get_simul_efun(M), inheritance(LPC), operators(LPC)

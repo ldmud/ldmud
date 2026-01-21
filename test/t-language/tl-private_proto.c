@@ -1,3 +1,4 @@
+// Not for compile_string()
 inherit "/inh/private_proto";
 
 private void fun();

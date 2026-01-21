@@ -1,0 +1,102 @@
+CONCEPT
+        sqlite - SQLite3 support
+
+DESCRIPTION
+        On hosts with the SQLite3 package installed, the driver can be
+        configured to interface with SQLite databases. If that is done,
+        the driver defines the macro __SQLITE__ for LPC programs and
+        activates a number of efuns.
+
+
+        -- Configuration --
+
+        SQLite databases require no special configuration.
+
+
+        -- Usage --
+
+        Being file-based, using an SQLite database is very straightforward.
+        The interface consists of just 4 efuns:
+
+        * sl_open(filename)
+          Open the database <filename> for the current program. Each program
+          can only have one database open at any time.
+
+        * sl_exec(query, ...)
+          Execute <query> on the previously opened database.
+
+        * sl_insert_id()
+          After inserting into a table with an AUTO_INCREMENT field, this
+          efun returns the last generated value.
+
+        * sl_close()
+          Close the database file. This also automatically happens when the
+          object is destructed.
+
+
+        -- Security --
+
+        Accessing a SQLite database triggers a call to the master's
+        valid_write() with the func argument set to "sl_open".
+
+        If a query attempts to change an SQLite PRAGMA this will trigger a
+        privilege_violation("sqlite_pragma", "<name>", "<value>").
+
+
+EXAMPLE
+        A simple server to store aliases could be implemented like this:
+
+        #define DATABASE "/var/aliases.sqlite"
+
+        public void create()
+        {
+            sl_open(DATABASE);
+            sl_exec("CREATE TABLE IF NOT EXISTS aliases ("
+                "name text not NULL,"
+                "alias text not NULL,"
+                "command text not NULL,"
+                "primary key (name, alias));");
+        }
+
+        public int AddAlias(string alias, string command, object ob)
+        {
+            sl_exec("INSERT OR REPLACE INTO aliases (name, alias, command) "
+                    "VALUES (?, ?, ?)",
+                    getuid(ob), alias, command);
+            return 1;
+        }
+
+        public int RemoveAlias(string alias, object ob)
+        {
+            sl_exec("DELETE FROM aliases "
+                    "WHERE name = ? and alias = ?",
+                    getuid(ob), alias);
+            return 1;
+        }
+
+        public mapping QueryAliases(object ob)
+        {
+            mixed * result = sl_exec("SELECT alias, command FROM aliases "
+                    "WHERE name = ?",
+                    getuid(ob));
+            return sizeof(result) ? mkmapping(transpose_array(result)...) : 0;
+        }
+
+        public string QueryAlias(string alias, object ob)
+        {
+            mixed * result = sl_exec("SELECT command FROM aliases "
+                    "WHERE name = ? AND alias = ?",
+                    getuid(ob), alias);
+            return sizeof(result) ? result[0][0] : 0;
+        }
+
+
+AUTHOR
+        Bastian Hoyer and others.
+
+HISTORY
+        SQLite support was added in 3.3.713.
+
+SEE ALSO
+        mysql(C), pgsql(C),
+        sl_open(E), sl_exec(E), sl_insert_id(E), sl_close(E)

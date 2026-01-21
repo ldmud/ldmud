@@ -18,6 +18,8 @@ src/Makefile
 src/patchlevel.h
 src/stdstrings.c
 src/stdstrings.h
+src/stdstructs.c
+src/stdstructs.h
 src/y.output
 src/**/*.o
 src/**/*.orig

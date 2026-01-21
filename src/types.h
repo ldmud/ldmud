@@ -13,12 +13,16 @@
 
 #include "driver.h"
 #include "typedefs.h"
+#include "svalue.h"
 
 typedef enum type_classes    type_classes_t;
 typedef enum primary_types   primary_types_t;
 typedef enum object_types    object_types_t;
 typedef struct struct_info_s struct_info_t;
 typedef struct object_type_s object_type_t;
+#ifdef USE_PYTHON
+typedef struct python_type_s python_type_t;
+#endif
 typedef struct array_type_s  array_type_t;
 typedef struct union_type_s  union_type_t;
 typedef uint32               typeflags_t;
@@ -47,7 +51,10 @@ enum type_classes
     TCLASS_STRUCT,
     TCLASS_OBJECT,
     TCLASS_ARRAY,
-    TCLASS_UNION
+    TCLASS_UNION,
+#ifdef USE_PYTHON
+    TCLASS_PYTHON
+#endif
 };
 
 /* --- Primary type values --- */
@@ -65,6 +72,7 @@ enum primary_types
     TYPE_QUOTED_ARRAY =  9,
     TYPE_BYTES        = 10,
     TYPE_COROUTINE    = 11,
+    TYPE_LPCTYPE      = 12,
 };
 
 /* -- Object types -- */
@@ -87,6 +95,12 @@ struct struct_info_s
      * NULL otherwise.
      */
     struct_type_t *def;
+
+    /* Used during compilation. This is the index into
+     * the list of struct definitions that corresponds to
+     * this type. USHRT_MAX when not initialized.
+     */
+    unsigned short def_idx;
 };
 
 struct object_type_s
@@ -105,6 +119,15 @@ struct object_type_s
      */
     object_types_t type;
 };
+
+#ifdef USE_PYTHON
+struct python_type_s
+{
+    /* Index into the Python type table.
+     */
+    int type_id;
+};
+#endif
 
 struct array_type_s
 {
@@ -174,6 +197,9 @@ struct lpctype_s
         primary_types_t  t_primary;     /* TCLASS_PRIMARY */
         struct_info_t    t_struct;      /* TCLASS_STRUCT */
         object_type_t    t_object;      /* TCLASS_OBJECT */
+#ifdef USE_PYTHON
+        python_type_t    t_python;      /* TCLASS_PYTHON */
+#endif
         array_type_t     t_array;       /* TCLASS_ARRAY */
         union_type_t     t_union;       /* TCLASS_UNION */
     };
@@ -240,7 +266,7 @@ struct fulltype_s
 extern lpctype_t *lpctype_int, *lpctype_string, *lpctype_bytes,
                  *lpctype_mapping, *lpctype_float, *lpctype_mixed,
                  *lpctype_closure, *lpctype_symbol, *lpctype_coroutine,
-                 *lpctype_quoted_array,
+                 *lpctype_lpctype, *lpctype_quoted_array,
                  *lpctype_any_struct, *lpctype_any_object,
                  *lpctype_any_lwobject, *lpctype_void, *lpctype_unknown;
 
@@ -248,14 +274,18 @@ extern lpctype_t *lpctype_int, *lpctype_string, *lpctype_bytes,
 extern lpctype_t _lpctype_int, _lpctype_string, _lpctype_bytes,
                  _lpctype_mapping, _lpctype_float, _lpctype_mixed,
                  _lpctype_closure, _lpctype_symbol, _lpctype_coroutine,
-                 _lpctype_quoted_array,
+                 _lpctype_lpctype, _lpctype_quoted_array,
                  _lpctype_any_struct, _lpctype_any_object,
                  _lpctype_any_lwobject, _lpctype_void, _lpctype_unknown;
 
 
+extern lpctype_t *get_struct_name_type(struct_name_t* name);
 extern lpctype_t *get_struct_type(struct_type_t* def);
 extern lpctype_t *get_object_type(string_t* prog);
 extern lpctype_t *get_lwobject_type(string_t* prog);
+#ifdef USE_PYTHON
+extern lpctype_t *get_python_type(int python_type_id);
+#endif
 extern lpctype_t *get_array_type(lpctype_t *element);
 extern lpctype_t *get_array_type_with_depth(lpctype_t *element, int depth);
 extern lpctype_t *get_union_type(lpctype_t *head, lpctype_t* member);
@@ -269,6 +299,7 @@ extern void _free_lpctype(lpctype_t *t);
 extern bool lpctype_contains(lpctype_t* src, lpctype_t* dest);
 extern bool is_compatible_object(object_t *ob, lpctype_t *t);
 extern bool is_compatible_lwobject(lwobject_t *ob, lpctype_t *t);
+extern lpctype_t *parse_lpctype(const char** start, const char* end);
 extern int get_type_compat_int(lpctype_t *t);
 extern void types_driver_info(svalue_t *svp, int value) __attribute__((nonnull(1)));
 
@@ -336,6 +367,18 @@ static INLINE fulltype_t get_fulltype_flags(lpctype_t *t, typeflags_t f)
 {
     return ((fulltype_t) { .t_type = t, .t_flags = f });
 }
+
+static INLINE void put_ref_lpctype(svalue_t * const dest, lpctype_t * const t)
+                                                __attribute__((nonnull(1,2)));
+static INLINE void put_ref_lpctype(svalue_t * const dest, lpctype_t * const t)
+/* Put the type <t> into <dest>, which is considered empty,
+ * and increment the refcount of <t>.
+ */
+{
+    *dest = svalue_lpctype(ref_lpctype(t));
+}
+
+#define push_ref_lpctype(sp,val) put_ref_lpctype(++(sp),val)
 
 #ifdef GC_SUPPORT
 

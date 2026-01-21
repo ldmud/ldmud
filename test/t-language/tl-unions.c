@@ -52,6 +52,29 @@ int             f_return_member           (struct sub1|struct sub2|struct indep 
 
 int|string|mixed* multiply(int|string|mixed* arg, int factor)   {return arg*factor;}
 
+#pragma weak_types
+just_compile_this(arg)
+{
+    /* Initialization and simple operations. */
+    g_str = arg;
+    g_str = g_int + arg;
+    arg = arg + g_int;
+    arg = arg[0];
+    arg = multiply(arg, arg);
+
+    return arg;
+}
+
+#pragma strong_types
+int call_the_weak()
+{
+    /* Check mixing of available type information
+     * with not-available type information.
+     * Should not result in a compiler error or segfault.
+     */
+    return just_compile_this(10);
+}
+
 int run_test()
 {
     /* Initialize variables of different types with zero.
@@ -115,27 +138,4 @@ int run_test()
     }
 
     return 1;
-}
-
-#pragma weak_types
-just_compile_this(arg)
-{
-    /* Initialization and simple operations. */
-    g_str = arg;
-    g_str = g_int + arg;
-    arg = arg + g_int;
-    arg = arg[0];
-    arg = multiply(arg, arg);
-
-    return arg;
-}
-
-#pragma strong_types
-int call_the_weak()
-{
-    /* Check mixing of available type information
-     * with not-available type information.
-     * Should not result in a compiler error or segfault.
-     */
-    return just_compile_this(10);
 }

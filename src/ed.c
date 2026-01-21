@@ -730,7 +730,7 @@ prntln (char *str, Bool vflg, int lin)
 
     while(*str && *str != NL)
     {
-        if (*str < ' ' || *str >= 0x7f)
+        if (((unsigned char)*str) < ' ')
         {
             switch(*str)
             {
@@ -756,7 +756,7 @@ prntln (char *str, Bool vflg, int lin)
             char *start;
 
             start = str;
-            do str++; while(*str >= ' ' && *str < 0x7f);
+            do str++; while(((unsigned char)*str) >= ' ');
             if (*str)
                 add_message("%.*s", (int)(str - start), start);
             else
@@ -2614,8 +2614,8 @@ indent_code (int from, int to)
  */
 
 {
-    char s[STACKSZ];
-    int i[STACKSZ];
+    static char s[STACKSZ];
+    static int i[STACKSZ];
 
     /* setup stacks */
     stackbot = s;

@@ -1,4 +1,4 @@
-import sys,unittest,gc
+import sys,unittest,gc,functools,random
 import ldmud
 
 class TestModule(unittest.TestCase):
@@ -7,7 +7,38 @@ class TestModule(unittest.TestCase):
         self.assertEqual(ob, ldmud.get_master())
 
     def testSimulEfun(self):
-        self.assertIsNone(ldmud.get_simul_efun())
+        ob = ldmud.Object("/sefun")
+        self.assertEqual(ob, ldmud.get_simul_efun())
+
+class TestBasicTypes(unittest.TestCase):
+    def testInteger(self):
+        self.assertEqual(ldmud.Integer(10), 10)
+        self.assertEqual(ldmud.Integer(10)+ldmud.Integer(10), 20)
+        self.assertEqual({ldmud.Integer(10): 42,
+                          ldmud.Integer(11): 52}[ldmud.Integer(10)], 42)
+
+    def testFloat(self):
+        self.assertAlmostEqual(ldmud.Float(1.5), 1.5)
+        self.assertAlmostEqual(ldmud.Float(1.5)+ldmud.Integer(2), 3.5)
+        self.assertEqual({ldmud.Float(1.5): 42,
+                          ldmud.Float(2.5): 52}[ldmud.Float(1.5)], 42)
+
+    def testString(self):
+        self.assertEqual(ldmud.String("ABC"), "ABC")
+        self.assertEqual(ldmud.String("ABC")+ldmud.String("DEF"), "ABCDEF")
+        self.assertEqual({ldmud.String("ABC"): 42,
+                          ldmud.String("DEF"): 52,}[ldmud.String("ABC")], 42)
+
+    def testBytes(self):
+        self.assertEqual(ldmud.Bytes(b"ABC"), b"ABC")
+        self.assertEqual(ldmud.Bytes(b"ABC")+ldmud.Bytes(b"DEF"), b"ABCDEF")
+        self.assertEqual({ldmud.Bytes(b"ABC"): 42,
+                          ldmud.Bytes(b"DEF"): 52}[ldmud.Bytes(b"ABC")], 42)
+
+    def testMixed(self):
+        self.assertEqual(ldmud.Mixed(10), 10)
+        self.assertAlmostEqual(ldmud.Mixed(1.5) + ldmud.Mixed(2), 3.5)
+        self.assertEqual(list(ldmud.Mixed(ldmud.Array([42, 1.5, "Hi"]))), [42, 1.5, "Hi"])
 
 class TestObject(unittest.TestCase):
     def testEarlyObjectLoad(self):
@@ -28,25 +59,32 @@ class TestObject(unittest.TestCase):
         ob = ldmud.Object("/testob")
         self.assertIsNotNone(ob)
         self.assertEqual(ob.name, "/testob")
+        self.assertEqual(ob.program_name, "/testob.c")
         self.assertIn("testob", repr(ob))
 
     def testInitNonExisting(self):
         with self.assertRaises(RuntimeError):
             ob = ldmud.Object("/imnotthere")
 
+    def testHashable(self):
+        self.assertEqual({
+            ldmud.Object("/master"): 42,
+            ldmud.Object("/testob"): 52}[ldmud.Object("/master")], 42)
+
     def testFunctionInfo(self):
         ob = ldmud.Object("/testob")
         self.assertIsNotNone(ob)
 
-        self.assertTrue('testfun' in dir(ob.functions))
-        self.assertTrue('testfun' in ob.functions.__dict__)
+        self.assertIn('testfun', dir(ob.functions))
+        self.assertIn('testfun', ob.functions.__dict__)
+        self.assertIn('testfun', [ fun.name for fun in ob.functions ])
 
         fun = ob.functions.testfun
         self.assertIsNotNone(fun)
         self.assertEqual(fun.name, "testfun")
         self.assertEqual(fun.file_name, "/testob.c")
         self.assertGreater(fun.line_number, 0)
-        self.assertEqual(fun.return_type, int)
+        self.assertEqual(fun.return_type, ldmud.Integer)
         self.assertEqual(fun.flags, ldmud.LF_NOMASK)
         self.assertEqual(fun.visibility, ldmud.VIS_PROTECTED)
         self.assertTrue("testfun" in repr(fun) and "testob" in repr(fun))
@@ -57,25 +95,28 @@ class TestObject(unittest.TestCase):
         args = fun.arguments
         self.assertEqual(len(args), 2)
         self.assertEqual(args[0].position, 1)
-        self.assertSetEqual(set(args[0].type), set((int, float,)))
+        self.assertSetEqual(set(args[0].type), set((ldmud.Integer, ldmud.Float,)))
         self.assertEqual(args[1].position, 2)
         self.assertEqual(args[1].flags, ldmud.LA_VARARGS)
-        self.assertEqual(args[1].type, ldmud.Array)
+        self.assertEqual(args[1].type, ldmud.Array[ldmud.String])
 
         self.assertEqual(fun(10, "A", "B", "C"), 3)
+        with self.assertRaises(ValueError):
+            fun(ldmud.Array([1]), ldmud)
 
     def testVariableInfo(self):
         ob = ldmud.Object("/testob")
         self.assertIsNotNone(ob)
 
-        self.assertTrue('testvar' in dir(ob.variables))
-        self.assertTrue('testvar' in ob.variables.__dict__)
+        self.assertIn('testvar', dir(ob.variables))
+        self.assertIn('testvar', ob.variables.__dict__)
+        self.assertIn('testvar', [ var.name for var in ob.variables ])
 
         var = ob.variables.testvar
         self.assertIsNotNone(var)
         self.assertEqual(var.name, "testvar")
         self.assertEqual(var.value, 42)
-        self.assertSetEqual(set(var.type), set((int, float,)))
+        self.assertSetEqual(set(var.type), set((ldmud.Integer, ldmud.Float,)))
         self.assertEqual(var.flags, ldmud.VF_NOSAVE)
         self.assertEqual(var.visibility, ldmud.VIS_PROTECTED)
         self.assertTrue("testvar" in repr(var) and "testob" in repr(var))
@@ -103,6 +144,10 @@ class TestObject(unittest.TestCase):
         ldmud.efuns.destruct(ob)
         self.assertFalse(lfun)
         self.assertFalse(var)
+        with self.assertRaises(ValueError):
+            lfun(42)
+        with self.assertRaises(ValueError):
+            var.value
 
     def testDict(self):
         ob = ldmud.Object("/testob")
@@ -113,6 +158,36 @@ class TestObject(unittest.TestCase):
         self.assertEqual(ob.testvalue, "42")
         with self.assertRaises(AttributeError):
             ob.doesntExist
+
+    def testUninitializedObject(self):
+        ob = ldmud.Object.__new__(ldmud.Object)
+        self.assertEqual(ldmud.efuns.copy(ob), 0)
+
+    def testSwappedObject(self):
+        swap = getattr(ldmud.efuns, 'swap', None)
+        if swap:
+            ob = ldmud.Object("/testob")
+            swap(ob)
+            self.assertEqual(ob.program_name, "/testob.c")
+            swap(ob)
+
+            fun = ob.functions.testfun
+            swap(ob)
+            self.assertEqual(fun.file_name, "/testob.c")
+            swap(ob)
+            self.assertEqual(fun.arguments[1].type, ldmud.Array[ldmud.String])
+            swap(ob)
+            self.assertEqual(fun(10, "A", "B", "C"), 3)
+
+            swap(ob)
+            var = ob.variables.testvar
+            swap(ob)
+            self.assertEqual(var.name, "testvar")
+            swap(ob)
+            var.value = 100
+            swap(ob)
+            self.assertEqual(var.value, 100)
+            var.value = 42
 
 class TestLWObject(unittest.TestCase):
     def testInitLoaded(self):
@@ -135,6 +210,13 @@ class TestLWObject(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             lwob = ldmud.LWObject("/imnotthere")
 
+    def testHashable(self):
+        lwob = ldmud.LWObject("/testob")
+        lwob_eq = ldmud.efuns.funcall(lwob) # Same LPC lwobject, different Python object
+        lwob_ne = ldmud.LWObject("/testob") # Different LPC lwobject
+        self.assertNotEqual(id(lwob), id(lwob_eq))
+        self.assertEqual({lwob: 42, lwob_ne: 52}[lwob_eq], 42)
+
     def testFunctionInfo(self):
         lwob = ldmud.LWObject("/testob")
         self.assertIsNotNone(lwob)
@@ -148,7 +230,7 @@ class TestLWObject(unittest.TestCase):
         self.assertEqual(fun.name, "testfun")
         self.assertEqual(fun.file_name, "/testob.c")
         self.assertGreater(fun.line_number, 0)
-        self.assertEqual(fun.return_type, int)
+        self.assertEqual(fun.return_type, ldmud.Integer)
         self.assertEqual(fun.flags, ldmud.LF_NOMASK)
         self.assertEqual(fun.visibility, ldmud.VIS_PROTECTED)
         self.assertTrue("testfun" in repr(fun) and "testob" in repr(fun))
@@ -159,10 +241,10 @@ class TestLWObject(unittest.TestCase):
         args = fun.arguments
         self.assertEqual(len(args), 2)
         self.assertEqual(args[0].position, 1)
-        self.assertSetEqual(set(args[0].type), set((int, float,)))
+        self.assertSetEqual(set(args[0].type), set((ldmud.Integer, ldmud.Float,)))
         self.assertEqual(args[1].position, 2)
         self.assertEqual(args[1].flags, ldmud.LA_VARARGS)
-        self.assertEqual(args[1].type, ldmud.Array)
+        self.assertEqual(args[1].type, ldmud.Array[ldmud.String])
 
         self.assertEqual(fun(10, "A", "B", "C"), 3)
 
@@ -178,7 +260,7 @@ class TestLWObject(unittest.TestCase):
         self.assertTrue(var)
         self.assertEqual(var.name, "testvar")
         self.assertEqual(var.value, 42)
-        self.assertSetEqual(set(var.type), set((int, float,)))
+        self.assertSetEqual(set(var.type), set((ldmud.Integer, ldmud.Float,)))
         self.assertEqual(var.flags, ldmud.VF_NOSAVE)
         self.assertEqual(var.visibility, ldmud.VIS_PROTECTED)
         self.assertTrue("testvar" in repr(var) and "testob" in repr(var))
@@ -192,6 +274,10 @@ class TestLWObject(unittest.TestCase):
         with self.assertRaises(TypeError):
             var.value = "42"
         self.assertEqual(var.value, 84)
+
+    def testUninitializedLWObject(self):
+        lwob = ldmud.LWObject.__new__(ldmud.LWObject)
+        self.assertEqual(ldmud.efuns.copy(lwob), 0)
 
 class TestArray(unittest.TestCase):
     def testInitEmpty(self):
@@ -222,6 +308,13 @@ class TestArray(unittest.TestCase):
         self.assertTrue(0 in arr)
         self.assertTrue(9 in arr)
         self.assertFalse(10 in arr)
+
+    def testHashable(self):
+        arr = ldmud.Array([1,2,3])
+        arr_eq = ldmud.efuns.funcall(arr) # Same array
+        arr_ne = ldmud.Array([1,2,3,4])   # Different array
+        self.assertNotEqual(id(arr), id(arr_eq))
+        self.assertEqual({arr: 42, arr_ne: 52}[arr_eq], 42)
 
     def testConcat(self):
         arr = ldmud.Array([1,2,3]) + ldmud.Array([4,5,6])
@@ -291,6 +384,11 @@ class TestArray(unittest.TestCase):
         del parr[10:0:-3]
         self.assertEqual(list(arr), parr)
 
+    def testUninitializedArray(self):
+        arr = ldmud.Array.__new__(ldmud.Array)
+        ca = ldmud.efuns.copy(arr)
+        self.assertIsNotNone(ca)
+        self.assertEqual(len(ca), 0)
 
 class TestMapping(unittest.TestCase):
     def testInitEmpty(self):
@@ -336,6 +434,13 @@ class TestMapping(unittest.TestCase):
         with self.assertRaises(ValueError):
             m = ldmud.Mapping(width=-1)
 
+    def testHashable(self):
+        m = ldmud.Mapping({1:1, 2:4, 3:9})
+        m_eq = ldmud.efuns.funcall(m)         # Same mapping
+        m_ne = ldmud.Mapping({1:2, 2:3, 3:4}) # Different mapping
+        self.assertNotEqual(id(m), id(m_eq))
+        self.assertEqual({m: 42, m_ne: 52}[m_eq], 42)
+
     def testGetSetSimple(self):
         m = ldmud.Mapping()
         self.assertIsNotNone(m)
@@ -362,6 +467,9 @@ class TestMapping(unittest.TestCase):
         self.assertFalse('Two' in m)
         self.assertEqual(m['One'], 1)
         self.assertEqual(m['Three'], 3)
+
+        with self.assertRaises(RuntimeError):
+            del m["One",1]
 
     def testGetSetWide(self):
         m = ldmud.Mapping(width=2)
@@ -394,11 +502,54 @@ class TestMapping(unittest.TestCase):
         with self.assertRaises(IndexError):
             m['Hi',2] = 0
 
+    def testGetSetRange(self):
+        m = ldmud.Mapping((( "K", 0, 1, 2, 3, 4, 5, 6, 7 ),))
+
+        self.assertIsNotNone(m)
+        self.assertEqual(len(m), 1)
+        self.assertEqual(m.width, 8)
+
+        self.assertEqual(list(m["K",3:5]), [3,4])
+        self.assertEqual(list(m["K",5:3:-1]), [5,4])
+        self.assertEqual(list(m["K",::-2]), list(range(7,0,-2)))
+
+        m["K",::-1] = ldmud.Array(range(8))
+        self.assertEqual(list(m["K",:]), list(range(7,-1,-1)))
+
+        m["K",5:6] = ldmud.Array([10])
+        self.assertEqual(list(m["K",:]), [7, 6, 5, 4, 3, 10, 1, 0])
+
+        m["K",4:2:-1] = ldmud.Array([100,101])
+        self.assertEqual(list(m["K",:]), [7, 6, 5, 101, 100, 10, 1, 0])
+
+        with self.assertRaises(ValueError):
+            m["K",1:2] = ldmud.Array([-1,-2])
+        with self.assertRaises(ValueError):
+            m["K",1:2] = ldmud.Array([])
+        with self.assertRaises(RuntimeError):
+            del m["K",1:2]
+
     def testIterator(self):
         m = ldmud.Mapping( { "One": 1, "Two": 2, "Three": 3 } );
         self.assertEqual(dict(m), { "One": 1, "Two": 2, "Three": 3})
         self.assertEqual(set(m.keys()), set(("One", "Two", "Three",)))
         self.assertEqual(set(m.values()), set((1,2,3,)))
+
+    def testUninitializedMapping(self):
+        m = ldmud.Mapping.__new__(ldmud.Mapping)
+        cm = ldmud.efuns.copy(m)
+        self.assertIsNotNone(cm)
+        self.assertEqual(len(cm), 0)
+
+    def testInitLeak(self):
+        DI_NUM_MAPPINGS = -415
+        num_arr = ldmud.efuns.driver_info(DI_NUM_MAPPINGS)
+
+        m = ldmud.Mapping({"A": ldmud.Mapping() })
+        self.assertEqual(ldmud.efuns.driver_info(DI_NUM_MAPPINGS), num_arr+2)
+
+        del m
+        self.assertEqual(ldmud.efuns.driver_info(DI_NUM_MAPPINGS), num_arr)
 
 class TestStruct(unittest.TestCase):
     def setUp(self):
@@ -423,7 +574,10 @@ class TestStruct(unittest.TestCase):
         mem = s.members.t_int
         self.assertIsNotNone(mem)
         self.assertEqual(mem.name, "t_int")
-        self.assertEqual(mem.type, int)
+        self.assertEqual(mem.type, ldmud.Integer)
+
+        names = [m.name for m in s.members]
+        self.assertEqual(names, ["t_int", "t_float", "t_string", "t_object", "t_lwobject", "t_array", "t_mapping", "t_symbol", "t_quoted_array", "t_coroutine" ])
 
     def testInitValueTuple(self):
         s = ldmud.Struct(self.master, "test_struct", (42, 1.5, 'Hi',))
@@ -446,6 +600,13 @@ class TestStruct(unittest.TestCase):
         self.assertEqual(s.members.t_float.value, 1.5)
         self.assertEqual(s.members.t_string.value, 'Hi')
 
+    def testHashable(self):
+        s = ldmud.Struct(self.master, "test_struct", (42, 1.5, 'Hi',))
+        s_eq = ldmud.efuns.funcall(s)
+        s_ne = ldmud.Struct(self.master, "test_struct", (42, 2.5, 'Hi',))
+        self.assertNotEqual(id(s), id(s_eq))
+        self.assertEqual({s: 42, s_ne: 52}[s_eq], 42)
+
     def testSetValue(self):
         s = ldmud.Struct(self.master, "test_struct")
         self.assertIsNotNone(s)
@@ -455,6 +616,10 @@ class TestStruct(unittest.TestCase):
         self.assertEqual(s.members.t_int.value, 123)
         self.assertEqual(s.members.t_float.value, 5.5)
         self.assertEqual(s.members.t_string.value, 'Hello!')
+
+    def testUninitializedStruct(self):
+        s = ldmud.Struct.__new__(ldmud.Struct)
+        self.assertEqual(ldmud.efuns.copy(s), 0)
 
 class TestClosure(unittest.TestCase):
     def setUp(self):
@@ -467,6 +632,10 @@ class TestClosure(unittest.TestCase):
         s2 = ldmud.Closure(self.master, "this_object")
         self.assertEqual(s2, s)
         self.assertIn(s2, set((s,)))
+        with self.assertRaises(ValueError):
+            s(ldmud.Array([1]), ldmud)
+        s_ne = ldmud.Closure(self.master, "this_player")
+        self.assertEqual({s: 42, s_ne: 52}[s2], 42)
 
     def testLWOEfun(self):
         lwob = ldmud.LWObject("/testob")
@@ -476,6 +645,8 @@ class TestClosure(unittest.TestCase):
         s2 = ldmud.Closure(lwob, "this_object")
         self.assertEqual(s2, s)
         self.assertIn(s2, set((s,)))
+        s_ne = ldmud.Closure(lwob, "this_player")
+        self.assertEqual({s: 42, s_ne: 52}[s2], 42)
 
     def testOperator(self):
         s = ldmud.Closure(self.master, ",")
@@ -485,6 +656,8 @@ class TestClosure(unittest.TestCase):
         s2 = ldmud.Closure(self.master, ",")
         self.assertEqual(s2, s)
         self.assertIn(s2, set((s,)))
+        s_ne = ldmud.Closure(self.master, "while")
+        self.assertEqual({s: 42, s_ne: 52}[s2], 42)
 
     def testLfun(self):
         s = ldmud.Closure(self.master, "master_fun", self.master)
@@ -493,6 +666,10 @@ class TestClosure(unittest.TestCase):
         s2 = ldmud.Closure(self.master, "master_fun", self.master)
         self.assertEqual(s2, s)
         self.assertIn(s2, set((s,)))
+        with self.assertRaises(ValueError):
+            s(ldmud.Array([1]), ldmud)
+        s_ne = ldmud.Closure(self.master, "epilog", self.master)
+        self.assertEqual({s: 42, s_ne: 52}[s2], 42)
 
     def testDestructedLfun(self):
         ob = ldmud.Object("/testob")
@@ -509,12 +686,500 @@ class TestClosure(unittest.TestCase):
         s2 = ldmud.Closure(lwob, "testfun", lwob)
         self.assertEqual(s2, s)
         self.assertIn(s2, set((s,)))
+        s_ne = ldmud.Closure(lwob, "create", lwob)
+        self.assertEqual({s: 42, s_ne: 52}[s2], 42)
+
+    def testSwappedObjectLfun(self):
+        swap = getattr(ldmud.efuns, 'swap', None)
+        if swap:
+            ob = ldmud.Object("/testob")
+            swap(ob)
+            c = ldmud.Closure(ob, "testfun", ob)
+            swap(ob)
+            self.assertEqual(c(10, "A", "B", "C"), 3)
+            ldmud.efuns.destruct(ob)
+
+class TestLfunClosure(unittest.TestCase):
+    def setUp(self):
+        self.master = ldmud.get_master()
+
+    def testLfun(self):
+        s = ldmud.LfunClosure(self.master, "master_fun", self.master)
+        self.assertIsNotNone(s)
+        self.assertEqual(s.bound_object, self.master)
+        self.assertEqual(s.object, self.master)
+        self.assertEqual(s.lfun.name, "master_fun")
+        self.assertEqual(s.lfun.file_name, "/master.c")
+        self.assertEqual(s.lfun.program_name, "/master.c")
+        self.assertEqual(s(), 54321)
+
+        s2 = ldmud.efuns.symbol_function("master_fun", self.master)
+        self.assertEqual(s2.bound_object, self.master)
+        self.assertEqual(s2.object, self.master)
+        self.assertEqual(s2.lfun.name, "master_fun")
+        self.assertEqual(s2.lfun.file_name, "/master.c")
+        self.assertEqual(s2(), 54321)
+
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
+
+        with self.assertRaises(ValueError):
+            s(ldmud.Array([1]), ldmud)
+
+        s_ne = ldmud.LfunClosure(self.master, "epilog", self.master)
+        self.assertEqual({s: 42, s_ne: 52}[s2], 42)
+
+    def testDestructedLfun(self):
+        ob = ldmud.Object("/testob")
+        c = ldmud.LfunClosure(ob, "testfun", ob)
+        self.assertTrue(c)
+        ldmud.efuns.destruct(ob)
+        self.assertFalse(c)
+
+    def testLWOLfun(self):
+        lwob = ldmud.LWObject("/testob")
+        s = ldmud.LfunClosure(lwob, "testfun", self.master)
+        self.assertIsNotNone(s)
+        self.assertEqual(s.bound_object, self.master)
+        self.assertEqual(s.object, lwob)
+        self.assertEqual(s.lfun.name, "testfun")
+        self.assertEqual(s.lfun.file_name, "/testob.c")
+        self.assertEqual(s(42, "A", "B", "C"), 3)
+        s2 = ldmud.LfunClosure(lwob, "testfun", self.master)
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
+        s_ne = ldmud.LfunClosure(lwob, "create", lwob)
+        self.assertEqual({s: 42, s_ne: 52}[s2], 42)
 
     def testEmpty(self):
-        s = ldmud.Closure.__new__(ldmud.Closure)
+        s = ldmud.LfunClosure.__new__(ldmud.LfunClosure)
+        with self.assertRaises(Exception):
+            s.bound_object
+        with self.assertRaises(Exception):
+            s.object
+        with self.assertRaises(Exception):
+            s.lfun.name
         with self.assertRaises(Exception):
             s()
         self.assertFalse(s)
+        self.assertEqual(ldmud.efuns.copy(s), 0)
+
+    def testSwappedObjectLfun(self):
+        swap = getattr(ldmud.efuns, 'swap', None)
+        if swap:
+            ob = ldmud.Object("/testob")
+            swap(ob)
+            c = ldmud.LfunClosure(ob, "testfun", ob)
+            swap(ob)
+            self.assertEqual(c.lfun.name, "testfun")
+            swap(ob)
+            self.assertEqual(c(10, "A", "B", "C"), 3)
+            ldmud.efuns.destruct(ob)
+
+class TestIdentifierClosure(unittest.TestCase):
+    def setUp(self):
+        self.master = ldmud.get_master()
+
+    def testIdentifier(self):
+        s = ldmud.IdentifierClosure(self.master, "master_var")
+        self.assertIsNotNone(s)
+        self.assertEqual(s.bound_object, self.master)
+        self.assertEqual(s.object, self.master)
+        self.assertEqual(s.variable.name, "master_var")
+        self.assertEqual(s.variable.type, ldmud.Integer)
+        self.assertEqual(s(), 98765)
+
+        s2 = ldmud.efuns.symbol_variable("master_var")
+        self.assertEqual(s2.bound_object, self.master)
+        self.assertEqual(s2.object, self.master)
+        self.assertEqual(s2.variable.name, "master_var")
+        self.assertEqual(s2.variable.type, ldmud.Integer)
+        self.assertEqual(s2(), 98765)
+
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
+
+    def testDestructedIdentifier(self):
+        ob = ldmud.Object("/testob")
+        c = ldmud.IdentifierClosure(ob, "testvar")
+        self.assertTrue(c)
+        ldmud.efuns.destruct(ob)
+        self.assertFalse(c)
+
+    def testLWOIdentifier(self):
+        lwob = ldmud.LWObject("/testob")
+        s = ldmud.IdentifierClosure(lwob, "testvar")
+        self.assertIsNotNone(s)
+        self.assertEqual(s.bound_object, lwob)
+        self.assertEqual(s.object, lwob)
+        self.assertEqual(s.variable.name, "testvar")
+        self.assertEqual(s.variable.type, ldmud.Integer|ldmud.Float)
+        self.assertEqual(s(), 42)
+
+        s2 = ldmud.IdentifierClosure(lwob, "testvar")
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
+
+        s_ne = ldmud.IdentifierClosure(lwob, "var_testob")
+        self.assertEqual({s: 42, s_ne: 52}[s2], 42)
+
+    def testEmpty(self):
+        s = ldmud.IdentifierClosure.__new__(ldmud.IdentifierClosure)
+        with self.assertRaises(Exception):
+            s.bound_object
+        with self.assertRaises(Exception):
+            s.object
+        with self.assertRaises(Exception):
+            s.variable.name
+        with self.assertRaises(Exception):
+            s()
+        self.assertFalse(s)
+        self.assertEqual(ldmud.efuns.copy(s), 0)
+
+    def testSwappedObjectIdentifier(self):
+        swap = getattr(ldmud.efuns, 'swap', None)
+        if swap:
+            ob = ldmud.Object("/testob")
+            swap(ob)
+            c = ldmud.IdentifierClosure(ob, "testvar")
+            swap(ob)
+            self.assertEqual(c.variable.name, "testvar")
+            swap(ob)
+            self.assertEqual(c(), 42)
+            ldmud.efuns.destruct(ob)
+
+class TestLambdaClosure(unittest.TestCase):
+    def setUp(self):
+        self.master = ldmud.get_master()
+        self.lambda_efun = getattr(ldmud.efuns, 'lambda')
+
+    def testLambda(self):
+        s = self.lambda_efun(0, 42)
+        self.assertIsNotNone(s)
+        self.assertEqual(s.bound_object, self.master)
+        self.assertEqual(s.object, self.master)
+        self.assertEqual(s(), 42)
+
+    def testEmpty(self):
+        s = ldmud.LambdaClosure.__new__(ldmud.LambdaClosure)
+        with self.assertRaises(Exception):
+            s.bound_object
+        with self.assertRaises(Exception):
+            s.object
+        with self.assertRaises(Exception):
+            s()
+        self.assertFalse(s)
+        self.assertEqual(ldmud.efuns.copy(s), 0)
+
+class TestUnboundLambdaClosure(unittest.TestCase):
+    def setUp(self):
+        self.master = ldmud.get_master()
+
+    def testLambda(self):
+        s = ldmud.efuns.unbound_lambda(0, 42)
+        self.assertIsNotNone(s)
+        self.assertIsNone(s.bound_object)
+        self.assertIsNone(s.object)
+        with self.assertRaises(Exception):
+            s()
+
+    def testEmpty(self):
+        s = ldmud.UnboundLambdaClosure.__new__(ldmud.UnboundLambdaClosure)
+        with self.assertRaises(Exception):
+            s.bound_object
+        with self.assertRaises(Exception):
+            s.object
+        with self.assertRaises(Exception):
+            s()
+        self.assertFalse(s)
+        self.assertEqual(ldmud.efuns.copy(s), 0)
+
+class TestBoundLambdaClosure(unittest.TestCase):
+    def setUp(self):
+        self.master = ldmud.get_master()
+
+    def testBoundLambda(self):
+        unbound_lambda = ldmud.efuns.unbound_lambda(0, 50)
+        s = ldmud.BoundLambdaClosure(self.master, unbound_lambda)
+        self.assertIsNotNone(s)
+        self.assertEqual(s.bound_object, self.master)
+        self.assertEqual(s.object, self.master)
+        self.assertEqual(s.unbound_lambda, unbound_lambda)
+        self.assertEqual(s(), 50)
+
+        s2 = ldmud.efuns.copy(s)
+        self.assertEqual(s2.bound_object, self.master)
+        self.assertEqual(s2.object, self.master)
+        self.assertEqual(s.unbound_lambda, unbound_lambda)
+        self.assertEqual(s2(), 50)
+
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
+
+        with self.assertRaises(ValueError):
+            s(ldmud.Array([1]), ldmud)
+
+        s_ne = ldmud.BoundLambdaClosure(self.master, ldmud.efuns.unbound_lambda(0, 60))
+        self.assertEqual({s: 42, s_ne: 52}[s2], 42)
+
+    def testDestructedBoundLambda(self):
+        ob = ldmud.Object("/testob")
+        c = ldmud.BoundLambdaClosure(ob, ldmud.efuns.unbound_lambda(0, 50))
+        self.assertTrue(c)
+        ldmud.efuns.destruct(ob)
+        self.assertFalse(c)
+
+    def testLWOBoundLambda(self):
+        lwob = ldmud.LWObject("/testob")
+        unbound_lambda = ldmud.efuns.unbound_lambda(0, 50)
+        s = ldmud.BoundLambdaClosure(lwob, unbound_lambda)
+        self.assertIsNotNone(s)
+        self.assertEqual(s.bound_object, lwob)
+        self.assertEqual(s.object, lwob)
+        self.assertEqual(s.unbound_lambda, unbound_lambda)
+        self.assertEqual(s(), 50)
+
+        s2 = ldmud.efuns.copy(s)
+        self.assertEqual(s2.bound_object, lwob)
+        self.assertEqual(s2.object, lwob)
+        self.assertEqual(s.unbound_lambda, unbound_lambda)
+        self.assertEqual(s2(), 50)
+
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
+
+        s_ne = ldmud.BoundLambdaClosure(lwob, ldmud.efuns.unbound_lambda(0, 60))
+        self.assertEqual({s: 42, s_ne: 52}[s2], 42)
+
+    def testEmpty(self):
+        s = ldmud.BoundLambdaClosure.__new__(ldmud.BoundLambdaClosure)
+        with self.assertRaises(Exception):
+            s.bound_object
+        with self.assertRaises(Exception):
+            s.object
+        with self.assertRaises(Exception):
+            s.unbound_lambda
+        with self.assertRaises(Exception):
+            s()
+        self.assertFalse(s)
+        self.assertEqual(ldmud.efuns.copy(s), 0)
+
+class TestEfunClosure(unittest.TestCase):
+    def setUp(self):
+        self.master = ldmud.get_master()
+
+    def testEfun(self):
+        s = ldmud.EfunClosure(self.master, "this_object")
+        self.assertIsNotNone(s)
+        self.assertEqual(s.bound_object, self.master)
+        self.assertEqual(s.object, self.master)
+        self.assertEqual(s.efun.name, "this_object")
+        self.assertEqual(s(), self.master)
+
+        s2 = ldmud.efuns.symbol_function("this_object")
+        self.assertEqual(s2.bound_object, self.master)
+        self.assertEqual(s2.object, self.master)
+        self.assertEqual(s2.efun.name, "this_object")
+        self.assertEqual(s2(), self.master)
+
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
+
+        with self.assertRaises(ValueError):
+            s(ldmud.Array([1]), ldmud)
+
+        s_ne = ldmud.EfunClosure(self.master, "this_player")
+        self.assertEqual({s: 42, s_ne: 52}[s2], 42)
+
+    def testPythonEfun(self):
+        s = ldmud.EfunClosure(self.master, "to_bigint")
+        self.assertIsNotNone(s)
+        self.assertEqual(s.bound_object, self.master)
+        self.assertEqual(s.object, self.master)
+        self.assertEqual(s.efun.name, "to_bigint")
+        self.assertEqual(s(10), bigint(10))
+
+        s2 = ldmud.efuns.symbol_function("to_bigint")
+        self.assertEqual(s2.bound_object, self.master)
+        self.assertEqual(s2.object, self.master)
+        self.assertEqual(s2.efun.name, "to_bigint")
+        self.assertEqual(s2(20), bigint(20))
+
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
+
+        with self.assertRaises(ValueError):
+            s(ldmud.Array([1]), ldmud)
+
+        s_ne = ldmud.EfunClosure(self.master, "create_box")
+        self.assertEqual({s: 42, s_ne: 52}[s2], 42)
+
+    def testDestructedEfun(self):
+        ob = ldmud.Object("/testob")
+        c = ldmud.EfunClosure(ob, "this_object")
+        self.assertTrue(c)
+        ldmud.efuns.destruct(ob)
+        self.assertFalse(c)
+
+    def testLWOEfun(self):
+        lwob = ldmud.LWObject("/testob")
+        s = ldmud.EfunClosure(lwob, "this_object")
+        self.assertIsNotNone(s)
+        self.assertEqual(s.bound_object, lwob)
+        self.assertEqual(s.object, lwob)
+        self.assertEqual(s.efun.name, "this_object")
+        self.assertEqual(s(), lwob)
+        s2 = ldmud.EfunClosure(lwob, ldmud.efuns.this_object)
+        self.assertEqual(s2.bound_object, lwob)
+        self.assertEqual(s2.object, lwob)
+        self.assertEqual(s2.efun.name, "this_object")
+        self.assertEqual(s2(), lwob)
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
+        s_ne = ldmud.EfunClosure(lwob, "this_player")
+        self.assertEqual({s: 42, s_ne: 52}[s2], 42)
+
+    def testEmpty(self):
+        s = ldmud.EfunClosure.__new__(ldmud.EfunClosure)
+        with self.assertRaises(Exception):
+            s.bound_object
+        with self.assertRaises(Exception):
+            s.object
+        with self.assertRaises(Exception):
+            s.efun.name
+        with self.assertRaises(Exception):
+            s()
+        self.assertFalse(s)
+        self.assertEqual(ldmud.efuns.copy(s), 0)
+
+class TestSimulEfunClosure(unittest.TestCase):
+    def setUp(self):
+        self.master = ldmud.get_master()
+
+    def testEfun(self):
+        s = ldmud.SimulEfunClosure(self.master, "testsefun")
+        self.assertIsNotNone(s)
+        self.assertEqual(s.bound_object, self.master)
+        self.assertEqual(s.object, self.master)
+        self.assertEqual(s.simul_efun.name, "testsefun")
+        self.assertEqual(list(s(10)), ["10", "/master.c"])
+
+        s2 = ldmud.efuns.symbol_function("testsefun")
+        self.assertEqual(s2.bound_object, self.master)
+        self.assertEqual(s2.object, self.master)
+        self.assertEqual(s2.simul_efun.name, "testsefun")
+        self.assertEqual(list(s2(20)), ["20", "/master.c"])
+
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
+
+        with self.assertRaises(ValueError):
+            s(ldmud.Array([1]), ldmud)
+
+        self.assertEqual({s: 42}[s2], 42)
+
+    def testDestructedEfun(self):
+        ob = ldmud.Object("/testob")
+        c = ldmud.SimulEfunClosure(ob, "testsefun")
+        self.assertTrue(c)
+        ldmud.efuns.destruct(ob)
+        self.assertFalse(c)
+
+    def testLWOEfun(self):
+        lwob = ldmud.LWObject("/testob")
+        s = ldmud.SimulEfunClosure(lwob, "testsefun")
+        self.assertIsNotNone(s)
+        self.assertEqual(s.bound_object, lwob)
+        self.assertEqual(s.object, lwob)
+        self.assertEqual(s.simul_efun.name, "testsefun")
+        self.assertEqual(list(s(100)), ["100", "/testob.c"])
+
+        s2 = ldmud.efuns.copy(s)
+        self.assertEqual(s2.bound_object, lwob)
+        self.assertEqual(s2.object, lwob)
+        self.assertEqual(s2.simul_efun.name, "testsefun")
+        self.assertEqual(list(s2(200)), ["200", "/testob.c"])
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
+
+        self.assertEqual({s: 42}[s2], 42)
+
+    def testEmpty(self):
+        s = ldmud.SimulEfunClosure.__new__(ldmud.SimulEfunClosure)
+        with self.assertRaises(Exception):
+            s.bound_object
+        with self.assertRaises(Exception):
+            s.object
+        with self.assertRaises(Exception):
+            s.simul_efun.name
+        with self.assertRaises(Exception):
+            s()
+        self.assertFalse(s)
+        self.assertEqual(ldmud.efuns.copy(s), 0)
+
+class TestOperatorClosure(unittest.TestCase):
+    def setUp(self):
+        self.master = ldmud.get_master()
+
+    def testEfun(self):
+        s = ldmud.OperatorClosure(self.master, "foreach")
+        self.assertIsNotNone(s)
+        self.assertEqual(s.bound_object, self.master)
+        self.assertEqual(s.object, self.master)
+        self.assertEqual(s.operator_name, "foreach")
+
+        s2 = ldmud.efuns.symbol_function("foreach")
+        self.assertEqual(s2.bound_object, self.master)
+        self.assertEqual(s2.object, self.master)
+        self.assertEqual(s2.operator_name, "foreach")
+
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
+
+        with self.assertRaises(RuntimeError):
+            s()
+
+        s_ne = ldmud.OperatorClosure(self.master, "catch")
+        self.assertEqual({s: 42, s_ne: 52}[s2], 42)
+
+    def testDestructedEfun(self):
+        ob = ldmud.Object("/testob")
+        c = ldmud.OperatorClosure(ob, "foreach")
+        self.assertTrue(c)
+        ldmud.efuns.destruct(ob)
+        self.assertFalse(c)
+
+    def testLWOEfun(self):
+        lwob = ldmud.LWObject("/testob")
+        s = ldmud.OperatorClosure(lwob, "foreach")
+        self.assertIsNotNone(s)
+        self.assertEqual(s.bound_object, lwob)
+        self.assertEqual(s.object, lwob)
+        self.assertEqual(s.operator_name, "foreach")
+
+        s2 = ldmud.efuns.copy(s)
+        self.assertEqual(s2.bound_object, lwob)
+        self.assertEqual(s2.object, lwob)
+        self.assertEqual(s2.operator_name, "foreach")
+
+        self.assertEqual(s2, s)
+        self.assertIn(s2, set((s,)))
+
+        s_ne = ldmud.OperatorClosure(lwob, "catch")
+        self.assertEqual({s: 42, s_ne: 52}[s2], 42)
+
+    def testEmpty(self):
+        s = ldmud.OperatorClosure.__new__(ldmud.OperatorClosure)
+        with self.assertRaises(Exception):
+            s.bound_object
+        with self.assertRaises(Exception):
+            s.object
+        with self.assertRaises(Exception):
+            s.efun.name
+        with self.assertRaises(Exception):
+            s()
+        self.assertFalse(s)
+        self.assertEqual(ldmud.efuns.copy(s), 0)
 
 class TestCoroutine(unittest.TestCase):
     def setUp(self):
@@ -593,6 +1258,14 @@ class TestCoroutine(unittest.TestCase):
         with self.assertRaises(Exception):
             c()
         self.assertFalse(c)
+        self.assertEqual(ldmud.efuns.copy(c), 0)
+
+    def testHashable(self):
+        cr = self.ob.functions.testcoroutine("A", "B", "C")
+        cr_eq = ldmud.efuns.funcall(cr)
+        cr_ne = self.ob.functions.testcoroutine("A", "B", "X")
+        self.assertNotEqual(id(cr), id(cr_eq))
+        self.assertEqual({cr: 42, cr_ne: 52}[cr_eq], 42)
 
 class TestSymbol(unittest.TestCase):
     def testSymbolInit(self):
@@ -619,6 +1292,14 @@ class TestSymbol(unittest.TestCase):
         self.assertEqual(s1, s2)
         self.assertNotEqual(s1, s3)
         self.assertNotEqual(s1, s4)
+
+    def testHashable(self):
+        self.assertEqual({ldmud.Symbol("sym", 2): 42,
+                          ldmud.Symbol("sym", 5): 52}[ldmud.Symbol("sym", 2)], 42)
+
+    def testUninitializedSymbol(self):
+        s = ldmud.Symbol.__new__(ldmud.Symbol)
+        self.assertEqual(ldmud.efuns.copy(s), 0)
 
 class TestQuotedArray(unittest.TestCase):
     def testQuotedArrayInit(self):
@@ -650,10 +1331,23 @@ class TestQuotedArray(unittest.TestCase):
         with self.assertRaises(TypeError):
             ldmud.QuotedArray(1.5, 1)
 
+    def testUninitializedQuotedArray(self):
+        qa = ldmud.QuotedArray.__new__(ldmud.QuotedArray)
+        self.assertEqual(ldmud.efuns.copy(qa), 0)
+
+    def testHashable(self):
+        arr = ldmud.Array([4, 3])
+        qa = ldmud.QuotedArray(arr, quotes=2)
+        qa_eq = ldmud.QuotedArray(arr, quotes=2)
+        qa_ne = ldmud.QuotedArray(arr, quotes=5)
+        self.assertNotEqual(id(qa), id(qa_eq))
+        self.assertEqual({qa: 42, qa_ne: 52}[qa_eq], 42)
+
 class TestLvalue(unittest.TestCase):
     def testLvalueInit(self):
         lv = ldmud.Lvalue(10)
         self.assertIsNotNone(lv)
+        self.assertEqual({lv: 42, ldmud.Lvalue(10): 52}[lv], 42)
 
     def testLvalueValue(self):
         lv = ldmud.Lvalue(10)
@@ -674,17 +1368,29 @@ class TestLvalue(unittest.TestCase):
         self.assertEqual(arr[2], 42)
         arr[0] = 100
         self.assertEqual(lv[0].value, 100)
+        lv_arr = ldmud.Lvalue(ldmud.Array([lv[2]]))
+        lv_arr0 = lv_arr[0]
+        self.assertNotEqual(id(lv_arr0), id(lv_arr[0]))
+        self.assertEqual({lv_arr0: 42, lv[0]: 52}[lv_arr[0]], 42)
 
     def testLvalueStringItem(self):
         lv = ldmud.Lvalue("Test \U0001f4a5!")
         lv[5].value = 88
         self.assertEqual(lv.value, "Test X!")
+        lv_arr = ldmud.Lvalue(ldmud.Array([lv[2]]))
+        lv_arr0 = lv_arr[0]
+        self.assertNotEqual(id(lv_arr0), id(lv_arr[0]))
+        self.assertEqual({lv_arr0: 42, lv[0]: 52}[lv_arr[0]], 42)
 
     def testLvalueArrayRange(self):
         arr = ldmud.Array([10,11,12])
         lv = ldmud.Lvalue(arr)
         lv[1:2].value = ldmud.Array([111, 112])
         self.assertEqual(list(lv.value), [10, 111, 112, 12])
+        lv_arr = ldmud.Lvalue(ldmud.Array([lv[1:2]]))
+        lv_arr0 = lv_arr[0]
+        self.assertNotEqual(id(lv_arr0), id(lv_arr[0]))
+        self.assertEqual({lv_arr0: 42, lv[0:1]: 52}[lv_arr[0]], 42)
 
     def testLvalueStringRange(self):
         lv = ldmud.Lvalue("Teststring")
@@ -692,6 +1398,10 @@ class TestLvalue(unittest.TestCase):
         self.assertEqual(lv.value, "Test\uff33\uff54\uff52ing")
         lv[4:8].value = ""
         self.assertEqual(lv.value, "Testng")
+        lv_arr = ldmud.Lvalue(ldmud.Array([lv[1:2]]))
+        lv_arr0 = lv_arr[0]
+        self.assertNotEqual(id(lv_arr0), id(lv_arr[0]))
+        self.assertEqual({lv_arr0: 42, lv[0:1]: 52}[lv_arr[0]], 42)
 
     def testLvalueMappingItem(self):
         m = ldmud.Mapping({1:1, 2:4, 3:9, 4:16})
@@ -700,6 +1410,10 @@ class TestLvalue(unittest.TestCase):
         self.assertEqual(m[3], 27)
         m[3] = 81
         self.assertEqual(lv[3,0].value, 81)
+        lv_arr = ldmud.Lvalue(ldmud.Array([lv[2]]))
+        lv_arr0 = lv_arr[0]
+        self.assertNotEqual(id(lv_arr0), id(lv_arr[0]))
+        self.assertEqual({lv_arr0: 42, lv[3]: 52}[lv_arr[0]], 42)
 
     def testLvalueMappingNewItem(self):
         m = ldmud.Mapping()
@@ -712,6 +1426,54 @@ class TestLvalue(unittest.TestCase):
         self.assertEqual(m[3], 9)
         self.assertEqual(item.value, 9)
 
+    def testLvalueMappingRange(self):
+        m = ldmud.Mapping(((1,11,12,13,14,15), (2,21,22,23,24,25), (3,31,32,33,34,35),))
+        lv = ldmud.Lvalue(m);
+
+        lvr1 = lv[1,1:3]
+        self.assertEqual(list(lvr1.value), [12,13])
+        self.assertEqual(list(lvr1[:].value), [12,13])
+        self.assertEqual(lvr1[0].value, 12)
+        self.assertEqual(len(lvr1), 2)
+        lvr1[0].value = 112
+        self.assertEqual(m[1,1], 112)
+
+        lvr2 = lv[2,2:0:-1]
+        self.assertEqual(list(lvr2.value), [23,22])
+        self.assertEqual(list(lvr2[:].value), [23,22])
+        self.assertEqual(lvr2[0].value, 23)
+        self.assertEqual(len(lvr2), 2)
+        lvr2[0].value = 223
+        self.assertEqual(m[2,2], 223)
+
+        lv_arr = ldmud.Lvalue(ldmud.Array([lv[1,0:2]]))
+        lv_arr0 = lv_arr[0]
+        self.assertNotEqual(id(lv_arr0), id(lv_arr[0]))
+        self.assertEqual({lv_arr0: 42, lv[1,1:3]: 52}[lv_arr[0]], 42)
+
+    def testLvalueMappingNewRange(self):
+        m = ldmud.Mapping(width = 5)
+        lv = ldmud.Lvalue(m);
+
+        lvr1 = lv[1,1:3]
+        self.assertEqual(list(lvr1.value), [0,0])
+        self.assertEqual(list(lvr1[:].value), [0,0])
+        self.assertEqual(lvr1[0].value, 0)
+        self.assertEqual(len(lvr1), 2)
+        self.assertEqual(len(m), 0)
+        lvr1[0].value = 112
+        self.assertEqual(len(m), 1)
+        self.assertEqual(list(m[1,:]), [0,112,0,0,0])
+
+        lvr2 = lv[2,2:0:-1]
+        self.assertEqual(list(lvr2.value), [0,0])
+        self.assertEqual(list(lvr2[:].value), [0,0])
+        self.assertEqual(lvr2[0].value, 0)
+        self.assertEqual(len(lvr2), 2)
+        lvr2[0].value = 223
+        self.assertEqual(len(m), 2)
+        self.assertEqual(list(m[2,:]), [0,0,223,0,0])
+
     def testLvalueStructItem(self):
         s = ldmud.Struct(ldmud.get_master(), "test_struct", (10,))
         self.assertIsNotNone(s)
@@ -723,6 +1485,211 @@ class TestLvalue(unittest.TestCase):
         s.members.t_int.value = 1000
         self.assertEqual(lv.members.t_int.value, 1000)
 
+        lv_arr = ldmud.Lvalue(ldmud.Array([lv.members.t_int]))
+        lv_arr0 = lv_arr[0]
+        self.assertNotEqual(id(lv_arr0), id(lv_arr[0]))
+        self.assertEqual({lv_arr0: 42, lv.members.t_float: 52}[lv_arr[0]], 42)
+
+    def testUninitializedLvalue(self):
+        lv = ldmud.Lvalue.__new__(ldmud.Lvalue)
+        self.assertEqual(ldmud.efuns.copy(lv), 0)
+
+class TestLPCType(unittest.TestCase):
+    def testPythonType(self):
+        lpctype = ldmud.LPCType
+        self.assertEqual(lpctype, lpctype.__class__)
+        self.assertEqual(str(lpctype), "lpctype")
+        self.assertEqual({lpctype: 42,
+                          ldmud.Mixed: 52}[ldmud.LPCType], 42)
+
+    def testAnyArrayType(self):
+        self.assertEqual(str(ldmud.Array), "mixed*")
+        self.assertEqual({ldmud.Array: 42,
+                          ldmud.Mixed: 52}[ldmud.Array], 42)
+
+    def testConcreteArrayType(self):
+        obarray = ldmud.Array[ldmud.Object]
+        self.assertIn("Object", repr(obarray))
+        self.assertEqual(str(obarray), "object*")
+        self.assertNotEqual(ldmud.efuns.check_type(obarray((ldmud.get_master(),)), obarray), 0)
+        self.assertEqual(ldmud.efuns.check_type(ldmud.Array((10,)), obarray), 0)
+        self.assertIn(obarray, ldmud.Array)
+
+        intarray = ldmud.Array[int]
+        self.assertIn("Integer", repr(intarray))
+        self.assertEqual(str(intarray), "int*")
+        self.assertEqual(ldmud.efuns.check_type(obarray((ldmud.get_master(),)), intarray), 0)
+        self.assertNotEqual(ldmud.efuns.check_type(intarray((10,)), intarray), 0)
+        self.assertIn(intarray, ldmud.Array)
+        self.assertEqual(len(intarray((1,2,3,))), 3)
+
+        self.assertEqual({obarray: 42,
+                          ldmud.Array: 52}[ldmud.Array[ldmud.Object]], 42)
+
+    def testAnyStructType(self):
+        self.assertEqual(str(ldmud.Struct), "struct mixed")
+        self.assertEqual({ldmud.Struct: 42,
+                          ldmud.Mixed: 52}[ldmud.Struct], 42)
+
+    def testConcreteStructType(self):
+        master = ldmud.efuns.find_object("/master")
+        stype = ldmud.Struct[master, "test_struct"]
+        self.assertIn("Struct", repr(stype))
+        self.assertIn("test_struct", repr(stype))
+        self.assertNotEqual(ldmud.efuns.check_type(ldmud.Struct(master, "test_struct"), stype), 0)
+        self.assertEqual(ldmud.efuns.check_type(ldmud.Struct(master, "other_struct"), stype), 0)
+        self.assertIn(stype, ldmud.Struct)
+
+        self.assertEqual({stype: 42,
+                          ldmud.Struct: 52}[ldmud.Struct[master, "test_struct"]], 42)
+
+    def testUnloadedConcreteStructType(self):
+        master = ldmud.efuns.find_object("/master")
+        stype = ldmud.Struct["/teststruct", "test_struct"]
+        self.assertIn("Struct", repr(stype))
+        self.assertIn("test_struct", repr(stype))
+        self.assertNotEqual(ldmud.Struct[master, "test_struct"], stype)
+        self.assertIn(stype, ldmud.Struct)
+
+        # Should not be loaded
+        ob = ldmud.efuns.find_object("/teststruct")
+        self.assertFalse(ob)
+
+        s = stype([42])
+        self.assertIsNotNone(s)
+        self.assertEqual(s.members.value.value, 42)
+
+        # Should be loaded by now.
+        ob = ldmud.efuns.find_object("/teststruct")
+        self.assertTrue(ob)
+
+        stype2 = ldmud.Struct["/teststruct.c", "test_struct"]
+        self.assertEqual(stype, stype2)
+        s2 = stype([100])
+        self.assertIsNotNone(s2)
+        self.assertEqual(s2.members.value.value, 100)
+        ldmud.efuns.destruct(ob)
+
+    def testAnyObjectType(self):
+        self.assertEqual(str(ldmud.Object), "object")
+        self.assertEqual({ldmud.Object: 42,
+                          ldmud.Mixed: 52}[ldmud.Object], 42)
+
+    def testNamedObjectType(self):
+        obt1 = ldmud.Object["/master"]
+        obt2 = ldmud.Object["/master.c"]
+        obt3 = ldmud.Object["/testob"]
+        self.assertIn("Object", repr(obt1))
+        self.assertIn("testob", repr(obt3))
+        self.assertEqual(str(obt1), 'object "/master.c"')
+        self.assertEqual(obt1, obt2)
+        self.assertNotEqual(obt1, obt3)
+        self.assertNotEqual(ldmud.efuns.check_type(ldmud.Object("/master"), obt1), 0)
+        self.assertEqual(ldmud.efuns.check_type(ldmud.Object("/master"), obt3), 0)
+        self.assertIn(obt1, ldmud.Object)
+        self.assertEqual(ldmud.Object("/master"), obt1("/master"))
+
+        self.assertEqual({obt1: 42,
+                          ldmud.Object: 52}[obt2], 42)
+
+    def testAnyLWObjectType(self):
+        self.assertEqual(str(ldmud.LWObject), 'lwobject')
+        self.assertEqual({ldmud.LWObject: 42,
+                          ldmud.Mixed: 52}[ldmud.LWObject], 42)
+
+    def testNamedLWObjectType(self):
+        obt1 = ldmud.LWObject["/master"]
+        obt2 = ldmud.LWObject["/master.c"]
+        obt3 = ldmud.LWObject["/testob"]
+        self.assertIn("LWObject", repr(obt1))
+        self.assertIn("testob", repr(obt3))
+        self.assertEqual(str(obt1), 'lwobject "/master.c"')
+        self.assertEqual(obt1, obt2)
+        self.assertNotEqual(obt1, obt3)
+        self.assertEqual(ldmud.efuns.check_type(ldmud.LWObject("/testob"), obt1), 0)
+        self.assertNotEqual(ldmud.efuns.check_type(ldmud.LWObject("/testob"), obt3), 0)
+        self.assertNotEqual(ldmud.efuns.check_type(obt3("/testob"), obt3), 0)
+        self.assertIn(obt3, ldmud.LWObject)
+
+        self.assertEqual({obt1: 42,
+                          ldmud.LWObject: 52}[obt2], 42)
+
+    def testInstantiation(self):
+        with self.assertRaises(Exception):
+            empty = ldmud.LPCType()
+        self.assertEqual(ldmud.LPCType(int), ldmud.Integer)
+
+    def testInteger(self):
+        self.assertEqual(str(ldmud.Integer), "int")
+        self.assertEqual({ldmud.Integer: 42,
+                          ldmud.Mixed: 52}[ldmud.Integer], 42)
+
+    def testFloat(self):
+        self.assertEqual(str(ldmud.Float), "float")
+        self.assertEqual({ldmud.Float: 42,
+                          ldmud.Mixed: 52}[ldmud.Float], 42)
+
+    def testString(self):
+        self.assertEqual(str(ldmud.String), "string")
+        self.assertEqual({ldmud.String: 42,
+                          ldmud.Mixed: 52}[ldmud.String], 42)
+
+    def testBytes(self):
+        self.assertEqual(str(ldmud.Bytes), "bytes")
+        self.assertEqual({ldmud.Bytes: 42,
+                          ldmud.Mixed: 52}[ldmud.Bytes], 42)
+
+    def testMapping(self):
+        self.assertEqual(str(ldmud.Mapping), "mapping")
+        self.assertEqual({ldmud.Mapping: 42,
+                          ldmud.Mixed: 52}[ldmud.Mapping], 42)
+
+    def testClosure(self):
+        self.assertEqual(str(ldmud.Closure), "closure")
+        self.assertEqual({ldmud.Closure: 42,
+                          ldmud.Mixed: 52}[ldmud.Closure], 42)
+
+    def testCoroutine(self):
+        self.assertEqual(str(ldmud.Coroutine), "coroutine")
+        self.assertEqual({ldmud.Coroutine: 42,
+                          ldmud.Mixed: 52}[ldmud.Coroutine], 42)
+
+    def testSymbol(self):
+        self.assertEqual(str(ldmud.Symbol), "symbol")
+        self.assertEqual({ldmud.Symbol: 42,
+                          ldmud.Mixed: 52}[ldmud.Symbol], 42)
+
+    def testQuotedArray(self):
+        self.assertEqual(str(ldmud.QuotedArray), "quoted_array")
+        self.assertEqual({ldmud.QuotedArray: 42,
+                          ldmud.Mixed: 52}[ldmud.QuotedArray], 42)
+
+    def testMixed(self):
+        self.assertEqual(str(ldmud.Mixed), "mixed")
+        self.assertIn(ldmud.Integer, ldmud.Mixed)
+        self.assertNotIn(ldmud.Mixed, ldmud.Integer)
+
+    def testVoid(self):
+        self.assertIn("Void", repr(ldmud.Void))
+        self.assertEqual(str(ldmud.Void), "void")
+        self.assertEqual(ldmud.Void | ldmud.Integer, ldmud.Integer)
+        self.assertEqual(ldmud.Integer | ldmud.Void, ldmud.Integer)
+
+        self.assertEqual({ldmud.Void: 42,
+                          ldmud.Mixed: 52}[ldmud.Void], 42)
+
+    def testUnions(self):
+        self.assertSetEqual(set(ldmud.Integer | ldmud.String), set((ldmud.Integer, ldmud.String,)))
+        self.assertEqual(ldmud.Integer | ldmud.String, ldmud.Integer|str)
+        self.assertEqual(ldmud.Integer | ldmud.String, ldmud.String|int)
+        self.assertEqual(ldmud.Integer | ldmud.Mixed, ldmud.Mixed)
+        self.assertIn(ldmud.String, ldmud.Integer | ldmud.String)
+        self.assertEqual(ldmud.LPCType((ldmud.Integer, ldmud.String)), ldmud.Integer | ldmud.String)
+
+        self.assertEqual({ldmud.Integer | ldmud.String: 42,
+                          ldmud.Mixed: 52}[ldmud.String | ldmud.Integer], 42)
+        self.assertIn(str(ldmud.Integer | ldmud.String), ("int|string", "string|int"))
+
 class TestEfuns(unittest.TestCase):
     def testDir(self):
         self.assertGreater(len(dir(ldmud.efuns)), 200)
@@ -732,6 +1699,243 @@ class TestEfuns(unittest.TestCase):
         self.assertEqual(ldmud.efuns.call_other(master, "master_fun"), 54321)
         self.assertEqual(ldmud.efuns.object_name(master), "/master")
 
+    def testCallWithInvalidArg(self):
+        with self.assertRaises(ValueError):
+            ldmud.efuns.call_other(ldmud.get_master(), "fun", ldmud.Array([1]), ldmud)
+
+class TestRegisteredEfuns(unittest.TestCase):
+    def testDir(self):
+        self.assertIn("python_test", dir(ldmud.registered_efuns))
+        self.assertGreater(len(dir(ldmud.registered_efuns)), 21)
+
+    def testDict(self):
+        self.assertIn("python_test", ldmud.registered_efuns.__dict__)
+        self.assertEqual(ldmud.registered_efuns.__dict__["python_test"], python_test)
+        self.assertEqual(len(ldmud.registered_efuns.__dict__), 21)
+
+    def testIter(self):
+        efuns = { efun.name: efun for efun in ldmud.registered_efuns }
+        self.assertIn("python_test", efuns)
+        self.assertIn("to_bigint", efuns)
+        self.assertEqual(efuns["to_bigint"](i = 42), bigint(42))
+        self.assertEqual(efuns["to_bigint"].name, "to_bigint")
+        self.assertEqual(efuns["to_bigint"].function, to_bigint)
+
+    def testAttribute(self):
+        self.assertTrue(hasattr(ldmud.registered_efuns, 'python_test'))
+        self.assertEqual(ldmud.registered_efuns.python_test, python_test)
+        with self.assertRaises(AttributeError):
+            ldmud.registered_efuns.doesnt_exist
+        with self.assertRaises(AttributeError):
+            # Unregistered Efun
+            ldmud.registered_efuns.abc
+
+class TestRegisteredStructs(unittest.TestCase):
+    def setUp(self):
+        ldmud.register_struct("testregisteredstructs_struct1", None, (("value", int),))
+        ldmud.register_struct("testregisteredstructs_struct2", None, (("value", ldmud.Object),))
+        ldmud.unregister_struct("testregisteredstructs_struct2")
+        ldmud.register_struct("testregisteredstructs_struct3", None, (("value", int),))
+        ldmud.register_struct("testregisteredstructs_struct3", None, (("value", str),))
+
+    def tearDown(self):
+        ldmud.unregister_struct("testregisteredstructs_struct1")
+        ldmud.unregister_struct("testregisteredstructs_struct3")
+
+    def testDir(self):
+        self.assertIn("testregisteredstructs_struct1", dir(ldmud.registered_structs))
+        self.assertNotIn("testregisteredstructs_struct2", dir(ldmud.registered_structs))
+        self.assertIn("testregisteredstructs_struct3", dir(ldmud.registered_structs))
+        self.assertNotIn("testregisteredstructs_struct4", dir(ldmud.registered_structs))
+        self.assertGreater(len(dir(ldmud.registered_structs)), 0)
+
+    def testDict(self):
+        self.assertIn("testregisteredstructs_struct1", ldmud.registered_structs.__dict__)
+        self.assertNotIn("testregisteredstructs_struct2", ldmud.registered_structs.__dict__)
+        self.assertIn("testregisteredstructs_struct3", ldmud.registered_structs.__dict__)
+        self.assertNotIn("testregisteredstructs_struct4", ldmud.registered_structs.__dict__)
+        self.assertEqual(ldmud.registered_structs.__dict__["testregisteredstructs_struct1"], ldmud.Struct["python","testregisteredstructs_struct1"])
+        self.assertEqual(ldmud.registered_structs.__dict__["testregisteredstructs_struct3"], ldmud.Struct["python","testregisteredstructs_struct3"])
+        self.assertEqual(len(ldmud.registered_structs.__dict__), 3)
+
+    def testAttribute(self):
+        self.assertTrue(hasattr(ldmud.registered_structs, 'testregisteredstructs_struct1'))
+        self.assertFalse(hasattr(ldmud.registered_structs, 'testregisteredstructs_struct2'))
+        self.assertTrue(hasattr(ldmud.registered_structs, 'testregisteredstructs_struct3'))
+        self.assertFalse(hasattr(ldmud.registered_structs, 'testregisteredstructs_struct4'))
+        self.assertEqual(ldmud.registered_structs.testregisteredstructs_struct1, ldmud.Struct["python","testregisteredstructs_struct1"])
+        self.assertEqual(ldmud.registered_structs.testregisteredstructs_struct3, ldmud.Struct["python","testregisteredstructs_struct3"])
+        with self.assertRaises(AttributeError):
+            ldmud.registered_structs.testregisteredstructs_struct2
+        with self.assertRaises(AttributeError):
+            ldmud.registered_structs.testregisteredstructs_struct4
+
+    def testUsage(self):
+        instance1 = ldmud.registered_structs.testregisteredstructs_struct1({ "value": 10 })
+        instance3 = ldmud.registered_structs.testregisteredstructs_struct3({ "value": "10" })
+
+class TestRegisteredTypes(unittest.TestCase):
+    def testDir(self):
+        self.assertIn("bigint", dir(ldmud.registered_types))
+        self.assertGreater(len(dir(ldmud.registered_types)), 3)
+
+    def testDict(self):
+        self.assertIn("bigint", ldmud.registered_types.__dict__)
+        self.assertEqual(ldmud.registered_types.__dict__["bigint"], bigint)
+        self.assertEqual(len(ldmud.registered_types.__dict__), 3)
+
+    def testAttribute(self):
+        self.assertTrue(hasattr(ldmud.registered_types, 'bigint'))
+        self.assertEqual(ldmud.registered_types.bigint, bigint)
+        with self.assertRaises(AttributeError):
+            ldmud.registered_types.doesnt_exist
+
+class TestCallStack(unittest.TestCase):
+    # The current call stack is:
+    # [0]: CALL_FRAME_TYPE_LFUN /master.c->epilog()
+    # [1]: CALL_FRAME_TYPE_LFUN /master.c->run_test()
+    # [2]: CALL_FRAME_TYPE_LFUN /master.c->run_array()
+    # [3]: CALL_FRAME_TYPE_LFUN /master.c->run_array_without_callback()
+    # [4]: CALL_FRAME_TYPE_LFUN Test case inline closure
+    # [5]: CALL_FRAME_TYPE_CATCH
+    # [6]: CALL_FRAME_TYPE_EFUN_CLOSURE (#'funcall)
+    # [7]: CALL_FRAME_TYPE_PYTHON_EFUN_CLOSURE (#'python_test)
+
+    def testLen(self):
+        self.assertEqual(len(ldmud.call_stack), 8)
+
+    def testFrame0(self):
+        frame = ldmud.call_stack[0]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
+        self.assertEqual(frame.name, "epilog")
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertEqual(frame.program_name, "/master.c")
+        self.assertEqual(frame.file_name, "/master.c")
+        self.assertGreater(frame.line_number, 500)
+        self.assertGreater(frame.eval_cost, 0)
+
+        self.assertIn('eflag', dir(frame.variables))
+        self.assertIn('eflag', frame.variables.__dict__)
+        self.assertEqual([ 'eflag' ], [ var.name for var in frame.variables ])
+        var = frame.variables.eflag
+        self.assertIsNotNone(var)
+        self.assertTrue(var)
+        self.assertEqual(var.name, "eflag")
+        self.assertEqual(var.type, ldmud.Integer)
+        self.assertEqual(var.value, 1)
+        self.assertTrue("eflag" in repr(var))
+        self.assertEqual(var, frame.variables.eflag)
+        var.value = 10
+        self.assertEqual(var.value, 10)
+        with self.assertRaises(TypeError):
+            var.value = "20"
+        self.assertEqual(var.value, 10)
+
+    def testFrame1(self):
+        frame = ldmud.call_stack[1]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
+        self.assertEqual(frame.name, "run_test")
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertEqual(frame.program_name, "/master.c")
+        self.assertEqual(frame.file_name, "/master.c")
+        self.assertLess(frame.line_number, ldmud.call_stack[0].line_number)
+        self.assertGreater(frame.eval_cost, ldmud.call_stack[0].eval_cost)
+        self.assertEqual(frame.variables.__dict__, {})
+        self.assertEqual([], list(frame.variables))
+
+    def testFrame2(self):
+        frame = ldmud.call_stack[2]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
+        self.assertEqual(frame.name, "run_array")
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertEqual(frame.program_name, "/master.c")
+        self.assertEqual(frame.file_name, "/inc/testarray.inc")
+        self.assertGreater(frame.line_number, 0)
+        self.assertGreater(frame.eval_cost, ldmud.call_stack[1].eval_cost)
+
+        self.assertIn('testarray', dir(frame.variables))
+        self.assertIn('callback', dir(frame.variables))
+        self.assertIn('errors', dir(frame.variables))
+        self.assertIn('testarray', frame.variables.__dict__)
+        self.assertIn('callback', frame.variables.__dict__)
+        self.assertIn('errors', frame.variables.__dict__)
+        self.assertEqual(['testarray', 'callback', 'errors'], [ var.name for var in frame.variables ])
+        self.assertIsNotNone(frame.variables.testarray)
+        self.assertIsNotNone(frame.variables.callback)
+        self.assertIsNotNone(frame.variables.errors)
+        self.assertEqual(frame.variables.testarray.name, "testarray")
+        self.assertEqual(frame.variables.callback.name, "callback")
+        self.assertEqual(frame.variables.errors.name, "errors")
+        self.assertEqual(frame.variables.testarray.type, ldmud.Array)
+        self.assertEqual(frame.variables.callback.type, ldmud.Closure)
+        self.assertEqual(frame.variables.errors.type, ldmud.Integer)
+        self.assertEqual(frame.variables.errors.value, 0)
+
+    def testFrame3(self):
+        frame = ldmud.call_stack[3]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
+        self.assertEqual(frame.name, "run_array_without_callback")
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertEqual(frame.program_name, "/master.c")
+        self.assertEqual(frame.file_name, "/inc/testarray.inc")
+        self.assertLess(frame.line_number, ldmud.call_stack[2].line_number)
+        self.assertGreater(frame.eval_cost, ldmud.call_stack[2].eval_cost)
+
+    def testFrame4(self):
+        frame = ldmud.call_stack[4]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertEqual(frame.program_name, "/master.c")
+        self.assertEqual(frame.file_name, "/master.c")
+        self.assertLess(frame.line_number, ldmud.call_stack[1].line_number)
+        self.assertGreater(frame.eval_cost, ldmud.call_stack[3].eval_cost)
+
+        self.assertIn('$1', dir(frame.variables))
+        self.assertIn('$9', dir(frame.variables))
+        self.assertIn('err', dir(frame.variables))
+        self.assertIn('result', dir(frame.variables))
+        self.assertIn('$1', frame.variables.__dict__)
+        self.assertIn('$8', frame.variables.__dict__)
+        self.assertIn('err', frame.variables.__dict__)
+        self.assertIn('result', frame.variables.__dict__)
+        self.assertEqual(['$1', '$2', '$3', '$4', '$5', '$6', '$7', '$8', '$9', 'err', 'result'], [ var.name for var in frame.variables ])
+        self.assertIsNotNone(frame.variables.err)
+        self.assertIsNotNone(frame.variables.result)
+        self.assertEqual(frame.variables.err.name, "err")
+        self.assertEqual(frame.variables.result.name, "result")
+        self.assertEqual(frame.variables.err.type, ldmud.String)
+        self.assertEqual(frame.variables.result.type, ldmud.Integer)
+        self.assertEqual(frame.variables.err.value, 0)
+        self.assertEqual(frame.variables.result.value, 0)
+
+    def testFrame5(self):
+        frame = ldmud.call_stack[5]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_CATCH)
+        self.assertEqual(frame.name, "catch")
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertEqual(frame.program_name, "/master.c")
+        self.assertEqual(frame.file_name, "/master.c")
+        self.assertEqual(frame.line_number, ldmud.call_stack[4].line_number)
+        self.assertGreater(frame.eval_cost, ldmud.call_stack[4].eval_cost)
+
+    def testFrame6(self):
+        frame = ldmud.call_stack[6]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_EFUN_CLOSURE)
+        self.assertEqual(frame.name, "funcall")
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertGreater(frame.eval_cost, ldmud.call_stack[5].eval_cost)
+        self.assertEqual(frame.variables.__dict__, {})
+        self.assertEqual([], list(frame.variables))
+
+    def testFrame7(self):
+        frame = ldmud.call_stack[7]
+        self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_PYTHON_EFUN_CLOSURE)
+        self.assertEqual(frame.name, "python_test")
+        self.assertEqual(frame.object, ldmud.get_master())
+        self.assertGreater(frame.eval_cost, ldmud.call_stack[6].eval_cost)
+        self.assertEqual(frame.variables.__dict__, {})
+        self.assertEqual([], list(frame.variables))
+
 def python_test():
     """Run the python test cases."""
 
@@ -740,6 +1944,20 @@ def python_test():
     result = runner.run(suite)
 
     return result.wasSuccessful()
+
+def python_test_call_stack():
+    """Run a single test on the call stack."""
+
+    # The current call stack is:
+    # [0]: CALL_FRAME_TYPE_LFUN /master->epilog()
+    # [1]: CALL_FRAME_TYPE_LFUN /master->run_test()
+    # [2]: CALL_FRAME_TYPE_LFUN /master->run_array()
+    # [3]: CALL_FRAME_TYPE_LFUN /master->run_array_without_callback()
+    # [4]: CALL_FRAME_TYPE_LFUN Test case inline closure
+    # [5]: CALL_FRAME_TYPE_LFUN /testob#->callback()
+    # [6]: CALL_FRAME_TYPE_LFUN Test case inline closure
+    return [ frame.object.name for frame in ldmud.call_stack] == [ "/master", "/master", "/master", "/master", "/master", "/testob#1", "/master" ] and \
+           [ bool(frame.object) for frame in ldmud.call_stack] == [ True, True, True, True, True, False, True ]
 
 def python_return(val):
     """Return the given value to check the
@@ -788,6 +2006,7 @@ def python_check_testob() -> bool:
     return True
 
 ldmud.register_efun("python_test", python_test)
+ldmud.register_efun("python_test_call_stack", python_test_call_stack)
 ldmud.register_efun("python_return", python_return)
 ldmud.register_efun("python_get", python_get)
 ldmud.register_efun("python_set", python_set)
@@ -816,16 +2035,163 @@ def ob_destroyed(ob):
 def get_hook_info():
     return ldmud.Array((num_hb, ldmud.Array(ob_list),))
 
+last_progname = None
+last_filename = None
+last_linenumber = None
+def before_instruction(ob, instr):
+    global last_progname, last_filename, last_linenumber
+    last_progname = ldmud.call_stack[-1].program_name
+    last_filename = ldmud.call_stack[-1].file_name
+    last_linenumber = ldmud.call_stack[-1].line_number
+
+def get_last_program_name() -> str:
+    return last_progname
+
+def get_last_file_name() -> str:
+    return last_filename
+
+def get_last_line_number() -> int:
+    return last_linenumber
+
+# Create a distinct class for use in LPC
+class bigint(int):
+    def __efun_to_int__(self) -> int:
+        return int(self)
+
+    def __efun_to_string__(self) -> str:
+        return str(self)
+
+    def __save__(self):
+        return str(self)
+
+    @staticmethod
+    def __restore__(val):
+        return bigint(val)
+
+# Modify all operations to return bigint instead of int.
+for funname in ( '__add__', '__radd__', '__sub__', '__rsub__', '__mul__', '__rmul__', '__truediv__', '__rtruediv__', '__mod__', '__rmod__', '__lshift__', '__rlshift__', '__rshift__', '__rrshift__', '__and__', '__rand__', '__or__', '__ror__', '__xor__', '__rxor__',):
+    def get_replacement_fun(f):
+        @functools.wraps(f)
+        def replacement(self, other: (int, bigint)) -> bigint:
+            return bigint(f(self, other))
+        return replacement
+
+    fun = getattr(bigint, funname, None)
+    if fun:
+        setattr(bigint, funname, get_replacement_fun(fun))
+
+for funname in ( '__neg__', '__invert__',):
+    def get_replacement_fun(f):
+        @functools.wraps(f)
+        def replacement(self) -> bigint:
+            return bigint(f(self))
+        return replacement
+
+    fun = getattr(bigint, funname, None)
+    if fun:
+        setattr(bigint, funname, get_replacement_fun(fun))
+
+# Add reverse comparison functions (and annotations to the existing one).
+for funname, rfunname in (('__lt__','__rgt__',),('__le__','__rge__',),('__eq__','__req__',),('__ne__','__rne__',),('__gt__','__rlt__'),('__ge__','__rle__',),):
+    def get_replacement_fun(f):
+        @functools.wraps(f)
+        def replacement(self, other: (int, bigint)) -> bool:
+            return f(self, other)
+        return replacement
+
+    fun = getattr(bigint, funname, None)
+    if fun:
+        setattr(bigint, funname, get_replacement_fun(fun))
+        setattr(bigint, rfunname, get_replacement_fun(fun))
+
+# Efuns to create and read bigint.
+def to_bigint(i: int) -> bigint:
+    return bigint(i)
+
+class random_generator(random.Random):
+    # Implement call_strict() to call functions in this object.
+    def __efun_call_strict__(self, funname: str, *args):
+        if not funname.startswith("_") and hasattr(self, funname):
+            return getattr(self, funname)(*args)
+        raise AttributeError("Function %s() not found." % (funname,))
+
+def create_random_generator(seed: int = None) -> random_generator:
+    return random_generator(None if seed == 0 else seed)
+
+class box:
+    def __init__(self, val):
+        self.value = val
+
+    def get_value(self):
+        return self.value
+
+    def set_value(self, val):
+        self.value = val
+
+    def __efun_call_strict__(self, funname: str, *args):
+        if not funname.startswith("_") and hasattr(self, funname):
+            return getattr(self, funname)(*args)
+        raise AttributeError("Function %s() not found." % (funname,))
+
+    def __copy__(self):
+        return box(self.value)
+
+    def __save__(self):
+        return self.value
+
+    def __convert__(self, target, opts):
+        return ldmud.efuns.to_type(self.value, target, *(o for o in (opts,) if o is not None))
+
+    @staticmethod
+    def __restore__(val):
+        return box(val)
+
+def create_box(value) -> box:
+    return box(value)
+
+def has_gil_log_message() -> bool:
+    # DC_DEBUG_FILE = 14
+    logfile = ldmud.efuns.driver_info(14)
+    with open(logfile, 'rt') as f:
+        for line in f:
+            if "Python GIL" in line:
+                return True
+    return False
+
 ldmud.register_hook(ldmud.ON_HEARTBEAT, hb_hook)
 ldmud.register_hook(ldmud.ON_OBJECT_CREATED, ob_created)
 ldmud.register_hook(ldmud.ON_OBJECT_DESTRUCTED, ob_destroyed)
+ldmud.register_hook(ldmud.BEFORE_INSTRUCTION, before_instruction)
 
 ldmud.register_efun("python_get_hook_info", get_hook_info)
+ldmud.register_efun("python_get_last_program_name", get_last_program_name)
+ldmud.register_efun("python_get_last_file_name", get_last_file_name)
+ldmud.register_efun("python_get_last_line_number", get_last_line_number)
+ldmud.register_type("bigint", bigint)
+ldmud.register_type("bigint", int)
+ldmud.register_type("bigint", bigint)
+ldmud.register_efun("to_bigint", to_bigint)
+ldmud.register_type("random_generator", random_generator)
+ldmud.register_efun("create_random_generator", create_random_generator)
+ldmud.register_type("box", box)
+ldmud.register_efun("create_box", create_box)
+ldmud.register_efun("has_gil_log_message", has_gil_log_message)
+
+PythonStruct = ldmud.register_struct("python_struct", None, (("value1", int), ("value2", int)))
+def sum_struct(s: PythonStruct) -> int:
+    return s.members.value1.value + s.members.value2.value
+ldmud.register_efun("python_sum_struct", sum_struct)
 
 # Test loading objects at startup
 early_ob = ldmud.Object("/testob")
 if early_ob is not None and early_ob.name == "/testob":
     early_ob_worked = True
-    ldmud.efuns.destruct(early_ob)
 else:
     early_ob_worked = False
+
+def destruct_early_ob():
+    global early_ob
+    if early_ob:
+        ldmud.efuns.destruct(early_ob)
+        early_ob = None
+ldmud.register_efun("clean_early_ob", destruct_early_ob)

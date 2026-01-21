@@ -2,11 +2,16 @@ SYNOPSIS
         mixed copy(mixed arg)
 
 DESCRIPTION
-        Create a shallow copy of <arg> and return it. For arrays and mappings
-        this means that a new array or mapping is created with copies of the
-        original content. Embedded arrays and mappings are copied by reference!
+        Create a shallow copy of <arg> and return it. For arrays, mappings,
+        structs and lightweight objects this means that a new array, mapping,
+        struct resp. lightweight object is created with copies of the
+        original content. Embedded arrays, mappings, structs or lightweight
+        objects are copied by reference!
 
         For other values this function is a no-op.
+
+        If a lightweight objects was copied, the H_CREATE_LWOBJECT_COPY hook
+        will be called to finish initialization of the lightweight object.
 
 EXAMPLES
         mixed *a, *b;

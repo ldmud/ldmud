@@ -33,25 +33,36 @@ mixed global_var;
 
 /* The RANGE argument must always correspond to [4..6] */
 #define MAKE_RANGE_TEST(RANGE)                                  \
-    ({ "Checking array range RANGE", 0,                         \
+    ({ "Checking array range[RANGE]", 0,                        \
         function int()                                          \
         {                                                       \
             mixed arr = ({ 0, 1, 2, 3, 4, 5, 6 });              \
-            if(!deep_eq(arr RANGE, ({4,5,6})))                  \
+            if(!deep_eq(arr[RANGE], ({4,5,6})))                 \
                  return 0;                                      \
-            mixed result = arr RANGE = ({10});                  \
+            mixed result = arr[RANGE] = ({10});                 \
             return deep_eq(arr, ({0,1,2,3,10}))                 \
                 && deep_eq(result, ({10}));                     \
         }                                                       \
     }),                                                         \
-    ({ "Checking string range RANGE", 0,                        \
+    ({ "Checking string range[RANGE]", 0,                       \
         function int()                                          \
         {                                                       \
             mixed str = "abcdefg";                              \
-            if(str RANGE != "efg")                              \
+            if(str[RANGE] != "efg")                             \
                  return 0;                                      \
-            mixed result = str RANGE = "x";                     \
+            mixed result = str[RANGE] = "x";                    \
             return str == "abcdx" && result == "x";             \
+        }                                                       \
+    }),                                                         \
+    ({ "Checking mapping range[K,RANGE]", 0,                    \
+        function int()                                          \
+        {                                                       \
+            mapping m = (["KEY": 0; 1; 2; 3; 4; 5; 6]);         \
+            if(!deep_eq(m ["KEY",RANGE], ({4,5,6})))            \
+                 return 0;                                      \
+            mixed result = m["KEY",RANGE] = ({10,11,12});       \
+            return deep_eq(m, (["KEY":0;1;2;3;10;11;12]))       \
+                && deep_eq(result, ({10,11,12}));               \
         }                                                       \
     })
 
@@ -70,38 +81,54 @@ mixed global_var;
     MAKE_LAMBDA_TEST(#'global_var, OP_NAME, START_VAL, OP_VAL, RESULT)
 
 /* The RANGE argument must always correspond to [4..6] */
-#define MAKE_LAMBDA_RANGE_TEST(OP_RANGE, INDICES)                                                  \
-    ({ "Lambda: Checking array range OP_RANGE with INDICES", 0,                                    \
-        lambda(0,                                                                                  \
-         ({#',,                                                                                    \
-            ({ #'=, 'arr, '({ 0, 1, 2, 3, 4, 5, 6 }) }),                                           \
-            ({ #'?!,                                                                               \
-                ({#'deep_eq, ({OP_RANGE, 'arr }) + INDICES, '({4,5,6}) }), 0,                      \
-                ({ #',,                                                                            \
-                    ({ #'=, 'result, ({ #'=, ({ OP_RANGE, 'arr }) + INDICES, '({10}) }) }),        \
-                    ({ #'&&,                                                                       \
-                        ({ #'deep_eq, 'arr, '({0,1,2,3,10}) }),                                    \
-                        ({ #'deep_eq, 'result, '({10}) }),                                         \
-                    })                                                                             \
-                })                                                                                 \
-            })                                                                                     \
-        })),                                                                                       \
-    }),                                                                                            \
-    ({ "Lambda: Checking string range OP_RANGE with INDICES", 0,                                   \
-        lambda(0,                                                                                  \
-         ({#',,                                                                                    \
-            ({ #'=, 'str, "abcdefg" }),                                                            \
-            ({ #'?,                                                                                \
-                ({#'!=, ({OP_RANGE, 'str }) + INDICES, "efg" }), 0,                                \
-                ({ #',,                                                                            \
-                    ({ #'=, 'result, ({ #'=, ({ OP_RANGE, 'str }) + INDICES, "x" }) }),            \
-                    ({ #'&&,                                                                       \
-                        ({ #'==, 'str, "abcdx" }),                                                 \
-                        ({ #'==, 'result, "x" }),                                                  \
-                    })                                                                             \
-                })                                                                                 \
-            })                                                                                     \
-        })),                                                                                       \
+#define MAKE_LAMBDA_RANGE_TEST(OP_RANGE, INDICES)                                              \
+    ({ "Lambda: Checking array range #'[OP_RANGE with INDICES", 0,                             \
+        lambda(0,                                                                              \
+         ({#',,                                                                                \
+            ({ #'=, 'arr, '({ 0, 1, 2, 3, 4, 5, 6 }) }),                                       \
+            ({ #'?!,                                                                           \
+                ({#'deep_eq, ({#'[OP_RANGE, 'arr }) + INDICES, '({4,5,6}) }), 0,               \
+                ({ #',,                                                                        \
+                    ({ #'=, 'result, ({ #'=, ({ #'[OP_RANGE, 'arr }) + INDICES, '({10}) }) }), \
+                    ({ #'&&,                                                                   \
+                        ({ #'deep_eq, 'arr, '({0,1,2,3,10}) }),                                \
+                        ({ #'deep_eq, 'result, '({10}) }),                                     \
+                    })                                                                         \
+                }) \
+            })     \
+        })),       \
+    }),            \
+    ({ "Lambda: Checking string range #'[OP_RANGE with INDICES", 0,                            \
+        lambda(0,                                                                              \
+         ({#',,                                                                                \
+            ({ #'=, 'str, "abcdefg" }),                                                        \
+            ({ #'?,                                                                            \
+                ({#'!=, ({#'[OP_RANGE, 'str }) + INDICES, "efg" }), 0,                         \
+                ({ #',,                                                                        \
+                    ({ #'=, 'result, ({ #'=, ({ #'[OP_RANGE, 'str }) + INDICES, "x" }) }),     \
+                    ({ #'&&,                                                                   \
+                        ({ #'==, 'str, "abcdx" }),                                             \
+                        ({ #'==, 'result, "x" }),                                              \
+                    })                                                                         \
+                }) \
+            })     \
+        })),       \
+    }),            \
+    ({ "Lambda: Checking mapping range #'[,OP_RANGE with INDICES", 0,                          \
+        lambda(0,                                                                              \
+         ({#',,                                                                                \
+            ({ #'=, 'm, (["K": 0; 1; 2; 3; 4; 5; 6 ]) }),                                      \
+            ({ #'?!,                                                                           \
+                ({#'deep_eq, ({#'[,OP_RANGE, 'm, "K" }) + INDICES, '({4,5,6}) }), 0,           \
+                ({ #',,                                                                        \
+                    ({ #'=, 'result, ({ #'=, ({ #'[,OP_RANGE, 'm, "K" }) + INDICES, '({10,11,12}) }) }), \
+                    ({ #'&&,                                                                   \
+                        ({ #'deep_eq, 'm, (["K":0;1;2;3;10;11;12]) }),                         \
+                        ({ #'deep_eq, 'result, '({10,11,12}) }),                               \
+                    }) \
+                })     \
+            })         \
+        })),           \
     })
 
 mixed *tests = ({
@@ -128,26 +155,26 @@ mixed *tests = ({
     MAKE_OP_TEST(>>=,-20,2,-5),
     MAKE_OP_TEST(>>>=,-1,1,__INT_MAX__),
 
-    MAKE_RANGE_TEST([4..6]),
-    MAKE_RANGE_TEST([<3..6]),
-    MAKE_RANGE_TEST([>4..6]),
-    MAKE_RANGE_TEST([>-3..6]),
-    MAKE_RANGE_TEST([4..<1]),
-    MAKE_RANGE_TEST([<3..<1]),
-    MAKE_RANGE_TEST([>4..<1]),
-    MAKE_RANGE_TEST([>-3..<1]),
-    MAKE_RANGE_TEST([4..>6]),
-    MAKE_RANGE_TEST([<3..>6]),
-    MAKE_RANGE_TEST([>4..>6]),
-    MAKE_RANGE_TEST([>-3..>6]),
-    MAKE_RANGE_TEST([4..>-1]),
-    MAKE_RANGE_TEST([<3..>-1]),
-    MAKE_RANGE_TEST([>4..>-1]),
-    MAKE_RANGE_TEST([>-3..>-1]),
-    MAKE_RANGE_TEST([4..]),
-    MAKE_RANGE_TEST([<3..]),
-    MAKE_RANGE_TEST([>4..]),
-    MAKE_RANGE_TEST([>-3..]),
+    MAKE_RANGE_TEST(4..6),
+    MAKE_RANGE_TEST(<3..6),
+    MAKE_RANGE_TEST(>4..6),
+    MAKE_RANGE_TEST(>-3..6),
+    MAKE_RANGE_TEST(4..<1),
+    MAKE_RANGE_TEST(<3..<1),
+    MAKE_RANGE_TEST(>4..<1),
+    MAKE_RANGE_TEST(>-3..<1),
+    MAKE_RANGE_TEST(4..>6),
+    MAKE_RANGE_TEST(<3..>6),
+    MAKE_RANGE_TEST(>4..>6),
+    MAKE_RANGE_TEST(>-3..>6),
+    MAKE_RANGE_TEST(4..>-1),
+    MAKE_RANGE_TEST(<3..>-1),
+    MAKE_RANGE_TEST(>4..>-1),
+    MAKE_RANGE_TEST(>-3..>-1),
+    MAKE_RANGE_TEST(4..),
+    MAKE_RANGE_TEST(<3..),
+    MAKE_RANGE_TEST(>4..),
+    MAKE_RANGE_TEST(>-3..),
 
     ({ "Unprotected char: =", 0,  (: string str="xyz"; str[2]='x'; return str=="xyx"; :) }),
     ({ "Unprotected char: pre ++",  0,  (: string str="@@@";  int result = ++str[1];       return str == "@A@"  && result == 'A'; :) }),
@@ -188,6 +215,8 @@ mixed *tests = ({
 
     ({ "Unprotected lvalue-mapping element 1",      0, (: mapping m = ([ "a": 'a', "b": 'b', "c": ({'c'}) ]); int result = m["b"]    = 'B'; return deep_eq(m, (["a":'a',"b":'B',"c":({'c'})])) && result == 'B'; :) }),
     ({ "Unprotected lvalue-mapping element 2",      0, (: mapping m = ([ "a": 'a', "b": 'b', "c": ({'c'}) ]); int result = m["b", 0] = 'B'; return deep_eq(m, (["a":'a',"b":'B',"c":({'c'})])) && result == 'B'; :) }),
+    ({ "Unprotected lvalue-mapping element 3",      0, (: mapping m = ([ "a": 'a';'a';'a';'a', "b": 'b';'b';'b';'b', "c": ({'c'});'c';'c';'c' ]); int result = m["b", <2] = 'B'; return deep_eq(m, (["a":'a';'a';'a';'a',"b":'b';'b';'B';'b',"c":({'c'});'c';'c';'c'])) && result == 'B'; :) }),
+    ({ "Unprotected lvalue-mapping element 4",      0, (: mapping m = ([ "a": 'a';'a';'a';'a', "b": 'b';'b';'b';'b', "c": ({'c'});'c';'c';'c' ]); int result = m["b", >-3] = 'B'; return deep_eq(m, (["a":'a';'a';'a';'a',"b":'b';'B';'b';'b',"c":({'c'});'c';'c';'c'])) && result == 'B'; :) }),
     ({ "Unprotected rvalue-mapping element 1",      0, (: mapping m = ([ "a": 'a', "b": 'b', "c": ({'c'}) ]); int result = funcall(m)["b"]    = 'B'; return deep_eq(m, (["a":'a',"b":'B',"c":({'c'})])) && result == 'B'; :) }),
     ({ "Unprotected rvalue-mapping element 2",      0, (: mapping m = ([ "a": 'a', "b": 'b', "c": ({'c'}) ]); int result = funcall(m)["b", 0] = 'B'; return deep_eq(m, (["a":'a',"b":'B',"c":({'c'})])) && result == 'B'; :) }),
     ({ "Unprotected last rvalue-mapping element 1", 0, (: int result = ([ "a": 'a', "b": 'b', "c": ({'c'}) ])["b"]    = 'B'; return result == 'B'; :) }),
@@ -199,11 +228,20 @@ mixed *tests = ({
     ({ "Unprotected array range 4", 0, (: mixed a = ({0,1,2,3,4}); a[2..3]= ({10,11,12,13}); return deep_eq(a, ({0,1,10,11,12,13,4})); :) }),
     ({ "Unprotected string range 1", 0, (: string a = "0123456789"; a[2..6]   = "xxxxx"; return a == "01xxxxx789"; :) }),
     ({ "Unprotected string range 2", 0, (: string a = "0123456789"; a[2..6] &&= "xxxxx"; return a == "01xxxxx789"; :) }),
+    ({ "Unprotected mapping range 1", 0, (: mapping m = (["X10":1;1;1;1;1;1;1;1;1;1]); m["X"+10,2..6]   = ({2})*5; return deep_eq(m, (["X10":1;1;2;2;2;2;2;1;1;1])); :) }),
+    ({ "Unprotected mapping range 2", 0, (: mapping m = (["X10":1;1;1;1;1;1;1;1;1;1]); m["X"+10,2..6] &&= ({2})*5; return deep_eq(m, (["X10":1;1;2;2;2;2;2;1;1;1])); :) }),
+    ({ "Unprotected mapping range 3", 0, (: mapping m = ([:10]); m["X"+20,2..6] &&= ({2})*5; return deep_eq(m, (["X20":0;0;2;2;2;2;2;0;0;0])); :) }),
+    ({ "Unprotected mapping range 4", TF_ERROR, (: mapping m = ([:10]); m["X"+20,2..6] = ({}); :) }),
+    ({ "Unprotected mapping range 5", TF_ERROR, (: mapping m = ([:10]); m["X"+20,2..6] = ({10,11,12,13}); :) }),
 
     ({ "Indexing array range 1", 0, (: int* a = ({1,2,3,4,5,6}); a[1..3][1] = 7; return deep_eq(a, ({1,2,7,4,5,6})); :) }),
     ({ "Indexing array range 2", 0, (: int* a = ({1,2,3,4,5,6}); a[1..3][1..1] = ({}); return deep_eq(a, ({1,2,4,5,6})); :) }),
     ({ "Indexing string range 1", 0, (: string str = "abcdef"; str[0..3][2] = 'x'; return str == "abxdef"; :) }),
     ({ "Indexing string range 2", 0, (: string str = "abcdef"; str[0..3][2..2] = "xyz"; return str == "abxyzdef"; :) }),
+    ({ "Indexing mapping range 1", 0, (: mapping m = (["X":1;2;3;4;5;6]); m["X",1..3][1] = 7; return deep_eq(m, (["X":1;2;7;4;5;6])); :) }),
+    ({ "Indexing mapping range 2", 0, (: mapping m = (["X":1;2;3;4;5;6]); m["X",1..3][1..1] = ({7}); return deep_eq(m, (["X":1;2;7;4;5;6])); :) }),
+    ({ "Indexing mapping range 3", 0, (: mapping m = ([:6]); m["X",1..3][1] = 7; return deep_eq(m, (["X":0;0;7;0;0;0])); :) }),
+    ({ "Indexing mapping range 4", 0, (: mapping m = ([:6]); m["X",1..3][1..1] = ({7}); return deep_eq(m, (["X":0;0;7;0;0;0])); :) }),
 
     /* TODO: What should the proper results be? */
     ({ "Vanishing destinations 1a", TF_ERROR, (: mixed a = ({1}); a[0] = (a=0); :) }),
@@ -230,6 +268,9 @@ mixed *tests = ({
     ({ "Vanishing destinations 10", 0, (: mixed a = ({1,2,3,4,5,6}); mixed range = &(a[1..4]); a = 0; range = ({7,8,9}); return deep_eq(range, ({7,8,9})); :) }),
     ({ "Vanishing destinations 11", 0, (: mixed a = "Vanishing"; mixed element = &(a[1]); a = 0; return element == 'a'; :) }),
     ({ "Vanishing destinations 12", 0, (: mixed a = "Vanishing"; mixed range = &(a[5..6]); a = 0; return range == "hi"; :) }),
+    ({ "Vanishing destinations 13", 0, (: mixed e = (["Vanishing":1;2;3;4;5;6])["Vanishing",4] *= 2; return e == 10; :) }),
+    ({ "Vanishing destinations 14", 0, (: mapping m = (["Vanishing":1;2;3;4;5;6]); mixed element = &(m["Vanishing",5]); m = 0; return element == 6; :) }),
+    ({ "Vanishing destinations 15", 0, (: mapping m = (["Vanishing":1;2;3;4;5;6]); mixed range = &(m["Vanishing",1..3]); m = 0; range = ({7,8,9}); return deep_eq(range, ({7,8,9})); :) }),
 
     ({ "Protected locals 1", 0, (: mixed a = ({1,2,3,4,5}); int summe; map(a, (: $2+=$1 :), &summe); return summe == 15; :) }),
     ({ "Protected locals 2", 0, (: int x = 1; return &x; :) }),
@@ -327,10 +368,66 @@ mixed *tests = ({
            return deep_eq(a, ({1,100,8,4,5})) && deep_eq(b, ({6,100,8,9,0}));
        :)
     }),
+    ({ "Protected array range 8", 0,
+       (:
+           mixed a = ({1,2,3,4,5});
+           mixed b = a;
+           mixed x = &(b[1..2]);
+           mixed y;
+
+           b = 0;
+           y = x;
+
+           a[1] = 20;
+           return deep_eq(a, ({1,20,3,4,5})) && deep_eq(x, ({20,3})) && deep_eq(y, ({2,3}));
+       :)
+    }),
     ({ "Protected string range 1", 0, (: string a = "12345"; funcall((: $1 = $2; :), &(a[1..2]), &(a[3..3])); return a == "1445"; :) }),
     ({ "Protected string range 2a", 0, (: string a = "12345"; funcall((: $1[1] = 'a'; :), &(a[1..2])); return "X" + a == "X12a45"; :) }),
     ({ "Protected string range 2b", 0, (: string a = "12345"; funcall((: $1[1] = 'a'; :), &(a[1..2])); return a == "12a45"; :) }),
     ({ "Protected string range 3", 0, (: string a = "12345"; funcall((: $1 = $3; $2 = $3; :), &(a[1..2]), &(a[3..3]), &(a[4..4])); return a == "1555"; :) }),
+    ({ "Protected mapping range 1", 0, (: mapping m = (["K":1;2;3;4;5]); funcall((: $1 = $2; :), &(m["K",1..2]), &(m["K",3..4])); return deep_eq(m, (["K":1;4;5;4;5])); :) }),
+    ({ "Protected mapping range 2", 0, (: mapping m = (["K":1;2;3;4;5]); funcall((: $1[1] = "a"; :), &(m["K",1..2])); return deep_eq(m, (["K":1;2;"a";4;5])); :) }),
+    ({ "Protected mapping range 3", 0, (: mapping m = (["K":0;1;2;3;4]); funcall((: $1 = ({11,12}); :), &(m["K",1..2])); return deep_eq(m, (["K":0;11;12;3;4])); :) }),
+    ({ "Protected mapping range 4", 0, (: mapping m = (["K":1;2;3;4;5]); funcall((: $1 = $3; $2 = $3:), &(m["K",2..2]), &(m["K",3..3]), &(m["K",4..4])); return deep_eq(m, (["K":1;2;5;5;5])); :) }),
+    ({ "Protected mapping range 5", 0,
+       (:
+           mapping a = (["X":1;2;3;4;5]), b = (["Y":6;7;8;9;0]);
+           mixed x = &(a["X",1..2]), y = &(b["Y",1..2]);
+
+           x = &y;
+
+           y = ({10, 11});
+
+           return deep_eq(a, (["X":1;10;11;4;5])) && deep_eq(b, (["Y":6;10;11;9;0]));
+       :)
+    }),
+    ({ "Protected mapping range 6", 0,
+       (:
+           mapping a = (["X":1;2;3;4;5]), b = (["Y":6;7;8;9;0]);
+           mixed x = &(a["X",1..2]), y = &(b["Y",1..2]);
+
+           x = &y;
+
+           x[0] = 100;
+
+           return deep_eq(a, (["X":1;100;8;4;5])) && deep_eq(b, (["Y":6;100;8;9;0]));
+       :)
+    }),
+    ({ "Protected mapping range 7", 0,
+       (:
+           mapping a = (["K":1;2;3;4;5]);
+           mapping b = a;
+           mixed x = &(b["K",1..2]);
+           mixed y;
+
+           b = 0;
+           y = x;
+
+           a["K",1] = 20;
+           return deep_eq(a, (["K":1;20;3;4;5])) && deep_eq(x, ({20,3})) && deep_eq(y, ({2,3}));
+       :)
+    }),
     ({ "Volatile protected lvalues 1", 0,
         (:
             mixed val = 10;
@@ -650,6 +747,26 @@ mixed *tests = ({
            return member((["a","b","c"]),key) && member("ABC",a) >= 0 && deep_eq(m, (["a":'A',"b":'B',"c":'C']));
        :)
     }),
+    ({ "foreach over mapping range 1", 0,
+       (:
+           int a;
+           mapping m = ([ "K": 0; 1; 2; 3; 4; 5; 6 ]);
+
+           foreach(a: &(m["K",2..4])) { a *= 2; }
+
+           return a == 8 && deep_eq(m, ([ "K": 0; 1; 4; 6; 8; 5; 6 ]));
+       :)
+    }),
+    ({ "foreach over mapping range 2", 0,
+       (:
+           int a;
+           mapping m = ([:6]);
+
+           foreach(a: &(m["K",2..4])) { a += 2; }
+
+           return a == 2 && deep_eq(m, ([ "K": 0; 0; 2; 2; 2; 0 ]));
+       :)
+    }),
 
 #if 0 /* Still needs to be done... */
     ({ "foreach with an empty body", 0,
@@ -736,6 +853,30 @@ mixed *tests = ({
                   deep_eq(result, ({ 1,3,4,7,8 }));
        :)
     }),
+    ({ "sort_array by mapping range 1", 0,
+       (:
+           mapping m = ([ "K": 5;1;7;4;8;3;0 ]);
+           mixed result = sort_array(&(m["K",1..5]), #'>);
+           return deep_eq(m, ([ "K": 5;1;3;4;7;8;0 ])) &&
+                  deep_eq(result, ({ 1,3,4,7,8 }));
+       :)
+    }),
+    ({ "sort_array by mapping range 2", 0,
+       (:
+           mapping m = ([:7]);
+           mixed result = sort_array(&(m["K",1..5]), #'>);
+           return deep_eq(m-(["K"]), ([:7])) &&
+                  deep_eq(result, ({ 0,0,0,0,0 }));
+       :)
+    }),
+    ({ "sort_array by vanishing mapping range", 0,
+       (:
+           mapping m = ([ "K": 5;1;7;4;8;3;0 ]);
+           mixed result = sort_array(&(m["K",1..5]), (m=0) || #'>);
+           return m == 0 &&
+                  deep_eq(result, ({ 1,3,4,7,8 }));
+       :)
+    }),
     ({ "reverse by array value", 0,
        (:
            mixed arr = ({ 0, 1, 2, 3, 4, 5, 6 });
@@ -787,6 +928,22 @@ mixed *tests = ({
            return arr = "0543216" && result == "54321";
        :)
     }),
+    ({ "reverse by mapping range 1", 0,
+       (:
+           mapping m = ([ "K": 0; 1; 2; 3; 4; 5; 6 ]);
+           mixed result = reverse(&(m["K",1..5]));
+           return deep_eq(m, ([ "K":0;5;4;3;2;1;6 ])) &&
+                  deep_eq(result, ({ 5,4,3,2,1 }));
+       :)
+    }),
+    ({ "reverse by mapping range 2", 0,
+       (:
+           mapping m = ([:7]);
+           mixed result = reverse(&(m["K",1..5]));
+           return deep_eq(m - (["K"]), ([:7])) &&
+                  deep_eq(result, ({ 0,0,0,0,0 }));
+       :)
+    }),
     ({ "reverse by vanishing array range", 0,
        (:
            mixed arr = ({ 0, 1, 2, 3, 4, 5, 6 });
@@ -800,6 +957,14 @@ mixed *tests = ({
            mixed arr = "lvalu" + to_string(({'e'}));
            mixed result = reverse(return_first_lvalue(&(arr[1..4]), arr=6));
            return arr == 6 && result == "ulav";
+       :)
+    }),
+    ({ "reverse by vanishing mapping range", 0,
+       (:
+           mapping m = ([ "K": 0; 1; 2; 3; 4; 5; 6 ]);
+           mixed result = reverse(return_first_lvalue(&(m["K",1..5]), m=0));
+           return m == 0 &&
+                  deep_eq(result, ({ 5,4,3,2,1 }));
        :)
     }),
     ({
@@ -875,6 +1040,62 @@ mixed *tests = ({
            res[1] = 'K';
            res[2] = 'l';
            return str == "Char" && res[0] == "Klar";
+       :)
+    }),
+    ({
+       "deep_copy with mapping ranges in an array 1", 0,
+       (:
+           mapping m = ([ "K": 0;1;2;3;4;5;6;7;8 ]);
+           mixed res = deep_copy(({&(m["K",0..3]),&(m["K",5..8]),m}));
+
+           if(!deep_eq(res, ({ ({0,1,2,3}), ({5,6,7,8}), ([ "K": 0;1;2;3;4;5;6;7;8 ]) })))
+               return 0;
+
+           res[0][1..2] = ({11,12});
+           return deep_eq(m, ([ "K": 0;1;2;3;4;5;6;7;8 ])) &&
+                  deep_eq(res[2], ([ "K": 0;11;12;3;4;5;6;7;8 ]));
+       :)
+    }),
+    ({
+       "deep_copy with mapping ranges in an array 2", 0,
+       (:
+           mapping m = ([ "K": 0;1;2;3;4;5;6;7;8 ]);
+           mixed res = deep_copy(({m,&(m["K",0..3]),&(m["K",5..8])}));
+
+           if(!deep_eq(res, ({ ([ "K": 0;1;2;3;4;5;6;7;8 ]), ({0,1,2,3}), ({5,6,7,8}) })))
+               return 0;
+
+           res[1][1..2] = ({11,12});
+           return deep_eq(m, ([ "K": 0;1;2;3;4;5;6;7;8 ])) &&
+                  deep_eq(res[0], ([ "K": 0;11;12;3;4;5;6;7;8 ]));
+       :)
+    }),
+    ({
+       "deep_copy with mapping ranges in an array 3", 0,
+       (:
+           mapping m = ([:9]);
+           mixed res = deep_copy(({&(m["K",0..3]),&(m["K",5..8]),m}));
+
+           if(!deep_eq(res, ({ ({0,0,0,0}), ({0,0,0,0}), ([:9]) })))
+               return 0;
+
+           res[0][1..2] = ({11,12});
+           return deep_eq(m, ([:9])) &&
+                  deep_eq(res[2], ([ "K": 0;11;12;0;0;0;0;0;0 ]));
+       :)
+    }),
+    ({
+       "deep_copy with mapping ranges in an array 4", 0,
+       (:
+           mapping m = ([:9]);
+           mixed res = deep_copy(({m,&(m["K",0..3]),&(m["K",5..8])}));
+
+           if(!deep_eq(res, ({ ([:9]), ({0,0,0,0}), ({0,0,0,0}) })))
+               return 0;
+
+           res[1][1..2] = ({11,12});
+           return deep_eq(m, ([:9])) &&
+                  deep_eq(res[0], ([ "K": 0;11;12;0;0;0;0;0;0 ]));
        :)
     }),
     ({
@@ -1052,6 +1273,15 @@ mixed *tests = ({
        :)
     }),
     ({
+       "transpose_array with mapping ranges in the array", 0,
+       (:
+           mapping m = (["X":1;2;3;4;5, "Y":'a';'b';'c';'d';'e']);
+           int** both = ({ &(m["X",1..3]), &(m["Y",1..3]) });
+
+           return deep_eq(transpose_array(both), ({ ({2,'b'}), ({3,'c'}), ({4,'d'}) }));
+       :)
+    }),
+    ({
        "transpose_array unraveling references", 0,
        (:
            int i = 11;
@@ -1208,6 +1438,15 @@ mixed *tests = ({
                == "({({1,2,3,}),})";
        :)
     }),
+    ({ "save_value with array range lvalue references 6", 0,
+       (:
+           int* arr = ({0,1,2,3,4,5});
+           mixed var = &(arr[1..3]);
+
+           return explode(save_value(({&arr, &var})),"\n")[1]
+               == "({<1>=&(({0,1,2,3,4,5,}),),&(<1>,1..3),})";
+       :)
+    }),
     ({ "save_value with array range lvalue references in old format 1", 0,
        (:
            int* arr = ({0,1,2,3,4,5});
@@ -1215,6 +1454,42 @@ mixed *tests = ({
 
            return explode(save_value(({arr, &arr, &var, &var}),2),"\n")[1]
                == "({<1>=({0,1,2,3,4,5,}),<1>,<2>=({1,2,3,}),<2>,})";
+       :)
+    }),
+    ({ "save_value with mapping range lvalue references 1", 0,
+       (:
+           mapping m = (["K":0;1;2;3;4;5]);
+           mixed var = &(m["K",1..3]);
+
+           return explode(save_value(({m, &var, &var})),"\n")[1]
+               == "({<1>=([\"K\":0;1;2;3;4;5,]),<2>=&(<1>,\"K\",1..3),<2>,})";
+       :)
+    }),
+    ({ "save_value with mapping range lvalue references 2", 0,
+       (:
+           mapping m = (["K":0;1;2;3;4;5]);
+           mixed var = &(m["K",1..3]);
+
+           return explode(save_value(({&var, &var})),"\n")[1]
+               == "({<1>=&(([\"K\":0;1;2;3;4;5,]),\"K\",1..3),<1>,})";
+       :)
+    }),
+    ({ "save_value with mapping range lvalue references 3", 0,
+       (:
+           mapping m = (["K":0;1;2;3;4;5]);
+           mixed var = &(m["K",1..3]);
+
+           return explode(save_value(({&var})),"\n")[1]
+               == "({&(([\"K\":0;1;2;3;4;5,]),\"K\",1..3),})";
+       :)
+    }),
+    ({ "save_value with mapping range lvalue references in old format", 0,
+       (:
+           mapping m = (["K":0;1;2;3;4;5]);
+           mixed var = &(m["K",1..3]);
+
+           return explode(save_value(({m, &m, &var, &var}),2),"\n")[1]
+               == "({<1>=([\"K\":0;1;2;3;4;5,]),<1>,<2>=({1,2,3,}),<2>,})";
        :)
     }),
     ({ "restore_value of lvalue references", 0,
@@ -1286,6 +1561,64 @@ mixed *tests = ({
     ({ "restore_value of array range with wrong indices 3", TF_ERROR,
        (:
            restore_value("#3:2\n({<1>=&(<2>=({10,11,12,}),-1..0),<1>,<2>,})\n");
+       :)
+    }),
+    ({ "restore_value of mapping range", 0,
+       (:
+           mixed* arr = restore_value("#3:2\n({<1>=&(<2>=([\"X\":10;11;12,]),\"X\",1..1),<1>,<2>,})\n");
+
+           if(sizeof(arr) != 3 || !deep_eq(arr[0],({11})) || !deep_eq(arr[1],({11})) || !deep_eq(arr[2], (["X":10;11;12])))
+               return 0;
+
+           arr[2]["X",1] = 101;
+           return arr[0][0] == 101 && arr[1][0] == 101;
+       :)
+    }),
+    ({ "restore_value of a recursive mapping range", 0,
+       (:
+           mixed* arr = restore_value("#3:2\n({<1>=&(<2>=([\"X\":<1>;11;12,]),\"X\",1..1),<1>,<2>,})\n");
+
+           if(sizeof(arr) != 3 || !deep_eq(arr[0],({11})) || !deep_eq(arr[1],({11})) || sizeof(arr[2]) != 1 || widthof(arr[2]) != 3)
+               return 0;
+
+           arr[2]["X",1] = 101;
+
+           if(arr[0][0] != 101 || arr[1][0] != 101)
+               return 0;
+
+           // Break the circular reference.
+           &(arr[2]["X",0]) = 10;
+           return deep_eq(arr[2], (["X":10;101;12]));
+       :)
+    }),
+    ({ "restore_value of mapping range with wrong indices 1", TF_ERROR,
+       (:
+           restore_value("#3:2\n({<1>=&(<2>=([\"X\":10;11;12,]),\"X\",1..10),<1>,<2>,})\n");
+       :)
+    }),
+    ({ "restore_value of mapping range with wrong indices 2", TF_ERROR,
+       (:
+           restore_value("#3:2\n({<1>=&(<2>=([\"X\":10;11;12,]),\"X\",2..0),<1>,<2>,})\n");
+       :)
+    }),
+    ({ "restore_value of mapping range with wrong indices 3", TF_ERROR,
+       (:
+           restore_value("#3:2\n({<1>=&(<2>=([\"X\":10;11;12,]),\"X\",-1..0),<1>,<2>,})\n");
+       :)
+    }),
+    ({ "restore_value of mapping range without key", TF_ERROR,
+       (:
+           restore_value("#3:2\n({<1>=&(<2>=([\"X\":10;11;12,]),1..1),<1>,<2>,})\n");
+       :)
+    }),
+    ({ "restore_value of mapping range without indices 1", TF_ERROR,
+       (:
+           restore_value("#3:2\n({<1>=&(<2>=([\"X\":10;11;12,]),\"X\"),<1>,<2>,})\n");
+       :)
+    }),
+    ({ "restore_value of mapping range without indices 2", TF_ERROR,
+       (:
+           restore_value("#3:2\n({<1>=&(<2>=([\"X\":10;11;12,]),\"X\",\"Y\"),<1>,<2>,})\n");
        :)
     }),
     ({ "dump_driver_info(DDI_OBJECTS) with lvalues", 0,
@@ -1378,6 +1711,15 @@ mixed *tests = ({
         :),
     }),
     ({
+        "Flattening mapping range lvalue parameters with apply", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            mapping m = (["K": 0; 1; 2; 3; 4; 5]);
+            apply(cl, &(m["K",2..4]));
+            return deep_eq(m, (["K":0;1;4;6;9;5]));
+        :),
+    }),
+    ({
         "Flattening lvalue parameters '...'", 0,
         (:
             closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
@@ -1403,6 +1745,15 @@ mixed *tests = ({
             int* arr = ({0, 1, 2, 3, 4, 5});
             funcall(cl, &(arr[2..4])...);
             return deep_eq(arr, ({0,1,4,6,9,5}));
+        :),
+    }),
+    ({
+        "Flattening mapping range lvalue parameters '...'", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            mapping m = (["K": 0; 1; 2; 3; 4; 5]);
+            funcall(cl, &(m["K",2..4])...);
+            return deep_eq(m, (["K":0;1;4;6;9;5]));
         :),
     }),
     /* The same tests without any '&' should leave them alone. */
@@ -1435,6 +1786,15 @@ mixed *tests = ({
         :),
     }),
     ({
+        "Flattening mapping range rvalue parameters with apply", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            mapping m = (["K": 0; 1; 2; 3; 4; 5]);
+            apply(cl, m["K",2..4]);
+            return deep_eq(m, (["K":0;1;2;3;4;5]));
+        :),
+    }),
+    ({
         "Flattening rvalue parameters '...'", 0,
         (:
             closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
@@ -1460,6 +1820,15 @@ mixed *tests = ({
             int* arr = ({0, 1, 2, 3, 4, 5});
             funcall(cl, (arr[2..4])...);
             return deep_eq(arr, ({0,1,2,3,4,5}));
+        :),
+    }),
+    ({
+        "Flattening mapping range rvalue parameters '...'", 0,
+        (:
+            closure cl = function void(int a, int b, int c, int d) { a+=2; b+=3; c+=5; d+=7; };
+            mapping m = (["K": 0; 1; 2; 3; 4; 5]);
+            funcall(cl, (m["K",2..4])...);
+            return deep_eq(m, (["K":0;1;2;3;4;5]));
         :),
     }),
 
@@ -1787,26 +2156,26 @@ mixed *tests = ({
     MAKE_LAMBDA_OP_TEST(#'>>=,-20,2,-5),
     MAKE_LAMBDA_OP_TEST(#'>>>=,-1,1,__INT_MAX__),
 
-    MAKE_LAMBDA_RANGE_TEST(#'[..],   ({4,6})),
-    MAKE_LAMBDA_RANGE_TEST(#'[<..],  ({3,6})),
-    MAKE_LAMBDA_RANGE_TEST(#'[>..],  ({4,6})),
-    MAKE_LAMBDA_RANGE_TEST(#'[>..],  ({-3,6})),
-    MAKE_LAMBDA_RANGE_TEST(#'[..<],  ({4,1})),
-    MAKE_LAMBDA_RANGE_TEST(#'[<..<], ({3,1})),
-    MAKE_LAMBDA_RANGE_TEST(#'[>..<], ({4,1})),
-    MAKE_LAMBDA_RANGE_TEST(#'[>..<], ({-3,1})),
-    MAKE_LAMBDA_RANGE_TEST(#'[..>],  ({4,6})),
-    MAKE_LAMBDA_RANGE_TEST(#'[<..>], ({3,6})),
-    MAKE_LAMBDA_RANGE_TEST(#'[>..>], ({4,6})),
-    MAKE_LAMBDA_RANGE_TEST(#'[>..>], ({-3,6})),
-    MAKE_LAMBDA_RANGE_TEST(#'[..>],  ({4,-1})),
-    MAKE_LAMBDA_RANGE_TEST(#'[<..>], ({3,-1})),
-    MAKE_LAMBDA_RANGE_TEST(#'[>..>], ({4,-1})),
-    MAKE_LAMBDA_RANGE_TEST(#'[>..>], ({-3,-1})),
-    MAKE_LAMBDA_RANGE_TEST(#'[..,    ({4})),
-    MAKE_LAMBDA_RANGE_TEST(#'[<..,   ({3})),
-    MAKE_LAMBDA_RANGE_TEST(#'[>..,   ({4})),
-    MAKE_LAMBDA_RANGE_TEST(#'[>..,   ({-3})),
+    MAKE_LAMBDA_RANGE_TEST(..],   ({4,6})),
+    MAKE_LAMBDA_RANGE_TEST(<..],  ({3,6})),
+    MAKE_LAMBDA_RANGE_TEST(>..],  ({4,6})),
+    MAKE_LAMBDA_RANGE_TEST(>..],  ({-3,6})),
+    MAKE_LAMBDA_RANGE_TEST(..<],  ({4,1})),
+    MAKE_LAMBDA_RANGE_TEST(<..<], ({3,1})),
+    MAKE_LAMBDA_RANGE_TEST(>..<], ({4,1})),
+    MAKE_LAMBDA_RANGE_TEST(>..<], ({-3,1})),
+    MAKE_LAMBDA_RANGE_TEST(..>],  ({4,6})),
+    MAKE_LAMBDA_RANGE_TEST(<..>], ({3,6})),
+    MAKE_LAMBDA_RANGE_TEST(>..>], ({4,6})),
+    MAKE_LAMBDA_RANGE_TEST(>..>], ({-3,6})),
+    MAKE_LAMBDA_RANGE_TEST(..>],  ({4,-1})),
+    MAKE_LAMBDA_RANGE_TEST(<..>], ({3,-1})),
+    MAKE_LAMBDA_RANGE_TEST(>..>], ({4,-1})),
+    MAKE_LAMBDA_RANGE_TEST(>..>], ({-3,-1})),
+    MAKE_LAMBDA_RANGE_TEST(..,    ({4})),
+    MAKE_LAMBDA_RANGE_TEST(<..,   ({3})),
+    MAKE_LAMBDA_RANGE_TEST(>..,   ({4})),
+    MAKE_LAMBDA_RANGE_TEST(>..,   ({-3})),
 
     ({ "Lambda: Unprotected char: =",       0,  lambda(0, ({#',, ({#'=,'str,"xyz"}),  ({#'=, ({#'[,'str,2}), 'x'}), ({#'==,'str, "xyx"}) })) }),
     ({ "Lambda: Unprotected char: post ++", 0,  lambda(0, ({#',, ({#'=,'str,"@@@"}),  ({#'=, 'result, ({#'++,  ({#'[,'str,1}) }) }),      ({#'&&, ({#'==,'str, "@A@"}),  ({#'==,'result,'@'}) }) })) }),
@@ -1839,13 +2208,18 @@ mixed *tests = ({
     ({ "Lambda: Unprotected strict non-existant lvalue-struct element",  TF_ERROR, lambda(0, ({#',, ({#'=,'s,(<teststruct> -1,-2,-3)}), ({#'=, 'result, ({#'=,({#'., 's,                     "d"}), 55}) }), ({#'&&, ({#'deep_eq,'s,(<teststruct> -1,-2,-3)}), ({#'==,'result,55}) }) })) }),
     ({ "Lambda: Unprotected relaxed non-existant lvalue-struct element", 0,        lambda(0, ({#',, ({#'=,'s,(<teststruct> -1,-2,-3)}), ({#'=, 'result, ({#'=,({#'->,'s,                     "d"}), 55}) }), ({#'&&, ({#'deep_eq,'s,(<teststruct> -1,-2,-3)}), ({#'==,'result,55}) }) })) }),
 
-    // There are three mapping index operations, we test each one of them:
+    // There are five mapping index operations, we test each one of them:
     // 1. ({ #'[, mapping, index })
     // 2. ({ #'[, mapping, index, subindex })
     // 3. ({ #'[,], mapping, index, subindex })
+    // 4. ({ #'[,<], mapping, index, subindex })
+    // 5. ({ #'[,>], mapping, index, subindex })
     ({ "Lambda: Unprotected lvalue-mapping element 1",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a',"b":'b',"c":({'c'})])}), ({#'=, 'result, ({#'=,({#'[,   'm,                              "b"   }), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a',"b":'B',"c":({'c'})])}), ({#'==,'result,'B'}) }) })) }),
     ({ "Lambda: Unprotected lvalue-mapping element 2",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a',"b":'b',"c":({'c'})])}), ({#'=, 'result, ({#'=,({#'[,   'm,                              "b", 0}), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a',"b":'B',"c":({'c'})])}), ({#'==,'result,'B'}) }) })) }),
     ({ "Lambda: Unprotected lvalue-mapping element 3",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a',"b":'b',"c":({'c'})])}), ({#'=, 'result, ({#'=,({#'[,], 'm,                              "b", 0}), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a',"b":'B',"c":({'c'})])}), ({#'==,'result,'B'}) }) })) }),
+    ({ "Lambda: Unprotected lvalue-mapping element 3",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a';'a';'a';'a',"b":'b';'b';'b';'b',"c":({'c'});'c';'c';'c'])}), ({#'=, 'result, ({#'=,({#'[,<], 'm, "b",   2}), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a';'a';'a';'a',"b":'b';'b';'B';'b',"c":({'c'});'c';'c';'c'])}), ({#'==,'result,'B'}) }) })) }),
+    ({ "Lambda: Unprotected lvalue-mapping element 4",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a';'a';'a';'a',"b":'b';'b';'b';'b',"c":({'c'});'c';'c';'c'])}), ({#'=, 'result, ({#'=,({#'[,>], 'm, "b",  -3}), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a';'a';'a';'a',"b":'b';'B';'b';'b',"c":({'c'});'c';'c';'c'])}), ({#'==,'result,'B'}) }) })) }),
+
     ({ "Lambda: Unprotected rvalue-mapping element 1",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a',"b":'b',"c":({'c'})])}), ({#'=, 'result, ({#'=,({#'[,   ({#'funcall,'m}),                "b"   }), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a',"b":'B',"c":({'c'})])}), ({#'==,'result,'B'}) }) })) }),
     ({ "Lambda: Unprotected rvalue-mapping element 2",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a',"b":'b',"c":({'c'})])}), ({#'=, 'result, ({#'=,({#'[,   ({#'funcall,'m}),                "b", 0}), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a',"b":'B',"c":({'c'})])}), ({#'==,'result,'B'}) }) })) }),
     ({ "Lambda: Unprotected rvalue-mapping element 3",      0, lambda(0, ({#',, ({#'=,'m,(["a":'a',"b":'b',"c":({'c'})])}), ({#'=, 'result, ({#'=,({#'[,], ({#'funcall,'m}),                "b", 0}), 'B'}) }), ({#'&&, ({#'deep_eq,'m,(["a":'a',"b":'B',"c":({'c'})])}), ({#'==,'result,'B'}) }) })) }),
@@ -1859,11 +2233,20 @@ mixed *tests = ({
     ({ "Lambda: Unprotected array range 4", 0, lambda(0, ({#',, ({#'=,'a,'({0,1,2,3,4}) }), ({#'=,  ({#'[..],'a,2,3}),'({10,11,12,13})}), ({#'deep_eq,'a,'({0,1,10,11,12,13,4})}) })) }),
     ({ "Lambda: Unprotected string range 1", 0, lambda(0, ({#',, ({#'=,'a,"0123456789"}),   ({#'=,  ({#'[..],'a,2,6}),"xxxxx"         }), ({#'==,'a,"01xxxxx789"}) })) }),
     ({ "Lambda: Unprotected string range 2", 0, lambda(0, ({#',, ({#'=,'a,"0123456789"}),   ({#'&&=,({#'[..],'a,2,6}),"xxxxx"         }), ({#'==,'a,"01xxxxx789"}) })) }),
+    ({ "Lambda: Unprotected mapping range 1", 0, lambda(0, ({#',, ({#'=,'m,(["X10":1;1;1;1;1;1;1;1;1;1])}), ({#'=,  ({#'[,..],'m,({#'+,"X",10}),2,6}),quote(({2})*5)  }), ({#'deep_eq,'m,(["X10":1;1;2;2;2;2;2;1;1;1])}) })) }),
+    ({ "Lambda: Unprotected mapping range 2", 0, lambda(0, ({#',, ({#'=,'m,(["X10":1;1;1;1;1;1;1;1;1;1])}), ({#'&&=,({#'[,..],'m,({#'+,"X",10}),2,6}),quote(({2})*5)  }), ({#'deep_eq,'m,(["X10":1;1;2;2;2;2;2;1;1;1])}) })) }),
+    ({ "Lambda: Unprotected mapping range 3", 0, lambda(0, ({#',, ({#'=,'m,([:10])                      }), ({#'=,  ({#'[,..],'m,({#'+,"X",10}),2,6}),quote(({2})*5)  }), ({#'deep_eq,'m,(["X10":0;0;2;2;2;2;2;0;0;0])}) })) }),
+    ({ "Lambda: Unprotected mapping range 3", TF_ERROR, lambda(0, ({#',, ({#'=,'m,([:10]) }), ({#'=,  ({#'[,..],'m,({#'+,"X",20}),2,6}),'({}) }) })) }),
+    ({ "Lambda: Unprotected mapping range 3", TF_ERROR, lambda(0, ({#',, ({#'=,'m,([:10]) }), ({#'=,  ({#'[,..],'m,({#'+,"X",20}),2,6}),'({10,11,12,13}) }) })) }),
 
     ({ "Lambda: Indexing array range 1", 0, lambda(0, ({#',, ({#'=,'a,'({1,2,3,4,5,6})}), ({#'=,({#'[,({#'[..],'a,1,3}),1}),7}), ({#'deep_eq,'a,'({1,2,7,4,5,6})}) })) }),
     ({ "Lambda: Indexing array range 2", 0, lambda(0, ({#',, ({#'=,'a,'({1,2,3,4,5,6})}), ({#'=,({#'[..],({#'[..],'a,1,3}),1,1}),'({})}), ({#'deep_eq,'a,'({1,2,4,5,6})}) })) }),
     ({ "Lambda: Indexing string range 1", 0, lambda(0, ({#',, ({#'=,'str,"abcdef"}), ({#'=,({#'[,({#'[..],'str,0,3}),2}),'x'}), ({#'==,'str,"abxdef"}) })) }),
     ({ "Lambda: Indexing string range 2", 0, lambda(0, ({#',, ({#'=,'str,"abcdef"}), ({#'=,({#'[..],({#'[..],'str,0,3}),2,2}),"xyz"}), ({#'==,'str,"abxyzdef"}) })) }),
+    ({ "Lambda: Indexing mapping range 1", 0, lambda(0, ({#',, ({#'=,'m,(["X":1;2;3;4;5;6])}), ({#'=,({#'[,({#'[,..],'m,"X",1,3}),1}),7}), ({#'deep_eq,'m,(["X":1;2;7;4;5;6])}) })) }),
+    ({ "Lambda: Indexing mapping range 2", 0, lambda(0, ({#',, ({#'=,'m,(["X":1;2;3;4;5;6])}), ({#'=,({#'[..],({#'[,..],'m,"X",1,3}),1,1}),'({7})}), ({#'deep_eq,'m,(["X":1;2;7;4;5;6])}) })) }),
+    ({ "Lambda: Indexing mapping range 3", 0, lambda(0, ({#',, ({#'=,'m,([:6])}), ({#'=,({#'[,({#'[,..],'m,"X",1,3}),1}),7}), ({#'deep_eq,'m,(["X":0;0;7;0;0;0])}) })) }),
+    ({ "Lambda: Indexing mapping range 4", 0, lambda(0, ({#',, ({#'=,'m,([:6])}), ({#'=,({#'[..],({#'[,..],'m,"X",1,3}),1,1}),'({7})}), ({#'deep_eq,'m,(["X":0;0;7;0;0;0])}) })) }),
 
     ({ "Lambda: Vanishing destinations 1a", TF_ERROR, lambda(0, ({#',, ({#'=,'a,'({1})}),   ({#'=, ({#'[,'a,          0       }), ({#'=,'a,  0}) }) })) }),
     ({ "Lambda: Vanishing destinations 1b", TF_ERROR, lambda(0, ({#',, ({#'=,'a,'({1})}),   ({#'=, ({#'[,'a, ({#'=,'a,0})     }),            0   }) })) }),
@@ -1881,6 +2264,9 @@ mixed *tests = ({
     ({ "Lambda: Vanishing destinations 10", 0, lambda(0, ({#',, ({#'=,'a,'({1,2,3,4,5,6})}), ({#'=,'range,({#'&,({#'[..],'a,1,4})})}), ({#'=,'a,0}), ({#'=,'range,'({7,8,9})}), ({#'deep_eq,'range,'({7,8,9})}) })) }),
     ({ "Lambda: Vanishing destinations 11", 0, lambda(0, ({#',, ({#'=,'a,"Vanishing"}), ({#'=,'element,({#'&,({#'[,'a,1})})}), ({#'=,'a,0}), ({#'==,'element,'a'}) })) }),
     ({ "Lambda: Vanishing destinations 12", 0, lambda(0, ({#',, ({#'=,'a,"Vanishing"}), ({#'=,'range,({#'&,({#'[..],'a,5,6})})}), ({#'=,'a,0}), ({#'==,'range,"hi"}) })) }),
+    ({ "Lambda: Vanishing destinations 13", 0, lambda(0, ({#',, ({#'=,'e, ({#'*=, ({#'[,],(["Vanishing":1;2;3;4;5;6]),"Vanishing",4}), 2}) }), ({#'==,'e,10}) })) }),
+    ({ "Lambda: Vanishing destinations 14", 0, lambda(0, ({#',, ({#'=,'m,(["Vanishing":1;2;3;4;5;6])}), ({#'=,'element,({#'&,({#'[,],'m,"Vanishing",5})})}), ({#'=,'m,0}), ({#'==,'element,6}) })) }),
+    ({ "Lambda: Vanishing destinations 15", 0, lambda(0, ({#',, ({#'=,'m,(["Vanishing":1;2;3;4;5;6])}), ({#'=,'range,({#'&,({#'[,..],'m,"Vanishing",1,3})})}), ({#'=,'m,0}), ({#'=,'range,'({7,8,9})}), ({#'deep_eq,'range,'({7,8,9})}) })) }),
 
 
     ({ "Lambda: Protected locals 1", 0,
@@ -2062,6 +2448,22 @@ mixed *tests = ({
             })
        }))
     }),
+    ({ "Lambda: Protected array range 8", 0,
+       lambda(0,
+       ({#',,
+            ({#'=, 'a, '({1,2,3,4,5}) }),
+            ({#'=, 'b, 'a }),
+            ({#'=, 'x, ({#'&, ({#'[..], 'b, 1, 2}) }) }),
+            ({#'=, 'b, 0 }),
+            ({#'=, 'y, 'x }),
+            ({#'=, ({#'[, 'a, 1}), 20 }),
+            ({#'&&,
+                ({#'deep_eq, 'a, '({1,20,3,4,5}) }),
+                ({#'deep_eq, 'x, '({20,3}) }),
+                ({#'deep_eq, 'y, '({2,3}) }),
+            })
+       }))
+    }),
     ({ "Lambda: Protected string range 1", 0,
        lambda(0,
         ({#',,
@@ -2108,6 +2510,99 @@ mixed *tests = ({
             }),
             ({#'==, 'a, "1555" })
         }))
+    }),
+    ({ "Lambda: Protected mapping range 1", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'm, (["K":1;2;3;4;5]) }),
+            ({#'funcall,
+                lambda(({'arg1, 'arg2}), ({#'=, 'arg1, 'arg2})),
+                ({#'&, ({#'[,..], 'm, "K", 1, 2}) }),
+                ({#'&, ({#'[,..], 'm, "K", 3, 4}) }),
+            }),
+            ({#'deep_eq, 'm, (["K":1;4;5;4;5]) })
+        }))
+    }),
+    ({ "Lambda: Protected mapping range 2", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'm, (["K":1;2;3;4;5]) }),
+            ({#'funcall,
+                lambda(({'arg}), ({#'=, ({#'[, 'arg, 1}), "a" })),
+                ({#'&, ({#'[,..], 'm, "K", 1, 2}) }),
+            }),
+            ({#'deep_eq, 'm, (["K":1;2;"a";4;5]) })
+        }))
+    }),
+    ({ "Lambda: Protected mapping range 3", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'm, (["K":0;1;2;3;4]) }),
+            ({#'funcall,
+                lambda(({'arg}), ({#'=, 'arg, '({11,12}) })),
+                ({#'&, ({#'[,..], 'm, "K", 1, 2}) }),
+            }),
+            ({#'deep_eq, 'm, (["K":0;11;12;3;4]) })
+        }))
+    }),
+    ({ "Lambda: Protected mapping range 4", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'm, (["K":1;2;3;4;5]) }),
+            ({#'funcall,
+                lambda(({'arg1, 'arg2, 'arg3}), ({#',, ({#'=, 'arg1, 'arg3}), ({#'=, 'arg2, 'arg3})})),
+                ({#'&, ({#'[,..], 'm, "K", 2, 2}) }),
+                ({#'&, ({#'[,..], 'm, "K", 3, 3}) }),
+                ({#'&, ({#'[,..], 'm, "K", 4, 4}) }),
+            }),
+            ({#'deep_eq, 'm, (["K":1;2;5;5;5]) })
+        }))
+    }),
+    ({ "Lambda: Protected mapping range 5", 0,
+       lambda(0,
+       ({#',,
+            ({#'=, 'a, (["X":1;2;3;4;5]) }),
+            ({#'=, 'b, (["Y":6;7;8;9;0]) }),
+            ({#'=, 'x, ({#'&, ({#'[,..], 'a, "X", 1, 2}) }) }),
+            ({#'=, 'y, ({#'&, ({#'[,..], 'b, "Y", 1, 2}) }) }),
+            ({#'=, 'x, ({#'&, 'y}) }),
+            ({#'=, 'y, '({10, 11}) }),
+            ({#'&&,
+                ({#'deep_eq, 'a, (["X":1;10;11;4;5]) }),
+                ({#'deep_eq, 'b, (["Y":6;10;11;9;0]) }),
+            })
+       }))
+    }),
+    ({ "Lambda: Protected mapping range 6", 0,
+       lambda(0,
+       ({#',,
+            ({#'=, 'a, (["X":1;2;3;4;5]) }),
+            ({#'=, 'b, (["Y":6;7;8;9;0]) }),
+            ({#'=, 'x, ({#'&, ({#'[,..], 'a, "X", 1, 2}) }) }),
+            ({#'=, 'y, ({#'&, ({#'[,..], 'b, "Y", 1, 2}) }) }),
+            ({#'=, 'x, ({#'&, 'y}) }),
+            ({#'=, ({#'[, 'x, 0}), 100 }),
+            ({#'&&,
+                ({#'deep_eq, 'a, (["X":1;100;8;4;5]) }),
+                ({#'deep_eq, 'b, (["Y":6;100;8;9;0]) }),
+            })
+       }))
+    }),
+    ({ "Lambda: Protected mapping range 7", 0,
+       lambda(0,
+       ({#',,
+            ({#'=, 'a, (["K":1;2;3;4;5]) }),
+            ({#'=, 'b, 'a }),
+            ({#'=, 'x, ({#'&, ({#'[,..], 'b, "K", 1, 2}) }) }),
+            ({#'=, 'b, 0 }),
+            ({#'=, 'y, 'x }),
+            ({#'=, ({#'[, 'a, "K", 1}), 20 }),
+            ({#'&&,
+                ({#'deep_eq, 'a, (["K":1;20;3;4;5]) }),
+                ({#'deep_eq, 'x, '({20,3}) }),
+                ({#'deep_eq, 'y, '({2,3}) }),
+            })
+       }))
     }),
 
     ({ "Lambda: Volatile protected lvalues 1", 0,
@@ -2400,6 +2895,28 @@ mixed *tests = ({
             })
         }))
     }),
+    ({ "Lambda: foreach over mapping range 1", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'm, ([ "K": 0; 1; 2; 3; 4; 5; 6 ]) }),
+            ({#'foreach, 'a, ({#'&, ({#'[,..], 'm, "K", 2, 4}) }),
+                ({#'*=, 'a, 2})
+            }),
+
+            ({#'&&, ({#'==, 'a, 8}), ({#'deep_eq, 'm, ([ "K": 0; 1; 4; 6; 8; 5; 6 ]) }) })
+        }))
+    }),
+    ({ "Lambda: foreach over mapping range 2", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:6]) }),
+            ({#'foreach, 'a, ({#'&, ({#'[,..], 'm, "K", 2, 4}) }),
+                ({#'+=, 'a, 2})
+            }),
+
+            ({#'&&, ({#'==, 'a, 2}), ({#'deep_eq, 'm, ([ "K": 0; 0; 2; 2; 2; 0 ]) }) })
+        }))
+    }),
 #if 0 /* Still needs to be done... */
     ({ "foreach with an empty body", 0,
        lambda(0,
@@ -2491,6 +3008,39 @@ mixed *tests = ({
             })
         }))
     }),
+    ({ "Lambda: sort_array by mapping range 1", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'm, ([ "K": 5;1;7;4;8;3;0 ]) }),
+            ({#'=, 'result, ({#'sort_array, ({#'&,({#'[,..],'m,"K",1,5})}), #'>}) }),
+            ({#'&&,
+                ({#'deep_eq, 'm, ([ "K": 5;1;3;4;7;8;0 ]) }),
+                ({#'deep_eq, 'result, '({ 1,3,4,7,8 }) })
+            })
+        }))
+    }),
+    ({ "Lambda: sort_array by mapping range 2", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:7]) }),
+            ({#'=, 'result, ({#'sort_array, ({#'&,({#'[,..],'m,"K",1,5})}), #'>}) }),
+            ({#'&&,
+                ({#'deep_eq, ({#'-, 'm, (["K"])}), ([:7]) }),
+                ({#'deep_eq, 'result, '({ 0,0,0,0,0 }) })
+            })
+        }))
+    }),
+    ({ "Lambda: sort_array by vanishing mapping range", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'm, ([ "K": 5;1;7;4;8;3;0 ]) }),
+            ({#'=, 'result, ({#'sort_array, ({#'&,({#'[,..],'m,"K",1,5})}), ({#'||, ({#'=,'m,0}), #'>}) }) }),
+            ({#'&&,
+                ({#'==, 'm, 0 }),
+                ({#'deep_eq, 'result, '({ 1,3,4,7,8 }) })
+            })
+        }))
+    }),
     ({ "Lambda: reverse by array value", 0,
        lambda(0,
         ({#',,
@@ -2564,6 +3114,28 @@ mixed *tests = ({
             })
         }))
     }),
+    ({ "Lambda: reverse by mapping range 1", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'm, ([ "K": 0; 1; 2; 3; 4; 5; 6 ]) }),
+            ({#'=, 'result, ({#'reverse, ({#'&,({#'[,..],'m,"K",1,5}) }) }) }),
+            ({#'&&,
+                ({#'deep_eq, 'm, ([ "K":0;5;4;3;2;1;6 ]) }),
+                ({#'deep_eq, 'result, '({ 5,4,3,2,1 }) })
+            })
+        }))
+    }),
+    ({ "Lambda: reverse by mapping range 2", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'm, ([:7]) }),
+            ({#'=, 'result, ({#'reverse, ({#'&,({#'[,..],'m,"K",1,5}) }) }) }),
+            ({#'&&,
+                ({#'deep_eq, ({#'-, 'm, (["K"])}), ([:7]) }),
+                ({#'deep_eq, 'result, '({ 0,0,0,0,0 }) })
+            })
+        }))
+    }),
     ({ "Lambda: reverse by vanishing array range", 0,
        lambda(0,
         ({#',,
@@ -2583,6 +3155,17 @@ mixed *tests = ({
             ({#'&&,
                 ({#'==, 'arr, 6 }),
                 ({#'==, 'result, "ulav" })
+            })
+        }))
+    }),
+    ({ "Lambda: reverse by vanishing mapping range", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'm, ([ "K": 0; 1; 2; 3; 4; 5; 6 ]) }),
+            ({#'=, 'result, ({#'reverse, ({#'return_first_lvalue, ({#'&,({#'[,..],'m,"K",1,5})}), ({#'=,'m,0}) }) }) }),
+            ({#'&&,
+                ({#'==, 'm, 0 }),
+                ({#'deep_eq, 'result, '({ 5,4,3,2,1 }) })
             })
         }))
     }),
@@ -2663,6 +3246,23 @@ mixed *tests = ({
             ({#'deep_eq, 'arr, '({0,1,4,6,9,5}) })
         }))
     }),
+    ({ "Lambda: Flattening mapping range lvalue parameters with apply", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'm, (["K": 0; 1; 2; 3; 4; 5]) }),
+            ({#'apply,
+                lambda(({'a,'b,'c,'d}),
+                ({#',,
+                    ({#'+=, 'a, 2}),
+                    ({#'+=, 'b, 3}),
+                    ({#'+=, 'c, 5}),
+                    ({#'+=, 'd, 7}),
+                })),
+                ({#'&, ({#'[,..], 'm, "K", 2, 4}) }),
+            }),
+            ({#'deep_eq, 'm, (["K":0;1;4;6;9;5]) })
+        }))
+    }),
     ({ "Lambda: Flattening rvalue parameters with apply", 0,
        lambda(0,
         ({#',,
@@ -2714,6 +3314,23 @@ mixed *tests = ({
                 ({#'[..], 'arr, 2, 4}),
             }),
             ({#'deep_eq, 'arr, '({0,1,2,3,4,5}) })
+        }))
+    }),
+    ({ "Lambda: Flattening mapping range rvalue parameters with apply", 0,
+       lambda(0,
+        ({#',,
+            ({#'=, 'm, (["K": 0; 1; 2; 3; 4; 5]) }),
+            ({#'apply,
+                lambda(({'a,'b,'c,'d}),
+                ({#',,
+                    ({#'+=, 'a, 2}),
+                    ({#'+=, 'b, 3}),
+                    ({#'+=, 'c, 5}),
+                    ({#'+=, 'd, 7}),
+                })),
+                ({#'[,..], 'm, "K", 2, 4}),
+            }),
+            ({#'deep_eq, 'm, (["K":0;1;2;3;4;5]) })
         }))
     }),
 

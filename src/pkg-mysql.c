@@ -80,7 +80,7 @@ pkg_mysql_init (void)
  */
 
 {
-    const char * client_version = mysql_get_client_info();
+    const char * client_version;
     const char * server_version = MYSQL_SERVER_VERSION
 #ifdef MYSQL_SERVER_SUFFIX
                                   MYSQL_SERVER_SUFFIX
@@ -88,6 +88,14 @@ pkg_mysql_init (void)
                           ;
     long cl_version, s_version;
 
+    if (mysql_library_init(0, NULL, NULL))
+    {
+        printf("%s Could not initialize MySQL client library.\n", time_stamp());
+        debug_message("%s Could not initialize MySQL client library.\n", time_stamp());
+        return MY_FALSE;
+    }
+
+    client_version = mysql_get_client_info();
     cl_version = strtol(client_version, NULL, 10);
     s_version = strtol(server_version, NULL, 10);
     if (cl_version != s_version)

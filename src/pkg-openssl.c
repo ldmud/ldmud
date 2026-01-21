@@ -16,6 +16,10 @@
 #include <openssl/err.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+#include <openssl/decoder.h>
+#include <openssl/param_build.h>
+#endif
 #include <sys/utsname.h>
 #include <openssl/opensslconf.h>
 
@@ -76,68 +80,11 @@ static int current_key;
   /* Index into <keys>. */
 
 /*-------------------------------------------------------------------------*/
-DH *get_dh2048()
-/* Pre-computed Diffie-Hellman parameters. 2048 and avoiding any groups that
- * are in wide use. (https://www.weakdh.org/)
- * Returns a pointer to a DH structure from OpenSSL. Caller must free the
- * memory.
- */
-{
-  static unsigned char dh2048_p[]={
-    0x9C,0x4F,0xF0,0x77,0x2D,0x8A,0xBE,0xC0,0xED,0xA0,0x67,0x28,
-    0x7A,0xD8,0x76,0x7B,0x50,0x9C,0x79,0x83,0xA8,0x88,0x4A,0x0B,
-    0x4F,0x04,0xEE,0x99,0x80,0xF7,0x2F,0x69,0x26,0x6A,0xF6,0x2D,
-    0x08,0xCE,0x65,0x67,0xD7,0x54,0x1E,0x83,0x99,0x5C,0xA3,0xAF,
-    0x06,0xD1,0xD4,0x87,0x83,0x79,0xCA,0x57,0x75,0x02,0xE1,0x02,
-    0xEA,0xD1,0x37,0x6B,0xE1,0xEB,0xE1,0x32,0x24,0x48,0x26,0x91,
-    0x5D,0x42,0x61,0x36,0x1E,0x64,0xC9,0xE6,0xE4,0xC5,0x63,0x3A,
-    0xCE,0x52,0x71,0x84,0x64,0xF1,0x0D,0xDE,0x96,0x26,0x4D,0x5E,
-    0x79,0x6C,0x0A,0x6B,0xC2,0x85,0x82,0x81,0x21,0xD9,0x61,0xEA,
-    0x37,0x0B,0x81,0x59,0xE4,0x9D,0xA0,0x01,0xE6,0xC3,0x48,0x95,
-    0x4A,0x36,0xE3,0xDA,0x5A,0x5B,0xFD,0x72,0x15,0x24,0x94,0x12,
-    0x5F,0xC1,0xD3,0x99,0x65,0x0F,0x22,0xE4,0x5A,0x29,0x09,0x84,
-    0xC5,0x2E,0x05,0xDB,0x97,0x40,0x2D,0xE1,0x57,0x5D,0x8C,0xF4,
-    0x6D,0x7E,0xF6,0x16,0x73,0xE0,0x69,0xBF,0xDF,0x8C,0x13,0x55,
-    0x05,0xB6,0x64,0xB1,0x5F,0xBE,0x3E,0x5B,0xA2,0xEC,0xD2,0xF3,
-    0x9F,0x9A,0xBE,0x81,0x22,0x5F,0x22,0xA6,0xDD,0x01,0xD4,0x2B,
-    0xEE,0xFD,0xB9,0xAE,0xB1,0x68,0xC3,0x3F,0xC2,0x94,0x43,0x11,
-    0x1F,0x42,0x17,0x33,0x5D,0x21,0xF2,0xC8,0x73,0xAF,0x70,0xB1,
-    0xE1,0xEE,0x79,0xD9,0x9D,0xAC,0x69,0x5F,0x52,0x44,0xF3,0xA0,
-    0xAE,0x57,0x03,0x57,0x1C,0x84,0xC1,0xEA,0x4C,0x21,0x43,0x43,
-    0x08,0xE0,0x8F,0x34,0xFD,0xA7,0xC3,0x00,0x57,0x6A,0xFD,0x74,
-    0x6C,0x69,0x99,0xD3,
-  };
-  static unsigned char dh2048_g[]={
-    0x05,
-  };
-  DH *dh;
-  if ((dh=DH_new()) == NULL)
-    return(NULL);
-
-  BIGNUM *p = BN_bin2bn(dh2048_p,sizeof(dh2048_p),NULL);
-  BIGNUM *g = BN_bin2bn(dh2048_g,sizeof(dh2048_g),NULL);
-  if (p == NULL || g == NULL)
-  {
-    DH_free(dh);
-    return(NULL);
-  }
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  DH_set0_pqg(dh, p, NULL, g);
-#else
-  dh->p=p;
-  dh->g=g;
-#endif
-
-  return(dh);
-} /* get_dh2048 */
-
-/*-------------------------------------------------------------------------*/
 int
 tls_import_dh_params (const char* const buffer, size_t length)
 
 /* OpenSSL: Import Diffie Hellman parameters. They are for use with DHE kx
- * algorithms. By default, sets the statically provided parameters in the
- * source.
+ * algorithms. By default builtin OpenSSL parameters will be used.
  * Depending on security requirements, they may be provided by the
  * administrator or even re-newed from time to time.
  * If successful, the new parameters will be set in <context>.
@@ -149,32 +96,71 @@ tls_import_dh_params (const char* const buffer, size_t length)
  * The global <context> must be initialized.
  */
 {
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    OSSL_DECODER_CTX *decoderctx;
+    EVP_PKEY *dh = NULL;
+    const unsigned char *pbuffer = (const unsigned char *)buffer;
+#else
     BIO *membio = NULL;
     DH *dh = NULL;
     int ret = 1;
+#endif
 
     if (buffer == NULL || !length)
     {
         // use built-in defaults
-        printf("%s TLS: Importing built-in default DH parameters.\n"
+        printf("%s TLS: Using OpenSSL default DH parameters.\n"
                , time_stamp());
-        debug_message("%s TLS: Importing built-in default DH parameters.\n"
+        debug_message("%s TLS: Using OpenSSL default DH parameters.\n"
                       , time_stamp());
-        dh = get_dh2048();
+        SSL_CTX_set_dh_auto(context, 1);
+        return 1;
     }
-    else
+
+    printf("%s TLS: Importing user-supplied DH parameters.\n"
+           , time_stamp());
+    debug_message("%s TLS: Importing user-supplied DH parameters.\n"
+                  , time_stamp());
+
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    decoderctx = OSSL_DECODER_CTX_new_for_pkey(&dh, "PEM", NULL, NULL, OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS, NULL, NULL);
+    if (decoderctx != NULL)
     {
-      printf("%s TLS: Importing user-supplied DH parameters.\n"
-             , time_stamp());
-      debug_message("%s TLS: Importing user-supplied DH parameters.\n"
-                    , time_stamp());
-      membio = BIO_new_mem_buf((unsigned char*)buffer, length);
-      if (membio)
-      {
-          // So BIO_free() leaves our buffer alone, when freeing
-          BIO_set_close(membio, BIO_NOCLOSE);
-          dh = PEM_read_bio_DHparams(membio, NULL, NULL, NULL);
-      }
+        OSSL_DECODER_from_data(decoderctx, &pbuffer, &length);
+        OSSL_DECODER_CTX_free(decoderctx);
+    }
+
+    if (dh == NULL)
+    {
+        char * const errstring = ERR_error_string(ERR_get_error(), NULL);
+        printf("%s TLS: Could not decode Diffie-Hellmann parameters: %s\n"
+              , time_stamp(), errstring);
+        debug_message("%s TLS: Could not decode Diffie-Hellmann parameters: %s.\n"
+                     , time_stamp(), errstring);
+        return 0;
+    }
+
+    // Gets ownership of the key.
+    if (!SSL_CTX_set0_tmp_dh_pkey(context, dh))
+    {
+        char * const errstring = ERR_error_string(ERR_get_error(), NULL);
+        printf("%s TLS: Error importing Diffie-Hellmann parameters: %s.\n"
+              , time_stamp(), errstring);
+        debug_message("%s TLS: Error importing Diffie-Hellmann parameters: %s.\n"
+                     , time_stamp(), errstring);
+        EVP_PKEY_free(dh);
+        return 0;
+    }
+
+    SSL_CTX_set_dh_auto(context, 0);
+    return 1;
+#else
+    membio = BIO_new_mem_buf((unsigned char*)buffer, length);
+    if (membio)
+    {
+        // So BIO_free() leaves our buffer alone, when freeing
+        BIO_set_close(membio, BIO_NOCLOSE);
+        dh = PEM_read_bio_DHparams(membio, NULL, NULL, NULL);
     }
 
     // Set parameters
@@ -192,6 +178,9 @@ tls_import_dh_params (const char* const buffer, size_t length)
                          , time_stamp(), errstring);
         }
     }
+    else
+        SSL_CTX_set_dh_auto(context, 0);
+
     // SSL_CTX_set_tmp_dh() duplicates dh itself. So we have to free it even
     // in case of successesfully setting parameters
     if (dh)
@@ -203,7 +192,8 @@ tls_import_dh_params (const char* const buffer, size_t length)
     if (membio)
         BIO_free(membio);
 
-  return ret;
+    return ret;
+#endif
 }
 
 /*-------------------------------------------------------------------------*/
@@ -275,6 +265,7 @@ no_passphrase_callback (char * buf, int num, int w, void *arg)
     return -1;
 } /* no_passphrase_callback() */
 
+#if defined(ALLOCATOR_WRAPPERS)
 static void *
 openssl_malloc (size_t size, const char* file, int line)
 /*
@@ -305,6 +296,7 @@ openssl_realloc (void * ptr, size_t size, const char* file, int line)
 {
     return prexalloc(ptr, size);
 }
+#endif /* ALLOCATOR_WRAPPERS */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -844,12 +836,16 @@ tls_global_init (void)
     debug_message("%s TLS: (OpenSSL) Keyfile '%s', Certfile '%s'\n"
                  , time_stamp(), tls_keyfile, tls_certfile);
 
+#if defined(ALLOCATOR_WRAPPERS)
     // Register pointers to our own allocator functions before calling any
     // other function from OpenSSL.
     CRYPTO_set_mem_functions(openssl_malloc, openssl_realloc, openssl_free);
+#endif /* ALLOCATOR_WRAPPERS */
 
     SSL_load_error_strings();
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
     ERR_load_BIO_strings();
+#endif
     if (!SSL_library_init())
     {
         printf("%s TLS: Initialising the SSL library failed.\n"
@@ -1572,6 +1568,41 @@ calc_digest (digest_t md, void *dest, size_t destlen, void *msg, size_t msglen, 
 #if defined(OPENSSL_NO_HMAC)
         errorf("OpenSSL wasn't configured to provide the hmac() method.\n");
         /* NOTREACHED */
+#elif OPENSSL_VERSION_NUMBER >= 0x30000000L
+        OSSL_PARAM_BLD *bld;
+        OSSL_PARAM *params;
+        EVP_MAC_CTX *ctx;
+        EVP_MAC *mac;
+
+        bld = OSSL_PARAM_BLD_new();
+        OSSL_PARAM_BLD_push_utf8_string(bld, "digest", EVP_MD_name(md), 0);
+        params = OSSL_PARAM_BLD_to_param(bld);
+        OSSL_PARAM_BLD_free(bld);
+        if (!params)
+            errorf("Can't create parameters for hmac with OpenSSL.\n");
+
+        mac = EVP_MAC_fetch(NULL, "HMAC", NULL);
+        if (mac == NULL)
+        {
+            OSSL_PARAM_free(params);
+            errorf("Can't calculate a hmac with OpenSSL.\n");
+        }
+
+        ctx = EVP_MAC_CTX_new(mac);
+        if (ctx == NULL || !EVP_MAC_init(ctx, key, keylen, params))
+        {
+            if (ctx)
+                 EVP_MAC_CTX_free(ctx);
+            EVP_MAC_free(mac);
+            OSSL_PARAM_free(params);
+            errorf("Can't calculate '%s' hmac with OpenSSL.\n",  EVP_MD_name(md));
+        }
+
+        EVP_MAC_update(ctx, msg, msglen);
+        EVP_MAC_final(ctx, dest, NULL, destlen);
+        EVP_MAC_CTX_free(ctx);
+        EVP_MAC_free(mac);
+        OSSL_PARAM_free(params);
 #elif OPENSSL_VERSION_NUMBER >= 0x10100000L
         HMAC_CTX *ctx = HMAC_CTX_new();
         if (ctx == NULL)
@@ -1597,7 +1628,11 @@ calc_digest (digest_t md, void *dest, size_t destlen, void *msg, size_t msglen, 
         if (ctx == NULL)
             errorf("Can't calculate a digest with OpenSSL.\n");
 
-        EVP_DigestInit(ctx, md);
+        if (!EVP_DigestInit(ctx, md))
+        {
+            EVP_MD_CTX_free(ctx);
+            errorf("Can't calculate '%s' digest with OpenSSL.\n", EVP_MD_name(md));
+        }
         EVP_DigestUpdate(ctx, msg, msglen);
         EVP_DigestFinal(ctx, dest, NULL);
 

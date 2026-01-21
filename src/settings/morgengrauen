@@ -14,57 +14,90 @@ exec ./configure --prefix=${MUDHOME}/ --libdir=${MUDHOME}/mudlib --bindir=${MUDH
 exit $?
 
 # --- The actual settings ---
-with_portno=4711
-enable_debug=yes
-enable_erq=no
-enable_access_control=no
-enable_strict_euids=yes
-enable_filename_spaces=no
-enable_use_deprecated=no
-enable_use_set_light=no
-enable_use_parse_command=no
-enable_erq=no
-enable_use_pcre=no
+
+# --- Timing ---
 enable_synchronous_heart_beat=yes
 with_alarm_time=1
 with_heart_beat_interval=2
-with_read_file_max_size=200000
+enable_posix_timers=yes
 with_time_to_clean_up=90000
 with_time_to_swap=25200
 with_time_to_swap_variables=39600
 with_time_to_reset=3600
-enable_dynamic_costs=yes
-enable_eval_cost_trace=yes
-with_max_cost=1500000
-with_catch_reserved_cost=4000
-with_master_reserved_cost=1024
-with_max_array_size=20000
-with_max_mapping_keys=20000
-with_max_mapping_size=60000
-with_max_callouts=1250
-with_max_players=225
+
+# --- Memory ---
 with_reserved_user_size=8500000
 with_reserved_master_size=500000
 with_reserved_system_size=1000000
-with_htable_size=131072
-with_otable_size=131072
-with_itable_size=4096
-with_max_local=30
-with_evaluator_stack_size=4000
-with_apply_cache_bits=18
-with_max_user_trace=120
-with_max_trace=130
-with_max_byte_transfer=200000
-with_max_net_connects=40
 with_min_malloced=0xfa00000
 with_min_small_malloced=0x8200000
 with_hard_malloc_limit=0x7fffffff
+
+# --- Interpreter ---
+with_max_cost=1500000
+enable_strict_euids=yes
+enable_filename_spaces=no
+
+# --- Communication ---
+with_portno=4711
+enable_use_tls=gnu
+with_max_net_connects=40
+enable_use_anl=yes
+
+# --- Compilation Options ---
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
-with_pcre_recursion_limit=20000
-with_optimize=med
-enable_use_tls=gnu
+
+# --- Wizlist ---
+
+# --- Access Control ---
+enable_access_control=no
+
+# --- Language ---
 enable_use_xml=xml2
 enable_use_json=yes
 enable_use_sqlite=yes
+enable_use_set_light=no
+enable_use_parse_command=no
+enable_use_pcre=no
+enable_use_deprecated=no
+with_max_local=30
+with_catch_reserved_cost=4000
+with_master_reserved_cost=1024
+enable_keyword_in=yes
+enable_use_python=yes
+
+# --- Runtime limits ---
+enable_dynamic_costs=yes
+enable_eval_cost_trace=yes
+with_max_array_size=20000
+with_max_mapping_keys=20000
+with_max_mapping_size=60000
+with_read_file_max_size=200000
+with_max_byte_transfer=200000
+with_evaluator_stack_size=4000
+with_max_user_trace=120
+with_max_trace=130
+with_max_players=225
+with_max_callouts=1250
+with_pcre_recursion_limit=20000
+
+# --- Compiler ---
+
+# --- Internal Tables ---
+with_htable_size=131072
+with_otable_size=131072
+with_itable_size=4096
+with_apply_cache_bits=18
+
+# --- Profiling ---
+
+# --- Standard Debugging ---
+enable_debug=yes
+with_optimize=med
+
+# --- Specific Debugging ---
+
+# --- Additional tools ---
+enable_erq=no
 

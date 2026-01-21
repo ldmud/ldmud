@@ -1,0 +1,16 @@
+SYNOPSIS
+        int check_type(mixed arg, lpctype type)
+
+DESCRIPTION
+        Returns 1 if the first argument <arg> fulfills the type <type>,
+        0 otherwise.
+
+        This check is similar to runtime type checks. The target type
+        doesn't need to match exactly, but a variable of that type should
+        be able to hold the argument.
+
+HISTORY
+        Introduced in LDMud 3.6.7
+
+SEE ALSO
+        get_type_info(E), lpctypes(LPC)

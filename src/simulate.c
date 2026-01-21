@@ -44,6 +44,7 @@
 #include "call_out.h"
 #include "closure.h"
 #include "comm.h"
+#include "coroutine.h"
 #include "ed.h"
 #include "filestat.h"
 #include "gcollect.h"
@@ -360,6 +361,7 @@ catch_instruction ( int flags, uint offset
                   , volatile svalue_t ** volatile i_sp
                   , bytecode_p i_pc, svalue_t * i_fp
                   , int32 reserve_cost
+                  , int32 limit_eval
                   , svalue_t * i_context
                   )
 
@@ -385,6 +387,7 @@ catch_instruction ( int flags, uint offset
     volatile Bool old_out_of_memory = out_of_memory;
 
     bytecode_p new_pc;  /* Address of first instruction after the catch() */
+    int32 orig_max_eval_cost = max_eval_cost;
 
     /* Compute address of next instruction after the CATCH statement.
      */
@@ -440,6 +443,9 @@ catch_instruction ( int flags, uint offset
         eval_cost -= reserve_cost;
         assigned_eval_cost -= reserve_cost;
 
+        if (limit_eval > 0)
+            max_eval_cost = orig_max_eval_cost;
+
         /* If we ran out of memory, throw a new error */
         if (!old_out_of_memory && out_of_memory)
         {
@@ -469,6 +475,10 @@ catch_instruction ( int flags, uint offset
             return MY_TRUE;
         }
 
+        if (limit_eval > 0
+         && (!max_eval_cost || eval_cost + limit_eval < max_eval_cost))
+            max_eval_cost = eval_cost + limit_eval;
+
         /* Recursively call the interpreter */
         rc = eval_instruction(i_pc, INTER_SP);
 
@@ -487,6 +497,9 @@ catch_instruction ( int flags, uint offset
 
         eval_cost -= reserve_cost;
         assigned_eval_cost -= reserve_cost;
+
+        if (limit_eval > 0)
+            max_eval_cost = orig_max_eval_cost;
     }
 
     return rc;
@@ -1520,17 +1533,13 @@ determine_uid (svalue_t ob, string_t* name, wiz_list_t **user, wiz_list_t **eff_
  */
 
 {
-    lambda_t *l;
     svalue_t *ret;
 
     *user = &default_wizlist_entry;  /* Default uid */
 
-    if ( NULL != (l = driver_hook[hook].u.lambda) )
+    if (driver_hook[hook].type == T_CLOSURE)
     {
-        if (driver_hook[hook].x.closure_type == CLOSURE_LAMBDA)
-            assign_object_svalue(&(l->ob), ob, "determine_uid");
-
-        call_lambda(&driver_hook[hook], numarg);
+        call_lambda_ob(&driver_hook[hook], numarg, &ob);
         ret = inter_sp;
 
         if (ret->type == T_STRING)
@@ -2125,7 +2134,7 @@ load_object (const char *lname, Bool create_super, int depth
 
             if (strcmp(pInherited, name) == 0)
             {
-                errorf("Illegal to inherit self.\n");
+                load_object_error("Illegal to inherit self", name, chain);
             }
 
             if (depth >= MAX_LOAD_DEPTH)
@@ -3294,6 +3303,10 @@ status_parse (strbuf_t * sbuf, char * buff)
                             , tot_alloc_object, tot_alloc_object_size
                             , num_destructed  
                             , num_vb_swapped, total_vb_bytes_swapped / 1024);
+            strbuf_addf(sbuf, "Lightweight Objects:\t\t%8ld %9ld\n"
+                            , num_lwobjects, total_lwobject_size);
+            strbuf_addf(sbuf, "Coroutines:\t\t\t%8ld %9ld\n"
+                            , num_coroutines, total_coroutine_size);
             strbuf_addf(sbuf, "Prog blocks:\t\t\t%8"PRIdMPINT" %9"PRIdMPINT
                               " (%"PRIdMPINT" swapped: %"PRIdMPINT" Kbytes)\n"
                             , total_num_prog_blocks + num_swapped - num_unswapped
@@ -3848,7 +3861,7 @@ init_empty_callback (callback_t *cb)
 
 {
     cb->num_arg = 0;
-    cb->is_lambda = MY_FALSE;
+    cb->is_closure = MY_FALSE;
     cb->function.named.ob = const0;
     cb->function.named.name = NULL;
 } /* init_empty_callback() */
@@ -3898,12 +3911,12 @@ free_callback (callback_t *cb)
  */
 
 {
-    if (cb->is_lambda && cb->function.lambda.type != T_INVALID)
+    if (cb->is_closure && cb->function.closure.type != T_INVALID)
     {
-        free_svalue(&(cb->function.lambda));
-        cb->function.lambda.type = T_INVALID;
+        free_svalue(&(cb->function.closure));
+        cb->function.closure.type = T_INVALID;
     }
-    else if (!(cb->is_lambda))
+    else if (!(cb->is_closure))
     {
         free_svalue(&(cb->function.named.ob));
         if (cb->function.named.name)
@@ -3964,14 +3977,21 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args)
 
 /*-------------------------------------------------------------------------*/
 int
-setup_function_callback ( callback_t *cb, svalue_t ob, string_t * fun
-                        , int nargs, svalue_t * args)
+setup_function_callback_base ( callback_t *cb, svalue_t ob, string_t * fun
+                             , int nargs, svalue_t * args, bool no_warn)
 
-/* Setup the empty/uninitialized callback <cb> to hold a function
+/* Aliases:
+ *   setup_function_callback(cb, ob, fun, nargs, args)
+ *         == setup_function_callback_base(cb, ob, fun, nargs, args, false)
+ *
+ * Setup the empty/uninitialized callback <cb> to hold a function
  * call to <ob>:<fun> with the <nargs> arguments starting from <args>.
  *
  * Both <ob> and <fun> are copied from the caller, but the arguments are
  * adopted (taken away from the caller).
+ *
+ * If function <fun> doesn't exist in <ob> and <no_warn> is not set,
+ * issue a runtime warning.
  *
  * Result is -1 on success, or, when encountering an illegal argument,
  * the index of the faulty argument (but even then all caller arguments
@@ -3981,7 +4001,7 @@ setup_function_callback ( callback_t *cb, svalue_t ob, string_t * fun
 {
     int error_index;
 
-    cb->is_lambda = MY_FALSE;
+    cb->is_closure = MY_FALSE;
     cb->function.named.name = make_tabled_from(fun); /* for faster apply()s */
     assign_object_svalue_no_free(&(cb->function.named.ob), ob, "callback");
 
@@ -3993,7 +4013,7 @@ setup_function_callback ( callback_t *cb, svalue_t ob, string_t * fun
         cb->function.named.ob = const0;
         cb->function.named.name = NULL;
     }
-    else
+    else if (!no_warn)
     {
         /* Check whether the function does exist, */
         switch (ob.type)
@@ -4009,15 +4029,17 @@ setup_function_callback ( callback_t *cb, svalue_t ob, string_t * fun
     }
 
     return error_index;
-} /* setup_function_callback() */
+} /* setup_function_callback_base() */
 
 /*-------------------------------------------------------------------------*/
 int
 setup_closure_callback ( callback_t *cb, svalue_t *cl
-                       , int nargs, svalue_t * args)
+                       , int nargs, svalue_t * args
+                       , bool expect_code)
 
 /* Setup the empty/uninitialized callback <cb> to hold a closure
  * call to <cl> with the <nargs> arguments starting from <args>.
+ * If <expect_code> is true, identifier closures are not allowed.
  *
  * Both <cl> and the arguments are adopted (taken away from the caller).
  *
@@ -4029,15 +4051,15 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
 {
     int error_index = -1;
 
-    cb->is_lambda = MY_TRUE;
-    transfer_svalue_no_free(&(cb->function.lambda), cl);
+    cb->is_closure = MY_TRUE;
+    transfer_svalue_no_free(&(cb->function.closure), cl);
 
-    if (cb->function.lambda.x.closure_type == CLOSURE_UNBOUND_LAMBDA)
+    if (!is_closure_callable(&(cb->function.closure), expect_code))
     {
         /* Uncalleable closure  */
         error_index = 0;
-        free_svalue(&(cb->function.lambda));
-        cb->function.lambda.type = T_INVALID;
+        free_svalue(&(cb->function.closure));
+        cb->function.closure.type = T_INVALID;
 
         for (int i = 0; i < nargs; i++)
             free_svalue(args+i);
@@ -4047,8 +4069,8 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
         error_index = setup_callback_args(cb, nargs, args);
         if (error_index >= 0)
         {
-            free_svalue(&(cb->function.lambda));
-            cb->function.lambda.type = T_INVALID;
+            free_svalue(&(cb->function.closure));
+            cb->function.closure.type = T_INVALID;
             error_index++;
         }
     }
@@ -4099,7 +4121,7 @@ setup_efun_callback_base ( callback_t **cb, svalue_t *args, int nargs
     if (args[0].type == T_CLOSURE)
     {
         memsafe(*cb = xalloc(sizeof(callback_t)) , sizeof(callback_t), "callback structure");
-        error_index = setup_closure_callback(*cb, args, nargs-1, args+1);
+        error_index = setup_closure_callback(*cb, args, nargs-1, args+1, false);
     }
     else if (args[0].type == T_STRING)
     {
@@ -4145,9 +4167,10 @@ setup_efun_callback_base ( callback_t **cb, svalue_t *args, int nargs
         if (ob.type != T_NUMBER)
         {
             memsafe(*cb = xalloc(sizeof(callback_t)), sizeof(callback_t), "callback structure");
-            error_index = setup_function_callback(*cb, ob, args[0].u.str
-                                                 , nargs-first_arg
-                                                 , args+first_arg);
+            error_index = setup_function_callback_base(*cb, ob, args[0].u.str
+                                                      , nargs-first_arg
+                                                      , args+first_arg
+                                                      , bNoObj);
             if (error_index >= 0)
                 error_index += first_arg;
         }
@@ -4203,7 +4226,7 @@ callback_change_object (callback_t *cb, object_t *obj)
 
 {
     svalue_t old;
-    if (cb->is_lambda)
+    if (cb->is_closure)
     {
         fatal("callback_change_object(): Must not be called with a closure callback.");
         /* NOTREACHED */
@@ -4224,7 +4247,7 @@ callback_change_lwobject (callback_t *cb, lwobject_t *lwobj)
  */
 
 {
-    if (cb->is_lambda)
+    if (cb->is_closure)
     {
         fatal("callback_change_lwobject(): Must not be called with a closure callback.");
         /* NOTREACHED */
@@ -4250,8 +4273,8 @@ callback_object (callback_t *cb)
 {
     svalue_t ob;
 
-    if (cb->is_lambda)
-        ob = get_bound_object(cb->function.lambda);
+    if (cb->is_closure)
+        ob = get_bound_object(cb->function.closure);
     else
         ob = cb->function.named.ob;
 
@@ -4285,8 +4308,8 @@ callback_function (callback_t *cb)
 {
     static svalue_t fun;
 
-    if (cb->is_lambda)
-        assign_svalue_no_free(&fun, &(cb->function.lambda));
+    if (cb->is_closure)
+        assign_svalue_no_free(&fun, &(cb->function.closure));
     else
         put_ref_string(&fun, cb->function.named.name);
 
@@ -4377,11 +4400,11 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
     if (toplevel)
         current_object = ob; /* Need something valid here */
 
-    if (cb->is_lambda)
+    if (cb->is_closure)
     {
         if (toplevel
-         && cb->function.lambda.x.closure_type < CLOSURE_SIMUL_EFUN
-         && cb->function.lambda.x.closure_type >= CLOSURE_OPERATOR)
+         && cb->function.closure.x.closure_type < CLOSURE_SIMUL_EFUN
+         && cb->function.closure.x.closure_type >= CLOSURE_OPERATOR)
         {
             /* efun, operator or sefun closure called from the backend:
              * we need the program for a proper traceback. We made sure
@@ -4390,9 +4413,8 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
             current_prog = (ob.type == T_OBJECT) ? ob.u.ob->prog : ob.u.lwob->prog;
         }
 
-        call_lambda(&(cb->function.lambda), num_arg + nargs);
-        transfer_svalue(&apply_return_value, inter_sp);
-        inter_sp--;
+        call_lambda(&(cb->function.closure), num_arg + nargs);
+        pop_apply_value();
 
         if (toplevel)
             current_prog = NULL;
@@ -4405,7 +4427,10 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
         if (ob.type == T_OBJECT
          ? !sapply(cb->function.named.name, ob.u.ob, num_arg + nargs)
          : !sapply_lwob(cb->function.named.name, ob.u.lwob, num_arg + nargs))
-            transfer_svalue(&apply_return_value, &const0);
+        {
+            free_svalue(&apply_return_value);
+            apply_return_value = const0;
+        }
     }
 
     if (!keep)
@@ -4427,10 +4452,10 @@ count_callback_extra_refs (callback_t *cb)
 /* Count all the refs in the callback to verify the normal refcounting. */
 
 {
-    if (!cb->is_lambda)
+    if (!cb->is_closure)
         count_extra_ref_in_vector(&cb->function.named.ob, 1);
     else
-        count_extra_ref_in_vector(&cb->function.lambda, 1);
+        count_extra_ref_in_vector(&cb->function.closure, 1);
     if (cb->num_arg == 1)
         count_extra_ref_in_vector(&(cb->arg), 1);
     else if (cb->num_arg > 1)
@@ -4458,8 +4483,8 @@ clear_ref_in_callback (callback_t *cb)
         clear_memory_reference(cb->arg.u.lvalue);
     }
 
-    if (cb->is_lambda)
-        clear_ref_in_vector(&(cb->function.lambda), 1);
+    if (cb->is_closure)
+        clear_ref_in_vector(&(cb->function.closure), 1);
     else
     {
 #ifdef DEBUG
@@ -4491,8 +4516,8 @@ count_ref_in_callback (callback_t *cb)
     if (!valid_callback_object(cb))
         fatal("GC run on callback with stale object.\n");
 #endif
-    if (cb->is_lambda)
-        count_ref_in_vector(&(cb->function.lambda), 1);
+    if (cb->is_closure)
+        count_ref_in_vector(&(cb->function.closure), 1);
     else
     {
         count_ref_in_vector(&(cb->function.named.ob), 1);
@@ -4752,7 +4777,7 @@ f_destruct (svalue_t * sp)
     if (T_NUMBER != sp->type || sp->u.number)
     {
         if (sp->type != T_OBJECT)
-            efun_arg_error(1, T_OBJECT, sp->type, sp);
+            efun_arg_error(1, T_OBJECT, sp, sp);
         destruct_object(sp);
     }
     free_svalue(sp);
@@ -5162,22 +5187,19 @@ f_set_driver_hook (svalue_t *sp)
       }
 
     case T_CLOSURE:
-        if (sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA
-         && sp->u.lambda->ref == 1)
+        /* Even if the hook type map doesn't specify so, we allow
+         * unbound lambdas that we can take ownership of.
+         * (We need ownership, because those hooks will rebind
+         * the closure before call.)
+         */
+        if ((hook_type_map[n] & TF_CLOSURE) == 0
+         && sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA
+         && sp->u.lambda->base.ref == 1)
         {
             driver_hook[n] = *sp;
             driver_hook[n].x.closure_type = CLOSURE_LAMBDA;
-            put_ref_object(&(driver_hook[n].u.lambda->ob), master_ob, "hook closure");
-            if (n == H_NOECHO)
-            {
-                mudlib_telopts();
-            }
+            put_ref_object(&(driver_hook[n].u.lambda->base.ob), master_ob, "hook closure");
             break;
-        }
-        else if (!CLOSURE_IS_LFUN(sp->x.closure_type))
-        {
-            errorf("Bad value for hook %"PRIdPINT": unbound lambda or "
-                  "lfun closure expected.\n", n);
         }
         /* FALLTHROUGH */
 
@@ -5186,7 +5208,7 @@ default_test:
         if ( !((1 << sp->type) & hook_type_map[n]) )
         {
             errorf("Bad value for hook %"PRIdPINT": got %s, expected %s.\n"
-                 , n, typename(sp->type), efun_arg_typename(hook_type_map[n]));
+                 , n, sv_typename(sp), efun_arg_typename(hook_type_map[n]));
             break; /* flow control hint */
         }
 
@@ -5282,7 +5304,7 @@ set_single_limit ( struct limits_context_s * result
 
     if (svp->type != T_NUMBER)
         errorf("Illegal %s value: got a %s, expected a number\n"
-             , limitnames[limit], typename(svp[limit].type));
+             , limitnames[limit], sv_typename(svp+limit));
 
     val = svp->u.number;
 
@@ -5414,7 +5436,7 @@ extract_limits ( struct limits_context_s * result
 
             if (svp[i].type != T_NUMBER)
                 errorf("Illegal limit value: got a %s, expected a number\n"
-                     , typename(svp[i].type));
+                     , sv_typename(svp+i));
             limit = svp[i].u.number;
             if (limit < 0 || limit >= LIMIT_MAX)
                 errorf("Illegal limit tag: %"PRIdPINT"\n", limit);

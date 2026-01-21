@@ -115,19 +115,19 @@ volatile mp_int total_alarms = 0;
   /* The total number of alarm()s so far, incremented from the alarm handler.
    */
 
-uint32 total_player_commands = 0;
+uint32_t total_player_commands = 0;
   /* Total number of player commands so far.
    */
 
-uint num_listed_objs = 0;
+uint32_t num_listed_objs = 0;
   /* Number of objects in the object list.
    */
 
-uint num_last_processed = 0;
+uint32_t num_last_processed = 0;
   /* Number of object processed in last process_objects().
    */
 
-uint num_last_data_cleaned = 0;
+uint32_t num_last_data_cleaned = 0;
   /* Number of object data-cleaned in last process_objects().
    */
 
@@ -373,6 +373,11 @@ handle_signal (int sig)
             break;
     }
 
+#ifdef USE_PYTHON
+    /* Notify the python package. Python will not react immediately. */
+    python_handle_signal(sig);
+#endif
+
     switch (action)
     {
         case DCS_IGNORE:
@@ -602,10 +607,10 @@ cleanup_stuff (void)
             lambda_t *l;
 
             l = driver_hook[i].u.lambda;
-            if (l->ob.type != T_OBJECT || l->ob.u.ob != master_ob)
+            if (l->base.ob.type != T_OBJECT || l->base.ob.u.ob != master_ob)
             {
-                free_svalue(&(l->ob));
-                put_ref_object(&(l->ob), master_ob, "backend");
+                free_svalue(&(l->base.ob));
+                put_ref_object(&(l->base.ob), master_ob, "backend");
             }
         }
     }
@@ -1421,15 +1426,12 @@ static Bool did_swap;
              * is inherited by other objects. Cloned objects might as well
              * believe they are not inherited. Swapped objects will not
              * have a ref count > 1 (and will have an invalid ob->prog
-             * pointer). If the object is a blueprint, the extra reference
-             * from the program will not be counted.
+             * pointer).
              */
             if (obj->flags & (O_CLONE|O_REPLACED))
                 push_number(inter_sp, 0);
             else if (O_PROG_SWAPPED(obj))
                 push_number(inter_sp, 1);
-            else if (obj->prog->blueprint == obj)
-                push_number(inter_sp, obj->prog->ref - 1);
             else
                 push_number(inter_sp, obj->prog->ref);
 
@@ -1441,17 +1443,9 @@ static Bool did_swap;
             trace_level = 0;
             if (driver_hook[H_CLEAN_UP].type == T_CLOSURE)
             {
-                lambda_t *l;
-
                 mark_start_evaluation();
-                l = driver_hook[H_CLEAN_UP].u.lambda;
-                if (driver_hook[H_CLEAN_UP].x.closure_type == CLOSURE_LAMBDA)
-                {
-                    free_svalue(&(l->ob));
-                    put_ref_object(&(l->ob), obj, "clean_up");
-                }
                 push_ref_object(inter_sp, obj, "clean up");
-                call_lambda(&driver_hook[H_CLEAN_UP], 2);
+                call_lambda_ob(&driver_hook[H_CLEAN_UP], 2, inter_sp);
                 svp = inter_sp;
                 pop_stack();
                 mark_end_evaluation();

@@ -4,6 +4,9 @@
 
 #include "/sys/driver_info.h"
 
+/* A struct with the same name as an sefun. */
+struct sefunF001 {};
+
 mixed* fun(string arg, int num)
 {
     return ({arg, num});
@@ -30,6 +33,11 @@ void run_test()
                 return sefunF000() == 0xf000;
             :)
         }),
+        ({ "Calling sefunF001", 0,
+            (:
+                return sefunF001() == 0xf001;
+            :)
+        }),
         ({ "Calling sefunFFFF", 0,
             (:
                 return sefunFFFF() == 0xffff;
@@ -45,9 +53,34 @@ void run_test()
                 return funcall(#'sefunF000) == 0xf000;
             :)
         }),
+        ({ "Calling #'sefunF001", 0,
+            (:
+                return funcall(#'sefunF001) == 0xf001;
+            :)
+        }),
         ({ "Calling #'sefunFFFF", 0,
             (:
                 return funcall(#'sefunFFFF) == 0xffff;
+            :)
+        }),
+        ({ "Calling symbol_function(\"sefun0000\")", 0,
+            (:
+                return funcall(symbol_function("sefun0000")) == 0;
+            :)
+        }),
+        ({ "Calling symbol_function(\"sefunF000\")", 0,
+            (:
+                return funcall(symbol_function("sefunF000")) == 0xf000;
+            :)
+        }),
+        ({ "Calling symbol_function(\"sefunF001\")", 0,
+            (:
+                return funcall(symbol_function("sefunF001")) == 0xf001;
+            :)
+        }),
+        ({ "Calling symbol_function(\"sefunFFFF\")", 0,
+            (:
+                return funcall(symbol_function("sefunFFFF")) == 0xffff;
             :)
         }),
         ({ "Calling increment()", 0,
@@ -96,6 +129,59 @@ void run_test()
                return find_object("/master").is_old_master();
            :)
         }),
-    }), #'shutdown);
+        ({
+           "Loading master using simul-efun struct", 0,
+           (:
+               object ob = find_object("/master");
+               rename("/master.c", "/master-old.c");
+               copy_file("/master-new-struct.c", "/master.c");
 
+               destruct(ob);
+
+               catch(master());
+               rm("/master.c");
+               rename("/master-old.c", "/master.c");
+
+               return find_object("/master").is_old_master();
+           :)
+        }),
+        ({ "Cleanup of struct definitions after compilation 1", TF_ERROR,
+           (:
+               load_object("/struct1");
+           :)
+        }),
+        ({ "Cleanup of struct definitions after compilation 2", 0,
+           (:
+               load_object("/struct2");
+               return 1;
+           :)
+        }),
+        ({ "Multiple uses of simul-efun struct.", 0,
+           (:
+               foreach (int i: 100)
+               {
+                   object ob = load_object("/struct3");
+                   ob->run_test();
+                   destruct(ob);
+               }
+               return 1;
+           :)
+        }),
+    }) + map(get_dir("/tl-*.c"), function mixed* (string fname)
+    {
+        return ({ sprintf("Testing '%s'", fname[..<3]), 0,
+            (:
+                int res;
+
+                return !catch(res = load_object(fname[..<3])->run_test()) && res;
+            :)
+        });
+    }) + map(get_dir("/tf-*.c"), function mixed* (string fname)
+    {
+        return ({ sprintf("Testing '%s'", fname[..<3]), 0,
+            (:
+                return catch(load_object(fname[..<3])) != 0;
+            :)
+        });
+    }), #'shutdown);
 }
