@@ -1,4 +1,4 @@
-FROM debian:bookworm-20240904-slim
+FROM debian:bookworm-20260112-slim
 ENV LANG C.UTF-8
 RUN apt update
 RUN apt-get install -y --no-install-recommends clang ca-certificates bison
