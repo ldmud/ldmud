@@ -209,7 +209,7 @@ extern char *time_stamp(void);
 extern void die(void);
 extern void bad_request(char *);
 extern void erq_cmd(void);
-extern void sig_child();
+extern void sig_child(int sig);
 extern void remove_child(child_t *);
 extern int read_socket(socket_t *, int);
 extern socket_t *new_socket(int, char);
