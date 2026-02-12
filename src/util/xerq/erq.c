@@ -522,13 +522,8 @@ die(void)
 } /* die() */
 
 /*-------------------------------------------------------------------------*/
-#ifndef _AIX
-void
-sig_child()
-#else
 void
 sig_child(int sig)
-#endif
 
 /* A child process exited - update its child structure.
  */
@@ -537,6 +532,8 @@ sig_child(int sig)
     wait_status_t status;
     pid_t pid;
     struct child_s *chp;
+
+    (void)sig;
 
     pid = wait(&status);
 
