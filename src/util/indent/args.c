@@ -38,7 +38,6 @@ int else_endif_col;
 
 extern char *in_name;
 
-char       *getenv();
 void       scan_profile(FILE *f);
 void       set_option( char *arg, int explicit);
 
