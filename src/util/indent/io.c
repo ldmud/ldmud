@@ -649,10 +649,7 @@ void writefdef(f, nm)
    a pointer to the character after the last character written.
    For troff mode only.  */
 char *
-chfont(of, nf, s)
-    register struct fstate *of,
-               *nf;
-    char       *s;
+chfont(struct fstate *of, struct fstate *nf, char *s)
 {
     if (of->font[0] != nf->font[0]
 	    || of->font[1] != nf->font[1]) {

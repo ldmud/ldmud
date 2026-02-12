@@ -21,8 +21,7 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 /* Like malloc but get error if no storage available.  */
 
 char *
-xmalloc (size)
-     long size;
+xmalloc (long size)
 {
   register char *val = (char *) calloc (1, size);
   if (!val)
@@ -36,9 +35,7 @@ xmalloc (size)
 /* Like realloc but get error if no storage available.  */
 
 char *
-xrealloc (ptr, size)
-     char *ptr;
-     long size;
+xrealloc (void *ptr, long size)
 {
   register char *val = (char *) realloc (ptr, size);
   if (!val)
