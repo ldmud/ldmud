@@ -24,8 +24,8 @@
 #include <stdlib.h>
 /* Do the same thing, but abort with an error if out of memory
    (see globs.c).  */
-char *xmalloc ();
-char *xrealloc ();
+char *xmalloc (long size);
+char *xrealloc (void *ptr, long size);
 
 #ifndef M_UNIX
 #include <strings.h>
@@ -285,7 +285,7 @@ struct fstate {
     char        size;
     int         allcaps:1;
 };
-char       *chfont();
+char       *chfont(struct fstate *of, struct fstate *nf, char *s);
 
 GLOBAL struct fstate
             keywordf,		/* keyword font */
