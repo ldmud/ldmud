@@ -36,6 +36,6 @@ int east()
 
 int west()
 {
-    this_player()->move_player("west#room/south/sforst44");
+    this_player()->move_player("west#room/south/sforst43");
     return 1;
 }
