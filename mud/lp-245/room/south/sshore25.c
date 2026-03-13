@@ -22,7 +22,7 @@ void long()
     write("You are standing on the shore of Crescent Lake, a beautiful and\n" +
 	  "clear lake. Out in the centre of the lake stands the Isle\n" +
 	  "of the Magi.\n" +
-	  "Trails lead into the forest to the south and west.\n" +
+	  "Trails lead into the forest to the north and east.\n" +
 	  "The shore of Crescent Lake continues northwest and southeast\n");
 }
 
