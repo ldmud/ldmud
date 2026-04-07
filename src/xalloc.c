@@ -216,7 +216,7 @@ mem_debug_log (const char * name, p_int size)
       dprintf3(1, " , '%s':%d , obj %s\n"
                 , (p_int)mdb_file, (p_int)mdb_line
                 , (p_int)(mdb_object.type == T_OBJECT   ? ( mdb_object.u.ob->name ? get_txt(mdb_object.u.ob->name) : "<?>")
-                        : mdb_object.type == T_LWOBJECT ? mdb_object.u.lwob->prog->name)
+                        : mdb_object.type == T_LWOBJECT ? ( mdb_object.u.lwob->prog->name)
                         : "<null>")
                 );
 #else
@@ -226,7 +226,7 @@ mem_debug_log (const char * name, p_int size)
                 );
       dprintf1(1, " , obj %s\n"
                 , (p_int)(mdb_object.type == T_OBJECT   ? ( mdb_object.u.ob->name ? get_txt(mdb_object.u.ob->name) : "<?>")
-                        : mdb_object.type == T_LWOBJECT ? mdb_object.u.lwob->prog->name)
+                        : mdb_object.type == T_LWOBJECT ? ( mdb_object.u.lwob->prog->name)
                         : "<null>")
                 );
 #endif /* MALLOC_TRACE */
