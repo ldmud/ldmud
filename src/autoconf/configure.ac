@@ -215,6 +215,7 @@ AC_MY_ARG_ENABLE(filename-spaces,no,,[Allow space characters in filenames])
 AC_MY_ARG_ENABLE(share-variables,no,,[Enable clone initialization from blueprint variable values])
 AC_MY_ARG_ENABLE(keyword-in,no,,[Enable 'in' as a keyword])
 AC_MY_ARG_ENABLE(use-ipv6,no,,[Enables support for IPv6])
+AC_MY_ARG_ENABLE(use-proxy-protocol,no,,[Enables PROXY protocol v1 support for reverse proxies])
 AC_MY_ARG_ENABLE(use-anl,no,,[Enable asynchronous name lookup using C-Ares])
 AC_MY_ARG_ENABLE(use-mccp,no,,[Enables MCCP support])
 AC_MY_ARG_ENABLE(use-mysql,no,,[Enables mySQL support])
@@ -1013,6 +1014,15 @@ else
     fi
     cdef_use_ipv6="#undef"
     enable_use_ipv6=no
+fi
+
+# --- PROXY protocol v1 ---
+
+AC_UPDATE_VAR(enable_use_proxy_protocol)
+if test "x$enable_use_proxy_protocol" = "xyes"; then
+    cdef_use_proxy_protocol="#define"
+else
+    cdef_use_proxy_protocol="#undef"
 fi
 
 # --- Asynchronous Name Lookup ---
@@ -2568,6 +2578,7 @@ AC_SUBST(cdef_filename_spaces)
 AC_SUBST(cdef_share_variables)
 AC_SUBST(cdef_keyword_in)
 AC_SUBST(cdef_use_ipv6)
+AC_SUBST(cdef_use_proxy_protocol)
 AC_SUBST(cdef_use_anl)
 AC_SUBST(cdef_use_mysql)
 AC_SUBST(cdef_use_pgsql)

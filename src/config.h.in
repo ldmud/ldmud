@@ -208,6 +208,13 @@
  */
 @cdef_use_ipv6@ USE_IPV6
 
+/* Define this if you want PROXY protocol v1 support. When enabled, the
+ * driver auto-detects PROXY protocol headers on new connections (as sent
+ * by HAProxy, Traefik, etc.) and uses the real client IP instead of the
+ * proxy's IP. Connections without a PROXY header work normally.
+ */
+@cdef_use_proxy_protocol@ SUPPORT_PROXY_PROTOCOL
+
 /* Define this if you want asynchronous name lookup using libanl
  * instead of using the ERQ.
  */
