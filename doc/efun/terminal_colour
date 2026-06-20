@@ -1,25 +1,26 @@
 SYNOPSIS
-        varargs string terminal_colour(string str, null|mapping|closure map,
-                                       int wrap, int indent)
+        varargs string terminal_colour(string str,
+                                null|mapping|closure map,
+                                [int wrap, int indent,]
+                                [string delimiter, int|string end_delimiter])
 
 DESCRIPTION
         If <map> is given as a non-0 value, this efun expands all
-        colour-defines of the form "%^KEY%^" (see below for details) from the
-        input-string and replaces them by the apropriate values found
-        for the color-key specified by <map>.
+        colour-defines of the form "%^KEY%^" from the input-string and
+        replaces them by the apropriate values found for the color-key
+        specified by <map>.
+        This behaviour can be modified by providing alternative values 
+        for delimiter and code_length (see below).
 
         If <map> is a mapping, the entries queries have the
-        format "KEY" : "value", non-string contents are ignored with one
-        exception: if the mapping contains an entry 0:value, it is used
-        for all otherwise unrecognized keys. The value in this case can be
-        a string, or a closure. If it is a closure, it takes the key as
-        argument and has to return the replacement string.
+        format ([ "KEY" : "value" ]), non-string contents are ignored with
+        one exception: if the mapping contains an entry ([ 0 : value ]), it
+        is used for all otherwise unrecognized keys. The value in this case
+        can be a string, or a closure. If it is a closure, it takes the key
+        as argument and has to return the replacement string.
 
         If <map> is given as a closure, it is called with the KEYs to
         replace, and has to return the replacement string.
-
-        The special keys "%^%^" and "%%^^" are always replaced with the
-        literal "%^".
 
         The parameters wrap and indent are both optional, if only wrap is
         given then the str will be linewrapped at the column given with
@@ -37,11 +38,14 @@ DESCRIPTION
         provided by sprintf("%-=s").
 
 
-        KEY RECOGNITION STRATEGY
+        DEFAULT KEY RECOGNITION STRATEGY
 
-        As mentioned above, the special keys "%^%^" and "%%^^" are always
-        replaced with the literal "%^" and play no role in the following
-        considerations.
+        By default terminal_colour searches for colour-defined enclosed
+        by the key "%^". This behaviour can be changed by providing
+        values for delimiter and code_length (see below).
+
+        The special key "%^%^" is always replaced with the literal "%^"
+        and plays no role in the following considerations.
 
         The input string is supposed to follow this syntax:
 
@@ -66,12 +70,33 @@ DESCRIPTION
                                   , ext, w, i);
           }
 
-EXAMPLES
+
+        MODIFYING THE KEY RECOGNITION STRATEGY
+
+        The matching strategy can be configured by providing alternative
+        values for delimiters and code_length.
+
+        'delimiter' is the delimter to use for matching (default "%^").
+        'end_delimiter' determines how the following characters are to be
+        interpreted. It can either be an integer, denoting a fixed color key
+        length after the delimiter, or a string containing an end-delimiter.
+        The default value is 0, meaning "variable length, enclosed between
+        two equal delimiters" (i.e. the default "<delim><colorkey><delim>"
+        behaviour).
+        Any positive number will treat as many characters after a delimiter as
+        colour-key, requiring _no_ closing delimiter.
+
+        A delimiter followed immediately by an end-delimiter (or a duplicate
+        delimiter if the two are identical, or a fixed colorkey length is
+        used) will again be replaced with a literal copy of the delimiter.
+
+
+
+EXAMPLES (DEFAULT BEHAVIOUR)
         mapping trans;
         string str;
 
         trans = ([ "GREEN" : "ansi-green", "RED" : "", "BLUE" : 1 ]);
-
         str = terminal_colour( "%^GREEN%^ and %^RED%^ and %^BLUE%^", trans );
 
         This will result in str == "ansi-green and  and BLUE"
@@ -103,6 +128,40 @@ EXAMPLES
 
             "this is the first line\n   and this is the indented second one"
 
+
+EXAMPLES (MODIFIED BEHAVIOUR)
+
+    Fixed length:
+        trans = ([ "g" : "ansi-green", "b" : "ansi-blue" ]);
+        str = terminal_colour( "^g and ^r^^ and ^b", trans, "^", 1 );
+
+        This will result in str == "ansi-green and r^ and ansi-blue". Note
+        that "^r" was not translated because there is no key "r" and no 0-key
+        in the map.
+
+    XML-style color codes:
+        str = terminal_colour( "<g> and <r> are <> than <b>", trans, "<", ">" )
+
+        Results in str == "ansi-green and r are < than ansi-blue".
+
+    Decoding ANSI colors with differing delimiters:
+        trans = ([ "31" : "(ansi-red)", "1" : "(ansi-hilite)",
+                "0" : "(ansi-reset)" ]);
+        str = terminal_colour( "\e[31mRed text\e[0m", trans, "\e[", "m" );
+
+        This will result in str == "(ansi-red)Red text(ansi-reset)".
+
+    Decoding compound ANSI-Codes:
+        str = terminal_colour( "\e[31;1mBright-red text\e[0m",
+               (: implode(map(explode($1, ";"),
+                              (: trans[$1] || "" :)
+                             ), "")
+                :),
+                "\e[", "m" );
+
+        Yields str == "(ansi-red)(ansi-hilite)Bright-red text(ansi-reset)".
+
+
 HISTORY
         Efun idea and initial implementation taken from MudOS; the key
         recognition strategy (including pure wrapping mode) was straightened
@@ -111,6 +170,8 @@ HISTORY
         mappings.
         LDMud 3.2.9/3.3.102 officialized the "%%^^" replacement pattern for
         better MudOS compatibility.
+        LDMud 3.7.0 introduced configurable delimiters and dropped support for
+        the "%%^^" replacement pattern (use provided simul-efun if needed).
 
 SEE ALSO
         sprintf(E)

@@ -1914,6 +1914,20 @@ mixed *tests = (this_object() == blueprint()) &&
     ({ "variable_list 5", 0, (: variable_list(this_object(), RETURN_VARIABLE_VALUE)[3] == b"\x00" :) }),
     ({ "variable_list 6", 0, (: deep_eq(variable_list(this_object(), RETURN_FUNCTION_LPCTYPE), ({ [string*],                  [mapping],       [string],          [bytes],          [string],       [mixed],      [object],    [string],         [mixed],          [mixed*],                  [mixed*],                  [int] })) :) }),
 
+    ({ "terminal_colour (default) 1", 0, (: terminal_colour("%^foo%^bar%^baz%^", ([ "foo": "#", 0: "*" ])) == "#bar*" :) }),
+    ({ "terminal_colour (default) 2", 0, (: terminal_colour("%^foo%^%^bar%^baz", ([ "foo": "#", "bar": "*" ])) == "#*baz" :) }),
+    ({ "terminal_colour (default) 3", 0, (: terminal_colour("%^foo%^%^%^bar%^baz%^%^", ([ "foo": "#", "bar": "*" ])) == "#%^barbaz" :) }),
+    ({ "terminal_colour (default) 4", 0, (: terminal_colour("%^foo%^%^%^bar%^baz%^%^", ([ "foo": "#", 0: "*" ])) == "#%^bar*" :) }),
+    ({ "terminal_colour (default) 5", 0, (: terminal_colour("%^foo%^%^%^%^^%^%^%^", ([ "foo": "#", 0: "*" ])) == "#%^*%^" :) }),
+    ({ "terminal_colour (default) buffer resize", 0, (: terminal_colour("%^foo%^bar%^%^"*20, ([ "foo": "#", 0: "*" ])) == "#bar%^"*20 :) }),
+    ({ "terminal_colour (default) no colour", 0, (: terminal_colour("foobar", ([ "foo": "#", 0: "*" ])) == "foobar" :) }),
+    ({ "terminal_colour (fixed length) 1", 0, (: terminal_colour("^Xbar^Y", ([ "X": "#", 0: "*" ]), "^", 1) == "#bar*" :) }),
+    ({ "terminal_colour (fixed length) 2", 0, (: terminal_colour("^Xfoo^Ybar^Z", ([ "X": "#", "Y": "*" ]), "^", 1) == "#foo*barZ" :) }),
+    ({ "terminal_colour (fixed length) 3", 0, (: terminal_colour("^Xfoo^^Zbar^Y^", ([ "X": "#", "Y": "*" ]), "^", 1) == "#foo^Zbar*" :) }),
+    ({ "terminal_colour (fixed length) 4", 0, (: terminal_colour("^Xfoo^^Zbar^Yrestofstring", ([ "Z": "#", 0: "*" ]), "^", 1) == "*foo^Zbar*restofstring" :) }),
+    ({ "terminal_colour (fixed length) 5", 0, (: terminal_colour("^^^Xfoo^Y^^^", ([ "X": "#", 0: "*" ]), "^", 1) == "^#foo*^" :) }),
+    ({ "terminal_colour (fixed length) buffer resize", 0, (: terminal_colour("^X^Yfoo^X^Y"*10, ([ "X": "#", 0: "*" ]), "^", 1) == "#*foo#*"*10 :) }),
+
 #ifdef __JSON__
     ({ "json_parse/_serialize 1", 0,
         (: json_parse(json_serialize(1) ) == 1:) }),
