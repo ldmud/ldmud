@@ -12196,6 +12196,21 @@ again:
          */
         TYPE_TEST1(sp, T_LVALUE);
 
+        /* Fast path for the by far most common case: an unprotected lvalue
+         * pointing straight at an integer that won't overflow (e.g. a loop
+         * counter). Everything else - protected lvalues, char/mapentry
+         * lvalues, floats and the overflow case - is left to the general
+         * handler below.
+         */
+        if (sp->x.lvalue_type == LVALUE_UNPROTECTED
+         && sp->u.lvalue->type == T_NUMBER
+         && sp->u.lvalue->u.number < PINT_MAX)
+        {
+            sp->u.lvalue->u.number++;
+            sp--;
+            break;
+        }
+
         inter_sp = sp;
         add_number_to_lvalue("++", sp, 1, NULL, NULL);
         pop_stack();
@@ -12211,6 +12226,16 @@ again:
          */
 
         TYPE_TEST1(sp, T_LVALUE);
+
+        /* Fast path, see F_INC above. */
+        if (sp->x.lvalue_type == LVALUE_UNPROTECTED
+         && sp->u.lvalue->type == T_NUMBER
+         && sp->u.lvalue->u.number > PINT_MIN)
+        {
+            sp->u.lvalue->u.number--;
+            sp--;
+            break;
+        }
 
         inter_sp = sp;
         add_number_to_lvalue("--", sp, -1, NULL, NULL);
