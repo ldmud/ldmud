@@ -10121,7 +10121,8 @@ again:
         previous_pc[last] = pc-1;
         stack_size[last] = sp - fp - csp->num_local_variables;
         abs_stack_size[last] = sp - VALUE_STACK;
-        assign_current_object(previous_objects + last, "TRACE_CODE");
+        if (!is_current_object(previous_objects[last]))
+            assign_current_object(previous_objects + last, "TRACE_CODE");
         previous_programs[last] = current_prog;
 #   endif  /* ifdef TRACE_CODE */
 
