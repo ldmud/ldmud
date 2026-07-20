@@ -249,7 +249,17 @@ extern Bool destructed_object_ref (svalue_t *svp);
 extern void free_object_svalue(svalue_t *v);
 extern void zero_object_svalue(svalue_t *v);
 extern void free_svalue(svalue_t *v);
-extern void normalize_svalue(svalue_t *svp, bool collapse_lvalues);
+extern void normalize_lvalue(svalue_t *svp, bool collapse_lvalues);
+
+/* Normalize the svalue <svp> (see normalize_lvalue() for the details).
+ * Only lvalues ever need any work, so the overwhelmingly common non-lvalue
+ * case is handled inline here without a function call.
+ */
+static INLINE void normalize_svalue(svalue_t *svp, bool collapse_lvalues)
+{
+    if (svp->type == T_LVALUE)
+        normalize_lvalue(svp, collapse_lvalues);
+}
 extern void assign_svalue_no_free(svalue_t *to, svalue_t *from);
 extern void assign_rvalue_no_free(svalue_t *to, svalue_t *from);
 extern void assign_rvalue_no_free_no_collapse(svalue_t *to, svalue_t *from);
