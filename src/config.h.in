@@ -644,10 +644,13 @@
 
 /* Order malloc large block freelists by address.
  * Supported by: MALLOC_smalloc, MALLOC_slaballoc.
- * TODO: Remove if it doesn't help with the fragmentation, as it uses up
- * TODO:: a small, but measurable amount of time in the allocator.
+ * The ordered insertion walks the list of same-sized free blocks linearly,
+ * which degenerates to O(n) per free on long-running heaps with many free
+ * blocks of one size, and profiles show it can dominate the allocator's
+ * runtime cost. No corresponding reduction of memory fragmentation could
+ * be measured, so it is disabled by default.
  */
-#define MALLOC_ORDER_LARGE_FREELISTS
+#undef MALLOC_ORDER_LARGE_FREELISTS
 
 /* Order slaballoc partial-slab freelists by number of free blocks.
  * Supported by: MALLOC_slaballoc.
