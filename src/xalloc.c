@@ -1437,15 +1437,49 @@ DIAGWARN_POP
 } /* get_stack_direction() */
 
 /*-------------------------------------------------------------------------*/
-void
-assert_stack_gap (void)
+
+static enum stack_gap_condition_e { SGAP_Initial, SGAP_Normal, SGAP_Error, SGAP_Fatal }
+    stack_gap_condition = SGAP_Initial;
+  /* State of the stack gap check in assert_stack_gap_inner().
+   */
+
+char * stack_gap_fast_limit = NULL;
+  /* When non-NULL, any stack address at or above this limit is known
+   * to leave at least HEAP_STACK_GAP bytes between a downward-growing
+   * stack and the heap, and assert_stack_gap() (in xalloc.h) may return
+   * without calling assert_stack_gap_slow(). The allocators reset this
+   * to NULL whenever heap_end changes; update_stack_gap_fast_limit()
+   * recomputes it after every slow-path check.
+   */
+
+/*-------------------------------------------------------------------------*/
+static void
+update_stack_gap_fast_limit (void)
+
+/* Recompute stack_gap_fast_limit from the current heap boundaries and
+ * check state. The fast path is enabled only in the common configuration
+ * (downward-growing stack, gap checking active and in its normal state);
+ * in all other cases every check takes the slow path.
+ */
+
+{
+    if (stack_gap_condition == SGAP_Normal
+     && stack_direction < 0
+     && heap_end != NULL)
+        stack_gap_fast_limit = (char *)heap_end + HEAP_STACK_GAP;
+    else
+        stack_gap_fast_limit = NULL;
+} /* update_stack_gap_fast_limit() */
+
+/*-------------------------------------------------------------------------*/
+static void
+assert_stack_gap_inner (void)
 
 /* Test if the stack is far enough away from the heap area and throw
  * an error if not.
  */
 
 {
-    static enum { Initial, Normal, Error, Fatal } condition = Initial;
     char * stack_start, * stack_end;
     ptrdiff_t gap;
     char local; /* used to yield a stack address */
@@ -1453,19 +1487,19 @@ assert_stack_gap (void)
     /* Don't check the gap after a Fatal error or if the system is
      * not fully initialised yet.
      */
-    if (stack_direction == 0 || condition == Fatal || heap_end == NULL)
+    if (stack_direction == 0 || stack_gap_condition == SGAP_Fatal || heap_end == NULL)
         return;
 
     /* On the first call, test if checking the gap actually makes sense.
-     * If the stack-gap check is not necessary, the 'condition' will be set to
-     * Fatal, otherwise the check will be enabled by setting condition to
-     * 'Normal'.
+     * If the stack-gap check is not necessary, the condition will be set to
+     * SGAP_Fatal, otherwise the check will be enabled by setting condition to
+     * SGAP_Normal.
      */
-    if (condition == Initial)
+    if (stack_gap_condition == SGAP_Initial)
     {
         /* Currently there are no limitations on checking the heap/stack gap.
          */
-        condition = Normal;
+        stack_gap_condition = SGAP_Normal;
     }
 
     /* Determine the stack limits */
@@ -1486,9 +1520,10 @@ assert_stack_gap (void)
      || (stack_end > (char *)heap_start && stack_start < (char *)heap_start)
        )
     {
-        if (condition != Fatal)
+        if (stack_gap_condition != SGAP_Fatal)
         {
-            condition = Fatal;
+            stack_gap_condition = SGAP_Fatal;
+            stack_gap_fast_limit = NULL;
             fatal("Out of memory: Stack (%p..%p) overlaps heap (%p..%p).\n"
                  , stack_start, stack_end, heap_start, heap_end);
             /* NOTREACHED */
@@ -1504,7 +1539,7 @@ assert_stack_gap (void)
        )
     {
         /* No worries about the gap */
-        condition = Normal;
+        stack_gap_condition = SGAP_Normal;
         return;
     }
 
@@ -1523,7 +1558,7 @@ assert_stack_gap (void)
     /* If the gap is big enough, mark that condition and return */
     if (gap >= HEAP_STACK_GAP)
     {
-        condition = Normal;
+        stack_gap_condition = SGAP_Normal;
         return;
     }
 
@@ -1531,14 +1566,28 @@ assert_stack_gap (void)
      * Throw an error only if the condition was normal before,
      * otherwise the error handling would again get an error.
      */
-    if (condition == Normal)
+    if (stack_gap_condition == SGAP_Normal)
     {
-        condition = Error;
+        stack_gap_condition = SGAP_Error;
+        stack_gap_fast_limit = NULL;
         errorf("Out of memory: Gap between stack and heap: %ld.\n"
              , (long)gap);
         /* NOTREACHED */
     }
-} /* assert_stack_gap() */
+} /* assert_stack_gap_inner() */
+
+/*-------------------------------------------------------------------------*/
+void
+assert_stack_gap_slow (void)
+
+/* Slow path of assert_stack_gap() (see xalloc.h): do the full check
+ * and re-enable the fast path if the current state allows it.
+ */
+
+{
+    assert_stack_gap_inner();
+    update_stack_gap_fast_limit();
+} /* assert_stack_gap_slow() */
 
 /*-------------------------------------------------------------------------*/
 void

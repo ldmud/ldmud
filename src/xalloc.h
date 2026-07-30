@@ -207,7 +207,33 @@ extern void dump_lpc_trace (int d, void *p) __attribute__((nonnull(2)));
 extern void dump_malloc_trace (int d, void *adr) __attribute__((nonnull(2)));
 
 extern void get_stack_direction (void);
-extern void assert_stack_gap(void);
+
+extern char * stack_gap_fast_limit;
+extern void assert_stack_gap_slow(void);
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+assert_stack_gap (void)
+
+/* Test if the stack is far enough away from the heap area and throw
+ * an error if not.
+ *
+ * Fast path: on the (typical) platform with a downward-growing stack,
+ * a stack address at or above stack_gap_fast_limit is known to be at
+ * least HEAP_STACK_GAP bytes away from the heap, so the full check can
+ * be skipped. The limit is maintained by xalloc.c and reset whenever
+ * the heap grows or the check state changes.
+ */
+
+{
+    char local; /* used to yield a stack address */
+
+    if (stack_gap_fast_limit != NULL && &local >= stack_gap_fast_limit)
+        return;
+
+    assert_stack_gap_slow();
+} /* assert_stack_gap() */
+
 extern void reserve_memory (void);
 extern void reallocate_reserved_areas(void);
 extern void check_for_soft_malloc_limit(void);

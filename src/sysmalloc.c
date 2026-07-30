@@ -44,7 +44,14 @@ mem_alloc (size_t size)
     if (heap_start == NULL || (char *)rc < heap_start)
         heap_start = rc;
     if (heap_end == NULL || (char *)rc + size > heap_end)
+    {
         heap_end = rc + size;
+
+        /* heap_end changed - take the next stack gap check through
+         * the slow path so it recomputes the fast-path limit.
+         */
+        stack_gap_fast_limit = NULL;
+    }
 
     assert_stack_gap();
 
