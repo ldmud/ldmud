@@ -1377,6 +1377,21 @@ mixed *tests = (this_object() == blueprint()) &&
             return prepos[0] == "at" && deep_eq(items, ({ 1, this_object() }));
         :)
     }),
+    ({ "parse_command with an empty command", 0,
+       (:
+            mixed *items;
+            return !parse_command("", ({ this_object() }), " 'take' %i ", items);
+        :)
+    }),
+    ({ "parse_command with an empty pattern", 0,
+       (:
+            mixed *items;
+            return !parse_command("take apple", ({ this_object() }), "", items);
+        :)
+    }),
+    ({ "parse_command with an empty command and no lvalues", 0,
+       (: !parse_command("", ({ this_object() }), " 'take' ") :)
+    }),
 #endif
 
     ({ "regmatch 1", 0, (: regmatch("abcd", "abc") == "abc" :) }),
