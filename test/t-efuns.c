@@ -1330,6 +1330,41 @@ mixed *tests = (this_object() == blueprint()) &&
       :)
     }),
 
+    ({ "lambda with deep nesting", 0,
+      (:
+          mixed val = 1;
+          foreach(int i: 990)
+              val = ({ #'+, val, 1 });
+          return funcall(lambda(0, val)) == 991;
+      :)
+    }),
+    ({ "lambda with too deep nesting", TF_ERROR,
+      (:
+          mixed val = 1;
+          foreach(int i: 2000)
+              val = ({ #'+, val, 1 });
+          lambda(0, val);
+          return 0;
+      :)
+    }),
+    ({ "lambda with deep lvalue nesting", 0,
+      (:
+          mixed lv = 'a;
+          foreach(int i: 500)
+              lv = ({ #'[, lv, 0 });
+          return closurep(lambda(({'a}), ({ #'=, lv, 1 })));
+      :)
+    }),
+    ({ "lambda with too deep lvalue nesting", TF_ERROR,
+      (:
+          mixed lv = 'a;
+          foreach(int i: 2000)
+              lv = ({ #'[, lv, 0 });
+          lambda(({'a}), ({ #'=, lv, 1 }));
+          return 0;
+      :)
+    }),
+
     ({ "limited with operator closure", TF_ERROR, (: limited(#'switch) :) }),
     ({ "limited with unbound_lambda",   TF_ERROR, (: limited(unbound_lambda(0,0)) :) }),
     ({ "limited with identifier closure", 0,      (: global_var = "X"; return limited(#'global_var) == "X"; :) }),
