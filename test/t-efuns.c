@@ -1944,8 +1944,66 @@ mixed *tests = (this_object() == blueprint()) &&
     ({ "json_parse 3", 0,
         (: deep_eq(json_parse(json_teststring), json_testdata) :) }),
     ({ "json_serialize + json_parse 1", 0,
-        (: deep_eq(json_parse(json_serialize(json_testdata)), json_testdata) 
+        (: deep_eq(json_parse(json_serialize(json_testdata)), json_testdata)
          :) }),
+    /* The cycles below are broken again before returning: a value that
+     * contains itself keeps itself alive, and the garbage collection check
+     * at the end of the test run would report it as a lost block.
+     */
+    ({ "json_serialize of a self-containing array", 0,
+        (:
+            mixed *a = ({ 0 });
+            int errors;
+            a[0] = a;
+            errors = catch(json_serialize(a); nolog) != 0;
+            a[0] = 0;
+            return errors;
+        :) }),
+    ({ "json_serialize of a self-containing mapping", 0,
+        (:
+            mapping m = ([ "self": 0 ]);
+            int errors;
+            m["self"] = m;
+            errors = catch(json_serialize(m); nolog) != 0;
+            m["self"] = 0;
+            return errors;
+        :) }),
+    ({ "json_serialize of an indirect cycle", 0,
+        (:
+            mixed *a = ({ 0 });
+            mapping m = ([ "a": a ]);
+            int errors;
+            a[0] = m;
+            errors = catch(json_serialize(a); nolog) != 0;
+            a[0] = 0;
+            return errors;
+        :) }),
+    ({ "json_serialize of a too deeply nested array", TF_ERROR,
+        (:
+            mixed a = ({ 1 });
+            for (int i = 0; i < 2000; i++)
+                a = ({ a });
+            return json_serialize(a);
+        :) }),
+    ({ "json_serialize of a repeated (acyclic) array", 0,
+        (:
+            mixed *inner = ({ 1, 2 });
+            return json_serialize(({ inner, inner, inner }))
+                   == "[ [ 1, 2 ], [ 1, 2 ], [ 1, 2 ] ]";
+        :) }),
+    ({ "json_serialize of a repeated (acyclic) mapping", 0,
+        (:
+            mapping m = ([ "x": 1 ]);
+            return json_serialize(({ m, m })) == "[ { \"x\": 1 }, { \"x\": 1 } ]";
+        :) }),
+    ({ "json_serialize is usable after a cycle error", 0,
+        (:
+            mixed *a = ({ 0 });
+            a[0] = a;
+            catch(json_serialize(a); nolog);
+            a[0] = 0;
+            return deep_eq(json_parse(json_serialize(json_testdata)), json_testdata);
+        :) }),
 #endif // __JSON__
 
 #ifdef __MYSQL__
