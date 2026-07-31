@@ -86,7 +86,7 @@ nosave mixed *tests = ({
     ({ "bitwise left shift assignment (int, >MAX_SHIFT)", 0,
        (: int i = 1;
           i<<=10000;
-          return i == -__INT_MAX__-1; :)
+          return i == 0; :)
     }),
     ({ "bitwise left shift assignment (char)", 0,
        (: string s = "0"; // 48
@@ -123,6 +123,35 @@ nosave mixed *tests = ({
        (: string s = "0"; // 48
           s[0] >>= 10000;
           return s[0] == 0; :)
+    }),
+    ({ "bitwise right shift assignment (negative int, >MAX_SHIFT)", 0,
+       (: int i = -8;
+          i>>=10000;
+          return i == -1; :)
+    }),
+    /* The assigning shift operators must agree with their plain
+     * counterparts for every combination of value and shift width.
+     */
+    ({ "shift assignment matches plain shift", 0,
+       (: foreach (int x : ({ 1, -1, -8, 255, __INT_MAX__, __INT_MIN__ }))
+            foreach (int n : ({ 0, 1, 31, 63, 64, 65, 10000, __INT_MAX__ }))
+            {
+                int i;
+                i = x; i <<= n;  if (i != (x << n))  return 0;
+                i = x; i >>= n;  if (i != (x >> n))  return 0;
+                i = x; i >>>= n; if (i != (x >>> n)) return 0;
+            }
+          return 1; :)
+    }),
+    ({ "shift assignment on a mapping entry", 0,
+       (: mapping m = ([ "v": -8 ]);
+          m["v"] >>= 10000;
+          return m["v"] == -1; :)
+    }),
+    ({ "shift assignment on an array element", 0,
+       (: int *a = ({ -8 });
+          a[0] >>= 10000;
+          return a[0] == -1; :)
     }),
     ({ "logical right shift (positive)", 0,
        (: return (2147483647 >>> 20) == 2047; :)
