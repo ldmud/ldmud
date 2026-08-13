@@ -244,13 +244,62 @@ struct xdirect
     int   mode;
 };
 
-#define XOPENDIR(dest, path) (\
-    (!chdir(path) &&\
-    NULL != ((dest) = opendir("."))) ||\
-        (chdir(mud_lib),MY_FALSE)\
-)
+/*-------------------------------------------------------------------------*/
+static void
+restore_mudlib_directory (void)
 
-#define xclosedir(dir_ptr)   (chdir(mud_lib),closedir(dir_ptr))
+/* Restore the process working directory after directory operations.
+ */
+
+{
+    if (chdir(mud_lib) < 0)
+        fatal("Could not restore mudlib directory '%s': %s.\n",
+              mud_lib, strerror(errno));
+} /* restore_mudlib_directory() */
+
+/*-------------------------------------------------------------------------*/
+static Bool
+xopendir (DIR **dest, const char *path)
+
+/* Change into <path> and open it. On failure, restore the mudlib working
+ * directory and preserve the original error.
+ */
+
+{
+    int errorno;
+
+    if (chdir(path) < 0)
+    {
+        errorno = errno;
+    }
+    else
+    {
+        *dest = opendir(".");
+        if (*dest != NULL)
+            return MY_TRUE;
+        errorno = errno;
+    }
+
+    restore_mudlib_directory();
+    errno = errorno;
+    return MY_FALSE;
+} /* xopendir() */
+
+/*-------------------------------------------------------------------------*/
+static void
+xclosedir (DIR *dir_ptr)
+
+/* Restore the mudlib working directory and close <dir_ptr>.
+ */
+
+{
+    restore_mudlib_directory();
+    if (closedir(dir_ptr) < 0)
+        debug_message("%s Could not close directory: %s.\n",
+                      time_stamp(), strerror(errno));
+} /* xclosedir() */
+
+#define XOPENDIR(dest, path) xopendir(&(dest), path)
 #define xrewinddir(dir_ptr)  rewinddir(dir_ptr)
 #define XDIR DIR
 
@@ -2030,8 +2079,19 @@ v_write_file (svalue_t *sp, int num_arg)
                     atend = true;
                 }
 
-                if (outbufptr != outbuf)
-                    fwrite(outbuf, outbufptr - outbuf, 1, f);
+                if (outbufptr != outbuf
+                 && fwrite(outbuf, outbufptr - outbuf, 1, f) != 1)
+                {
+                    int err = errno;
+
+                    mb_free(mbFile);
+                    fclose(f);
+                    if (err)
+                        errorf("Could not write file: (%d) %s.\n",
+                               err, strerror(err));
+                    else
+                        errorf("Could not write complete file contents.\n");
+                }
 
                 if (res == (size_t)-1)
                 {

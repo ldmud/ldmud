@@ -868,6 +868,34 @@ set_socket_nonblocking (SOCKET_T new_socket)
 
 /*-------------------------------------------------------------------------*/
 static void
+write_socket_best_effort (SOCKET_T socket, const char *message, size_t length)
+
+/* Write as much of <message> as the nonblocking <socket> currently accepts.
+ * Retry interrupted writes and stop on any other error.
+ */
+
+{
+    int retries = 6;
+
+    while (length > 0)
+    {
+        ssize_t written = (ssize_t)socket_write(socket, message, length);
+
+        if (written > 0)
+        {
+            message += written;
+            length -= written;
+            retries = 6;
+        }
+        else if (written < 0 && errno == EINTR && --retries > 0)
+            continue;
+        else
+            break;
+    }
+} /* write_socket_best_effort() */
+
+/*-------------------------------------------------------------------------*/
+static void
 set_close_on_exec (SOCKET_T new_socket)
 
 /* Set that <new_socket> is closed when the driver performs an exec()
@@ -1291,7 +1319,7 @@ urgent_data_handler (int signo)
 
 {
     if (d_flag)
-        write(2, "received urgent data\n", 21);
+        write_bytes(2, "received urgent data\n", 21);
     urgent_data = MY_TRUE;
     urgent_data_time = current_time;
 }
@@ -2865,10 +2893,10 @@ get_message (char *buff, size_t *bufflength)
                     char buf[MAX_TEXT];
 #ifdef USE_TLS
                     if (ip->tls_status != TLS_INACTIVE)
-                        tls_read(ip, buf, MAX_TEXT);
+                        l = tls_read(ip, buf, MAX_TEXT);
                     else
 #endif
-                        socket_read(ip->socket, buf, MAX_TEXT);
+                        l = socket_read(ip->socket, buf, MAX_TEXT);
 
                     continue;
                 }
@@ -3304,7 +3332,8 @@ remove_interactive (object_t *ob, Bool force)
 
         erq_demon = interactive->socket;
         erq_proto_demon = -1;
-        socket_write(erq_demon, erq_welcome, sizeof erq_welcome);
+        write_socket_best_effort(erq_demon, (char *)erq_welcome,
+                                 sizeof erq_welcome);
     }
     else
 #endif
@@ -3581,8 +3610,8 @@ new_player ( object_t *ob, SOCKET_T new_socket
 
     if (message)
     {
-        socket_write(new_socket, message, strlen(message));
-        socket_write(new_socket, "\r\n", 2);
+        write_socket_best_effort(new_socket, message, strlen(message));
+        write_socket_best_effort(new_socket, "\r\n", 2);
         socket_close(new_socket);
         return;
     }
@@ -3601,12 +3630,12 @@ new_player ( object_t *ob, SOCKET_T new_socket
             string_t *msg;
 
             msg = driver_hook[H_NO_IPC_SLOT].u.str;
-            socket_write(new_socket, get_txt(msg), mstrsize(msg));
+            write_socket_best_effort(new_socket, get_txt(msg), mstrsize(msg));
         }
         else
         {
             message = "The mud is full. Come back later.\r\n";
-            socket_write(new_socket, message, strlen(message));
+            write_socket_best_effort(new_socket, message, strlen(message));
         }
         socket_close(new_socket);
         debug_message("%s Out of IPC slots for new connection.\n"
@@ -3619,7 +3648,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
     if (O_IS_INTERACTIVE(master_ob))
     {
         message = "Cannot accept connections. Come back later.\r\n";
-        socket_write(new_socket, message, strlen(message));
+        write_socket_best_effort(new_socket, message, strlen(message));
         socket_close(new_socket);
         debug_message("%s Master still busy with previous new connection.\n"
                      , time_stamp());
@@ -3632,7 +3661,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
     if (!new_interactive)
     {
         message = "Cannot accept connection (out of memory). Come back later.\r\n";
-        socket_write(new_socket, message, strlen(message));
+        write_socket_best_effort(new_socket, message, strlen(message));
         socket_close(new_socket);
         debug_message("%s Out of memory (%zu bytes) for new connection.\n"
                      , time_stamp(), sizeof(interactive_t));
@@ -3721,7 +3750,7 @@ new_player ( object_t *ob, SOCKET_T new_socket
             debug_message("%s Error setting up initial encoding: %s.\n", time_stamp(), strerror(errno));
 
         message = "Error setting up encoding.\r\n";
-        socket_write(new_socket, message, strlen(message));
+        write_socket_best_effort(new_socket, message, strlen(message));
         socket_close(new_socket);
 
         O_GET_INTERACTIVE(master_ob) = NULL;
@@ -5752,6 +5781,7 @@ start_erq_demon (const char *suffix, size_t suffixlen)
     int sockets[2];
     int pid, i;
     char c = 0;
+    ssize_t received;
 
     /* Create the freelist in pending_erq[] */
     pending_erq[0].fun.type = T_INVALID;
@@ -5787,8 +5817,12 @@ start_erq_demon (const char *suffix, size_t suffixlen)
     if ((pid = fork()) == 0)
     {
         /* Child */
-        dup2(sockets[0], 0);
-        dup2(sockets[0], 1);
+        if (dup2(sockets[0], 0) < 0 || dup2(sockets[0], 1) < 0)
+        {
+            write_bytes(sockets[0], "0", 1);
+            _exit(1);
+        }
+
         close(sockets[0]);
         close(sockets[1]);
 
@@ -5800,7 +5834,7 @@ start_erq_demon (const char *suffix, size_t suffixlen)
             else
                 execl((char *)path, "erq", "--forked", (char*)0);
         }
-        write(1, "0", 1);  /* indicate failure back to the driver */
+        write_bytes(1, "0", 1);  /* indicate failure back to the driver */
         _exit(1);
     }
 
@@ -5827,8 +5861,11 @@ start_erq_demon (const char *suffix, size_t suffixlen)
     /* Read the first character from the ERQ. If it's '0', the ERQ
      * didn't start.
      */
-    read(sockets[1], &c, 1);
-    if (c == '0') {
+    do
+        received = read(sockets[1], &c, 1);
+    while (received < 0 && errno == EINTR);
+
+    if (received != 1 || c == '0') {
         close(sockets[1]);
 
         printf("%s Failed to start erq.\n", time_stamp());
