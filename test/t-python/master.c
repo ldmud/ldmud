@@ -504,7 +504,7 @@ void run_test()
                 ([2:2,3:3,5:5,tmp_ob:({2,3,5})]),
                 quote("abc"+"gc"),
                 quote(({11, 13, 17})),
-                "/testob"->testcoroutine(),
+                clone_object("/testob").testcoroutine(),
             ));
 
             python_remember_testob(load_object("/testrp"));
@@ -558,7 +558,7 @@ void run_test()
 
                 if(!hook_info[2])
                 {
-                    msg("Python heartbeat coroutine switch test failed!\n");
+                    msg("Python heartbeat test suite failed!\n");
                     shutdown(1);
                     return;
                 }
