@@ -25,7 +25,8 @@ DESCRIPTION
 
         If a function by the same name is inherited from multiple sources,
         and not explicitly overloaded, the first inherit will become the
-        'dominant' version.
+        'dominant' version. Additionally 'nomask' functions will take
+        precedence.
 
         Be aware that the topmost/dominant function replaces *all* other
         functions of the same name in the *whole* object, including all of
