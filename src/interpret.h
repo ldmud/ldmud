@@ -208,6 +208,7 @@ extern struct control_stack *csp;
 extern svalue_t * inter_fp;
 extern svalue_t * inter_sp;
 extern svalue_t * inter_context;
+extern svalue_t * break_sp;
 extern int function_index_offset;
 extern int variable_index_offset;
 extern svalue_t *current_variables;

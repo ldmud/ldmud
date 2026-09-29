@@ -473,7 +473,7 @@ svalue_t *inter_context;
    * May be NULL if no context is available.
    */
 
-static svalue_t *break_sp;
+svalue_t *break_sp;
   /* Points to address to branch to at next F_BREAK from within a switch().
    * This is actually a stack of addresses with break_sp pointing to the
    * bottom with the most recent entry. This break stack is stored on

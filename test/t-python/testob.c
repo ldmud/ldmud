@@ -28,6 +28,17 @@ async string* testcoroutine(varargs string* args)
     return args + ({ yield(sizeof(args)), local });
 }
 
+async int test_switch_coroutine()
+{
+    mixed value = yield(0);
+
+    switch (value)
+    {
+        case 1:  return 42;
+        default: return 0;
+    }
+}
+
 mixed callback(closure fun)
 {
     return funcall(fun);

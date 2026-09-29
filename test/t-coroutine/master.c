@@ -221,6 +221,101 @@ void run_test()
                 return 1;
             },
         }),
+        ({ "switch after yield", 0,
+            function int()
+            {
+                coroutine cr = async function int()
+                {
+                    int result;
+
+                    while (1)
+                    {
+                        mixed v = yield(result);
+                        switch (v)
+                        {
+                            case 1: result += 10; break;
+                            case 2: result += 20; break;
+                            default: return result;
+                        }
+                    }
+                };
+                /* If break_sp is not restored, the resumed coroutine writes
+                 * its break address into this frame's last local.
+                 */
+                int sentinel = 42;
+
+                if (call_coroutine(cr) != 0)
+                    return 0;
+                if (call_coroutine(cr, 1) != 10)
+                    return 0;
+                if (call_coroutine(cr, 2) != 30)
+                    return 0;
+                if (call_coroutine(cr, 3) != 30)
+                    return 0;
+                return sentinel == 42 && !cr;
+            },
+        }),
+        ({ "yield within switch", 0,
+            function int()
+            {
+                coroutine cr = async function int()
+                {
+                    int result;
+
+                    for (int i = 1; i <= 3; i++)
+                    {
+                        switch (i)
+                        {
+                            case 1:  result += yield(1); break;
+                            case 2:  result += yield(2); break;
+                            default: result += yield(i); break;
+                        }
+                    }
+                    return result;
+                };
+
+                if (call_coroutine(cr) != 1)
+                    return 0;
+                if (call_coroutine(cr, 100) != 2)
+                    return 0;
+                if (call_coroutine(cr, 200) != 3)
+                    return 0;
+                if (call_coroutine(cr, 300) != 600)
+                    return 0;
+                return !cr;
+            },
+        }),
+        ({ "continue within switch after yield", 0,
+            function int()
+            {
+                coroutine cr = async function int()
+                {
+                    int result;
+
+                    for (int i = 0; i < 4; i++)
+                    {
+                        switch (yield(i))
+                        {
+                            case 0:  continue;
+                            default: result += i;
+                        }
+                    }
+                    return result;
+                };
+
+                if (call_coroutine(cr) != 0)
+                    return 0;
+                if (call_coroutine(cr, 0) != 1)
+                    return 0;
+                if (call_coroutine(cr, 1) != 2)
+                    return 0;
+                if (call_coroutine(cr, 0) != 3)
+                    return 0;
+                if (call_coroutine(cr, 1) != 4)
+                    return 0;
+                return !cr;
+            },
+        }),
         ({ "driver_info(DI_NUM_COROUTINES) after some tests", 0,
             function int()
             {

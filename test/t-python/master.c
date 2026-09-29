@@ -504,7 +504,7 @@ void run_test()
                 ([2:2,3:3,5:5,tmp_ob:({2,3,5})]),
                 quote("abc"+"gc"),
                 quote(({11, 13, 17})),
-                "/testob"->testcoroutine(),
+                clone_object("/testob").testcoroutine(),
             ));
 
             python_remember_testob(load_object("/testrp"));
@@ -520,6 +520,7 @@ void run_test()
             start_gc(function void(int result)
             {
                 mixed val = python_get();
+                mixed* hook_info = python_get_hook_info();
 
                 if (result)
                 {
@@ -548,9 +549,16 @@ void run_test()
 
                 python_set(0);
 
-                if(python_get_hook_info()[0] == 0)
+                if(hook_info[0] == 0)
                 {
                     msg("Heartbeat hook didn't count any heartbeats!\n");
+                    shutdown(1);
+                    return;
+                }
+
+                if(!hook_info[2])
+                {
+                    msg("Python heartbeat test suite failed!\n");
                     shutdown(1);
                     return;
                 }

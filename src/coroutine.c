@@ -176,6 +176,7 @@ create_coroutine (svalue_t *closure)
     result->pc = inter_pc + 1 + 2*result->num_variable_names;
     result->function_index_offset = function_index_offset;
     result->variable_index_offset = variable_index_offset;
+    result->num_break_addrs = 0;
     reference_prog(result->prog, "create_coroutine");
 
     result->state = CS_SLEEPING;
@@ -224,6 +225,13 @@ suspend_coroutine (coroutine_t *cr, svalue_t *fp)
     /* Now save the pc and the stack. */
     num_values = inter_sp - fp + 1 - cr->num_variables;
     assert(num_values >= 0);
+
+    /* The compiler includes the maximum break stack depth in
+     * num_variables. Its entries are saved with the locals, and only the
+     * current depth needs to be recorded to restore break_sp later.
+     */
+    cr->num_break_addrs = (fp + cr->num_variables) - break_sp;
+    assert(cr->num_break_addrs >= 0 && cr->num_break_addrs <= cr->num_variables);
 
     if (num_values > CR_RESERVED_EXTRA_VALUES)
     {
@@ -379,6 +387,10 @@ resume_coroutine (coroutine_t *cr)
 
     for (int i = 0; i < cr->num_variables; i++)
         transfer_svalue_no_free(++inter_sp, cr->variables + i);
+
+    /* Rebase the saved break stack depth onto the restored frame. */
+    break_sp = inter_sp + 1 - cr->num_break_addrs;
+
     for (int i = 0; i < cr->num_values; i++)
     {
         transfer_svalue_no_free(++inter_sp, extra + i);
