@@ -10,10 +10,10 @@ DESCRIPTION
         with the typical line "#x:y" as it is created by the save_object()
         efun.
 
-        When restoring from a file, the name may end in ".c" which is stripped
-        off by the parser. The master object will probably append a .o to the
-        <name>. The validity of the filename is checked with a call to
-        check_valid_path().
+        When restoring from a file, read access will be checked by calling
+        valid_read() in the master object. The filename may be changed there.
+        Before the actual read, a suffix ".c" will be stripped from the name
+        if present. Furthermore the suffix ".o" is added.
 
         Return 1 on success, 0 if there was nothing to restore.
 

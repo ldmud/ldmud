@@ -6,19 +6,29 @@ BESCHREIBUNG
         Codiert die speicherbaren Variablen des aktuellen Objekts in einen
         String.
 
-        In der ersten Form wir der String in die Datei <name> geschrieben. Eine
-        Endung ".c" in <name> wird entfernt, dafuer kann eine Endung ".o"
-        durch das Masterobjekt angefuegt werden, waehrend der Ueberpruefung
-        durch valid_read(). Die Efun save_object() liefert 0, wenn die
-        Speicherdatei erfolgreich erstellt wurde, sonst eine Zahl ungleich 0,
-        wenn ein nicht schwerwiegendee Fehler aufgetreten ist (die Datei
-        konnte nicht geschrieben werden oder das aktuelle Objekt wurde
-        inzwischen zerstoert).
+        In der ersten Form wir der String in die Datei <name> geschrieben.
+        Der Schreibzugriff wird ueber einen Aufruf von valid_write() im
+        Masterobjekt ueberprueft. Dort kann der Dateiname noch veraendert
+        werden. Vor dem Schreiben wird eine eventuell noch vorhandene Endung
+        ".c" im Dateinamenn entfernt. Weiters wird die feste Endung ".o"
+        angefuegt.
+
+        Das Schreiben der Datei geschieht 'atomar', d.h. die Datei wird zuerst
+        als "<name>.o.tmp" geschrieben und erst nach dem Abschluss des
+        Schreibvorgangs auf "<name>.o" umbenannt. Sollte die Datei
+        "<name>.o.tmp" bereits exitieren wird sie dabei überschrieben!
+
+        Die Efun save_object() liefert 0, wenn die Speicherdatei erfolgreich
+        erstellt wurde, sonst eine Zahl ungleich 0, wenn ein nicht
+        schwerwiegender Fehler aufgetreten ist (die Datei konnte nicht
+        geschrieben werden oder das aktuelle Objekt wurde inzwischen
+        zerstoert).
 
         In der zweiten Form wird der String direkt zurueck gegeben. Wenn das
-        Objekt zerstoert wurde, wird 0 zurueck gegeben. In beiden Faellen kann
-        durch das optionale Argument <format> das Format der Speicherdatei
-        angegeben werden:
+        Objekt zerstoert wurde, wird 0 zurueck gegeben.
+
+        In beiden Faellen kann durch das optionale Argument <format> das
+        Format der Speicherdatei angegeben werden:
 
             -1: das normale Format des Treibers (Standard)
              0: das Originalformat nach Amylaar's LPMud und LDMud <=3.2.8
@@ -27,8 +37,8 @@ BESCHREIBUNG
              2: LDMUd >= 3.5.0: Gleitkommazahlen werden in einem neuen Format
                 geschrieben, welches kompakter ist die Gleitkommazahlen aus
                 3.5.x verlustfrei speichern kann.
-	     3: LDMud >= 3.5.0: kann zusaetzlich lvalue-Referenzen speichern
-	        (ohne werden stattdessen einfache rvalues gespeichert)
+             3: LDMud >= 3.5.0: kann zusaetzlich lvalue-Referenzen speichern
+                (ohne werden stattdessen einfache rvalues gespeichert)
 
         Es wird empfohlen, die Angabe des Formats wegzulassen oder in Version
         2 (oder hoeher) zu speichern.

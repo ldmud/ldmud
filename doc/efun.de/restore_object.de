@@ -10,11 +10,11 @@ BESCHREIBUNG
         mit der typischen Zeile "#x:y" beginnen. Strings, die von der Efun
         save_object() erzeugt wurden, beginnen so.
 
-        Wenn Variablen aus einer Datei geladen werden, kann <name> mit .c
-        enden. Diese Dateiendung wird vom Treiber entfernt. Das Masterobjekt
-        fuegt vermutlich dem Dateinamen ein .o hinzu. Die Gueltigkeit des
-        Dateinamens wird mit der Funktion check_valid_path() automatisch
-        ueberprueft.
+        Wenn Variablen aus einer Datei geladen werden wird der Lesezugriff
+        ueber einen Aufruf der valid_read() im Masterobjekt ueberprueft. Dort
+        kann der Dateiname noch veraendert werden. Vor dem Lesen wird eine
+        eventuell noch vorhandene Endung ".c" im Dateinamen entfernt. Weiters
+        wird die feste Endung ".o" angefuegt.
 
         Die Funktion gibt 1 zurueck, wenn die Variablen erfolgreich geladen
         wurden und 0, wenn es nichts zu laden gab.
@@ -22,7 +22,7 @@ BESCHREIBUNG
         Variablen mit dem Typenvermerk nosave werden nicht geladen, zum
         Beispiel nosave int xxx;
 
-        Clousers aus Lfuns, Variablne und simul_efuns werden nur geladen,
+        Closures aus Lfuns, Variablen und simul_efuns werden nur geladen,
         wenn sie gefunden werden. Falls nicht, werden sie mit dem Wert '0'
         geladen.
 
@@ -43,7 +43,7 @@ GESCHICHTE
             indem ein neues Format fuer das Savefile verwendet wird.
         LDMud 3.5.0 unterstuetzt das Einlesen von Formatversion 2 mit hoeherer
             Praezision der Gleitkommazahlen und Formatversion 3 um
-	    lvalue-Referenzen einzulesen.
+            lvalue-Referenzen einzulesen.
 
 SIEHE AUCH
         save_object(E), restore_value(E), valid_read(M)

@@ -5,12 +5,21 @@ SYNOPSIS
 DESCRIPTION
         Encode the saveable variables of the current object into a string.
 
-        In the first form, the string is written to the file <name>.
-        A suffix ".c" will be stripped from the name, the suffix ".o"
-        may be added by the master object during the check in
-        valid_read(). Result is 0 if the save file could be created,
-        and non-zero on a non-fatal error (file could not be written,
-        or current object is destructed).
+        In the first form, the string is written to the file <name>. The write
+        access will be checked by calling valid_write() in the master object.
+        The filename may be changed there. Before the actual write, a suffix
+        ".c" will be stripped from the name if present. Furthermore the suffix
+        ".o" is added.
+
+        The write will be performed in an 'atomic' way, i.e. the file will
+        be written as "<name>.o.tmp" first, and only if that succeeds it will
+        be ranamed to "<name>.o". If "<name>.o.tmp" happens to exist, it is
+        overwritten!
+
+        The efun save_object() returns 0 if the save file could be written
+        successfuly, otherwise it returns a non-zero value if a non-fatal
+        error occured (the file could not be written or the current object
+        was destructed).
 
         In the second form the string is returned directly. If the
         object is destructed, the result is 0.
@@ -24,8 +33,8 @@ DESCRIPTION
                  can be saved.
             2: LDMud >= 3.5.0: floats are stored in a different way, which is
                  more compact and can store the new float losslessly.
-	    3: LDMud >= 3.5.0: can also save lvalues references (without it,
-	         the plain rvalue will be saved).
+            3: LDMud >= 3.5.0: can also save lvalues references (without it,
+                 the plain rvalue will be saved).
 
         It is recommended to use version 3 or higher.
 
