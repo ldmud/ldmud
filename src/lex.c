@@ -2534,7 +2534,8 @@ set_input_source (int fd, const char* fname, string_t * str)
                 encoding = svp->u.str;
         }
 
-        yyin.cd = iconv_open("utf-8", encoding == NULL ? "ascii" : get_txt(encoding));
+        yyin.cd = iconv_open("utf-8", encoding == NULL ? DEFAULT_FILE_ENCODING
+                : get_txt(encoding));
         if (!iconv_valid(yyin.cd))
         {
             if (errno == EINVAL)
