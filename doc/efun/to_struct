@@ -29,6 +29,8 @@ DESCRIPTION
         new struct, which exist in both structs. This conversion is only
         allowed between a struct and one of its base structs or a base struct
         and one of its children. Otherwise an error is raised.
+        The recommended procedure to convert between non-related structs is
+        to_struct(mkmapping(data), template).
 
         Neither <data> nor <template> will be changed in this process - the
         result is a new struct value. The actual value of <template> does not
