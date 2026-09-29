@@ -1,6 +1,24 @@
 import sys,unittest,gc,functools,random
 import ldmud
 
+in_backend_loop = False
+
+def skipInBackendLoop(func):
+    @functools.wraps(func)
+    def checkAndExecute(self):
+        if in_backend_loop:
+            self.skipTest("in backend loop")
+        return func(self)
+    return checkAndExecute
+
+def executeInBackendLoop(func):
+    @functools.wraps(func)
+    def checkAndExecute(self):
+        if not in_backend_loop:
+            self.skipTest("not in backend loop")
+        return func(self)
+    return checkAndExecute
+
 class TestModule(unittest.TestCase):
     def testMaster(self):
         ob = ldmud.Object("/master")
@@ -1267,6 +1285,13 @@ class TestCoroutine(unittest.TestCase):
         self.assertNotEqual(id(cr), id(cr_eq))
         self.assertEqual({cr: 42, cr_ne: 52}[cr_eq], 42)
 
+    def testResumeInsideSwitch(self):
+        cr = self.lwob.functions.test_switch_coroutine()
+
+        self.assertEqual(cr(), 0)
+        self.assertEqual(cr(1), 42)
+        self.assertFalse(cr)
+
 class TestSymbol(unittest.TestCase):
     def testSymbolInit(self):
         s = ldmud.Symbol("sym")
@@ -1801,9 +1826,15 @@ class TestCallStack(unittest.TestCase):
     # [6]: CALL_FRAME_TYPE_EFUN_CLOSURE (#'funcall)
     # [7]: CALL_FRAME_TYPE_PYTHON_EFUN_CLOSURE (#'python_test)
 
+    @skipInBackendLoop
     def testLen(self):
         self.assertEqual(len(ldmud.call_stack), 8)
 
+    @executeInBackendLoop
+    def testBackendLoopLen(self):
+        self.assertEqual(len(ldmud.call_stack), 0)
+
+    @skipInBackendLoop
     def testFrame0(self):
         frame = ldmud.call_stack[0]
         self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
@@ -1831,6 +1862,7 @@ class TestCallStack(unittest.TestCase):
             var.value = "20"
         self.assertEqual(var.value, 10)
 
+    @skipInBackendLoop
     def testFrame1(self):
         frame = ldmud.call_stack[1]
         self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
@@ -1843,6 +1875,7 @@ class TestCallStack(unittest.TestCase):
         self.assertEqual(frame.variables.__dict__, {})
         self.assertEqual([], list(frame.variables))
 
+    @skipInBackendLoop
     def testFrame2(self):
         frame = ldmud.call_stack[2]
         self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
@@ -1871,6 +1904,7 @@ class TestCallStack(unittest.TestCase):
         self.assertEqual(frame.variables.errors.type, ldmud.Integer)
         self.assertEqual(frame.variables.errors.value, 0)
 
+    @skipInBackendLoop
     def testFrame3(self):
         frame = ldmud.call_stack[3]
         self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
@@ -1881,6 +1915,7 @@ class TestCallStack(unittest.TestCase):
         self.assertLess(frame.line_number, ldmud.call_stack[2].line_number)
         self.assertGreater(frame.eval_cost, ldmud.call_stack[2].eval_cost)
 
+    @skipInBackendLoop
     def testFrame4(self):
         frame = ldmud.call_stack[4]
         self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_LFUN)
@@ -1908,6 +1943,7 @@ class TestCallStack(unittest.TestCase):
         self.assertEqual(frame.variables.err.value, 0)
         self.assertEqual(frame.variables.result.value, 0)
 
+    @skipInBackendLoop
     def testFrame5(self):
         frame = ldmud.call_stack[5]
         self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_CATCH)
@@ -1918,6 +1954,7 @@ class TestCallStack(unittest.TestCase):
         self.assertEqual(frame.line_number, ldmud.call_stack[4].line_number)
         self.assertGreater(frame.eval_cost, ldmud.call_stack[4].eval_cost)
 
+    @skipInBackendLoop
     def testFrame6(self):
         frame = ldmud.call_stack[6]
         self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_EFUN_CLOSURE)
@@ -1927,6 +1964,7 @@ class TestCallStack(unittest.TestCase):
         self.assertEqual(frame.variables.__dict__, {})
         self.assertEqual([], list(frame.variables))
 
+    @skipInBackendLoop
     def testFrame7(self):
         frame = ldmud.call_stack[7]
         self.assertEqual(frame.type, ldmud.CALL_FRAME_TYPE_PYTHON_EFUN_CLOSURE)
@@ -2021,15 +2059,15 @@ ldmud.register_efun("unregister_abs", lambda: ldmud.unregister_efun("abs"))
 
 # Test of the hooks
 num_hb = 0
-external_coroutine_result = None
+hb_test_success = None
 def hb_hook():
-    global num_hb, external_coroutine_result
+    global num_hb, hb_test_success, in_backend_loop
     num_hb += 1
 
-    if external_coroutine_result is None:
-        # Exercise coroutine resumption with no active LPC frame.
-        cr = ldmud.LWObject("/testob").functions.test_switch_coroutine()
-        external_coroutine_result = cr() == 0 and cr(1) == 42 and not cr
+    if hb_test_success is None:
+        in_backend_loop = True
+        hb_test_success = python_test()
+        in_backend_loop = False
 
 ob_list = []
 def ob_created(ob):
@@ -2039,7 +2077,7 @@ def ob_destroyed(ob):
     ob_list.remove(ob)
 
 def get_hook_info():
-    return ldmud.Array((num_hb, ldmud.Array(ob_list), external_coroutine_result))
+    return ldmud.Array((num_hb, ldmud.Array(ob_list), hb_test_success))
 
 last_progname = None
 last_filename = None
