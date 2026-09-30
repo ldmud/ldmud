@@ -8132,6 +8132,12 @@ convert_to_type (svalue_t *dest, svalue_t *src, lpctype_t *type, struct_t *opts,
                 {
                     svalue_t key = svalue_string(st->type->member[i].name);
                     svalue_t *entry = get_map_lvalue_unchecked(m, &key);
+                    if (!entry)
+                    {
+                        free_mapping(m);
+                        outofmemory("converted mapping entry");
+                        /* NOTREACHED */
+                    }
                     free_svalue(entry);
                     assign_rvalue_no_free(entry, &st->member[i]);
                 }
