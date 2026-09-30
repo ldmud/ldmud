@@ -276,6 +276,45 @@ static Mempool lexpool = NULL;
   /* Fifopool to hold the allocations for the include and lpc_ifstate_t stacks.
    */
 
+/* Source excerpts must survive parser lookahead and destructive macro
+ * expansion, but must not make otherwise valid programs fail to compile.
+ */
+#define DIAGNOSTIC_MEMORY_LIMIT (1024 * 1024)
+static Mempool diagnostic_pool = NULL;
+static size_t diagnostic_memory;
+
+struct source_line_s
+{
+    size_t offset; /* Physical byte offset, independent of #line. */
+    size_t length;
+    char text[];
+};
+
+struct macro_trace_s
+{
+    macro_trace_t *parent;
+    source_loc_t definition;
+    source_span_t definition_source;
+    source_span_t invocation;
+    char name[];
+};
+
+typedef struct macro_interval_s
+{
+    struct macro_interval_s *next;
+    source_file_t *file;
+    ptrdiff_t begin, end; /* Distances from defbuf end; survive realloc. */
+    macro_trace_t *trace;
+} macro_interval_t;
+
+static macro_interval_t *diagnostic_macros;
+static source_span_t diagnostic_token;
+static bool diagnostic_lexing;
+static unsigned long diagnostic_input_serial;
+static ptrdiff_t diagnostic_input_end;
+static source_span_t diagnostic_rewrite;
+static ptrdiff_t diagnostic_rewrite_offset;
+
 static bool with_end_detection;
   /* For compile_string(), when true the Lexer will
    *  - return an L_EOF token for the end of string, so the actual end
@@ -302,6 +341,12 @@ typedef struct source_s
     char       convbytes[4]; /* Bytes that didn't fit into the destination buffer. */
     string_t * str;          /* The source string (referenced), or NULL */
     size_t     current;      /* Current position in .str */
+    size_t     diagnostic_read;
+    size_t     diagnostic_offset;
+    size_t     diagnostic_size;
+    ptrdiff_t  diagnostic_generated_end; /* Distance from defbuf end. */
+    source_line_t *diagnostic_line;
+    char       diagnostic_buffer[2 * MAXLINE + 2];
 } source_t;
 
 static source_t yyin;
@@ -2056,11 +2101,15 @@ new_source_file (const char * name, source_loc_t * parent)
         rc->name = NULL;
     
     if (parent)
+    {
         rc->parent = *parent;
+        rc->included_at = diagnostic_token;
+    }
     else
     {
         rc->parent.file = NULL;
         rc->parent.line = 0;
+        rc->included_at = (source_span_t){ .column = -1 };
     }
 
     rc->next = src_file_list;
@@ -2460,6 +2509,170 @@ free_shared_identifier (ident_t *p)
 } /* free_shared_identifier() */
 
 /*-------------------------------------------------------------------------*/
+static void *
+diagnostic_alloc (size_t size)
+
+/* Optional compilation-owned storage. Exhaustion only omits context. */
+
+{
+    void *result;
+
+    if (size > DIAGNOSTIC_MEMORY_LIMIT - diagnostic_memory)
+        return NULL;
+    if (!diagnostic_pool)
+        diagnostic_pool = new_mempool(4096);
+    if (!diagnostic_pool)
+        return NULL;
+    result = mempool_alloc(diagnostic_pool, size);
+    if (result)
+        diagnostic_memory += size;
+    return result;
+}
+
+/*-------------------------------------------------------------------------*/
+static source_span_t
+diagnostic_position (const char *pos)
+
+/* Map an input pointer to original source before the lexer consumes it. */
+
+{
+    source_span_t result = { .loc = current_loc, .column = -1 };
+    ptrdiff_t distance = defbuf + defbuf_len - pos;
+    ptrdiff_t relative;
+    size_t start, end, offset;
+    macro_interval_t **link = &diagnostic_macros;
+    source_line_t *line;
+
+    while (*link)
+    {
+        macro_interval_t *entry = *link;
+
+        if (entry->file == current_loc.file)
+        {
+            if (distance <= entry->end)
+            {
+                *link = entry->next;
+                continue;
+            }
+            if (distance <= entry->begin)
+            {
+                result = entry->trace->invocation;
+                result.macro = entry->trace;
+                return result;
+            }
+        }
+        link = &entry->next;
+    }
+
+    /* Unmapped generated text has no honest source column. */
+    if (distance > yyin.diagnostic_generated_end)
+        return result;
+    relative = (ptrdiff_t)(yyin.diagnostic_read - yyin.diagnostic_offset)
+               - (lastp - pos);
+    if (relative < 0 || (size_t)relative > yyin.diagnostic_size)
+        return result;
+
+    start = end = (size_t)relative;
+    while (start && yyin.diagnostic_buffer[start-1] != '\n')
+        start--;
+    while (end < yyin.diagnostic_size && yyin.diagnostic_buffer[end] != '\n')
+        end++;
+
+    offset = yyin.diagnostic_offset + start;
+    line = yyin.diagnostic_line;
+    if (!line || line->offset != offset)
+    {
+        line = diagnostic_alloc(sizeof(*line) + end - start + 1);
+        if (line)
+        {
+            line->offset = offset;
+            line->length = end - start;
+            memcpy(line->text, yyin.diagnostic_buffer + start, line->length);
+            line->text[line->length] = '\0';
+            yyin.diagnostic_line = line;
+        }
+    }
+    result.text = line;
+    result.column = relative - start;
+    result.end_column = result.column + 1;
+    return result;
+}
+
+/*-------------------------------------------------------------------------*/
+static void
+diagnostic_finish_token (source_span_t *span, const char *pos)
+
+/* Extend a token on its first source line; macro tokens keep the use site. */
+
+{
+    ptrdiff_t offset;
+
+    if (span->macro || !span->text || span->loc.file != current_loc.file)
+        return;
+    offset = (ptrdiff_t)yyin.diagnostic_read - (lastp - pos)
+             - (ptrdiff_t)span->text->offset;
+    if (offset > span->column)
+        span->end_column = offset > (ptrdiff_t)span->text->length
+                           ? span->text->length : offset;
+}
+
+/*-------------------------------------------------------------------------*/
+static void
+diagnostic_macro (ident_t *macro, source_span_t invocation)
+
+/* Retain names independently of the identifier table (#undef may free it). */
+
+{
+    macro_trace_t *trace;
+    macro_interval_t *interval;
+    size_t length = mstrsize(macro->name);
+
+    trace = diagnostic_alloc(sizeof(*trace) + length + 1);
+    interval = diagnostic_alloc(sizeof(*interval));
+    if (!trace || !interval)
+        return;
+    trace->parent = invocation.macro;
+    trace->definition = macro->u.define.loc;
+    trace->definition_source = macro->u.define.source;
+    trace->invocation = invocation;
+    memcpy(trace->name, get_txt(macro->name), length + 1);
+    interval->file = current_loc.file;
+    interval->begin = defbuf + defbuf_len - outp;
+    interval->end = diagnostic_input_end;
+    interval->trace = trace;
+    interval->next = diagnostic_macros;
+    diagnostic_macros = interval;
+}
+
+/*-------------------------------------------------------------------------*/
+source_span_t
+lex_diagnostic_location (void)
+
+{
+    source_span_t result;
+
+    if (lex_error_pos >= 0 || !current_loc.file)
+        return (source_span_t){ .loc = current_loc, .column = -1 };
+    result = diagnostic_lexing ? diagnostic_token : yylloc.source;
+    if (!result.loc.file)
+        result = (source_span_t){ .loc = current_loc, .column = -1 };
+    return result;
+}
+
+/*-------------------------------------------------------------------------*/
+void
+lex_extend_span (source_span_t *start, source_span_t end)
+
+{
+    if (start->loc.file != end.loc.file || start->macro != end.macro)
+        return;
+    if (start->text && start->text == end.text)
+        start->end_column = end.end_column;
+    else if (start->text && start->loc.line < end.loc.line)
+        start->end_column = start->text->length;
+}
+
+/*-------------------------------------------------------------------------*/
 static void
 realloc_defbuf (void)
 
@@ -2508,6 +2721,12 @@ set_input_source (int fd, const char* fname, string_t * str)
  */
 
 {
+    /* A failure while opening an included input belongs to that input,
+     * rather than to the parent's previously scanned #include token.
+     */
+    diagnostic_token = (source_span_t){ .loc = current_loc, .column = -1 };
+    if (diagnostic_token.loc.line < 1)
+        diagnostic_token.loc.line = 1;
     yyin.convbuf = NULL;
     yyin.convbytes[0] = 0;
 
@@ -2564,6 +2783,9 @@ set_input_source (int fd, const char* fname, string_t * str)
 
     yyin.str = str ? ref_mstring(str) : NULL;
     yyin.current = 0;
+    yyin.diagnostic_read = yyin.diagnostic_offset = yyin.diagnostic_size = 0;
+    yyin.diagnostic_generated_end = defbuf + defbuf_len - outp;
+    yyin.diagnostic_line = NULL;
 } /* set_input_source() */
 
 /*-------------------------------------------------------------------------*/
@@ -2623,7 +2845,7 @@ lexencodingerror (char* pos, char* msg)
     current_loc.line += forward_lines;
     lex_error_pos = pos - linestart;
 
-    lexerror(msg);
+    lexerrorf("%s at byte %d", msg, lex_error_pos);
 
     current_loc.line -= forward_lines;
     lex_error_pos = -1;
@@ -2669,6 +2891,21 @@ _myfilbuf (void)
     expandend -= MAXLINE;
     if (expandend < linebufstart)
         expandend = linebufstart;
+
+    /* Unlike expandend, this boundary must not classify the original
+     * incomplete-line prefix before linebufstart as generated text.
+     */
+    yyin.diagnostic_generated_end += MAXLINE;
+    if (yyin.diagnostic_generated_end > defbuf + defbuf_len - outp)
+        yyin.diagnostic_generated_end = defbuf + defbuf_len - outp;
+
+    /* Only unconsumed expansion text moves with the line fragment. */
+    for (macro_interval_t *entry = diagnostic_macros; entry; entry = entry->next)
+        if (entry->file == current_loc.file)
+        {
+            entry->begin += MAXLINE;
+            entry->end += MAXLINE;
+        }
 
     *(outp-1) = '\n'; /* so an ungetc() gives a sensible result */
 
@@ -2790,6 +3027,18 @@ _myfilbuf (void)
         yyin.current += i;
     }
 
+    if (i >= 0)
+    {
+        size_t length = p + i - outp;
+
+        yyin.diagnostic_read += i;
+        yyin.diagnostic_offset = yyin.diagnostic_read - length;
+        yyin.diagnostic_size = length;
+        memcpy(yyin.diagnostic_buffer, outp, length);
+        yyin.diagnostic_buffer[length] = '\0';
+        yyin.diagnostic_line = NULL;
+    }
+
     if (i < MAXLINE)
     {
         /* End of file or error: put in the final EOF marker */
@@ -2811,7 +3060,16 @@ _myfilbuf (void)
     while (*--p != '\n') NOOP; /* find last newline */
     if (p < linebufstart)
     {
-        lexerror("line too long");
+        code_location_t location = { .source = { .loc = current_loc, .column = -1 } };
+
+        /* Buffer reads can precede the next token, or run in the middle of
+         * scanning one. Neither the old lookahead nor the prior newline
+         * describes this source line.
+         */
+        if (location.source.loc.line < 1)
+            location.source.loc.line = 1;
+        yyerrorf_at(&location, "line too long");
+        lex_fatal = MY_TRUE;
         *(p = linebufend-1) = '\n';
     }
     p++;
@@ -2845,6 +3103,10 @@ add_input (char *p)
 
     outp -= l;
     memcpy(outp, p, l);
+    diagnostic_input_serial++;
+    diagnostic_input_end = defbuf + defbuf_len - outp - l;
+    if (yyin.diagnostic_generated_end > diagnostic_input_end)
+        yyin.diagnostic_generated_end = diagnostic_input_end;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -2992,6 +3254,7 @@ skip_to (char *token, char *atoken)
     for (nest = 0; ; ) {
         current_loc.line++;
         total_lines++;
+        diagnostic_token = diagnostic_position(p);
         c = *p++;
 
         if (c == '#')
@@ -3078,6 +3341,8 @@ skip_to (char *token, char *atoken)
                     else if (wordcmp(q, "elif", len) == 0)
                     {
                         /* Morph the 'elif' into '#if' and reparse it */
+                        diagnostic_rewrite = diagnostic_token;
+                        diagnostic_rewrite_offset = defbuf + defbuf_len - (q+1);
                         current_loc.line--;
                         total_lines--;
                         q[0] = nl;
@@ -5754,6 +6019,17 @@ yylex1 (void)
         p_int c;
         size_t clen;
 
+        if (!is_byte_literal)
+        {
+            if (diagnostic_rewrite.loc.file == current_loc.file
+             && diagnostic_rewrite_offset == defbuf + defbuf_len - yyp)
+            {
+                diagnostic_token = diagnostic_rewrite;
+                diagnostic_rewrite = (source_span_t){ .column = -1 };
+            }
+            else
+                diagnostic_token = diagnostic_position(yyp);
+        }
         READ_CHAR;
 
         switch(c)
@@ -5801,6 +6077,15 @@ yylex1 (void)
                 }
 
                 /* Here it's the end of the main file */
+
+                /* The lexer appends a synthetic newline to unterminated
+                 * input. Diagnostics belong at the actual end of source.
+                 */
+                diagnostic_token = diagnostic_position(lastp);
+                if (!yyin.diagnostic_size
+                 || yyin.diagnostic_buffer[yyin.diagnostic_size-1] != '\n')
+                    diagnostic_token.loc.line--;
+                diagnostic_token.end_column = diagnostic_token.column;
 
                 if (iftop)
                 {
@@ -6488,13 +6773,22 @@ yylex1 (void)
                     switch(p->type)
                     {
                         case I_TYPE_DEFINE:
+                        {
+                            source_span_t invocation = diagnostic_token;
+                            unsigned long serial = diagnostic_input_serial;
+
+                            diagnostic_finish_token(&invocation, yyp);
                             outp = yyp;
                             _expand_define(&p->u.define, p);
                             if (lex_fatal)
                                 return -1;
 
+                            if (serial != diagnostic_input_serial)
+                                diagnostic_macro(p, invocation);
+
                             yyp=outp;
                             continue;
+                        }
 
 #ifdef USE_PYTHON
                         case I_TYPE_PYTHON_TYPE:
@@ -6633,6 +6927,7 @@ yylex (void)
         r = start_token;
         start_token = -1;
         yylloc.start = yylloc.end = 0;
+        yylloc.source = (source_span_t){ .loc = current_loc, .column = -1 };
         return r;
     }
 
@@ -6641,12 +6936,16 @@ yylex (void)
 #ifdef LEXDEBUG
     yytext[0] = '\0';
 #endif
+    diagnostic_lexing = true;
     r = yylex1();
+    diagnostic_lexing = false;
 #ifdef LEXDEBUG
     fprintf(stderr, "%s lex=%d(%s) ", time_stamp(), r, yytext);
 #endif
 
     yylloc.end = get_string_position();
+    diagnostic_finish_token(&diagnostic_token, outp);
+    yylloc.source = diagnostic_token;
 
     return r;
 }
@@ -6663,6 +6962,14 @@ start_lex ()
 
     cleanup_source_files();
     free_defines();
+    if (diagnostic_pool)
+        mempool_reset(diagnostic_pool);
+    diagnostic_memory = 0;
+    diagnostic_macros = NULL;
+    diagnostic_token = (source_span_t){ .column = -1 };
+    diagnostic_rewrite = (source_span_t){ .column = -1 };
+    diagnostic_lexing = false;
+    yylloc.source = diagnostic_token;
 
     /* Restore the bytes keyword. */
     p = make_shared_identifier("bytes", I_TYPE_RESWORD, 0);
@@ -6737,6 +7044,14 @@ end_lex ()
 
     close_input_source(true);
     cleanup_source_files();
+    if (diagnostic_pool)
+        mempool_reset(diagnostic_pool);
+    diagnostic_memory = 0;
+    diagnostic_macros = NULL;
+    diagnostic_token = (source_span_t){ .column = -1 };
+    diagnostic_rewrite = (source_span_t){ .column = -1 };
+    diagnostic_lexing = false;
+    yylloc.source = diagnostic_token;
 
     mempool_reset(lexpool);
       /* Deallocates all incstates and ifstates at once */
@@ -7347,6 +7662,9 @@ add_define (char *name, short nargs, char *exps, source_loc_t loc)
         }
         strcpy(p->u.define.exps.str, exps);
         p->u.define.loc = loc;
+        p->u.define.source = diagnostic_token;
+        if (p->u.define.source.loc.file != loc.file)
+            p->u.define.source = (source_span_t){ .loc = loc, .column = -1 };
 
         p->next_all = all_defines;
         all_defines = p;
@@ -7399,6 +7717,7 @@ add_permanent_define (char *name, short nargs)
     p->u.define.permanent = MY_TRUE;
     p->u.define.loc.file = NULL;
     p->u.define.loc.line = 0;
+    p->u.define.source = (source_span_t){ .column = -1 };
     p->next_all = permanent_defines;
     permanent_defines = p;
 
@@ -8973,6 +9292,8 @@ show_lexer_status (strbuf_t * sbuf, Bool verbose UNUSED)
     }
 
     sum += mempool_size(lexpool);
+    if (diagnostic_pool)
+        sum += mempool_size(diagnostic_pool);
     sum += defbuf_len;
     sum += 2 * DEFMAX; /* for the buffers in _expand_define() */
 
@@ -9033,79 +9354,249 @@ count_lex_refs (void)
 
     if (lexpool)
         mempool_note_refs(lexpool);
+    if (diagnostic_pool)
+        mempool_note_refs(diagnostic_pool);
 }
 #endif /* GC_SUPPORT */
 
 /*-------------------------------------------------------------------------*/
-char *
-lex_error_context (void)
+static void
+diagnostic_append (char *buf, size_t size, const char *format, ...)
 
-/* Create the current lexing context in a static buffer and return its
- * pointer.
+{
+    size_t used = strlen(buf);
+    int written;
+    va_list args;
+
+    if (used >= size - 1)
+        return;
+    va_start(args, format);
+    written = vsnprintf(buf + used, size - used, format, args);
+    va_end(args);
+    if (written >= 0 && (size_t)written >= size - used)
+    {
+        char *last = utf8_prev(buf + size - 1, size - 1);
+        p_int codepoint;
+
+        /* snprintf bounds bytes. Never expose a partial UTF-8 character
+         * to LPC, even when a very wide combining cluster fills the buffer.
+         */
+        if (!utf8_to_unicode(last, buf + size - 1 - last, &codepoint))
+            *last = '\0';
+    }
+}
+
+/*-------------------------------------------------------------------------*/
+static size_t
+diagnostic_character (const char *text, size_t length, int column,
+                      int *width, char *escaped)
+
+/* Printable graphemes use driver display widths. Escape controls rather
+ * than letting source text inject terminal control sequences into logs.
  */
 
 {
-    // " before '" + 10 characters (max. 4 bytes each) + "'\0"
-#define CONTEXT_LENGTH 10
-    static char buf[11 + 4*CONTEXT_LENGTH];
-    char *end;
-    mp_int len;
+    p_int character;
+    size_t bytes = utf8_to_unicode(text, length, &character);
 
-    if (lex_error_pos >= 0)
+    escaped[0] = '\0';
+    if (!bytes)
     {
-        /* An encoding error, we just print the byte position. */
-        snprintf(buf, sizeof(buf), " at byte %d", lex_error_pos);
-        return buf;
+        snprintf(escaped, 16, "\\x%02x", (unsigned char)*text);
+        *width = 4;
+        return 1;
     }
-
-    strcpy(buf, ((signed char)yychar == -1 || yychar == CHAR_EOF)
-                ? (len = 6, " near ")
-                : (len = 8, " before "));
-
-    if (!yychar || !*outp)
+    if (character == '\t')
     {
-        strcpy(buf+len, "end of line");
+        *width = 8 - column % 8;
+        memset(escaped, ' ', *width);
+        escaped[*width] = '\0';
+        return bytes;
     }
-    else if ((signed char)*outp == -1 || *outp == CHAR_EOF)
+    if (character < 32 || (character >= 127 && character < 160))
     {
-        strcpy(buf+len, "end of file");
+        snprintf(escaped, 16, "\\x%02x", (unsigned int)character);
+        *width = 4;
+        return bytes;
     }
-    else
-    {
-        ssize_t left;
+    bytes = next_grapheme_break(text, length, width);
+    if (*width < 0)
+        *width = 1;
+    return bytes;
+}
 
-        left = linebufend - outp;
-        if (left > (ssize_t)sizeof(buf) - 3 - len)
-            left = sizeof(buf) - 3 - len;
-        if (left < 1)
-            buf[0] = '\0';
-        else
+/*-------------------------------------------------------------------------*/
+static int
+diagnostic_column (source_line_t *line, int byte_column)
+
+{
+    size_t offset = 0;
+    int column = 0;
+
+    while (offset < line->length && offset < (size_t)byte_column)
+    {
+        int width;
+        char escaped[16];
+        size_t bytes = diagnostic_character(line->text + offset,
+                                            line->length - offset, column,
+                                            &width, escaped);
+        if (!bytes || offset + bytes > (size_t)byte_column)
+            break;
+        column += width;
+        offset += bytes;
+    }
+    return column;
+}
+
+/*-------------------------------------------------------------------------*/
+static void
+diagnostic_note_source (char *buf, size_t size, source_span_t span)
+
+{
+    size_t offset = 0;
+    int column = 0;
+
+    if (!span.text)
+        return;
+    diagnostic_append(buf, size, "%5d | ", span.loc.line);
+    while (offset < span.text->length)
+    {
+        char escaped[16];
+        int width;
+        size_t bytes = diagnostic_character(span.text->text + offset,
+                                            span.text->length - offset,
+                                            column, &width, escaped);
+        if (!bytes)
+            break;
+        if (column + width > 120)
         {
-            size_t num = char_to_byte_index(outp, left, CONTEXT_LENGTH, NULL);
-
-            buf[len] = '\'';
-            strncpy(buf + len + 1, outp, num);
-            buf[len + num + 1] = '\'';
-            buf[len + num + 2] = '\0';
-            if ( NULL != (end = strchr(buf, '\n')) )
-            {
-                *end = '\'';
-                *(end+1) = '\0';
-                if (buf[len+1] == '\'')
-                    strcpy(buf+len, "end of line");
-            }
-            if ( NULL != (end = strchr(buf, -1)) )
-            {
-                *end = '\'';
-                *(end+1) = '\0';
-                if (buf[len+1] == '\'')
-                    strcpy(buf+len, "end of file");
-            }
+            diagnostic_append(buf, size, "...");
+            break;
         }
+        if (escaped[0])
+            diagnostic_append(buf, size, "%s", escaped);
+        else
+            diagnostic_append(buf, size, "%.*s", (int)bytes, span.text->text + offset);
+        offset += bytes;
+        column += width;
     }
-    return buf;
-#undef CONTEXT_LENGTH
-} /* lex_error_context() */
+    diagnostic_append(buf, size, "\n");
+}
+
+/*-------------------------------------------------------------------------*/
+void
+lex_format_diagnostic (char *buf, size_t size, source_span_t span,
+                       Bool warning, const char *message)
+
+/* Format once for all sinks. Excerpts and ancestry are deliberately bounded;
+ * the principal message always precedes optional source context.
+ */
+
+{
+    const int excerpt_width = 120;
+    const int maximum_notes = 8;
+    source_line_t *line = span.text;
+    source_loc_t parent;
+    macro_trace_t *macro;
+    int column = -1;
+    int notes;
+
+    if (!size)
+        return;
+    buf[0] = '\0';
+    if (line && span.column >= 0)
+        column = diagnostic_column(line, span.column);
+    diagnostic_append(buf, size, "%s:%d", span.loc.file && span.loc.file->name
+                       ? span.loc.file->name : "<source>", span.loc.line);
+    if (column >= 0)
+        diagnostic_append(buf, size, ":%d", column + 1);
+    diagnostic_append(buf, size, ": %s: %s\n", warning ? "warning" : "error", message);
+
+    if (column >= 0)
+    {
+        size_t offset = 0;
+        size_t length = line->length;
+        int display = 0;
+        int first = column > excerpt_width - 20 ? column - 40 : 0;
+        int shown_start = 0;
+        int shown_end = 0;
+        int prefix = 0;
+        int end_column = diagnostic_column(line, span.end_column);
+        bool started = false;
+
+        if (length && line->text[length-1] == '\r')
+            length--;
+        diagnostic_append(buf, size, "%5d | ", span.loc.line);
+        while (offset < length)
+        {
+            int width;
+            char escaped[16];
+            size_t bytes = diagnostic_character(line->text + offset,
+                                                length - offset, display,
+                                                &width, escaped);
+            if (!bytes)
+                break;
+            if (display >= first)
+            {
+                if (!started)
+                {
+                    shown_start = display;
+                    started = true;
+                    if (offset)
+                    {
+                        diagnostic_append(buf, size, "...");
+                        prefix = 3;
+                    }
+                }
+                if (display - shown_start + width > excerpt_width)
+                {
+                    diagnostic_append(buf, size, "...");
+                    break;
+                }
+                if (escaped[0])
+                    diagnostic_append(buf, size, "%s", escaped);
+                else
+                    diagnostic_append(buf, size, "%.*s", (int)bytes, line->text + offset);
+                shown_end = display + width;
+            }
+            display += width;
+            offset += bytes;
+        }
+        if (!started)
+            shown_start = display;
+        if (end_column > shown_end)
+            end_column = shown_end;
+        diagnostic_append(buf, size, "\n      | %*s^", prefix + column - shown_start, "");
+        for (int mark = column + 1; mark < end_column; mark++)
+            diagnostic_append(buf, size, "~");
+        diagnostic_append(buf, size, "\n");
+    }
+
+    for (macro = span.macro, notes = 0; macro && notes < maximum_notes;
+         macro = macro->parent, notes++)
+    {
+        diagnostic_append(buf, size, "note: in expansion of macro '%s'", macro->name);
+        if (macro->definition.file && macro->definition.file->name)
+            diagnostic_append(buf, size, ", defined at %s:%d:",
+                              macro->definition.file->name, macro->definition.line);
+        diagnostic_append(buf, size, "\n");
+        diagnostic_note_source(buf, size, macro->definition_source);
+    }
+    if (macro)
+        diagnostic_append(buf, size, "note: further macro expansions omitted\n");
+
+    parent = span.loc;
+    for (notes = 0; parent.file && parent.file->parent.file && notes < maximum_notes; notes++)
+    {
+        source_span_t included_at = parent.file->included_at;
+
+        parent = parent.file->parent;
+        diagnostic_append(buf, size, "note: included from %s:%d:\n", parent.file->name, parent.line);
+        diagnostic_note_source(buf, size, included_at);
+    }
+    if (parent.file && parent.file->parent.file)
+        diagnostic_append(buf, size, "note: further include sites omitted\n");
+}
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -9180,4 +9671,3 @@ f_expand_define (svalue_t *sp)
 } /* f_expand_define() */
 
 /***************************************************************************/
-

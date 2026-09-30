@@ -1423,33 +1423,19 @@ warnf (char *fmt, ...)
 
 /*-------------------------------------------------------------------------*/
 void
-parse_error (Bool warning, const char *error_file, int line, const char *what
-            , const char *context)
+parse_error (Bool warning, const char *error_file, int line, const char *message)
 
-/* The compiler found an error <what> (<warning> is FALSE) resp.
- * a warning <what> (<warning> is TRUE) while compiling <line> of
- * file <error_file>. The context of the error location is <context>.
- *
- * Log the error by calling master:log_error() (but do not reload
- * the master if not existing - the compiler is busy).
+/* Deliver a formatted diagnostic without a second, smaller text buffer.
+ * Keep the master's existing four-argument interface.
  */
 
 {
-    char buff[500];
-
     if (error_file == NULL)
         return;
-    if (strlen(what) + strlen(error_file) > sizeof buff - 100)
-        what = "...[too long error message]...";
-    if (strlen(what) + strlen(error_file) > sizeof buff - 100)
-        error_file = "...[too long filename]...";
-    sprintf(buff, "%s line %d%s: %s\n", error_file, line, context, what);
-
-    /* Don't call the master if it isn't loaded! */
-    if (master_ob && !(master_ob->flags & O_DESTRUCTED) )
+    if (master_ob && !(master_ob->flags & O_DESTRUCTED))
     {
         push_c_string(inter_sp, error_file);
-        push_c_string(inter_sp, buff);
+        push_c_string(inter_sp, message);
         push_number(inter_sp, warning ? 1 : 0);
         push_number(inter_sp, line);
         apply_master(STR_LOG_ERROR, 4);

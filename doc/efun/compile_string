@@ -67,6 +67,14 @@ DESCRIPTION
         driver hook will be prepended, for blocks the H_AUTO_INCLUDE_BLOCK
         hook will be used.
 
+        Compilation errors are raised as runtime errors. Their text includes
+        a source location and, when available, the input line and an
+        underline. The location uses the current program name followed by
+        " (string)"; lines and display columns start at one. Tabs use
+        eight-column stops. Include and macro expansion notes may follow.
+        This text can contain multiple lines and does not invoke the
+        master's log_error(). Source context is bounded and may be omitted.
+
 EXAMPLES
         funcall(compile_string(({'a,'b}), "a+b"), 1, 2);
 

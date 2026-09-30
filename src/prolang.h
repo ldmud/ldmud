@@ -5,6 +5,7 @@
 #include "typedefs.h"
 
 #include "exec.h"  /* bytecode_p, lpctype_t via types.h */
+#include "lex.h"
 
 /* --- Types --- */
 
@@ -68,14 +69,15 @@ struct code_context_s
 
 /* --- struct code_location_s: Location information of source code ---
  *
- * This is the (byte) position of a token within the given string.
- * If the token comes from a file or an auto-include string, the
- * corresponding position will be -1.
+ * start/end retain byte positions for compile_string() end detection; they
+ * are -1 for tokens from files or auto-includes. source separately retains
+ * the original location for diagnostic rendering, including file compilation.
  */
 struct code_location_s
 {
     int start;  /* Position of the first byte of the token. */
     int end;    /* Position of the byte after the token.    */
+    source_span_t source; /* Original source, also for file compilation. */
 };
 
 /* --- Variables --- */
@@ -114,6 +116,8 @@ extern Bool variables_defined;
 /* --- Prototypes --- */
 extern int proxy_efun(int, int);
 extern void yyerrorf VARPROT((const char *format, ...), printf, 1, 2);
+extern void yyerrorf_at VARPROT((const code_location_t *loc, const char *format, ...), printf, 2, 3);
+extern void yywarnf_at VARPROT((const code_location_t *loc, const char *format, ...), printf, 2, 3);
 extern void yyerror(const char *str);
 extern void yywarnf VARPROT((const char *format, ...), printf, 1, 2);
 extern void yywarn(const char *str);

@@ -304,7 +304,7 @@ extern void throw_error(svalue_t *v) NORETURN;
 extern char *limit_error_format(char *fixed_fmt, size_t fixed_fmt_len, const char *fmt);
 extern Bool legal_path(const char *path);
 extern Bool check_no_parentdirs(const char *path);
-extern void parse_error(Bool warning, const char *error_file, int line, const char *what, const char *context);
+extern void parse_error(Bool warning, const char *error_file, int line, const char *message);
 extern void init_filesystem_encoding();
 extern size_t convert_path_to_native_buf(const char* path, size_t len, char* buf, size_t buflen);
 extern char *convert_path_to_native(const char* path, size_t len);

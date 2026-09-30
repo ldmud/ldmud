@@ -1,4 +1,5 @@
 %define lr.type ielr
+%define parse.error verbose
 %define api.location.type {code_location_t}
 %{
 %line
@@ -132,10 +133,14 @@
         {                                                   \
             (cur).start = YYRHSLOC(rhs, 1).start;           \
             (cur).end   = YYRHSLOC(rhs, n).end;             \
+            (cur).source = YYRHSLOC(rhs, 1).source;         \
+            lex_extend_span(&(cur).source, YYRHSLOC(rhs, n).source); \
         }                                                   \
         else                                                \
         {                                                   \
             (cur).start = (cur).end = YYRHSLOC(rhs, 0).end; \
+            (cur).source = YYRHSLOC(rhs, 0).source;         \
+            (cur).source.column = (cur).source.end_column; \
         }                                                   \
     } while (0)
 
@@ -1427,7 +1432,7 @@ struct lvalue_s; /* Defined within YYSTYPE aka %union */
 
 static void decrease_lambda_values_table_level();
 static ident_t* define_local_variable (ident_t* name, lpctype_t* actual_type, struct lvalue_s *lv, Bool redeclare, Bool with_init);
-static void init_local_variable (ident_t* name, struct lvalue_s *lv, int assign_op, fulltype_t type2);
+static void init_local_variable (ident_t* name, struct lvalue_s *lv, int assign_op, fulltype_t type2, const code_location_t *loc);
 static void use_variable (ident_t* name, enum variable_usage usage);
 static void warn_variable_usage (string_t* name, enum variable_usage usage, const char* prefix);
 static Bool add_lvalue_code (lvalue_block_t lv, int instruction);
@@ -1454,45 +1459,85 @@ static int ins_lambda_value(svalue_t *svp);
 static svalue_t* lookup_entity(svalue_t *dict, ident_t* name, ph_int exp_type);
 
 /*-------------------------------------------------------------------------*/
-void
-yyerror (const char *str)
+static void
+report_compile_diagnostic (source_span_t location, Bool warning, const char *str)
 
-/* Raise the parse error <str>: usually generate the error message and log it.
- * If this is the first error in this file, account the wizard with an error.
- * If too many errors occurred already, do nothing.
- */
+/* Render before invoking LPC so all sinks receive the same diagnostic. */
 
 {
-    char *context;
+    char message[16384];
+    const char *file = location.loc.file ? location.loc.file->name : NULL;
 
-    if (num_parse_error > 5)
+    if (!warning && num_parse_error > 5)
         return;
-    context = lex_error_context();
-
-    if (string_context)
+    if (string_context && !warning)
     {
-        /* Return the error in the context, don't call master. */
+        /* Format directly into the destination so its smaller byte limit
+         * receives the same UTF-8-safe truncation as every other sink.
+         */
         if (string_context->error_msg[0] == 0)
-            snprintf(string_context->error_msg, sizeof(string_context->error_msg)
-                    , "%s%s\n", str, context);
+            lex_format_diagnostic(string_context->error_msg,
+                                  sizeof(string_context->error_msg), location,
+                                  warning, str);
         num_parse_error++;
         return;
     }
-
-    fprintf(stderr, "%s %s line %d: %s%s.\n"
-                  , time_stamp(), current_loc.file->name, current_loc.line
-                  , str, context);
-    /* TODO: lex should implement a function get_include_stack() which
-     * TODO:: returns an svalue-array with the current include stack.
-     * TODO:: This could be printed, and also passed to parse_error().
-     */
+    lex_format_diagnostic(message, sizeof(message), location, warning, str);
+    if (string_context)
+    {
+        warnf("%s", message);
+        return;
+    }
+    fprintf(stderr, "%s %s", time_stamp(), message);
     fflush(stderr);
-    parse_error(MY_FALSE, current_loc.file->name, current_loc.line
-               , str, context);
-    if (num_parse_error == 0)
-        save_error(str, current_loc.file->name, current_loc.line);
-    num_parse_error++;
-} /* yyerror() */
+    parse_error(warning, file, location.loc.line, message);
+    if (num_parse_error == 0 && (!warning || master_ob) && file)
+        save_error(str, file, location.loc.line);
+    if (!warning)
+        num_parse_error++;
+}
+
+/*-------------------------------------------------------------------------*/
+void
+yyerror (const char *str)
+
+{
+    report_compile_diagnostic(lex_diagnostic_location(), MY_FALSE, str);
+}
+
+/*-------------------------------------------------------------------------*/
+void
+yyerrorf_at (const code_location_t *loc, const char *format, ...)
+
+/* Semantic errors select the expression involved, independently of lookahead. */
+
+{
+    va_list args;
+    char message[5120];
+    char fixed_fmt[1000];
+
+    format = limit_error_format(fixed_fmt, sizeof(fixed_fmt), format);
+    va_start(args, format);
+    vsnprintf(message, sizeof(message), format, args);
+    va_end(args);
+    report_compile_diagnostic(loc->source, MY_FALSE, message);
+}
+
+/*-------------------------------------------------------------------------*/
+void
+yywarnf_at (const code_location_t *loc, const char *format, ...)
+
+{
+    va_list args;
+    char message[5120];
+    char fixed_fmt[1000];
+
+    format = limit_error_format(fixed_fmt, sizeof(fixed_fmt), format);
+    va_start(args, format);
+    vsnprintf(message, sizeof(message), format, args);
+    va_end(args);
+    report_compile_diagnostic(loc->source, MY_TRUE, message);
+}
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1517,38 +1562,9 @@ yyerrorf (const char *format, ...)
 void
 yywarn (const char *str)
 
-/* Raise the parse warning <str>: usually generate the warning message and
- * log it.
- */
-
 {
-    char *context;
-
-    context = lex_error_context();
-
-    if (string_context)
-    {
-        /* Change that to a runtime warning. */
-        warnf("%s%s\n", str, context);
-        return;
-    }
-
-    fprintf(stderr, "%s %s line %d: Warning: %s%s.\n"
-                  , time_stamp(), current_loc.file->name, current_loc.line
-                  , str, context);
-    /* TODO: lex should implement a function get_include_stack() which
-     * TODO:: returns an svalue-array with the current include stack.
-     * TODO:: This could be printed, and also passed to parse_error().
-     */
-    fflush(stderr);
-    parse_error(MY_TRUE, current_loc.file->name, current_loc.line
-               , str, context);
-    if (master_ob && num_parse_error == 0)
-        save_error(str, current_loc.file->name, current_loc.line);
-    /* TODO: Introduce a 'master_is_loading' flag to prevent this call while
-     * TODO:: the master is inactive.
-     */
-} /* yywarn() */
+    report_compile_diagnostic(lex_diagnostic_location(), MY_TRUE, str);
+}
 
 /*-------------------------------------------------------------------------*/
 void
@@ -2196,6 +2212,23 @@ get_two_fulltypes (fulltype_t type1, fulltype_t type2)
 
 /*-------------------------------------------------------------------------*/
 static char *
+get_expected_fulltypes (fulltype_t expected, fulltype_t got)
+
+/* Describe an incompatible value without relying on the shared buffers of
+ * get_fulltype_name() for both types in the same diagnostic.
+ */
+{
+    static char buff[2080];
+    char expected_name[1024], got_name[1024];
+
+    get_fulltype_name_buf(expected, expected_name, sizeof(expected_name));
+    get_fulltype_name_buf(got, got_name, sizeof(got_name));
+    snprintf(buff, sizeof(buff), "expected %s, got %s", expected_name, got_name);
+    return buff;
+} /* get_expected_fulltypes() */
+
+/*-------------------------------------------------------------------------*/
+static char *
 get_two_lpctypes (lpctype_t *type1, lpctype_t *type2)
 
 /* Return (in a static buffer) the text "(<type1> vs. <type2>)".
@@ -2263,6 +2296,7 @@ argument_type_error (int instr, lpctype_t *type)
 static void
 efun_argument_error(int arg, int instr
                    , fulltype_t * expected, fulltype_t got
+                   , const code_location_t *loc
                    )
 {
     char msg[1024];
@@ -2274,8 +2308,8 @@ efun_argument_error(int arg, int instr
             strcat(msg, "|");
         strcat(msg, get_fulltype_name(*expected));
     }
-    yyerrorf("Bad arg %d type to %s(): got %s, expected %s"
-            , arg, instrs[instr].name, get_fulltype_name(got), msg);
+    yyerrorf_at(loc, "Argument %d to '%s': expected %s, got %s"
+              , arg, instrs[instr].name, msg, get_fulltype_name(got));
 } /* efun_argument_error() */
 
 /*-------------------------------------------------------------------------*/
@@ -3433,7 +3467,27 @@ check_assignment_types (fulltype_t src, lpctype_t *dest)
 
 /*-------------------------------------------------------------------------*/
 static void
-check_function_call_types (fulltype_t *aargs, int num_aarg, function_t *funp, unsigned short *dargs, lpctype_t **types)
+function_argument_count_error (const code_location_t *loc, const char *name
+                              , int minimum, int maximum, int got)
+
+/* Describe the accepted argument count using the declaration's optional and
+ * repeated arguments. The caller decides whether the count is an error.
+ */
+{
+    if (minimum == maximum)
+        yyerrorf_at(loc, "Wrong number of arguments to '%s': expected %d, got %d"
+                  , name, minimum, got);
+    else if (maximum < 0)
+        yyerrorf_at(loc, "Wrong number of arguments to '%s': expected at least %d, got %d"
+                  , name, minimum, got);
+    else
+        yyerrorf_at(loc, "Wrong number of arguments to '%s': expected %d to %d, got %d"
+                  , name, minimum, maximum, got);
+} /* function_argument_count_error() */
+
+/*-------------------------------------------------------------------------*/
+static void
+check_function_call_types (fulltype_t *aargs, int num_aarg, function_t *funp, unsigned short *dargs, lpctype_t **types, const code_location_t *loc)
 
 /* Checks the actual function arguments (<aargs> with <num_aarg> entries)
  * against the function definition <funp> with <dargs> argument type index
@@ -3459,10 +3513,10 @@ check_function_call_types (fulltype_t *aargs, int num_aarg, function_t *funp, un
         lpctype_t *expected = dargs ? types[*dargs] : *types;
         if (!check_assignment_types(*aargs, expected))
         {
-            yyerrorf("Bad type for argument %d of %s %s",
+            yyerrorf_at(loc, "Argument %d to '%s': %s",
                 argno,
                 get_txt(funp->name),
-                get_two_lpctypes(expected, aargs->t_type));
+                get_expected_fulltypes(get_fulltype(expected), *aargs));
         }
 
         aargs++;
@@ -3480,10 +3534,10 @@ check_function_call_types (fulltype_t *aargs, int num_aarg, function_t *funp, un
         {
             if (!check_assignment_types(*aargs, flat_type))
             {
-                yyerrorf("Bad type for argument %d of %s %s",
+                yyerrorf_at(loc, "Argument %d to '%s': %s",
                     argno,
                     get_txt(funp->name),
-                    get_two_lpctypes(flat_type, aargs->t_type));
+                    get_expected_fulltypes(get_fulltype(flat_type), *aargs));
             }
 
             aargs++;
@@ -6072,7 +6126,7 @@ define_global_variable (ident_t* name, fulltype_t actual_type, Bool with_init)
 /*-------------------------------------------------------------------------*/
 static void
 init_global_variable (int i, ident_t* name, fulltype_t actual_type
-                     , int assign_op, fulltype_t exprtype)
+                     , int assign_op, fulltype_t exprtype, const code_location_t *loc)
 
 /* This is called directly from a parser rule: <type> <name> = <expr>
  * It will be called after the call to define_global_variable().
@@ -6128,9 +6182,8 @@ init_global_variable (int i, ident_t* name, fulltype_t actual_type
 
     if (!check_assignment_types(exprtype, actual_type.t_type))
     {
-        yyerrorf("Type mismatch %s when initializing %s"
-                , get_two_lpctypes(actual_type.t_type, exprtype.t_type)
-                , get_txt(name->name));
+        yyerrorf_at(loc, "Cannot initialize '%s': %s", get_txt(name->name)
+                  , get_expected_fulltypes(get_fulltype(actual_type.t_type), exprtype));
     }
 
     /* Ok, assign */
@@ -9051,93 +9104,93 @@ get_global_variable_lvalue (ident_t *ident)
 
 /*-------------------------------------------------------------------------*/
 
-%token L_ARROW
-%token L_ASSIGN
-%token L_ASYNC
-%token L_AWAIT
-%token L_BEGIN_INLINE
-%token L_BREAK
-%token L_BYTES
-%token L_BYTES_DECL
-%token L_CASE
-%token L_CATCH
-%token L_CLOSURE
-%token L_CLOSURE_DECL
-%token L_COLON_COLON
-%token L_CONTINUE
-%token L_COROUTINE
-%token L_DEC
-%token L_DECLTYPE
-%token L_DEFAULT
-%token L_DEPRECATED
-%token L_DO
-%token L_DUMMY
-%token L_ELLIPSIS
-%token L_ELSE
-%token L_END_INLINE
-%token L_EQ
-%token L_EOF
-%token L_FLOAT
-%token L_FLOAT_DECL
-%token L_FOR
-%token L_FOREACH
-%token L_FUNC
-%token L_GE
-%token L_IDENTIFIER
-%token L_IF
-%token L_ILLEGAL_CHAR
+%token L_ARROW "'->'"
+%token L_ASSIGN "assignment operator"
+%token L_ASYNC "'async'"
+%token L_AWAIT "'await'"
+%token L_BEGIN_INLINE "'(:'"
+%token L_BREAK "'break'"
+%token L_BYTES "bytes literal"
+%token L_BYTES_DECL "'bytes'"
+%token L_CASE "'case'"
+%token L_CATCH "'catch'"
+%token L_CLOSURE "closure literal"
+%token L_CLOSURE_DECL "'closure'"
+%token L_COLON_COLON "'::'"
+%token L_CONTINUE "'continue'"
+%token L_COROUTINE "'coroutine'"
+%token L_DEC "'--'"
+%token L_DECLTYPE "'decltype'"
+%token L_DEFAULT "'default'"
+%token L_DEPRECATED "'deprecated'"
+%token L_DO "'do'"
+%token L_DUMMY "internal token"
+%token L_ELLIPSIS "'...'"
+%token L_ELSE "'else'"
+%token L_END_INLINE "':)'"
+%token L_EQ "'=='"
+%token L_EOF "end of input"
+%token L_FLOAT "float literal"
+%token L_FLOAT_DECL "'float'"
+%token L_FOR "'for'"
+%token L_FOREACH "'foreach'"
+%token L_FUNC "'function'"
+%token L_GE "'>='"
+%token L_IDENTIFIER "identifier"
+%token L_IF "'if'"
+%token L_ILLEGAL_CHAR "invalid character"
 %ifdef KEYWORD_IN
-%token L_IN
+%token L_IN "'in'"
 %endif
-%token L_INC
-%token L_INHERIT
-%token L_INT
-%token L_LAMBDA_CLOSURE_VALUE
-%token L_LAND
-%token L_LE
-%token L_LOR
-%token L_LPCTYPE
-%token L_LSH
-%token L_LWOBJECT
-%token L_MAPPING
-%token L_MIXED
-%token L_NE
-%token L_NO_MASK
-%token L_NOSAVE
-%token L_NOT
-%token L_NUMBER
-%token L_OBJECT
-%token L_PRIVATE
-%token L_PROTECTED
-%token L_PUBLIC
+%token L_INC "'++'"
+%token L_INHERIT "'inherit'"
+%token L_INT "'int'"
+%token L_LAMBDA_CLOSURE_VALUE "captured closure value"
+%token L_LAND "'&&'"
+%token L_LE "'<='"
+%token L_LOR "'||'"
+%token L_LPCTYPE "'lpctype'"
+%token L_LSH "'<<'"
+%token L_LWOBJECT "'lwobject'"
+%token L_MAPPING "'mapping'"
+%token L_MIXED "'mixed'"
+%token L_NE "'!='"
+%token L_NO_MASK "'nomask'"
+%token L_NOSAVE "'nosave'"
+%token L_NOT "'!'"
+%token L_NUMBER "integer literal"
+%token L_OBJECT "'object'"
+%token L_PRIVATE "'private'"
+%token L_PROTECTED "'protected'"
+%token L_PUBLIC "'public'"
 %ifdef USE_PYTHON
-%token L_PYTHON_TYPE
+%token L_PYTHON_TYPE "Python type"
 %endif
-%token L_QUOTED_AGGREGATE
-%token L_RANGE
-%token L_RETURN
-%token L_RSH
-%token L_RSHL
-%token L_SIMUL_EFUN_CLOSURE
-%token L_START_BLOCK
-%token L_START_BLOCK_END_DETECTION
-%token L_START_EXPR
-%token L_START_EXPR_END_DETECTION
-%token L_START_PROG
-%token L_STATIC
-%token L_STATUS
-%token L_STRING
-%token L_STRING_DECL
-%token L_STRUCT
-%token L_SWITCH
-%token L_SYMBOL
-%token L_SYMBOL_DECL
-%token L_VARARGS
-%token L_VIRTUAL
-%token L_VISIBLE
-%token L_VOID
-%token L_WHILE
-%token L_YIELD
+%token L_QUOTED_AGGREGATE "quoted array"
+%token L_RANGE "'..'"
+%token L_RETURN "'return'"
+%token L_RSH "'>>'"
+%token L_RSHL "'>>>'"
+%token L_SIMUL_EFUN_CLOSURE "simul-efun closure"
+%token L_START_BLOCK "start of block"
+%token L_START_BLOCK_END_DETECTION "start of block with end detection"
+%token L_START_EXPR "start of expression"
+%token L_START_EXPR_END_DETECTION "start of expression with end detection"
+%token L_START_PROG "start of program"
+%token L_STATIC "'static'"
+%token L_STATUS "'status'"
+%token L_STRING "string literal"
+%token L_STRING_DECL "'string'"
+%token L_STRUCT "'struct'"
+%token L_SWITCH "'switch'"
+%token L_SYMBOL "symbol literal"
+%token L_SYMBOL_DECL "'symbol'"
+%token L_VARARGS "'varargs'"
+%token L_VIRTUAL "'virtual'"
+%token L_VISIBLE "'visible'"
+%token L_VOID "'void'"
+%token L_WHILE "'while'"
+%token L_YIELD "'yield'"
 
 /* Textbook solution to the 'dangling else' shift/reduce conflict.
  */
@@ -11313,7 +11366,7 @@ name_list:
       L_ASSIGN expr0
       {
           use_variable($5.name, VAR_USAGE_READ);
-          init_global_variable($<number>3, $2, $1, $4, $5.type);
+          init_global_variable($<number>3, $2, $1, $4, $5.type, &@5);
           free_fulltype($5.type);
           free_lvalue_block($5.lvalue);
           $$ = $1;
@@ -11351,7 +11404,7 @@ name_list:
           type.t_flags = $1.t_flags;
 
           use_variable($7.name, VAR_USAGE_READ);
-          init_global_variable($<number>5, $4, type, $6, $7.type);
+          init_global_variable($<number>5, $4, type, $6, $7.type, &@7);
 
           free_fulltype(type);
           free_fulltype($7.type);
@@ -11458,7 +11511,7 @@ local_name_list:
       L_ASSIGN expr0
       {
           use_variable($5.name, VAR_USAGE_READ);
-          init_local_variable($2, &$<lvalue>3, $4, $5.type);
+          init_local_variable($2, &$<lvalue>3, $4, $5.type, &@5);
 
           free_fulltype($5.type);
           free_lvalue_block($5.lvalue);
@@ -11483,7 +11536,7 @@ local_name_list:
       L_ASSIGN expr0
       {
           use_variable($7.name, VAR_USAGE_READ);
-          init_local_variable($4, &$<lvalue>5, $6, $7.type);
+          init_local_variable($4, &$<lvalue>5, $6, $7.type, &@7);
 
           free_fulltype($7.type);
           free_lvalue_block($7.lvalue);
@@ -11504,7 +11557,7 @@ statement:
 #endif /* F_BREAK_POINT */
 
           if (pragma_warn_unused_values && $1.needs_use)
-              yywarnf("Unused %s value", get_fulltype_name($1.type));
+              yywarnf_at(&@1, "Unused %s value", get_fulltype_name($1.type));
           free_fulltype($1.type);
 
           if (CURRENT_PROGRAM_SIZE > $1.start)
@@ -11640,11 +11693,8 @@ return:
                */
               if (!check_assignment_types(type2, exact_types))
               {
-                  char tmp[512];
-                  get_fulltype_name_buf(type2, tmp, sizeof(tmp));
-
-                  yyerrorf("Return type not matching: got %s, expected %s"
-                         , tmp, get_lpctype_name(exact_types));
+                  yyerrorf_at(&@2, "Return type mismatch: %s"
+                            , get_expected_fulltypes(get_fulltype(exact_types), type2));
               }
           }
 
@@ -12220,7 +12270,8 @@ expr_decl:
           if (exact_types
            && !check_assignment_types(type2, $1.type))
           {
-              yyerrorf("Bad assignment %s", get_two_lpctypes($1.type, type2.t_type));
+              yyerrorf_at(&@3, "Cannot initialize '%s': %s", get_txt($1.name->name)
+                        , get_expected_fulltypes(get_fulltype($1.type), type2));
           }
 
           if ($2 != F_ASSIGN)
@@ -13285,7 +13336,7 @@ comma_expr:
     | comma_expr
       {
           if (pragma_warn_unused_values && $1.needs_use)
-              yywarnf("Unused %s value", get_fulltype_name($1.type));
+              yywarnf_at(&@1, "Unused %s value", get_fulltype_name($1.type));
           insert_pop_value();
       }
 
@@ -13562,9 +13613,9 @@ expr0:
               {
                   restype.t_type = get_common_type(type1.t_type, type2.t_type);
                   if (!restype.t_type)
-                      yyerrorf("Bad assignment %s", get_two_fulltypes(type1, type2));
+                      yyerrorf_at(&@4, "Cannot assign value: %s", get_expected_fulltypes(type1, type2));
                   else if ((type2.t_flags & TYPE_MOD_LITERAL) && !lpctype_contains(type2.t_type, type1.t_type))
-                      yyerrorf("Bad assignment %s", get_two_fulltypes(type1, type2));
+                      yyerrorf_at(&@4, "Cannot assign value: %s", get_expected_fulltypes(type1, type2));
                   else
                       rttc2 = ref_lpctype(type1.t_type);
               }
@@ -14738,7 +14789,7 @@ expr0:
            && (!restype.t_type
             || ((type2.t_flags & TYPE_MOD_LITERAL) && !lpctype_contains(type2.t_type, type1.t_type))))
           {
-              yyerrorf("Bad assignment %s", get_two_fulltypes(type1, type2));
+              yyerrorf_at(&@3, "Cannot assign value: %s", get_expected_fulltypes(type1, type2));
               if (!restype.t_type)
                   restype = ref_fulltype(type1);
           }
@@ -17539,7 +17590,8 @@ function_call:
           if ( $4 >= 0xff )
               /* since num_arg is encoded in just one byte, and 0xff
                * is taken for SIMUL_EFUN_VARARG */
-              yyerrorf("Too many arguments to function");
+              yyerrorf_at(&@1, "Too many arguments to '%s': expected at most %d, got %ld"
+                        , get_txt($1.real->name), 0xfe, (long)$4);
 
           f = ($1.real->u.global.function == I_GLOBAL_FUNCTION_OTHER) ? -1 : $1.real->u.global.function;
           if (string_context && !$1.super && f >= 0)
@@ -17570,18 +17622,21 @@ function_call:
                   if (!(funp->flags & TYPE_MOD_VARARGS))
                   {
                       if ($4 > funp->num_arg && !(funp->flags & TYPE_MOD_XVARARGS))
-                          yyerrorf("Too many arguments to simul_efun %s"
-                                  , get_txt(funp->name));
+                          function_argument_count_error(&@1, get_txt(funp->name)
+                              , funp->num_arg - funp->num_opt_arg, funp->num_arg, $4);
 
                       if ($4 < funp->num_arg - funp->num_opt_arg - ((funp->flags & TYPE_MOD_XVARARGS)?1:0) && !has_ellipsis)
                       {
                           if (pragma_pedantic)
-                              yyerrorf("Missing arguments to simul_efun %s"
-                                      , get_txt(funp->name));
+                              function_argument_count_error(&@1, get_txt(funp->name)
+                                  , funp->num_arg - funp->num_opt_arg - ((funp->flags & TYPE_MOD_XVARARGS) ? 1 : 0)
+                                  , (funp->flags & TYPE_MOD_XVARARGS) ? -1 : funp->num_arg, $4);
                           else
                           {
-                              yywarnf("Missing arguments to simul_efun %s"
-                                     , get_txt(funp->name));
+                              yywarnf_at(&@1, "Missing arguments to simul_efun '%s': expected at least %d, got %ld"
+                                        , get_txt(funp->name)
+                                        , funp->num_arg - funp->num_opt_arg - ((funp->flags & TYPE_MOD_XVARARGS) ? 1 : 0)
+                                        , (long)$4);
                               ap_needed = MY_TRUE;
                           }
                       }
@@ -17598,7 +17653,7 @@ function_call:
                       ap_needed = MY_TRUE;
 
                   if (funp->offset.argtypes != NULL)
-                      check_function_call_types(get_argument_types_start($4), $4, funp, funp->offset.argtypes, progp->types);
+                      check_function_call_types(get_argument_types_start($4), $4, funp, funp->offset.argtypes, progp->types, &@1);
 
                   if (simul_efun == I_GLOBAL_SEFUN_BY_NAME)
                   {
@@ -17793,10 +17848,9 @@ function_call:
                    && exact_types
                    && !has_ellipsis)
                   {
-                      yyerrorf("Wrong number of arguments to %.60s: "
-                               "expected %ld, got %ld"
-                              , get_txt($1.real->name)
-                              , (long)(funp->num_arg - funp->num_opt_arg - ((funp->flags & TYPE_MOD_XVARARGS)?1:0)), (long)$4);
+                      function_argument_count_error(&@1, get_txt($1.real->name)
+                          , funp->num_arg - funp->num_opt_arg - ((funp->flags & TYPE_MOD_XVARARGS) ? 1 : 0)
+                          , (funp->flags & TYPE_MOD_XVARARGS) ? -1 : funp->num_arg, $4);
                   }
 
                   /* Check the argument types.
@@ -17807,7 +17861,7 @@ function_call:
                           arg_types += first_arg;
                       else
                           types += first_arg;
-                      check_function_call_types(get_argument_types_start($4), $4, funp, arg_types, types);
+                      check_function_call_types(get_argument_types_start($4), $4, funp, arg_types, types, &@1);
                   }
 
               } /* if (inherited lfun) */
@@ -17900,11 +17954,11 @@ function_call:
                            )
                   {
                       /* Not enough args, and no proxy_efun to replace this */
-                      yyerrorf("Too few arguments to %s", instrs[f].name);
+                      function_argument_count_error(&@1, instrs[f].name, min, max, num_arg);
                   }
                   else if (num_arg > max && max != -1)
                   {
-                      yyerrorf("Too many arguments to %s", instrs[f].name);
+                      function_argument_count_error(&@1, instrs[f].name, min, max, num_arg);
                       pop_arg_stack (num_arg - max);
                       $4 -= num_arg - max; /* Don't forget this for the final pop */
                       num_arg = max;
@@ -17950,7 +18004,7 @@ function_call:
 
                                       /* Nothing matched... */
                                       efun_argument_error(argn+1, f, beginArgp
-                                                         , *aargp);
+                                                         , *aargp, &@1);
                                       break;
                                   }
 
@@ -18286,11 +18340,11 @@ function_call:
                   if (num_arg > funp->num_arg
                    && !(funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
                    && !has_ellipsis)
-                      yyerrorf("Too many arguments to simul_efun %s"
-                              , get_txt(funp->name));
+                      function_argument_count_error(&@3, get_txt(funp->name)
+                          , funp->num_arg - funp->num_opt_arg, funp->num_arg, num_arg);
 
                   if (funp->offset.argtypes != NULL)
-                      check_function_call_types(get_argument_types_start(num_arg), num_arg, funp, funp->offset.argtypes, simul_efun_table[sefun].program->types);
+                      check_function_call_types(get_argument_types_start(num_arg), num_arg, funp, funp->offset.argtypes, simul_efun_table[sefun].program->types, &@3);
 
                   if (!(funp->flags & (TYPE_MOD_VARARGS|TYPE_MOD_XVARARGS))
                    && !has_ellipsis)
@@ -18374,7 +18428,7 @@ function_call:
 #endif
               )
               {
-                  efun_argument_error(1, call_instr, efun_arg_types + instrs[call_instr].arg_index, $1.type);
+                  efun_argument_error(1, call_instr, efun_arg_types + instrs[call_instr].arg_index, $1.type, &@1);
               }
           }
           $$.start = $1.start;
@@ -18992,7 +19046,7 @@ printf("DEBUG:   context name '%s'\n", get_txt(name->name));
 /*-------------------------------------------------------------------------*/
 static void
 init_local_variable ( ident_t* name, struct lvalue_s *lv, int assign_op
-                    , fulltype_t exprtype)
+                    , fulltype_t exprtype, const code_location_t *loc)
 
 /* This is called directly from a parser rule: <type> <name> = <expr>
  * It will be called after the call to define_local_variable().
@@ -19017,7 +19071,8 @@ if (current_inline && current_inline->parse_context)
     /* Check the assignment for validity */
     if (exact_types && !check_assignment_types(exprtype, lv->type))
     {
-        yyerrorf("Bad assignment %s", get_two_lpctypes(lv->type, exprtype.t_type));
+        yyerrorf_at(loc, "Cannot initialize '%s': %s", get_txt(name->name)
+                  , get_expected_fulltypes(get_fulltype(lv->type), exprtype));
     }
 
     if (assign_op != F_ASSIGN)
