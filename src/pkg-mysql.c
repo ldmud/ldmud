@@ -30,7 +30,6 @@
 
 #include <mysql.h>
 #include <errmsg.h>
-#include <mysql_version.h>
 
 #include "pkg-mysql.h"
 
@@ -98,7 +97,7 @@ pkg_mysql_init (void)
     client_version = mysql_get_client_info();
     cl_version = strtol(client_version, NULL, 10);
     s_version = strtol(server_version, NULL, 10);
-    if (cl_version != s_version)
+    if (cl_version != s_version && strstr(server_version, "Maria") == NULL)
     {
         printf("%s %s: mySQL: compiled for %s, linked with %s client.\n"
               , time_stamp()
@@ -112,8 +111,8 @@ pkg_mysql_init (void)
         if (cl_version > s_version)
             return MY_FALSE;
     }
-    printf("%s mySQL %s\n", time_stamp(), client_version);
-    debug_message("%s mySQL %s\n", time_stamp(), client_version);
+    printf("%s mySQL: %s\n", time_stamp(), server_version);
+    debug_message("%s mySQL: %s\n", time_stamp(), server_version);
     return MY_TRUE;
 } /* pkg_mysql_init() */
 
