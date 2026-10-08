@@ -212,6 +212,7 @@ AC_MY_ARG_ENABLE(access-log,no,,[Log all connection attempts])
 AC_MY_ARG_ENABLE(compat-mode,no,,[Enable compat mode])
 AC_MY_ARG_ENABLE(strict-euids,no,,[Enforce euids for loading objects])
 AC_MY_ARG_ENABLE(filename-spaces,no,,[Allow space characters in filenames])
+AC_MY_ARG_WITH(default-file-encoding,ascii,,[Default for H_FILE_ENCODING])
 AC_MY_ARG_ENABLE(share-variables,no,,[Enable clone initialization from blueprint variable values])
 AC_MY_ARG_ENABLE(keyword-in,no,,[Enable 'in' as a keyword])
 AC_MY_ARG_ENABLE(use-ipv6,no,,[Enables support for IPv6])
@@ -571,6 +572,8 @@ AC_STRING_VAL_FROM_WITH(tls_crldirectory)
 AC_STRING_VAL_FROM_WITH(tls_password)
 
 AC_STRING_VAL_FROM_WITH(python_script)
+
+AC_STRING_VAL_FROM_WITH(default_file_encoding)
 
 AC_TEXT_VAL_FROM_WITH(malloc)
 
@@ -2695,6 +2698,7 @@ AC_SUBST(val_tls_crldirectory)
 AC_SUBST(val_tls_password)
 AC_SUBST(val_python_script)
 AC_SUBST(val_valgrind_redzone)
+AC_SUBST(val_default_file_encoding)
 
 dnl finally: some remaining stuff
 dnl

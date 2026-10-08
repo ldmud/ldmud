@@ -28,6 +28,11 @@
  */
 @cdef_filename_spaces@ ALLOW_FILENAME_SPACES
 
+/* The default file encoding to be used if H_FILE_ENCODING is not set. This
+ * includes compilation of the Master object (i.e. before it had a chance to
+ * actually set H_FILE_ENCODING).
+ */
+#define DEFAULT_FILE_ENCODING    @val_default_file_encoding@
 
 /* --- Runtime limits --- */
 

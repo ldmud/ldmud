@@ -7,6 +7,8 @@
 exec ./configure --prefix=/RoleMUD/ --libexecdir=/RoleMUD/bin --libdir=/RoleMUD/MUD-Lib --enable-erq=xerq --with-setting=beutelland $*
 exit 1
 
+# --- default file encoding ---
+with_default_file_encoding=utf8
 
 # --- Timing ---
 with_time_to_clean_up=5400

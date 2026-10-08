@@ -1149,7 +1149,7 @@ get_file_encoding (string_t* filename, bool source, bool* ignore, bool* replace)
     {
         if (encoding == NULL)
         {
-            cd = iconv_open("utf-8", "ascii");
+            cd = iconv_open("utf-8", DEFAULT_FILE_ENCODING);
             *ignore = false;
             *replace = false;
         }
@@ -1171,7 +1171,8 @@ get_file_encoding (string_t* filename, bool source, bool* ignore, bool* replace)
         }
     }
     else
-        cd = iconv_open(encoding == NULL ? "ascii" : get_txt(encoding), "utf-8");
+        cd = iconv_open(encoding == NULL ? DEFAULT_FILE_ENCODING
+                : get_txt(encoding), "utf-8");
 
     if (!iconv_valid(cd))
         errorf("Unsupported encoding '%s'.\n", get_txt(encoding));
