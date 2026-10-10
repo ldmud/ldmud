@@ -22243,7 +22243,35 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep, string_t **fn
 
                         i++;
                         inc_new = xalloc(sizeof *inc_new);
-                        /* TODO: What if this fails? */
+                        if (!inc_new)
+                        {
+                            /* Out of memory: we cannot follow the include
+                             * structure any further, so report the position
+                             * as unknown, like the other failure modes above.
+                             */
+                            while (inctop)
+                            {
+                                struct incinfo *inc_old;
+
+                                inc_old = inctop;
+                                inctop = inc_old->super;
+                                xfree(inc_old);
+                            }
+
+                            if (used_system_mem)
+                            {
+                                total_prog_block_size -= progp->line_numbers->size;
+                                total_bytes_unswapped -= progp->line_numbers->size;
+                                xfree(progp->line_numbers);
+                                progp->line_numbers = NULL;
+                                reallocate_reserved_areas();
+                            }
+
+                            *namep = ref_mstring(STR_UNDEFINED);
+                            if (fnamep)
+                                *fnamep = NULL;
+                            return 0;
+                        }
                         inc_new->name = includes->filename;
                         includes++;
                         inc_new->super = inctop;
