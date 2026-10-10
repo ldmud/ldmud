@@ -5850,7 +5850,9 @@ closure_lookup_lfun_prog ( lfun_closure_t * l
 {
     int             ix;
     program_t      *prog;
+#ifdef DEBUG
     string_t       *obname;
+#endif
     Bool            is_inherited;
 
     is_inherited = MY_FALSE;
@@ -5873,13 +5875,17 @@ closure_lookup_lfun_prog ( lfun_closure_t * l
 
             /* Find the true definition of the function */
             prog = ob->prog;
+#ifdef DEBUG
             obname = ob->name;
+#endif
             break;
         }
 
         case T_LWOBJECT:
             prog = l->fun_ob.u.lwob->prog;
+#ifdef DEBUG
             obname = prog->name;
+#endif
             break;
 
         case T_NUMBER:
