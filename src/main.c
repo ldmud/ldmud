@@ -818,6 +818,35 @@ debug_message(const char *a, ...)
 
 /*-------------------------------------------------------------------------*/
 void
+write_bytes (int d, const char *s, size_t length)
+
+/* Memory-safe best-effort function to write <length> bytes from <s> to
+ * descriptor <d>. Complete partial writes and retry interrupted writes.
+ */
+
+{
+    int saved_errno = errno;
+
+    while (length > 0)
+    {
+        ssize_t written = write(d, s, length);
+
+        if (written > 0)
+        {
+            s += written;
+            length -= written;
+        }
+        else if (written < 0 && errno == EINTR)
+            continue;
+        else
+            break;
+    }
+
+    errno = saved_errno;
+} /* write_bytes() */
+
+/*-------------------------------------------------------------------------*/
+void
 write_x (int d, p_uint i)
 
 /* Memory safe function to write 4-byte hexvalue <i> to fd <d>. */
@@ -830,7 +859,7 @@ write_x (int d, p_uint i)
         c = (char)((i >> (8 * sizeof i - 4) ) + '0');
         if (c >= '9' + 1)
             c += (char)('a' - ('9' + 1));
-        write(d, &c, 1);
+        write_bytes(d, &c, 1);
     }
 } /* write_x() */
 
@@ -848,7 +877,7 @@ write_X (int d, unsigned char i)
         c = (char)((i >> (8 * sizeof i - 4) ) + '0');
         if (c >= '9' + 1)
             c += (char)('a' - ('9' + 1));
-        write(d, &c, 1);
+        write_bytes(d, &c, 1);
     }
 } /* write_X() */
 
@@ -866,7 +895,7 @@ writed (int d, p_uint i)
     if (!j) j = 1;
     do {
         c = (char)((i / j) % 10 + '0');
-        write(d, &c, 1);
+        write_bytes(d, &c, 1);
         j /= 10;
     } while (j > 0);
 } /* writed() */
@@ -878,7 +907,7 @@ writes (int d, const char *s)
 /* Memory safe function to string <s> to fd <d>. */
 
 {
-    write(d, s, strlen(s));
+    write_bytes(d, s, strlen(s));
 }
 
 /*-------------------------------------------------------------------------*/
@@ -899,23 +928,23 @@ dprintf_first (int fd, char *s, p_int a)
     do {
         if ( !(p = strchr(s, '%')) )
         {
-            write(fd, s, strlen(s));
+            writes(fd, s);
             return "";
         }
 
-        write(fd, s, p - s);
+        write_bytes(fd, s, p - s);
         switch(p[1])
         {
         case '%':
-            write(fd, p+1, 1);
+            write_bytes(fd, p+1, 1);
             continue;
         case 's':
-            write(fd, (char *)a, strlen((char*)a));
+            writes(fd, (char *)a);
             break;
         case 'c':
           {
             char c = (char)a;
-            write(fd, (char *)&c, 1);
+            write_bytes(fd, (char *)&c, 1);
             break;
           }
         case 'd':
@@ -942,7 +971,7 @@ dprintf1 (int fd, char *s, p_int a)
 
 {
     s = dprintf_first(fd, s, a);
-    write(fd, s, strlen(s));
+    writes(fd, s);
 } /* dprintf1() */
 
 /*-------------------------------------------------------------------------*/
@@ -3028,8 +3057,15 @@ eval_arg (int eOption, const char * pValue)
             int n;
 
             n = strtol(pValue, (char **)0, 0);
-            while(--n >= 0) {
-                (void)dup(2);
+            while (--n >= 0)
+            {
+                if (dup(2) < 0)
+                {
+                    fprintf(stderr,
+                            "Could not gobble another file descriptor: %s.\n",
+                            strerror(errno));
+                    return hrError;
+                }
             }
             break;
         }

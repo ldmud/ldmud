@@ -446,7 +446,7 @@ static word_t samagic[]
 
 #ifdef DEBUG_MALLOC_ALLOCS
 #    define ulog(s) \
-       write(gcollect_outfd, s, strlen(s))
+       writes(gcollect_outfd, s)
 #    define ulog1f(s,t) \
        dprintf1(gcollect_outfd, s, (p_int)(t))
 #    define ulog2f(s,t1,t2) \

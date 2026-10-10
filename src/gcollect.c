@@ -2767,12 +2767,12 @@ show_string (int d, char *block, int depth UNUSED)
         WRITES(d, "\"");
         if ((len = strlen(block)) < 70)
         {
-            write(d, block, len);
+            write_bytes(d, block, len);
             WRITES(d, "\"");
         }
         else
         {
-            write(d, block, 50);
+            write_bytes(d, block, 50);
             WRITES(d, "\" (truncated, length ");writed(d, len);WRITES(d, ")");
         }
     }
@@ -2797,12 +2797,12 @@ show_mstring_data (int d, void *block, int depth UNUSED)
     WRITES(d, ")\"");
     if (str->size < 50)
     {
-        write(d, str->txt, str->size);
+        write_bytes(d, str->txt, str->size);
         WRITES(d, "\"");
     }
     else
     {
-        write(d, str->txt, 50);
+        write_bytes(d, str->txt, 50);
         WRITES(d, "\" (truncated)");
     }
 } /* show_mstring_data() */
