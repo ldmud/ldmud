@@ -1479,6 +1479,14 @@ yyerror (const char *str)
         return;
     }
 
+    if (compile_check_is_active())
+    {
+        compile_check_record_diagnostic(MY_FALSE, current_loc.file->name,
+                                        current_loc.line, str, context);
+        num_parse_error++;
+        return;
+    }
+
     fprintf(stderr, "%s %s line %d: %s%s.\n"
                   , time_stamp(), current_loc.file->name, current_loc.line
                   , str, context);
@@ -1530,6 +1538,13 @@ yywarn (const char *str)
     {
         /* Change that to a runtime warning. */
         warnf("%s%s\n", str, context);
+        return;
+    }
+
+    if (compile_check_is_active())
+    {
+        compile_check_record_diagnostic(MY_TRUE, current_loc.file->name,
+                                        current_loc.line, str, context);
         return;
     }
 
@@ -10571,6 +10586,7 @@ inheritance:
            */
 
           object_t *ob;
+          program_t *inherit_prog;
 
           if (CURRENT_PROGRAM_SIZE
            && !(FUNCTION(FUNCTION_COUNT-1)->flags & NAME_INHERITED))
@@ -10693,23 +10709,35 @@ inheritance:
           ob = find_object(last_string_constant);
           if (ob == 0)
           {
-              inherit_file = last_string_constant;
-              last_string_constant = NULL;
-              /* Return back to load_object() */
-              YYACCEPT;
-          }
-          ob->time_of_ref = current_time;
+              inherit_prog = NULL;
+              if (compile_check_is_active())
+                  inherit_prog = compile_check_find_program(last_string_constant);
 
-          if (ob->flags & O_SWAPPED && load_ob_from_swap(ob) < 0)
+              if (inherit_prog == NULL)
+              {
+                  inherit_file = last_string_constant;
+                  last_string_constant = NULL;
+                  /* Return back to load_object(). */
+                  YYACCEPT;
+              }
+          }
+          else
           {
-              free_mstring(last_string_constant);
-              last_string_constant = NULL;
-              yyerrorf("Out of memory when unswapping '%s'", get_txt(ob->name));
-              YYACCEPT;
+              ob->time_of_ref = current_time;
+
+              if (ob->flags & O_SWAPPED && load_ob_from_swap(ob) < 0)
+              {
+                  free_mstring(last_string_constant);
+                  last_string_constant = NULL;
+                  yyerrorf("Out of memory when unswapping '%s'", get_txt(ob->name));
+                  YYACCEPT;
+              }
+
+              inherit_prog = ob->prog;
           }
 
           /* Legal to inherit? */
-          if (ob->prog->flags & P_NO_INHERIT)
+          if (inherit_prog->flags & P_NO_INHERIT)
           {
               yyerror("Illegal to inherit an object which sets "
                       "'#pragma no_inherit'.");
@@ -10727,7 +10755,7 @@ inheritance:
 
               for (; --j >= 0; inheritp++)
               {
-                  if (inheritp->prog == ob->prog && inheritp->inherit_depth == 1)
+                  if (inheritp->prog == inherit_prog && inheritp->inherit_depth == 1)
                   {
                       duplicate_toplevel = true;
                       break;
@@ -10751,7 +10779,7 @@ inheritance:
           /* Copy the functions and variables, and take
            * care of the initializer.
            */
-          int initializer = inherit_program(ob->prog, $1.funmod, $1.varmod, $1.structmod);
+          int initializer = inherit_program(inherit_prog, $1.funmod, $1.varmod, $1.structmod);
           if (initializer > -1)
           {
               /* We inherited a __INIT() function: create a call */

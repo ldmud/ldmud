@@ -1,0 +1,1 @@
+inherit "recursive_b";
