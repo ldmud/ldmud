@@ -650,11 +650,13 @@ string_to_string (fmt_state_t *st, string_t* obj, size_t index1, size_t index2, 
         }
         else
         {
-            char *tmpstr, *src, *dest;
-            size_t tmpsize = 10 * (index2-index1);
-
-            /* Allocate the temporary string */
-            tmpstr = alloca(tmpsize);
+            /* Escape into a small buffer of fixed size, flushing it into
+             * <str> whenever it might not have room for another character.
+             * (The buffer must be at least 10 bytes for
+             * get_escaped_character().)
+             */
+            char tmpstr[512];
+            char *src, *dest;
 
             src = get_txt(obj) + index1;
             dest = tmpstr;
@@ -673,10 +675,17 @@ string_to_string (fmt_state_t *st, string_t* obj, size_t index1, size_t index2, 
                     i += clen;
                 }
 
-                dest += get_escaped_character(c, dest, tmpstr + tmpsize - dest);
+                if ((size_t)(tmpstr + sizeof(tmpstr) - dest) < 10)
+                {
+                    straddn(st, &str, tmpstr, dest - tmpstr);
+                    dest = tmpstr;
+                }
+
+                dest += get_escaped_character(c, dest, tmpstr + sizeof(tmpstr) - dest);
             } /* for() */
 
-            straddn(st, &str, tmpstr, dest - tmpstr);
+            if (dest != tmpstr)
+                straddn(st, &str, tmpstr, dest - tmpstr);
         }
     }
 
