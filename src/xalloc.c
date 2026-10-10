@@ -1411,6 +1411,34 @@ realloc (void * p, size_t size)
 /* ======================================================================= */
 
 /*-------------------------------------------------------------------------*/
+static void
+get_stack_direction_probe (char * outer)
+
+/* Helper for get_stack_direction(): compare the address of a fresh local
+ * variable against <outer>, a local variable of our caller, and store the
+ * result (+1 or -1) into the global stack_direction.
+ */
+
+{
+    char local;  /* to get stack address */
+
+    if (&local > outer)
+        stack_direction = 1;    /* stack grew upward */
+    else
+        stack_direction = -1;   /* stack grew downward */
+} /* get_stack_direction_probe() */
+
+/* The probe must execute in a stack frame of its own, strictly deeper
+ * than the frame holding <outer>. Calling it directly (or the older
+ * recurse-once scheme) lets optimizing compilers inline the call and
+ * place both locals in the same frame, where their relative order is
+ * arbitrary and the detection yields wrong results. A call through a
+ * volatile function pointer cannot be inlined.
+ */
+static void (*volatile get_stack_direction_probe_fn)(char *)
+    = get_stack_direction_probe;
+
+/*-------------------------------------------------------------------------*/
 void
 get_stack_direction (void)
 
@@ -1421,19 +1449,12 @@ get_stack_direction (void)
 {
     char local;  /* to get stack address */
 
-    if (initial_stack == NULL)  /* initial call */
-    {
 DIAGWARN_PUSH
 DIAG_IGNORE_DANGLING_POINTER // This is intended.
-        initial_stack = &local;
+    initial_stack = &local;
 DIAGWARN_POP
-        get_stack_direction ();  /* recurse once */
-    }
-    else  /* recursive call */
-    if (&local > initial_stack)
-        stack_direction = 1;    /* stack grew upward */
-    else
-        stack_direction = -1;   /* stack grew downward */
+
+    get_stack_direction_probe_fn(&local);
 } /* get_stack_direction() */
 
 /*-------------------------------------------------------------------------*/
