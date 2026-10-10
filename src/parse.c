@@ -1660,7 +1660,14 @@ v_parse_command (svalue_t *sp, int num_arg)
     /* Pattern and commands can not be empty
      */
     if (!mstrsize(cmd) || !mstrsize(pattern))
-        return MY_FALSE;
+    {
+        /* No error handler has been pushed yet, so the stack holds
+         * just the arguments.
+         */
+        sp = pop_n_elems(num_arg + 3, sp);
+        push_number(sp, 0);
+        return sp;
+    }
 
     /* Prepare some variables */
 
