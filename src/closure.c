@@ -125,8 +125,16 @@
 
 /*-------------------------------------------------------------------------*/
 
-#define MAX_LAMBDA_LEVELS 0x8000;
+#define MAX_LAMBDA_LEVELS 1000
   /* Maximum recursion depth for compile_value.
+   *
+   * The limit must keep the recursion within the C stack: one level of
+   * nesting costs about 430 bytes of stack (compile_value() plus
+   * compile_efun_call()) in a normal build and about 1.1 KB in an
+   * AddressSanitizer build, so the previous limit of 0x8000 was hit by
+   * a stack overflow at a depth of about 19500 with the common 8 MB
+   * stack limit. 1000 levels stay well below 1 MB of stack and match
+   * MAX_JSON_NESTING_DEPTH in pkg-json.c.
    */
 
 #define SYMTAB_START_SIZE       16
@@ -4936,7 +4944,7 @@ is_lvalue (svalue_t *argp, int flags)
 
 /*-------------------------------------------------------------------------*/
 static void
-compile_lvalue (svalue_t *argp, int flags)
+compile_lvalue_int (svalue_t *argp, int flags)
 
 /* Compile the <argp> into an lvalue, according to the <flags>. The function
  * allocates enough space in the code buffer to store the assignment code
@@ -5513,6 +5521,25 @@ compile_lvalue (svalue_t *argp, int flags)
     }
 
     lambda_error("Illegal lvalue\n");
+} /* compile_lvalue_int() */
+
+/*-------------------------------------------------------------------------*/
+static void
+compile_lvalue (svalue_t *argp, int flags)
+
+/* Wrapper around compile_lvalue_int() that checks the recursion depth.
+ * compile_lvalue_int() recurses into nested lvalues without going
+ * through compile_value(), so it has to take part in the depth
+ * accounting itself.
+ */
+
+{
+    if (!--current.levels_left)
+        lambda_error("Too deep recursion inside lambda()\n");
+
+    compile_lvalue_int(argp, flags);
+
+    current.levels_left++;
 } /* compile_lvalue() */
 
 /*-------------------------------------------------------------------------*/
