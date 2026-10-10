@@ -2009,6 +2009,9 @@ options (void)
 #ifdef USE_IPV6
                               , "IPv6 supported\n"
 #endif
+#ifdef SUPPORT_PROXY_PROTOCOL
+                              , "PROXY protocol v1 supported\n"
+#endif
 #ifdef USE_MCCP
                               , "MCCP supported\n"
 #endif
