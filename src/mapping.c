@@ -1515,15 +1515,21 @@ resize_mapping (mapping_t *m, mp_int new_width)
     num_entries = m->num_entries;
 
     /* Get the target mapping without a hash, but with a condensed block
-     * big enough to hold all entries.
+     * big enough to hold all entries. Deleted keys and keys referencing
+     * destructed objects are not copied, so they don't get a slot either.
      */
     {
         p_int cm_size = 0;
         if (m->cond)
         {
-            cm_size = m->cond->size;
-            if (m->hash)
-                cm_size -= m->hash->cond_deleted;
+            size_t ix;
+            svalue_t * key;
+
+            for (ix = 0, key = &(m->cond->data[0]); ix < m->cond->size; ix++, key++)
+            {
+                if (key->type != T_INVALID && !destructed_object_ref(key))
+                    cm_size++;
+            }
         }
         m2 = get_new_mapping(get_current_user(), new_width, 0, cm_size);
         if (!m2)
@@ -1643,18 +1649,11 @@ resize_mapping (mapping_t *m, mp_int new_width)
                 ; /* Do nothing */
             else if (destructed_object_ref(src_key))
             {
-                /* We have to fill the space.
-                 * (Alternatively we could decrease m->cond->size.)
+                /* Skip the entry: the condensed block of the copy has
+                 * no space for it, and must not contain deleted keys
+                 * since it has no hash part to account for them.
                  */
-                p_int i;
-
                 num_entries--;
-
-                dest_key->type = T_INVALID;
-                dest_key++;
-
-                for (i = new_width; i > 0; i--, dest_data++)
-                    put_number(dest_data, 0);
             }
             else
             {
