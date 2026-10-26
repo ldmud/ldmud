@@ -108,7 +108,6 @@ static int logon() {
     write("Lars says: Let's get a body for your character ...\n");
     cat("/WELCOME");
     write("Version: " + version() + "\n");
-    write("What is your name: ");
     input_to("logon2", INPUT_PROMPT, "What is your name: ");
     call_out("time_out", 120);
     return 1;

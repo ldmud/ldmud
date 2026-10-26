@@ -9,7 +9,6 @@ void init() {
     add_action("close", "close");
     add_action("push", "push");
     add_action("north", "north");
-    add_action("south", "south");
 }
 
 string short() {
