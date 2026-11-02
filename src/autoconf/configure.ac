@@ -1440,7 +1440,7 @@ fi
 # like it if -lz precedes the -lmysqlclient in the link command.
 
 AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
-for TESTPATH in "" "${mysql_path}/include/mysql" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include/mysql" "/usr/local/mysql/include" "/usr/local/include/mysql" "/usr/local/include" "/usr/lib/mysql/include" "/usr/lib/mysql/mysql" "/usr/lib/mysql" "/usr/include/mysql"; do
+for TESTPATH in "" "${mysql_path}/include/mysql" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include/mysql" "/usr/local/mysql/include" "/usr/local/include/mysql" "/usr/local/include" "/usr/lib/mysql/include" "/usr/lib/mysql/mysql" "/usr/lib/mysql" "/usr/include/mysql" "${mysql_path}/include/mariadb" "/usr/local/include/mariadb" "/usr/include/mariadb"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="-I$TESTPATH $saveflags"
@@ -1450,7 +1450,7 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <mysql.h>
 #include <errmsg.h>
 
-struct MYSQL * foo(void)
+MYSQL * foo(void)
 {
     static MYSQL var;
     
@@ -1476,22 +1476,19 @@ if test "$lp_cv_has_mysql" = "yes"; then
     tmp=""
 
     if test "x$mysql_path" = "x"; then
-        AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -lmysqlclient")
+        AC_SEARCH_LIBS(mysql_init, mysqlclient mariadb, tmp="$PKGLIBS $ac_cv_search_mysql_init")
         if test "x$tmp" = "x"; then
             if test -d "/usr/local/mysql/lib/mysql"; then
-                unset ac_cv_lib_mysqlclient_main
                 CFLAGS="$saveflags -L/usr/local/mysql/lib/mysql"
                 AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/mysql/lib/mysql -lmysqlclient")
             elif test -d "/usr/local/mysql/lib"; then
-                unset ac_cv_lib_mysqlclient_main
                 CFLAGS="$saveflags -L/usr/local/mysql/lib"
                 AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/mysql/lib -lmysqlclient")
             elif test -d "/usr/local/lib"; then
-                unset ac_cv_lib_mysqlclient_main
+                unset ac_cv_search_mysql_init
                 CFLAGS="$saveflags -L/usr/local/lib"
-                AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/lib -lmysqlclient")
+                AC_SEARCH_LIBS(mysql_init, mysqlclient mariadb, tmp="$PKGLIBS -L/usr/local/lib $ac_cv_search_mysql_init")
             elif test -d "/usr/lib/mysql/lib"; then
-                unset ac_cv_lib_mysqlclient_main
                 CFLAGS="$saveflags -L/usr/lib/mysql/lib"
                 AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/lib/mysql/lib -lmysqlclient")
             fi
@@ -1502,10 +1499,10 @@ if test "$lp_cv_has_mysql" = "yes"; then
             AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L${mysql_path}/lib/mysql -lmysqlclient")
         elif test -d "${mysql_path}/lib"; then
             CFLAGS="$saveflags -L${mysql_path}/lib"
-            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L${mysql_path}/lib -lmysqlclient")
+            AC_SEARCH_LIBS(mysql_init, mysqlclient mariadb, tmp="$PKGLIBS -L${mysql_path}/lib $ac_cv_search_mysql_init")
         else
             CFLAGS="$saveflags -L$mysql_path"
-            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L$mysql_path -lmysqlclient")
+            AC_SEARCH_LIBS(mysql_init, mysqlclient mariadb, tmp="$PKGLIBS -L$mysql_path $ac_cv_search_mysql_init")
         fi
     fi
 
@@ -1528,7 +1525,7 @@ if test "$lp_cv_has_mysql" = "yes"; then
 
       AC_CACHE_CHECK(if -lz is needed, lp_cv_need_lib_z,
           AC_RUN_IFELSE([AC_LANG_SOURCE([[
-#include <mysql/mysql.h>
+#include <mysql.h>
 void t (void)
 {
     MYSQL *dat;
