@@ -531,6 +531,7 @@ void    configure_object(null|object, int, mixed);
 void    destruct(null|object);
 int     exec(object, object);
 object  find_object(string);
+mixed  *check_compile(string);
 mixed  *functionlist(object|lwobject|string, int default: F_CONST1);
 mixed   function_exists(string, void|int|object|lwobject, void|int);
 string *include_list(void|object|lwobject, void|int);

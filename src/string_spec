@@ -141,6 +141,7 @@ VARINIT         "__INIT"
     /* Master lfuns */
 
 ABS_PATH        "make_path_absolute"
+CHECK_COMPILE   "check_compile"
 COMPILE_OBJECT  "compile_object"
 CONNECT         "connect"
 DANGLING_LFUN   "dangling_lfun_closure"

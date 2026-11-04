@@ -1831,6 +1831,695 @@ load_object_error(const char *msg, const char *name, namechain_t *chain)
 /*-------------------------------------------------------------------------*/
 #define MAX_LOAD_DEPTH 60 /* Make this a configurable constant */
 
+typedef struct compile_check_diag_s
+{
+    string_t *file;
+    int line;
+    Bool warning;
+    string_t *message;
+} compile_check_diag_t;
+
+typedef struct compile_check_program_s
+{
+    string_t *name;
+    program_t *prog;
+    Bool active;
+} compile_check_program_t;
+
+typedef struct compile_check_context_s
+{
+    compile_check_diag_t *diag;
+    size_t num_diag;
+    size_t max_diag;
+    compile_check_program_t *programs;
+    size_t num_programs;
+    size_t max_programs;
+} compile_check_context_t;
+
+static compile_check_context_t *active_compile_check_context;
+
+typedef struct compile_check_cleanup_s
+{
+    error_handler_t head;
+    compile_check_context_t ctx;
+    compile_check_context_t *previous_active_context;
+    int fd;
+    Bool compiler_started;
+    Bool active_context_set;
+} compile_check_cleanup_t;
+
+bool
+compile_check_is_active (void)
+
+/* Return true if compiler diagnostics should be captured for check_compile().
+ */
+
+{
+    return active_compile_check_context != NULL;
+} /* compile_check_is_active() */
+
+/*-------------------------------------------------------------------------*/
+static const char *compile_check_diag_filename(const char *fname);
+static const char *compile_check_diag_source_filename(const char *fname);
+static compile_check_program_t *compile_check_find_program_entry(
+    compile_check_context_t *ctx, const char *name);
+
+/*-------------------------------------------------------------------------*/
+static compile_check_program_t *
+compile_check_find_program_entry (compile_check_context_t *ctx, const char *name)
+
+/* Return the cached program entry for canonical object name <name>, or NULL.
+ */
+
+{
+    size_t ix;
+
+    for (ix = 0; ix < ctx->num_programs; ix++)
+    {
+        if (strcmp(get_txt(ctx->programs[ix].name), name) == 0)
+            return ctx->programs + ix;
+    }
+
+    return NULL;
+} /* compile_check_find_program_entry() */
+
+/*-------------------------------------------------------------------------*/
+program_t *
+compile_check_find_program (string_t *name)
+
+/* Return a borrowed dry-compiled program for inherited object <name>, or NULL.
+ */
+
+{
+    const char *pName;
+    compile_check_program_t *entry;
+
+    if (active_compile_check_context == NULL)
+        return NULL;
+
+    pName = make_name_sane(get_txt(name), false, false);
+    if (pName == NULL)
+        pName = get_txt(name);
+
+    entry = compile_check_find_program_entry(active_compile_check_context, pName);
+    return entry != NULL ? entry->prog : NULL;
+} /* compile_check_find_program() */
+
+/*-------------------------------------------------------------------------*/
+static compile_check_program_t *
+compile_check_add_program_entry (compile_check_context_t *ctx, const char *name)
+
+/* Add a cache entry for canonical object name <name> to <ctx>.
+ */
+
+{
+    compile_check_program_t *entry;
+    string_t *name_str;
+
+    if (ctx->num_programs == ctx->max_programs)
+    {
+        size_t new_max;
+        size_t new_size;
+
+        new_max = ctx->max_programs ? 2 * ctx->max_programs : 4;
+        if (new_max <= ctx->max_programs
+         || new_max > (size_t)-1 / sizeof(*ctx->programs))
+            outofmem(sizeof(*ctx->programs), "compile check program cache");
+
+        new_size = new_max * sizeof(*ctx->programs);
+        entry = rexalloc(ctx->programs, new_size);
+        if (entry == NULL)
+            outofmem(new_size, "compile check program cache");
+
+        ctx->programs = entry;
+        ctx->max_programs = new_max;
+    }
+
+    name_str = new_unicode_tabled(name);
+    if (name_str == NULL)
+        outofmem(strlen(name), "compile check program name");
+
+    entry = ctx->programs + ctx->num_programs++;
+    entry->name = name_str;
+    entry->prog = NULL;
+    entry->active = MY_FALSE;
+
+    return entry;
+} /* compile_check_add_program_entry() */
+
+/*-------------------------------------------------------------------------*/
+static void
+compile_check_add_diag (compile_check_context_t *ctx, const char *file
+                       , int line, Bool warning, const char *message)
+
+/* Add one diagnostic to <ctx>. The strings are copied and owned by <ctx>.
+ */
+
+{
+    compile_check_diag_t *new_diag;
+    string_t *file_str;
+    string_t *message_str;
+    const char *file_text;
+    const char *message_text;
+
+    file_text = file != NULL ? file : "";
+    message_text = message != NULL ? message : "";
+
+    if (ctx->num_diag == ctx->max_diag)
+    {
+        size_t new_max;
+        size_t new_size;
+
+        new_max = ctx->max_diag ? 2 * ctx->max_diag : 4;
+        if (new_max <= ctx->max_diag
+         || new_max > (size_t)-1 / sizeof(*ctx->diag))
+            outofmem(sizeof(*ctx->diag), "compile check diagnostics");
+
+        new_size = new_max * sizeof(*ctx->diag);
+        new_diag = rexalloc(ctx->diag, new_size);
+        if (new_diag == NULL)
+            outofmem(new_size, "compile check diagnostics");
+
+        ctx->diag = new_diag;
+        ctx->max_diag = new_max;
+    }
+
+    file_str = new_unicode_mstring(file_text);
+    if (file_str == NULL)
+        outofmem(strlen(file_text), "compile check diagnostic file");
+
+    message_str = new_unicode_mstring(message_text);
+    if (message_str == NULL)
+    {
+        free_mstring(file_str);
+        outofmem(strlen(message_text), "compile check diagnostic message");
+    }
+
+    ctx->diag[ctx->num_diag].file = file_str;
+    ctx->diag[ctx->num_diag].line = line;
+    ctx->diag[ctx->num_diag].warning = warning;
+    ctx->diag[ctx->num_diag].message = message_str;
+    ctx->num_diag++;
+} /* compile_check_add_diag() */
+
+/*-------------------------------------------------------------------------*/
+void
+compile_check_record_diagnostic (Bool warning, const char *file, int line
+                                , const char *what, const char *context)
+
+/* Add one compiler diagnostic to the active check_compile() context.
+ */
+
+{
+    char *message;
+    const char *diag_file;
+    size_t what_len, context_len, message_len;
+
+    if (active_compile_check_context == NULL)
+        return;
+
+    if (what == NULL)
+        what = "";
+    if (context == NULL)
+        context = "";
+
+    what_len = strlen(what);
+    context_len = strlen(context);
+    if (what_len > (size_t)-1 - context_len - 1)
+        errorf("Out of memory for check_compile() diagnostic message.\n");
+
+    message_len = what_len + context_len;
+    message = alloca(message_len + 1);
+    if (message == NULL)
+        errorf("Out of stack memory (%zu bytes) for check_compile() "
+               "diagnostic message.\n", message_len + 1);
+
+    memcpy(message, what, what_len);
+    memcpy(message + what_len, context, context_len);
+    message[message_len] = '\0';
+
+    diag_file = file != NULL ? compile_check_diag_source_filename(file) : NULL;
+    compile_check_add_diag(active_compile_check_context, diag_file, line
+                          , warning, message);
+} /* compile_check_record_diagnostic() */
+
+/*-------------------------------------------------------------------------*/
+static const char *
+compile_check_diag_filename (const char *fname)
+
+/* Return the externally visible diagnostic name for object file <fname>.
+ */
+
+{
+    const char *diag_name;
+
+    diag_name = make_name_sane(fname, !compat_mode, true);
+    return diag_name != NULL ? diag_name : fname;
+} /* compile_check_diag_filename() */
+
+/*-------------------------------------------------------------------------*/
+static const char *
+compile_check_diag_source_filename (const char *fname)
+
+/* Return the externally visible diagnostic name for source location <fname>.
+ * Unlike object filenames, concrete source filenames keep their extension.
+ */
+
+{
+    static char buf[MAXPATHLEN+1];
+    const char *from = fname;
+    char *to = buf;
+    bool bDiffers = false;
+
+    if (!compat_mode)
+    {
+        *to++ = '/';
+        if (*from == '/')
+            from++;
+        else
+            bDiffers = true;
+    }
+
+    while (*from == '/' || (from[0] == '.' && from[1] == '/'))
+    {
+        bDiffers = true;
+        from++;
+    }
+
+    for (; '\0' != *from && (size_t)(to - buf) < sizeof(buf)
+         ; from++, to++)
+    {
+        if ('/' == *from)
+        {
+            *to = '/';
+            while (*from == '/' || (from[0] == '.' && from[1] == '/'))
+            {
+                bDiffers = true;
+                from++;
+            }
+
+            from--;
+        }
+        else
+            *to = *from;
+    }
+    *to = '\0';
+
+    return bDiffers ? (const char *)buf : fname;
+} /* compile_check_diag_source_filename() */
+
+/*-------------------------------------------------------------------------*/
+static vector_t *
+compile_check_result (compile_check_context_t *ctx, Bool ok)
+
+/* Create the LPC result array ({ ok, diagnostics }) from <ctx>.
+ */
+
+{
+    vector_t *result;
+    vector_t *diagnostics;
+    size_t ix;
+
+    result = allocate_array(2);
+    diagnostics = allocate_array(ctx->num_diag);
+
+    put_number(result->item, ok ? 1 : 0);
+    put_array(result->item + 1, diagnostics);
+
+    for (ix = 0; ix < ctx->num_diag; ix++)
+    {
+        vector_t *entry;
+
+        entry = allocate_array(4);
+        put_ref_string(entry->item, ctx->diag[ix].file);
+        put_number(entry->item + 1, ctx->diag[ix].line);
+        put_c_string(entry->item + 2
+                    , ctx->diag[ix].warning ? "warning" : "error");
+        put_ref_string(entry->item + 3, ctx->diag[ix].message);
+        put_array(diagnostics->item + ix, entry);
+    }
+
+    return result;
+} /* compile_check_result() */
+
+/*-------------------------------------------------------------------------*/
+static void
+compile_check_free (compile_check_context_t *ctx)
+
+/* Free the owned contents of <ctx>.
+ */
+
+{
+    size_t ix;
+
+    for (ix = 0; ix < ctx->num_programs; ix++)
+    {
+        if (ctx->programs[ix].prog != NULL)
+            free_prog(ctx->programs[ix].prog, MY_TRUE);
+        free_mstring(ctx->programs[ix].name);
+    }
+
+    if (ctx->programs != NULL)
+        xfree(ctx->programs);
+
+    for (ix = 0; ix < ctx->num_diag; ix++)
+    {
+        free_mstring(ctx->diag[ix].file);
+        free_mstring(ctx->diag[ix].message);
+    }
+
+    if (ctx->diag != NULL)
+        xfree(ctx->diag);
+
+    ctx->diag = NULL;
+    ctx->num_diag = 0;
+    ctx->max_diag = 0;
+    ctx->programs = NULL;
+    ctx->num_programs = 0;
+    ctx->max_programs = 0;
+} /* compile_check_free() */
+
+/*-------------------------------------------------------------------------*/
+static void
+compile_check_restore_active_context (compile_check_cleanup_t *cleanup)
+
+/* Restore the active check_compile() context after compile_file().
+ */
+
+{
+    if (cleanup->active_context_set)
+    {
+        active_compile_check_context = cleanup->previous_active_context;
+        cleanup->previous_active_context = NULL;
+        cleanup->active_context_set = MY_FALSE;
+    }
+} /* compile_check_restore_active_context() */
+
+/*-------------------------------------------------------------------------*/
+static void
+compile_check_cleanup (error_handler_t *arg)
+
+/* Error handler for check_compile() temporary resources.
+ */
+
+{
+    compile_check_cleanup_t *cleanup = (compile_check_cleanup_t *)arg;
+
+    compile_check_restore_active_context(cleanup);
+
+    if (cleanup->compiler_started)
+    {
+        if (current_loc.file != NULL)
+            end_new_file();
+
+        total_lines = 0;
+
+        if (inherit_file != NULL)
+        {
+            free_mstring(inherit_file);
+            inherit_file = NULL;
+        }
+
+        if (compiled_prog != NULL)
+        {
+            free_prog(compiled_prog, MY_TRUE);
+            compiled_prog = NULL;
+        }
+    }
+
+    if (cleanup->fd >= 0)
+    {
+        (void)close(cleanup->fd);
+        cleanup->fd = -1;
+    }
+
+    compile_check_free(&cleanup->ctx);
+    xfree(cleanup);
+} /* compile_check_cleanup() */
+
+/*-------------------------------------------------------------------------*/
+static compile_check_cleanup_t *
+push_compile_check_cleanup (void)
+
+/* Push the check_compile() cleanup handler and return its data record.
+ */
+
+{
+    compile_check_cleanup_t *cleanup;
+
+    cleanup = xalloc(sizeof(*cleanup));
+    if (cleanup == NULL)
+        outofmem(sizeof(*cleanup), "compile check cleanup");
+
+    cleanup->ctx.diag = NULL;
+    cleanup->ctx.num_diag = 0;
+    cleanup->ctx.max_diag = 0;
+    cleanup->ctx.programs = NULL;
+    cleanup->ctx.num_programs = 0;
+    cleanup->ctx.max_programs = 0;
+    cleanup->previous_active_context = NULL;
+    cleanup->fd = -1;
+    cleanup->compiler_started = MY_FALSE;
+    cleanup->active_context_set = MY_FALSE;
+
+    push_error_handler(compile_check_cleanup, &(cleanup->head));
+    return cleanup;
+} /* push_compile_check_cleanup() */
+
+/*-------------------------------------------------------------------------*/
+static Bool
+dry_compile_object_file (const char *lname, compile_check_cleanup_t *cleanup
+                       , int depth)
+
+/* Compile <lname>.c without creating or registering an object.
+ */
+
+{
+    struct stat c_st;
+    size_t name_length;
+    const char *sane_lname;
+    char *name;
+    char *fname;
+    compile_check_context_t *ctx = &cleanup->ctx;
+    compile_check_program_t *program_entry = NULL;
+    size_t program_index = 0;
+    Bool program_entry_activated = MY_FALSE;
+    Bool ok = MY_FALSE;
+
+    sane_lname = make_name_sane(lname, false, false);
+    if (sane_lname == NULL)
+        sane_lname = lname;
+
+    name_length = strlen(sane_lname);
+
+    name = xalloc_with_error_handler(2 * name_length + sizeof("/")
+                                     + sizeof("/.c"));
+    if (!name)
+        errorf("Out of memory (%zu bytes) in check_compile() for temporary "
+               "name buffers.\n"
+              , 2 * name_length + sizeof("/") + sizeof("/.c"));
+    fname = name + name_length + sizeof("/") + 1;
+
+    if (!compat_mode)
+        *name++ = '/';
+    strcpy(name, sane_lname);
+    strcpy(fname, sane_lname);
+
+    if (strchr(name, '#') != NULL)
+    {
+        compile_check_add_diag(ctx, compile_check_diag_filename(name), 0
+                              , MY_FALSE
+                              , "Illegal clone name for check_compile.");
+        goto cleanup;
+    }
+
+    program_entry = compile_check_find_program_entry(ctx, name);
+    if (program_entry != NULL)
+    {
+        if (program_entry->prog != NULL)
+        {
+            ok = MY_TRUE;
+            goto cleanup;
+        }
+
+        if (program_entry->active)
+        {
+            compile_check_add_diag(ctx, compile_check_diag_filename(name), 0
+                                  , MY_FALSE, "Recursive inherit.");
+            goto cleanup;
+        }
+    }
+    else
+        program_entry = compile_check_add_program_entry(ctx, name);
+
+    /* Recursive compiles add entries and may reallocate ctx->programs, so
+     * remember the index instead of the pointer.
+     */
+    program_index = program_entry - ctx->programs;
+    program_entry->active = MY_TRUE;
+    program_entry_activated = MY_TRUE;
+
+    (void)strcpy(fname + name_length, ".c");
+    if (ixstat(fname, &c_st) == -1)
+    {
+        compile_check_add_diag(ctx, compile_check_diag_filename(fname), 0
+                              , MY_FALSE
+                              , "Source file does not exist.");
+        goto cleanup;
+    }
+
+    if (!legal_path(fname))
+    {
+        compile_check_add_diag(ctx, compile_check_diag_filename(fname), 0
+                              , MY_FALSE, "Illegal pathname.");
+        goto cleanup;
+    }
+
+    while (MY_TRUE)
+    {
+        char *native;
+
+        if (current_loc.file)
+        {
+            errorf("Can't check-compile '%s': compiler is busy with '%s'.\n"
+                 , name, current_loc.file->name);
+        }
+
+        native = convert_path_to_native_or_throw(fname, strlen(fname));
+        cleanup->fd = ixopen(native, O_RDONLY | O_BINARY);
+        if (cleanup->fd <= 0)
+        {
+            compile_check_add_diag(ctx, compile_check_diag_filename(fname), 0
+                                  , MY_FALSE, "Could not read the file.");
+            goto cleanup;
+        }
+        FCOUNT_COMP(native);
+
+        cleanup->compiler_started = MY_TRUE;
+        cleanup->previous_active_context = active_compile_check_context;
+        cleanup->active_context_set = MY_TRUE;
+        active_compile_check_context = ctx;
+        compile_file(cleanup->fd, fname, MY_FALSE);
+        compile_check_restore_active_context(cleanup);
+
+        update_compile_av(total_lines);
+        total_lines = 0;
+
+        (void)close(cleanup->fd);
+        cleanup->fd = -1;
+
+        if (inherit_file != NULL)
+        {
+            string_t *inherited_file = inherit_file;
+            const char *tmp;
+            char *pInherited;
+
+            inherit_file = NULL;
+
+            if (num_parse_error > 0)
+            {
+                free_mstring(inherited_file);
+                goto cleanup;
+            }
+
+            tmp = make_name_sane(get_txt(inherited_file), false, false);
+            if (!tmp)
+                pInherited = get_txt(inherited_file);
+            else
+            {
+                pInherited = alloca(strlen(tmp)+1);
+                strcpy(pInherited, tmp);
+            }
+
+            if (strcmp(pInherited, name) == 0)
+            {
+                compile_check_add_diag(ctx, compile_check_diag_filename(name), 0
+                                      , MY_FALSE, "Illegal to inherit self.");
+                free_mstring(inherited_file);
+                goto cleanup;
+            }
+
+            if (depth >= MAX_LOAD_DEPTH)
+            {
+                compile_check_add_diag(ctx, compile_check_diag_filename(name), 0
+                                      , MY_FALSE, "Too deep inheritance.");
+                free_mstring(inherited_file);
+                goto cleanup;
+            }
+
+            {
+                size_t num_diag_before_dependency = ctx->num_diag;
+                Bool dependency_ok;
+
+                dependency_ok = dry_compile_object_file(pInherited, cleanup
+                                                       , depth+1);
+                if (!dependency_ok)
+                {
+                    if (ctx->num_diag == num_diag_before_dependency)
+                    {
+                        compile_check_add_diag(ctx
+                              , compile_check_diag_filename(pInherited)
+                              , 0, MY_FALSE
+                              , "Inherited file failed to compile.");
+                    }
+                    free_mstring(inherited_file);
+                    goto cleanup;
+                }
+            }
+
+            free_mstring(inherited_file);
+            continue;
+        }
+
+        if (num_parse_error > 0)
+            goto cleanup;
+
+        if (compiled_prog == NULL)
+        {
+            compile_check_add_diag(ctx, compile_check_diag_filename(fname), 0
+                                  , MY_FALSE
+                                  , "Compiler did not produce a program.");
+            goto cleanup;
+        }
+
+        ctx->programs[program_index].prog = compiled_prog;
+        compiled_prog = NULL;
+        ok = MY_TRUE;
+        break;
+    }
+
+cleanup:
+    if (program_entry_activated)
+        ctx->programs[program_index].active = MY_FALSE;
+
+    if (cleanup->fd >= 0)
+    {
+        (void)close(cleanup->fd);
+        cleanup->fd = -1;
+    }
+
+    if (cleanup->compiler_started)
+    {
+        if (inherit_file != NULL)
+        {
+            free_mstring(inherit_file);
+            inherit_file = NULL;
+        }
+
+        if (compiled_prog != NULL)
+        {
+            free_prog(compiled_prog, MY_TRUE);
+            compiled_prog = NULL;
+        }
+        cleanup->compiler_started = MY_FALSE;
+    }
+
+    pop_stack(); /* free error handler */
+
+    return ok;
+} /* dry_compile_object_file() */
+
+/*-------------------------------------------------------------------------*/
 static object_t *
 load_object (const char *lname, Bool create_super, int depth
             , Bool isMasterObj, namechain_t *chain)
@@ -4837,6 +5526,36 @@ f_load_object (svalue_t *sp)
         put_number(sp, 0);
     return sp;
 } /* f_load_object() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_check_compile (svalue_t *sp)
+
+/* EFUN check_compile()
+ *
+ *   mixed *check_compile(string name)
+ *
+ * Dry-compile <name> and return ({ success, diagnostics }).
+ */
+
+{
+    compile_check_cleanup_t *cleanup;
+    vector_t *result;
+    Bool ok;
+
+    if (!privilege_violation(STR_CHECK_COMPILE, sp, sp))
+        errorf("privilege violation: check_compile\n");
+
+    inter_sp = sp;
+    cleanup = push_compile_check_cleanup();
+    ok = dry_compile_object_file(get_txt(sp->u.str), cleanup, 0);
+    result = compile_check_result(&cleanup->ctx, ok);
+    free_svalue(sp);
+    put_array(sp, result);
+    free_svalue(inter_sp--);
+
+    return sp;
+} /* f_check_compile() */
 
 /*-------------------------------------------------------------------------*/
 static Bool

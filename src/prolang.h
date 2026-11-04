@@ -117,6 +117,14 @@ extern void yyerrorf VARPROT((const char *format, ...), printf, 1, 2);
 extern void yyerror(const char *str);
 extern void yywarnf VARPROT((const char *format, ...), printf, 1, 2);
 extern void yywarn(const char *str);
+extern bool compile_check_is_active(void);
+extern program_t *compile_check_find_program(string_t *name);
+extern void compile_check_record_diagnostic(
+    Bool warning,
+    const char *file,
+    int line,
+    const char *what,
+    const char *context);
 extern void free_all_local_names(void);
 extern void store_line_number_info(void);
 extern void store_line_number_backward(int offset);
