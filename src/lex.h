@@ -23,6 +23,21 @@ typedef struct source_loc_s
     int             line;  /* The source line */
 } source_loc_t;
 
+typedef struct source_line_s source_line_t;
+typedef struct macro_trace_s macro_trace_t;
+
+/* Diagnostic byte offsets refer to the original, decoded source line.
+ * All referenced records are owned by the current compilation.
+ */
+typedef struct source_span_s
+{
+    source_loc_t loc;
+    source_line_t *text;
+    macro_trace_t *macro;
+    int column;
+    int end_column;
+} source_span_t;
+
 
 /* --- struct source_file_s: a source file ---
  *
@@ -46,6 +61,7 @@ struct source_file_s
     source_loc_t    parent;  /* the file/line this source was included from;
                               * or NULL if none.
                               */
+    source_span_t included_at;
 };
 
 
@@ -122,6 +138,7 @@ struct defn
     source_loc_t loc;         /* location of the definition,
                                * NULL for predefined macros.
                                */
+    source_span_t source;
 };
 
 
@@ -331,7 +348,10 @@ extern void free_defines(void);
 extern size_t show_lexer_status (strbuf_t * sbuf, Bool verbose);
 extern void set_inc_list(vector_t *v);
 extern void remove_unknown_identifier(void);
-extern char *lex_error_context(void);
+extern source_span_t lex_diagnostic_location(void);
+extern void lex_extend_span(source_span_t *start, source_span_t end);
+extern void lex_format_diagnostic(char *buf, size_t size, source_span_t span,
+                                  Bool warning, const char *message);
 extern svalue_t *f_expand_define(svalue_t *sp);
 extern const char* lex_parse_number (const char* cp, const char* end, unsigned long* p_num, bool* p_overflow);
 extern void * get_include_handle (void);

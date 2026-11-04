@@ -9,6 +9,18 @@ DESCRIPTION
         this function is called. It should at least log the error in a file,
         and also announce it to the active user.
 
+        The diagnostic text starts with file:line:column and the severity.
+        When source context is available, it includes the original source
+        line and an underline. Columns are one-based display columns; tabs
+        use eight-column stops. Include sites and macro definitions may
+        appear as additional notes. The text may therefore contain several
+        lines. The callback's arguments are unchanged.
+
+        Some early lexer errors and diagnostics without retained source
+        context provide only file:line. Excerpts and expansion notes are
+        bounded; source capture is limited per compilation. The diagnostic
+        still reports its message when optional context is unavailable.
+
 HISTORY
         LDMud 3.2.8 added the 'warn' argument and the warnings in general.
         LDMud 3.6.5 added the 'line' argument.
