@@ -1175,12 +1175,30 @@ f_pg_conv_string (svalue_t *sp)
  */
 {
     string_t *escaped;
-    int size = mstrsize(sp->u.str);
+    size_t size = mstrsize(sp->u.str);
     memsafe(escaped = alloc_mstring(2 * size), 2 * size
                                              , "escaped sql string");
 
-    // PQescapeString(char *to, char *from, size_t length);
-    PQescapeString( get_txt(escaped), get_txt(sp->u.str), size);
+    // PQescapeString returns the actual length of the escaped string
+    // (not counting the terminating NUL).
+    size_t escaped_len =
+        PQescapeString( get_txt(escaped), get_txt(sp->u.str), size);
+
+    // Shrink the mstring to the actual escaped length, since the
+    // allocated buffer (2*size) may be larger than needed when few
+    // or no characters required escaping.
+    if (escaped_len < 2 * size)
+    {
+        escaped = resize_mstring(escaped, escaped_len);
+        if (!escaped)
+        {
+            errorf("(pg_conv_string) Out of memory (%zu bytes).\n",
+                   escaped_len);
+            /* NOTREACHED */
+            return sp;
+        }
+    }
+
     free_string_svalue(sp);
     put_string(sp, escaped);
     return sp;
