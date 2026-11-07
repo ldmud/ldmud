@@ -23,14 +23,34 @@ DESCRIPTION
         function, it has to use the modifier 'varargs' or a compiler error
         will be raised.
 
-EXAMPLE
+        If a function by the same name is inherited from multiple sources,
+        and not explicitly overloaded, the first inherit will become the
+        'dominant' version. Additionally 'nomask' functions will take
+        precedence.
+
+        Be aware that the topmost/dominant function replaces *all* other
+        functions of the same name in the *whole* object, including all of
+        its inherits! Calls without the ::-operator, even in inherited
+        files, will always resolve to this dominant function - which may
+        lead to unexpected behavior (that may also depend on the order of
+        inherits).
+
+        The only exception are functions that have the 'private' modifier.
+        For those, objects will still see the local version (but being
+        'private' they obviously wont be visible for other objects that
+        inherit this code).
+
+EXAMPLES
         File /players/alfe/a.c:
 
             foo() { write("A"); }
+            bar() { foo(); write(" via a "); }
 
         File /players/alfe/b.c:
 
             foo() { write("B"); }
+            bar() { foo(); write(" via b "); }
+            baz() { bar(); }
 
         File /players/alfe/c.c:
 
@@ -44,7 +64,50 @@ EXAMPLE
             }
 
         To call "players/alfe/c"->foo() will now result in the output of
-        ABC.
+        "ABC".
+
+        A call to "players/alfe/c"->bar() will result in the output
+        "ABC via a", as foo() in both "a" and "b" was overloaded by the
+        version from "c", and also a::bar() was inherited first and
+        therefore became the dominant version within the object.
+
+        The latter can be shown by calling "players/alfe/c"->baz(),
+        which will *also* output "ABC via a". Despite baz() being
+        defined in "b" it also 'sees' the dominant version a::bar()!
+                
+
+        If we change file /players/alfe/a.c to:
+
+            foo() { write("A"); }
+            
+        file /players/alfe/b.c to:
+
+            private foo() { write("B"); }
+            bar() { foo(); write(" via b "); }
+
+        and file /players/alfe/c.c to:
+
+            inherit "players/alfe/a";
+            inherit "players/alfe/b";
+
+            foo() {
+              a::foo(); // or just ::foo() as there now only is one
+                        // visible inherited function foo()
+              b::bar(); // b::foo() is no longer visible here
+              write("C");
+            }
+            
+        calling "players/alfe/c"->bar() will now result in the output
+        "B via b". The 'private' function b::foo() has now become the
+        default within "b".
+
+        Consequently a call to "players/alfe/c"->foo() now prints
+        "AB via b C".
+
+        Furthermore: without the 'private' modifier this last call
+        would result in an endless recursion, as b::bar() would then
+        call the topmost function c::foo(), which in turn calls b::bar,
+        and so on.
 
 SEE ALSO
         modifiers(LPC), inheritance(C), functions(LPC)
