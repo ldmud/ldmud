@@ -127,15 +127,12 @@ static struct access_address {
     struct access_address *next;
 } *all_access_addresses = NULL;
 
-/* Class descriptions, kept in a linked list.
- * The structure is allocated big enough to keep the full message, the
- * 8 characters listed in the definition are just a placeholder.
- */
+/* Class descriptions, kept in a linked list. */
 static struct access_class {
     long id;                  /* Class ID */
     mp_int max_usage, usage;  /* Max and current number of users */
     struct access_class *next;
-    char message[8];          /* Placeholder for the message text buffer */
+    char *message;            /* Owned, NUL-terminated message text */
 } *all_access_classes = NULL;
 
 static time_t last_read_time = 0;
@@ -255,6 +252,7 @@ read_access_file (void)
     }
     for (acp = all_access_classes; acp; acp = next_acp) {
         next_acp = acp->next;
+        pfree(acp->message);
         pfree((char *)acp);
     }
     all_access_classes = NULL;
@@ -408,15 +406,21 @@ read_access_file (void)
             len = strlen(message);
             if (len && message[len-1] == '\n')
                 message[--len] = '\0';
-            acp = pxalloc(sizeof *acp - sizeof acp->message + 1 + len);
+            acp = pxalloc(sizeof *acp);
             if (!acp) {
                 pfree((char *)aap);
                 break;
             }
+            acp->message = pxalloc(len + 1);
+            if (!acp->message) {
+                pfree((char *)acp);
+                pfree((char *)aap);
+                break;
+            }
+            memcpy(acp->message, message, len + 1);
             acp->id = class_id;
             acp->max_usage = max_usage == -1 ? MPINT_MAX : max_usage;
             acp->usage = 0;
-            strcpy(acp->message, message);
             acp->next = all_access_classes;
             all_access_classes = acp;
         }

@@ -1,0 +1,2 @@
+# Configure an access policy that rejects connections from 127.0.0.1
+127.0.0.1:0:0:0:0:Access denied.
