@@ -2385,8 +2385,11 @@ get_message (char *buff, size_t *bufflength)
             for (retries = 6;;)
             {
                 check_alarm();
-                timeout.tv_sec = twait;
-                timeout.tv_usec = 0;
+                /* An alarm after twait was computed would otherwise
+                 * leave select() waiting the full second.
+                 */
+                timeout.tv_sec = 0;
+                timeout.tv_usec = (twait && !comm_return_to_backend) ? 250000 : 0;
                 res = socket_select(nfds, &readfds, &writefds, &pexceptfds, &timeout);
                 if (res == -1)
                 {
