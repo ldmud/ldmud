@@ -22,6 +22,8 @@ extern svalue_t *v_pg_connect(svalue_t *sp, int num_arg);
 extern svalue_t *v_pg_query(svalue_t *sp, int numarg);
 extern svalue_t *f_pg_close(svalue_t *sp);
 extern svalue_t * f_pg_conv_string (svalue_t *sp);
+extern svalue_t *v_pg_listen(svalue_t *sp, int num_arg);
+extern svalue_t *f_pg_unlisten(svalue_t *sp);
 
 #ifdef GC_SUPPORT
 extern void pg_clear_refs (void);

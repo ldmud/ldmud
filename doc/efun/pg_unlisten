@@ -1,0 +1,22 @@
+OPTIONAL
+SYNOPSIS
+        int pg_unlisten(string channel)
+
+DESCRIPTION
+        Stop listening on a channel on the database connection for the current object.
+        This removes the callback associated with the channel and sends an UNLISTEN
+        command to the database.
+
+        Return 1 if a listener was found and removed, and 0 otherwise.
+
+        The function is available only if the driver is compiled with
+        PostgreSQL support. In that case, __PGSQL__ is defined.
+
+        The efun triggers a privilege violation ("pgsql", "pg_unlisten").
+
+HISTORY
+        Added in LDMud 3.6.8.
+
+SEE ALSO
+        pgsql(C), pg_connect(E), pg_query(E), pg_listen(E),
+        privilege_violation(M)
