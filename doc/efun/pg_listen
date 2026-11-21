@@ -1,0 +1,32 @@
+OPTIONAL
+SYNOPSIS
+        int pg_listen(string channel, string fun)
+        int pg_listen(string channel, string fun, string|object obj,
+                       mixed extra, ...)
+        int pg_listen(string channel, closure cl, mixed extra, ...)
+
+DESCRIPTION
+        Start listening on a channel on the database connection for the current object.
+        Assigns the callback function <fun>/<cl> with the optional <extra> parameters
+        to it. When a PostgreSQL NOTIFY event for the <channel> is received from the
+        database, the callback is invoked.
+
+        The callback function receives the channel name as the first argument, and 
+        the notify payload (if any) as the second argument. If there is no payload,
+        the second argument is 0.
+        
+        void <callback>(string channel, string|int payload [, mixed extra...])
+
+        Return 1 on success.
+
+        The function is available only if the driver is compiled with
+        PostgreSQL support. In that case, __PGSQL__ is defined.
+
+        The efun triggers a privilege violation ("pgsql", "pg_listen").
+
+HISTORY
+        Added in LDMud 3.6.8.
+
+SEE ALSO
+        pgsql(C), pg_connect(E), pg_query(E), pg_unlisten(E),
+        privilege_violation(M)

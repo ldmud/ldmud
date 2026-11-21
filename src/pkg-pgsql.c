@@ -120,6 +120,15 @@ struct query_queue_s
    struct query_queue_s * next;
 };
 
+/* ---  struct pg_listen_s: one active listener channel.
+ */
+struct pg_listen_s
+{
+   char                 * channel;
+   callback_t             callback;
+   struct pg_listen_s   * next;
+};
+
 /* ---  struct dbconn_s: one active database connection.
  * The connections are held in a singly linked list.
  * There can be only one connection per object.
@@ -140,6 +149,7 @@ struct dbconn_s
    time_t                      lastreply;
 
    struct query_queue_s      * queue;
+   struct pg_listen_s        * listens;
    
    struct dbconn_s           * next;
 };
@@ -159,6 +169,9 @@ struct dbconn_s
 
 typedef struct dbconn_s      dbconn_t;
 typedef struct query_queue_s query_queue_t;
+typedef struct pg_listen_s   pg_listen_t;
+
+#define PG_SILENT_QUERY 2
 
 /*-------------------------------------------------------------------------*/
 
@@ -332,6 +345,14 @@ dealloc_dbconn (dbconn_t *del)
     }
     while (del->queue)
       dequeue(del);
+    while (del->listens)
+    {
+        pg_listen_t *l = del->listens;
+        del->listens = l->next;
+        free_callback(&l->callback);
+        xfree(l->channel);
+        xfree(l);
+    }
     xfree(del);
 } /* dealloc_dbconn() */
 
@@ -564,15 +585,25 @@ pgresult (dbconn_t *pgconn, PGresult *res)
         return;
     }
     
-    if (valid_callback_object(&pgconn->callback))
+    if (!(pgconn->queue->flags & PG_SILENT_QUERY))
     {
-        push_number(inter_sp, pgconn->queue->id);
-        (void)apply_callback(&pgconn->callback, 3);
+        if (valid_callback_object(&pgconn->callback))
+        {
+            push_number(inter_sp, pgconn->queue->id);
+            (void)apply_callback(&pgconn->callback, 3);
+        }
+        else
+        {
+            debug_message("%s PG connection object destructed.\n", time_stamp());
+            free_svalue(inter_sp); inter_sp--;
+            free_svalue(inter_sp); inter_sp--;
+            pgreset(pgconn);
+        }
     }
     else
     {
-        debug_message("%s PG connection object destructed.\n", time_stamp());
-        pgreset(pgconn);
+        free_svalue(inter_sp); inter_sp--;
+        free_svalue(inter_sp); inter_sp--;
     }
 
     dequeue(pgconn);
@@ -719,8 +750,50 @@ pg_process_connect_reset (dbconn_t *pgconn)
             pgconn->state = PG_SENDQUERY;
         else
             pgconn->state = PG_IDLE;
+        
+        if (reset && pgconn->listens)
+        {
+            pg_listen_t *l;
+            for (l = pgconn->listens; l; l = l->next)
+            {
+                char qbuf[256];
+                snprintf(qbuf, sizeof(qbuf), "LISTEN \"%s\"", l->channel);
+                query_queue_t *q = queue(pgconn, qbuf);
+                q->flags |= PG_SILENT_QUERY;
+            }
+            if (pgconn->state == PG_IDLE)
+                pgconn->state = PG_SENDQUERY;
+        }
     }
 } /* pg_process_connect_reset() */
+
+/*-------------------------------------------------------------------------*/
+static void
+pg_process_notify (dbconn_t *pgconn, PGnotify *notify)
+
+/* Process a Postgres notification.
+ */
+
+{
+    pg_listen_t *l;
+    for (l = pgconn->listens; l; l = l->next) {
+        if (strcmp(l->channel, notify->relname) == 0) {
+            current_object = callback_object(&l->callback);
+            command_giver = 0;
+            current_interactive = 0;
+            
+            if (current_object.type != T_NUMBER)
+            {
+                push_c_string(inter_sp, notify->relname);
+                if (notify->extra && notify->extra[0])
+                    push_c_string(inter_sp, notify->extra);
+                else
+                    push_number(inter_sp, 0);
+                (void)apply_callback(&l->callback, 2);
+            }
+        }
+    }
+} /* pg_process_notify() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -769,6 +842,14 @@ pg_process_query (dbconn_t *pgconn)
     {
         pgconn->lastreply = time(NULL);
         PQconsumeInput(pgconn->conn);
+
+        PGnotify *notify;
+        while ((notify = PQnotifies(pgconn->conn)) != NULL)
+        {
+            pg_process_notify(pgconn, notify);
+            PQfreemem(notify);
+        }
+
         if (!PQisBusy(pgconn->conn))
             pgconn->state = PG_REPLYREADY;
     }
@@ -798,6 +879,10 @@ pg_process_one (dbconn_t *pgconn)
             pgconn->lastreply = time(NULL);
             PQsendQuery(pgconn->conn, pgconn->queue->str);
             pgconn->state = PG_WAITREPLY;
+        }
+        else if (pgconn->listens)
+        {
+            pg_process_query(pgconn);
         }
         break;
 
@@ -1186,6 +1271,142 @@ f_pg_conv_string (svalue_t *sp)
     return sp;
 } /* pg_conv_string() */
 
+/*-------------------------------------------------------------------------*/
+svalue_t *
+v_pg_listen (svalue_t *sp, int num_arg)
+
+/* EFUN pg_listen()
+ *
+ *   int pg_listen (string channel, string fun)
+ *   int pg_listen (string channel, string fun, string|object obj, mixed extra, ...)
+ *   int pg_listen (string channel, closure cl, mixed extra, ...)
+ *
+ * Start listening on a channel on the database connection for the current object.
+ */
+
+{
+    dbconn_t *db;
+    pg_listen_t *l;
+    callback_t *cb;
+    int error_index;
+    svalue_t *arg = sp - num_arg + 1;
+    char *chan_str;
+    char *qbuf;
+
+    if (current_object.type != T_OBJECT)
+        errorf("pg_listen() without current object.\n");
+
+    check_privilege(instrs[F_PG_LISTEN].name, MY_TRUE, sp);
+
+    db = find_current_connection(current_object.u.ob);
+    if (!db)
+        errorf("pg_listen(): not connected\n");
+
+    inter_sp = sp;
+    error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
+
+    if (error_index >= 0)
+    {
+        vefun_bad_arg(error_index+2, arg);
+        return arg;
+    }
+    
+    if (callback_object(cb).type != T_OBJECT)
+    {
+        xfree(cb);
+        errorf("pg_listen(): Callback object is destructed.\n");
+        return arg;
+    }
+
+    memsafe(l = xalloc(sizeof(*l)), sizeof(*l), "new listen");
+    chan_str = get_txt(arg[0].u.str);
+    l->channel = string_copy(chan_str);
+    l->callback = *cb;
+    xfree(cb);
+    
+    l->next = db->listens;
+    db->listens = l;
+
+    memsafe(qbuf = xalloc(strlen(chan_str) + 20), strlen(chan_str) + 20, "listen query");
+    sprintf(qbuf, "LISTEN \"%s\"", chan_str);
+    
+    query_queue_t *q = queue(db, qbuf);
+    q->flags |= PG_SILENT_QUERY;
+    xfree(qbuf);
+
+    if (db->state == PG_IDLE)
+        db->state = PG_SENDQUERY;
+
+    free_svalue(arg); /* free the channel string */
+    put_number(arg, 1);
+    return arg;
+} /* v_pg_listen() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_pg_unlisten (svalue_t *sp)
+
+/* EFUN pg_unlisten()
+ *
+ *   int pg_unlisten (string channel)
+ *
+ * Stop listening on a channel.
+ */
+
+{
+    dbconn_t *db;
+    pg_listen_t *l, *prev;
+    char *chan_str;
+    char *qbuf;
+    Bool found = MY_FALSE;
+
+    if (current_object.type != T_OBJECT)
+        errorf("pg_unlisten() without current object.\n");
+
+    check_privilege(instrs[F_PG_UNLISTEN].name, MY_TRUE, sp);
+
+    db = find_current_connection(current_object.u.ob);
+    if (!db)
+        errorf("pg_unlisten(): not connected\n");
+
+    chan_str = get_txt(sp->u.str);
+    
+    prev = NULL;
+    l = db->listens;
+    while (l) {
+        if (strcmp(l->channel, chan_str) == 0) {
+            pg_listen_t *next = l->next;
+            if (prev) prev->next = next;
+            else db->listens = next;
+            
+            free_callback(&l->callback);
+            xfree(l->channel);
+            xfree(l);
+            l = next;
+            found = MY_TRUE;
+        } else {
+            prev = l;
+            l = l->next;
+        }
+    }
+
+    if (found) {
+        memsafe(qbuf = xalloc(strlen(chan_str) + 20), strlen(chan_str) + 20, "unlisten query");
+        sprintf(qbuf, "UNLISTEN \"%s\"", chan_str);
+        
+        query_queue_t *q = queue(db, qbuf);
+        q->flags |= PG_SILENT_QUERY;
+        xfree(qbuf);
+
+        if (db->state == PG_IDLE)
+            db->state = PG_SENDQUERY;
+    }
+
+    free_svalue(sp);
+    put_number(sp, found ? 1 : 0);
+    return sp;
+} /* f_pg_unlisten() */
+
 /*=========================================================================*/
 
 /*                          GC SUPPORT                                     */
@@ -1204,7 +1425,10 @@ pg_clear_refs (void)
 
     for (dbconn = head; dbconn != NULL; dbconn = dbconn->next)
     {
+        pg_listen_t *l;
         clear_ref_in_callback(&(dbconn->callback));
+        for (l = dbconn->listens; l; l = l->next)
+            clear_ref_in_callback(&(l->callback));
     }
 } /* pg_clear_refs() */
 
@@ -1221,6 +1445,7 @@ pg_count_refs (void)
     for (dbconn = head; dbconn != NULL; dbconn = dbconn->next)
     {
         query_queue_t *qu;
+        pg_listen_t *l;
 
         note_malloced_block_ref(dbconn);
         count_ref_in_callback(&(dbconn->callback));
@@ -1229,6 +1454,13 @@ pg_count_refs (void)
         {
             note_malloced_block_ref(qu);
             note_malloced_block_ref(qu->str);
+        }
+        
+        for (l = dbconn->listens; l; l = l->next)
+        {
+            note_malloced_block_ref(l);
+            note_malloced_block_ref(l->channel);
+            count_ref_in_callback(&(l->callback));
         }
     }
 } /* pg_count_refs() */

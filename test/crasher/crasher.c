@@ -237,8 +237,10 @@ void reset_all()
         #'pg_close,
         #'pg_connect,
         #'pg_conv_string,
+        #'pg_listen,
         #'pg_pending,
         #'pg_query,
+        #'pg_unlisten,
 #endif
         #'pointerp,
         #'pow,

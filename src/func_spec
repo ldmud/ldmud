@@ -711,6 +711,8 @@ string   pg_conv_string(string);
 int      pg_pending(object default: F_THIS_OBJECT);
 int      pg_query(string, void|int) no_lightweight;
 void     pg_close() no_lightweight;
+int      pg_listen(string, string|closure, ...) no_lightweight;
+int      pg_unlisten(string) no_lightweight;
 
 #endif /* USE_PGSQL */
 

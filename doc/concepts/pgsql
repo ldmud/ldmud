@@ -85,4 +85,5 @@ HISTORY
 
 SEE ALSO
         mysql(C), sqlite(C), pg_connect(E), pg_conv_string(E), pg_query(E),
-        pg_pending(E), pg_close(E), privilege_violation(M)
+        pg_pending(E), pg_close(E), pg_listen(E), pg_unlisten(E),
+        privilege_violation(M)
