@@ -116,6 +116,10 @@ enum python_structmember_type
 #define USE_PYTHON_CONTEXT
 #endif
 
+#if PY_VERSION_HEX < 0x030d0000
+#define Py_HashPointer _Py_HashPointer
+#endif
+
 #define REAL_EFUN_COUNT (EFUN_COUNT + EFUN1_COUNT + EFUN2_COUNT + EFUN3_COUNT + EFUN4_COUNT + EFUNV_COUNT)
 
 /* --- Type declarations --- */
@@ -2232,7 +2236,7 @@ ldmud_lpctype_type_hash (ldmud_gc_lpctype_type_t *type)
  */
 
 {
-    return _Py_HashPointer(type->type);
+    return Py_HashPointer(type->type);
 } /* ldmud_lpctype_type_hash() */
 
 /*-------------------------------------------------------------------------*/
@@ -4090,7 +4094,7 @@ ldmud_program_and_index_hash (ldmud_program_and_index_t *val)
             ptr = NULL;
             break;
     }
-    return _Py_HashPointer(ptr) ^ val->index;
+    return Py_HashPointer(ptr) ^ val->index;
 } /* ldmud_program_and_index_hash() */
 
 /*-------------------------------------------------------------------------*/
@@ -5699,7 +5703,7 @@ ldmud_object_hash (ldmud_object_t *val)
  */
 
 {
-    return _Py_HashPointer(val->lpc_object);
+    return Py_HashPointer(val->lpc_object);
 } /* ldmud_object_hash() */
 
 /*-------------------------------------------------------------------------*/
@@ -6142,7 +6146,7 @@ ldmud_lwobject_hash (ldmud_lwobject_t *val)
  */
 
 {
-    return _Py_HashPointer(val->lpc_lwobject);
+    return Py_HashPointer(val->lpc_lwobject);
 } /* ldmud_lwobject_hash() */
 
 /*-------------------------------------------------------------------------*/
@@ -6588,7 +6592,7 @@ ldmud_array_hash (ldmud_array_t *val)
  */
 
 {
-    return _Py_HashPointer(val->lpc_array);
+    return Py_HashPointer(val->lpc_array);
 } /* ldmud_array_hash() */
 
 /*-------------------------------------------------------------------------*/
@@ -7779,7 +7783,7 @@ ldmud_mapping_hash (ldmud_mapping_t *val)
  */
 
 {
-    return _Py_HashPointer(val->lpc_mapping);
+    return Py_HashPointer(val->lpc_mapping);
 } /* ldmud_mapping_hash() */
 
 /*-------------------------------------------------------------------------*/
@@ -9062,7 +9066,7 @@ ldmud_struct_hash (ldmud_struct_t *val)
  */
 
 {
-    return _Py_HashPointer(val->lpc_struct);
+    return Py_HashPointer(val->lpc_struct);
 } /* ldmud_struct_hash() */
 
 /*-------------------------------------------------------------------------*/
@@ -9414,12 +9418,12 @@ ldmud_closure_hash (ldmud_closure_t *val)
 
     /* Lambdas. */
     if (CLOSURE_REFERENCES_CODE(closure_type))
-        return _Py_HashPointer(val->lpc_closure.u.lambda) ^ closure_type;
+        return Py_HashPointer(val->lpc_closure.u.lambda) ^ closure_type;
     /* Lfun or identifier closures. */
     if (CLOSURE_MALLOCED(closure_type))
         return (val->lpc_closure.u.closure->ob.type == T_OBJECT
-                ? _Py_HashPointer(val->lpc_closure.u.closure->ob.u.ob)
-                : _Py_HashPointer(val->lpc_closure.u.closure->ob.u.lwob)) ^ closure_type;
+                ? Py_HashPointer(val->lpc_closure.u.closure->ob.u.ob)
+                : Py_HashPointer(val->lpc_closure.u.closure->ob.u.lwob)) ^ closure_type;
     /* Efun, simul-efun or operator closure. */
     return closure_type;
 } /* ldmud_closure_hash() */
@@ -11445,7 +11449,7 @@ ldmud_coroutine_hash (ldmud_coroutine_t *val)
  */
 
 {
-    return _Py_HashPointer(val->lpc_coroutine);
+    return Py_HashPointer(val->lpc_coroutine);
 } /* ldmud_coroutine_hash() */
 
 /*-------------------------------------------------------------------------*/
@@ -11916,7 +11920,7 @@ ldmud_symbol_hash (ldmud_symbol_t *val)
  */
 
 {
-    return _Py_HashPointer(val->lpc_symbol.u.str) ^ val->lpc_symbol.x.quotes;
+    return Py_HashPointer(val->lpc_symbol.u.str) ^ val->lpc_symbol.x.quotes;
 } /* ldmud_symbol_hash() */
 
 /*-------------------------------------------------------------------------*/
@@ -12216,7 +12220,7 @@ ldmud_quoted_array_hash (ldmud_quoted_array_t *val)
     if (val->lpc_quoted_array.type != T_QUOTED_ARRAY)
         return 0;
 
-    return _Py_HashPointer(val->lpc_quoted_array.u.vec) ^ val->lpc_quoted_array.x.quotes;
+    return Py_HashPointer(val->lpc_quoted_array.u.vec) ^ val->lpc_quoted_array.x.quotes;
 } /* ldmud_quoted_array_hash() */
 
 /*-------------------------------------------------------------------------*/
@@ -12594,7 +12598,7 @@ ldmud_lvalue_hash (ldmud_lvalue_t *val)
  */
 
 {
-    return _Py_HashPointer(val->lpc_lvalue.u.generic) ^ val->lpc_lvalue.x.lvalue_type;
+    return Py_HashPointer(val->lpc_lvalue.u.generic) ^ val->lpc_lvalue.x.lvalue_type;
 } /* ldmud_lvalue_hash() */
 
 /*-------------------------------------------------------------------------*/
@@ -14666,7 +14670,7 @@ ldmud_efun_hash (ldmud_efun_t *val)
  */
 
 {
-    return _Py_HashPointer(instrs + val->efun_idx);
+    return Py_HashPointer(instrs + val->efun_idx);
 } /* ldmud_efun_hash() */
 
 /*-------------------------------------------------------------------------*/
@@ -14939,7 +14943,7 @@ ldmud_python_efun_hash (ldmud_efun_t *self)
  */
 
 {
-    return _Py_HashPointer(python_efun_table + self->efun_idx);
+    return Py_HashPointer(python_efun_table + self->efun_idx);
 } /* ldmud_python_efun_hash() */
 
 /*-------------------------------------------------------------------------*/

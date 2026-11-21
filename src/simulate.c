@@ -1738,7 +1738,7 @@ check_no_parentdirs (const char *path)
  */
 
 {
-    char *p;
+    const char *p;
 
     if (path == NULL)
         return MY_FALSE;
@@ -4574,7 +4574,7 @@ match_string (const char * match, const char * str, mp_int len)
 
         case '*':
           {
-            char *str2;
+            const char *str2;
             mp_int matchlen;
 
             for (;;)
