@@ -1954,6 +1954,39 @@ mixed *tests = (this_object() == blueprint()) &&
     }),
 #endif // __MYSQL__
 
+#ifdef __PGSQL__
+    ({ "pg_conv_string plain string", 0,
+        (:
+            string s = pg_conv_string("ldmud");
+            return s == "ldmud" && sizeof(s) == 5 && member(to_array(s), 0) == -1;
+        :)
+    }),
+    ({ "pg_conv_string single quotes", 0,
+        (:
+            string s = pg_conv_string("it's");
+            return s == "it''s" && sizeof(s) == 5 && member(to_array(s), 0) == -1;
+        :)
+    }),
+    ({ "pg_conv_string empty string", 0,
+        (:
+            string s = pg_conv_string("");
+            return s == "" && sizeof(s) == 0;
+        :)
+    }),
+    ({ "pg_conv_string concatenation without trailing NULs", 0,
+        (:
+            string s = "SELECT '" + pg_conv_string("it's a 'test'") + "'";
+            return s == "SELECT 'it''s a ''test'''" && sizeof(s) == 25 && member(to_array(s), 0) == -1;
+        :)
+    }),
+    ({ "pg_conv_string unicode string", 0,
+        (:
+            string s = pg_conv_string("caf\u00e9's");
+            return s == "caf\u00e9''s" && sizeof(s) == 7 && member(to_array(s), 0) == -1;
+        :)
+    }),
+#endif // __PGSQL__
+
 #ifdef __TLS__
 }) + (tls_available() ? ({
     ({ "configure_driver DHE 1 (testdata)", 0,
