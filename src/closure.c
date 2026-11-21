@@ -6422,10 +6422,38 @@ v_bind_lambda (svalue_t *sp, int num_arg)
             return sp;
 
         case CLOSURE_LFUN:
+        {
             /* Rebind an lfun to the given object */
-            free_svalue(&(sp->u.lfun_closure->base.ob));
-            sp->u.lfun_closure->base.ob = ob;
+            lfun_closure_t *l = sp->u.lfun_closure;
+            if (l->base.ref == 1)
+            {
+                free_svalue(&(l->base.ob));
+                l->base.ob = ob;
+            }
+            else
+            {
+                lfun_closure_t *l2;
+                l2 = xalloc(sizeof(lfun_closure_t) + l->context_size * sizeof(svalue_t));
+                if (!l2)
+                    outofmem(sizeof(lfun_closure_t) + l->context_size * sizeof(svalue_t), "bind_lambda");
+
+                closure_init_base(&(l2->base), ob);
+                free_svalue(&ob); /* We created a new reference. */
+
+                assign_svalue_no_free(&(l2->fun_ob), &(l->fun_ob));
+                l2->fun_index = l->fun_index;
+                l2->inhProg = l->inhProg;
+                if (l2->inhProg)
+                    reference_prog(l2->inhProg, "bind_lambda");
+                l2->context_size = l->context_size;
+                for (unsigned int ix = 0; ix < l->context_size; ix++)
+                    assign_svalue_no_free(l2->context+ix, l->context+ix);
+
+                sp->u.lfun_closure = l2;
+                l->base.ref--;
+            }
             break;
+        }
 
         case CLOSURE_BOUND_LAMBDA:
         {

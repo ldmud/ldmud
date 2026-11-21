@@ -3928,19 +3928,34 @@ move_object (void)
  */
 
 {
-    lambda_t *l;
     object_t *save_command = command_giver;
 
-    if (NULL != ( l = driver_hook[H_MOVE_OBJECT1].u.lambda) )
+    if (driver_hook[H_MOVE_OBJECT1].type == T_CLOSURE)
     {
-        free_svalue(&(l->base.ob));
-        put_ref_object(&(l->base.ob), inter_sp[-1].u.ob, "move_object");
-        call_lambda(&driver_hook[H_MOVE_OBJECT1], 2);
+        svalue_t *hook = &driver_hook[H_MOVE_OBJECT1];
+        if (hook->x.closure_type == CLOSURE_LAMBDA) {
+            free_svalue(&(hook->u.lambda->base.ob));
+            put_ref_object(&(hook->u.lambda->base.ob), inter_sp[-1].u.ob, "move_object");
+        } else if (hook->x.closure_type == CLOSURE_BOUND_LAMBDA) {
+            free_svalue(&(hook->u.bound_lambda->base.ob));
+            put_ref_object(&(hook->u.bound_lambda->base.ob), inter_sp[-1].u.ob, "move_object");
+        } else if (hook->x.closure_type == CLOSURE_LFUN) {
+            free_svalue(&(hook->u.lfun_closure->base.ob));
+            put_ref_object(&(hook->u.lfun_closure->base.ob), inter_sp[-1].u.ob, "move_object");
+        }
+        call_lambda(hook, 2);
     }
-    else if (NULL != ( l = driver_hook[H_MOVE_OBJECT0].u.lambda) )
+    else if (driver_hook[H_MOVE_OBJECT0].type == T_CLOSURE)
     {
-        assign_current_object(&(l->base.ob), "move_object");
-        call_lambda(&driver_hook[H_MOVE_OBJECT0], 2);
+        svalue_t *hook = &driver_hook[H_MOVE_OBJECT0];
+        if (hook->x.closure_type == CLOSURE_LAMBDA) {
+            assign_current_object(&(hook->u.lambda->base.ob), "move_object");
+        } else if (hook->x.closure_type == CLOSURE_BOUND_LAMBDA) {
+            assign_current_object(&(hook->u.bound_lambda->base.ob), "move_object");
+        } else if (hook->x.closure_type == CLOSURE_LFUN) {
+            assign_current_object(&(hook->u.lfun_closure->base.ob), "move_object");
+        }
+        call_lambda(hook, 2);
     }
     else
         errorf("Don't know how to move objects.\n");
