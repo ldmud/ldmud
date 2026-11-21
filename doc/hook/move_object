@@ -10,7 +10,7 @@ SYNOPSIS
 
 DESCRIPTION
         Mandatory hooks to implement the efun void move_object().
-        Hook setting must be an unbound lambda closure.
+        Hook setting must be an unbound lambda or lfun closure.
 
         Upon call, the hook has to perform the move itself (by using
         set_environment()) and all depending actions (like the calls to

@@ -15,7 +15,7 @@ DESCRIPTION
 
         H_MOVE_OBJECT0
         H_MOVE_OBJECT1
-          arg: unbound lambda
+          arg: unbound lambda or lfun closure
           Mandatory hooks implementing the move_object() efun.
 
         H_LOAD_UIDS

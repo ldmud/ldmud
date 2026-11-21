@@ -5192,7 +5192,7 @@ f_set_driver_hook (svalue_t *sp)
          * (We need ownership, because those hooks will rebind
          * the closure before call.)
          */
-        if ((hook_type_map[n] & TF_CLOSURE) == 0
+        if (((hook_type_map[n] & TF_CLOSURE) == 0 || n == H_MOVE_OBJECT0 || n == H_MOVE_OBJECT1)
          && sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA
          && sp->u.lambda->base.ref == 1)
         {

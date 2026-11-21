@@ -194,8 +194,8 @@ Bool variables_defined;
 
 short hook_type_map[NUM_DRIVER_HOOKS] =
 %hookmap \
-    H_MOVE_OBJECT0: 0, \
-    H_MOVE_OBJECT1: 0, \
+    H_MOVE_OBJECT0:             SH(T_CLOSURE), \
+    H_MOVE_OBJECT1:             SH(T_CLOSURE), \
     H_LOAD_UIDS:                SH(T_CLOSURE), \
     H_CLONE_UIDS:               SH(T_CLOSURE), \
     H_LWOBJECT_UIDS:            SH(T_CLOSURE), \
