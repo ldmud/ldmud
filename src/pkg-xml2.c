@@ -497,7 +497,7 @@ f_xml_generate (svalue_t *sp)
     /* Free the array. */
     free_svalue(sp);
 
-    put_c_string(sp, (char *) rec_data->buf->content);
+    put_c_string(sp, (const char *) xmlBufferContent(rec_data->buf));
 
     /* The error handler will free the buffer
      * and XML writer.
