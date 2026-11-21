@@ -1175,12 +1175,18 @@ f_pg_conv_string (svalue_t *sp)
  */
 {
     string_t *escaped;
-    int size = mstrsize(sp->u.str);
+    size_t size = mstrsize(sp->u.str);
+    size_t escaped_size;
+
     memsafe(escaped = alloc_mstring(2 * size), 2 * size
                                              , "escaped sql string");
 
     // PQescapeString(char *to, char *from, size_t length);
-    PQescapeString( get_txt(escaped), get_txt(sp->u.str), size);
+    escaped_size = PQescapeString(get_txt(escaped), get_txt(sp->u.str), size);
+    escaped->info.unicode = sp->u.str->info.unicode;
+    memsafe(escaped = resize_mstring(escaped, escaped_size), escaped_size
+                                                           , "escaped sql string");
+
     free_string_svalue(sp);
     put_string(sp, escaped);
     return sp;
