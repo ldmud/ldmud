@@ -163,7 +163,12 @@ typedef struct query_queue_s query_queue_t;
 /*-------------------------------------------------------------------------*/
 
 static dbconn_t *head = NULL;
-  /* The list of database connections.
+  /* The list of all database connections.
+   */
+
+static Bool pg_has_unconnected = MY_FALSE;
+  /* Set when any connection transitions to PG_UNCONNECTED so
+   * pg_process_all() can safely purge it after walking the list.
    */
 
 static long query_id = 1;
@@ -375,6 +380,7 @@ pgclose (dbconn_t *pgconn)
         PQfinish(pgconn->conn);
     pgconn->conn = NULL;
     pgconn->fd = -1;
+    pg_has_unconnected = MY_TRUE;
 } /* pgclose() */
 
 /*-------------------------------------------------------------------------*/
@@ -385,7 +391,7 @@ pgreset (dbconn_t *pgconn)
  */
 
 {
-    if (!PQresetStart(pgconn->conn))
+    if (!pgconn->conn || !PQresetStart(pgconn->conn))
     {
         pgclose(pgconn);
         
@@ -398,6 +404,7 @@ pgreset (dbconn_t *pgconn)
         return;
     }
     
+    pgconn->fd = PQsocket(pgconn->conn);
     pgconn->state = PG_RESETTING;
     pgconn->pgstate = PGRES_POLLING_WRITING;
 } /* pgreset() */
@@ -445,6 +452,12 @@ pgresult (dbconn_t *pgconn, PGresult *res)
 {
     int type;
     
+    if (!pgconn->queue)
+    {
+        PQclear(res);
+        return;
+    }
+
     current_object = callback_object(&pgconn->callback);
     command_giver = 0;
     current_interactive = 0;
@@ -560,6 +573,7 @@ pgresult (dbconn_t *pgconn, PGresult *res)
         break;
        
      default:
+        free_svalue(inter_sp); inter_sp--;
         PQclear(res);
         return;
     }
@@ -575,7 +589,6 @@ pgresult (dbconn_t *pgconn, PGresult *res)
         pgreset(pgconn);
     }
 
-    dequeue(pgconn);
     PQclear(res);
 } /* pgresult() */
 
@@ -601,7 +614,11 @@ pg_process_connect_reset (dbconn_t *pgconn)
         debug_message("%s PGSQL Connection resetting.\n", time_stamp());
     
     pqpollhandler = reset ? PQresetPoll : PQconnectPoll;
-    
+
+    pgconn->fd = PQsocket(pgconn->conn);
+    if (pgconn->fd < 0)
+        pgconn->pgstate = PGRES_POLLING_ACTIVE;
+
     if (pgconn->pgstate != PGRES_POLLING_ACTIVE)
     {
         int rc;
@@ -672,7 +689,10 @@ pg_process_connect_reset (dbconn_t *pgconn)
     }
     
     if (pgconn->pgstate == PGRES_POLLING_ACTIVE)
+    {
         pgconn->pgstate = pqpollhandler(pgconn->conn);
+        pgconn->fd = PQsocket(pgconn->conn);
+    }
     
     if (pgconn->pgstate == PGRES_POLLING_FAILED)
     {
@@ -688,13 +708,14 @@ pg_process_connect_reset (dbconn_t *pgconn)
             {
                 push_number(inter_sp, reset ? PGCONN_ABORTED : PGCONN_FAILED);
                 push_c_string(inter_sp, PQerrorMessage(pgconn->conn));
+                pgclose(pgconn);
                 (void)apply_callback(&pgconn->callback, 2);
             }
             else
             {
                 debug_message("%s PG connection object destructed.\n", time_stamp());
+                pgclose(pgconn);
             }
-            pgclose(pgconn);
         }
     }
     else if (pgconn->pgstate == PGRES_POLLING_OK)
@@ -806,8 +827,8 @@ pg_process_one (dbconn_t *pgconn)
         break;
 
     case PG_UNCONNECTED:
-        dealloc_dbconn(pgconn);
-        break;
+        pg_has_unconnected = MY_TRUE;
+        return;
 
     case PG_RESET_NEXT:
         if (pgconn->lastreset != time(NULL))
@@ -816,7 +837,8 @@ pg_process_one (dbconn_t *pgconn)
     } /* switch() */
     
     /* Validate the connection */
-    if ((PQstatus(pgconn->conn) != CONNECTION_OK)
+    if (pgconn->conn
+     && (PQstatus(pgconn->conn) != CONNECTION_OK)
      && (pgconn->state >= PG_IDLE)
        )
         pgreset(pgconn);
@@ -824,20 +846,22 @@ pg_process_one (dbconn_t *pgconn)
     /* If there is a result waiting, get it and forward
      * it to the controlling object.
      */
-    if (pgconn->state == PG_REPLYREADY)
+    if (pgconn->conn && pgconn->state == PG_REPLYREADY)
     {
         do
         {
             res = PQgetResult(pgconn->conn);
             if (!res)
             {
+                if (pgconn->queue)
+                    dequeue(pgconn);
                 pgconn->state = PG_IDLE;
                 pg_process_one(pgconn);
                 break;
             } else
                 pgresult(pgconn, res);
         }
-        while (!PQisBusy(pgconn->conn));
+        while (pgconn->conn && pgconn->state == PG_REPLYREADY && !PQisBusy(pgconn->conn));
     }
 } /* pg_process_one() */
 
@@ -852,25 +876,32 @@ pg_process_all (void)
 
 {
     dbconn_t *ptr = head;
-    Bool got_dead = MY_FALSE;
+    dbconn_t *next;
     
     while (ptr)
     {
+        next = ptr->next;
         if (!valid_callback_object(&ptr->callback)
          && ptr->state != PG_UNCONNECTED
            )
         {
             debug_message("%s PG connection object destructed.\n", time_stamp());
             pgclose(ptr);
-            got_dead = MY_TRUE;
+        }
+        else if (ptr->state == PG_UNCONNECTED)
+        {
+            pg_has_unconnected = MY_TRUE;
         }
         else
            pg_process_one(ptr);
-        ptr = ptr->next;
+        ptr = next;
     }
 
-    if (got_dead)
+    if (pg_has_unconnected)
+    {
+        pg_has_unconnected = MY_FALSE;
         pg_purge_connections();
+    }
 } /* pg_process_all() */
 
 
