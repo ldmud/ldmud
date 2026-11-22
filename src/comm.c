@@ -2300,7 +2300,7 @@ get_message (char *buff, size_t *bufflength)
             int retries;  /* retries of select() after EINTR */
 
             flush_all_player_mess();
-            twait = comm_return_to_backend ? 0 : 1;
+            twait = (comm_return_to_backend || comm_time_to_call_heart_beat) ? 0 : 1;
               /* If the heart_beat is due, just check the state
                * of the sockets, but don't wait.
                */
