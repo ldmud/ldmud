@@ -81,10 +81,15 @@ pkg_mysql_init (void)
 
 {
     const char * client_version;
-    const char * server_version = MYSQL_SERVER_VERSION
+    const char * server_version =
+#ifdef MARIADB_PACKAGE_VERSION
+                                  MARIADB_PACKAGE_VERSION
+#else
+                                  MYSQL_SERVER_VERSION
 #ifdef MYSQL_SERVER_SUFFIX
                                   MYSQL_SERVER_SUFFIX
 #endif /* MYSQL_SERVER_SUFFIX */
+#endif /* MARIADB_PACKAGE_VERSION */
                           ;
     long cl_version, s_version;
 
@@ -107,7 +112,7 @@ pkg_mysql_init (void)
         debug_message("%s %s: mySQL: compiled for %s, linked with %s "
                       "client.\n"
                      , time_stamp()
-                     , cl_version < s_version ? "Fatal" : "Warning"
+                     , cl_version > s_version ? "Fatal" : "Warning"
                      , server_version, client_version);
         if (cl_version > s_version)
             return MY_FALSE;
