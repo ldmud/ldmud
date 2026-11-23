@@ -107,7 +107,7 @@ pkg_mysql_init (void)
         debug_message("%s %s: mySQL: compiled for %s, linked with %s "
                       "client.\n"
                      , time_stamp()
-                     , cl_version < s_version ? "Fatal" : "Warning"
+                     , cl_version > s_version ? "Fatal" : "Warning"
                      , server_version, client_version);
         if (cl_version > s_version)
             return MY_FALSE;
