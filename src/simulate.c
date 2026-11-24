@@ -726,28 +726,37 @@ limit_error_format (char *fixed_fmt, size_t fixed_fmt_len, const char *fmt)
     ffptr = fixed_fmt;
     while (*fmt && ffptr < fixed_fmt + fixed_fmt_len-1)
     {
-      if ((*ffptr++=*fmt++)=='%')
+      if (*fmt == '%' && fmt[1] == 's')
       {
-        if (*fmt == 's')
-        {
-          *ffptr++ = '.';
-          *ffptr++ = '2';
-          *ffptr++ = '0';
-          *ffptr++ = '0';
-        }
+        /* Turn the '%' into "%.200"; the 's' is copied by the next
+         * iteration. Only do so if the five bytes still fit, otherwise
+         * stop here and let the truncation below handle it - the loop
+         * condition alone only guarantees room for a single byte.
+         */
+        if (ffptr + 5 > fixed_fmt + fixed_fmt_len-1)
+            break;
+
+        *ffptr++ = *fmt++;
+        *ffptr++ = '.';
+        *ffptr++ = '2';
+        *ffptr++ = '0';
+        *ffptr++ = '0';
       }
+      else
+        *ffptr++ = *fmt++;
     }
 
     if (*fmt)
     {
         /* We reached the end of the fixed_fmt buffer before
          * the <fmt> string was complete: mark this error message
-         * as truncated.
-         * ffptr points to the last byte in the <fixed_fmt> buffer.
+         * as truncated by overwriting the last three bytes written
+         * (fewer if less than three have been written at all).
          */
-        ffptr[-3] = '.';
-        ffptr[-2] = '.';
-        ffptr[-1] = '.';
+        char *mark = (ffptr - fixed_fmt >= 3) ? ffptr - 3 : fixed_fmt;
+
+        while (mark < ffptr)
+            *mark++ = '.';
     }
 
     *ffptr = '\0';
