@@ -286,6 +286,15 @@ clear_state (void)
     current_interactive = NULL;
     previous_ob = const0;
     current_prog = NULL;
+
+    /* An error can interrupt an apply before it stored its result,
+     * leaving the result of the previous apply in <apply_return_value>.
+     * Unlike the borrowed references above this one is owned and must
+     * be released, or it will keep its value alive indefinitely.
+     */
+    free_svalue(&apply_return_value);
+    put_number(&apply_return_value, 0);
+
     reset_machine(MY_FALSE);   /* Pop down the stack. */
     num_warning = 0;
 } /* clear_state() */
