@@ -801,23 +801,26 @@ static void check_extra_ref_in_vector(svalue_t *svp, size_t num);
 static INLINE void
 assign_eval_cost_inl(void)
 {
-    unsigned long carry;
     object_t *ob;
     wiz_list_t *user = get_current_user();
+
+    /* The counters carry over into the giga-counters once they reach a
+     * billion. The amount added per call is normally tiny, so a full 64-bit
+     * division just to find a zero carry would be wasteful - only compute it
+     * on the rare occasion that the counter actually overflowed.
+     */
     if (user)
     {
         user->cost += eval_cost - assigned_eval_cost;
-        carry = user->cost / 1000000000;
-        if (carry)
+        if (user->cost >= 1000000000)
         {
-            user->gigacost += carry;
+            user->gigacost += user->cost / 1000000000;
             user->cost %= 1000000000;
         }
         user->total_cost += eval_cost - assigned_eval_cost;
-        carry = user->total_cost / 1000000000;
-        if (carry)
+        if (user->total_cost >= 1000000000)
         {
-            user->total_gigacost += carry;
+            user->total_gigacost += user->total_cost / 1000000000;
             user->total_cost %= 1000000000;
         }
     }
@@ -826,13 +829,10 @@ assign_eval_cost_inl(void)
     if (ob)
     {
         ob->ticks += eval_cost - assigned_eval_cost;
+        if (ob->ticks >= 1000000000)
         {
-            carry = ob->ticks / 1000000000;
-            if (carry)
-            {
-                ob->gigaticks += carry;
-                ob->ticks %= 1000000000;
-            }
+            ob->gigaticks += ob->ticks / 1000000000;
+            ob->ticks %= 1000000000;
         }
     }
     assigned_eval_cost = eval_cost;
