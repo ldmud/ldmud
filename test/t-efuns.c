@@ -11,6 +11,7 @@
 #include "/sys/commands.h"
 #include "/sys/configuration.h"
 #include "/sys/driver_hook.h"
+#include "/sys/driver_info.h"
 #include "/sys/functionlist.h"
 #include "/sys/input_to.h"
 #include "/sys/lpctypes.h"
@@ -1953,6 +1954,18 @@ mixed *tests = (this_object() == blueprint()) &&
         (: db_conv_string("ldmud") == "ldmud" :) // This shouldn't crash.
     }),
 #endif // __MYSQL__
+
+    ({ "driver_info status texts", 0,
+        (: foreach (int what: ({ DI_STATUS_TEXT_MEMORY, DI_STATUS_TEXT_TABLES,
+                                 DI_STATUS_TEXT_SWAP, DI_STATUS_TEXT_MALLOC,
+                                 DI_STATUS_TEXT_MALLOC_EXTENDED }))
+           {
+               mixed s = driver_info(what);
+               if (!stringp(s) && s != 0)
+                   return 0;
+           }
+           return 1; :)
+    }),
 
 #ifdef __TLS__
 }) + (tls_available() ? ({

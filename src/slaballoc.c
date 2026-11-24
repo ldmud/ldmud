@@ -1251,8 +1251,11 @@ mem_dump_extdata (strbuf_t *sbuf)
              * as mem_alloc() does it.
              */
                 unsigned long numObjects = getNumBlocks(i);
-                unsigned long avgNumObjects = extstats[i].cur_alloc
-                                              / (slabtable[i].numSlabs - slabtable[i].numFreeSlabs);
+                unsigned long numUsedSlabs = slabtable[i].numSlabs
+                                             - slabtable[i].numFreeSlabs;
+                unsigned long avgNumObjects = numUsedSlabs
+                                              ? extstats[i].cur_alloc / numUsedSlabs
+                                              : 0;
 
                 strbuf_addf(sbuf, "            "
                                   "Avg. %4lu of %4lu (%6.2lf%%) objects per slab allocated\n"
