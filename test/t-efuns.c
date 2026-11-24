@@ -1456,6 +1456,42 @@ mixed *tests = (this_object() == blueprint()) &&
     ({ "sprintf 11", 0, (: sprintf("%=-4s\n", "A B\rC D E\n") == "A B\nC D\nE\n" :) }),
     ({ "sprintf 12", 0, (: sprintf("%=-4s\n", "A B\rC D\rE F G\n") == "A B\nC D\nE F\nG\n" :) }),
 
+    /* %Q escaping: the escaped output is assembled in a fixed size buffer,
+     * so make sure that characters straddling a buffer boundary and the
+     * longest escape sequences still come out correctly.
+     */
+    ({ "sprintf %Q control characters", 0,
+        (: sprintf("%Q", "a\nb\tc\rd\ae\bf") == "\"a\\nb\\tc\\rd\\ae\\bf\"" :) }),
+    ({ "sprintf %Q hex escape", 0,
+        (: sprintf("%Q", "\x01\x1f") == "\"\\x01\\x1f\"" :) }),
+    ({ "sprintf %Q unicode escape", 0,
+        (: sprintf("%Q", "\u00e4\u20ac") == "\"\\u00e4\\u20ac\"" :) }),
+    ({ "sprintf %Q wide unicode escape", 0,
+        (: sprintf("%Q", "\U0001f600") == "\"\\U0001f600\"" :) }),
+    ({ "sprintf %Q across the buffer boundary", 0,
+        (:
+            for (int i = 1; i <= 120; i++)
+                if (sprintf("%Q", "\u00e4" * i) != "\"" + ("\\u00e4" * i) + "\"")
+                    return 0;
+            return 1;
+        :) }),
+    ({ "sprintf %Q with the longest escape at the boundary", 0,
+        (:
+            for (int i = 0; i < 60; i++)
+                if (sprintf("%Q", ("a" * i) + "\U0001f600")
+                    != "\"" + ("a" * i) + "\\U0001f600\"")
+                    return 0;
+            return 1;
+        :) }),
+    ({ "sprintf %Q of a long string", 0,
+        (: sprintf("%Q", "\u00e4" * 10000) == "\"" + ("\\u00e4" * 10000) + "\"" :) }),
+    /* The result exceeds the sprintf buffer, so this must fail with a regular
+     * error - it used to put ten times the string length on the C stack and
+     * crash the driver before ever getting there.
+     */
+    ({ "sprintf %Q of a very long string", TF_ERROR,
+        (: sprintf("%Q", "\u00e4" * 500000) :) }),
+
     ({ "sprintf doc01", 0, (: sprintf("foo")                     == "foo"           :) }),
     ({ "sprintf doc02", 0, (: sprintf("%s","foo")                == "foo"           :) }),
     ({ "sprintf doc03", 0, (: sprintf("%7s","foo")               == "    foo"       :) }),
