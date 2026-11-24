@@ -15923,9 +15923,6 @@ again:
         TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
-        if (shift > MAX_SHIFT)
-            shift = MAX_SHIFT;
-
         /* Set argp to the actual value designated by sp[0].
          * We handle special lvalues right away.
          */
@@ -16028,9 +16025,6 @@ again:
         TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
-        if (shift > MAX_SHIFT)
-            shift = MAX_SHIFT + 1;
-
         /* Set argp to the actual value designated by sp[0].
          * We handle special lvalues right away.
          */
@@ -16094,10 +16088,16 @@ again:
         case T_NUMBER:
             if (sp[-1].type == T_NUMBER)
             {
-                if (shift > MAX_SHIFT)
+                /* Same result as F_RSH: shifting out all bits leaves the
+                 * sign, i.e. 0 for a non-negative and -1 for a negative
+                 * number.
+                 */
+                if (shift <= MAX_SHIFT)
+                    argp->u.number >>= shift;
+                else if (argp->u.number >= 0)
                     argp->u.number = 0;
                 else
-                    argp->u.number >>= shift;
+                    argp->u.number = -1;
             }
             else
             {
