@@ -1155,6 +1155,18 @@ int_free_svalue (svalue_t *v)
 {
     ph_int type = v->type;
 
+    /* Integers, floats and already-freed slots don't reference anything and
+     * can't cause a recursive free, so there is nothing to do beyond marking
+     * the value invalid. Skip the stack-gap check and the switch for them -
+     * this is by far the most common case (e.g. every integer popped off the
+     * stack).
+     */
+    if (type == T_NUMBER || type == T_FLOAT || type == T_INVALID)
+    {
+        v->type = T_INVALID;
+        return;
+    }
+
     v->type = T_INVALID;
       /* If freeing the value throws an error, it is most likely that
        * we ran out of stack. To avoid the error handling running
