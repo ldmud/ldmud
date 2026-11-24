@@ -27,5 +27,6 @@
 #define II_SNOOP_NEXT                   -30
 #define II_SNOOP_PREV                   -31
 #define II_SNOOP_ALL                    -32
+#define II_WRITE_BUFFER_FILL            -33
 
 #endif /* LPC_INTERACTIVE_INFO_H_ */

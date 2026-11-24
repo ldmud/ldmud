@@ -109,6 +109,27 @@ DESCRIPTION
           The calling object must be privileged by the master object
           via valid_query_snoop().
 
+        <what> == II_WRITE_BUFFER_FILL:
+          Returns the number of bytes that are waiting in the write
+          buffer of <ob>, i.e. that have been given to the driver but
+          could not be handed to the operating system yet.
+
+          This is the value that is checked against the maximum buffer
+          size (configure_interactive(ob, IC_MAX_WRITE_BUFFER_SIZE, ...),
+          queryable with interactive_info(ob, IC_MAX_WRITE_BUFFER_SIZE)):
+          once the fill reaches that maximum, further messages are
+          discarded and H_MSG_DISCARDED is called. Comparing both values
+          allows the mudlib to slow down or drop its own output before
+          that happens - which matters for messages that must not be
+          truncated, as a discarded message is dropped as a whole.
+
+          The value can exceed that maximum by the size of the last
+          write that was still accepted: the limit is checked before a
+          message is queued, not after.
+
+          If compression is active (II_MCCP_STATS), the buffer holds
+          compressed data, so the value counts compressed bytes.
+
 
 HISTORY
         Introduced in LDMud 3.5.0.

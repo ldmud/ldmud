@@ -9364,6 +9364,14 @@ f_interactive_info (svalue_t *sp)
             put_array(&result, vec);
             break;
         }
+
+    case II_WRITE_BUFFER_FILL:
+        /* The number of bytes waiting in the write buffer. This is the
+         * value that the overflow check in comm_socket_write() compares
+         * against IC_MAX_WRITE_BUFFER_SIZE.
+         */
+        put_number(&result, (p_int)ip->write_size);
+        break;
     }
 
     sp = pop_n_elems(2, sp);
