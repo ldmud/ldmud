@@ -1232,7 +1232,7 @@ static p_int switch_pc;
    * after the SWITCH instruction.
    */
 
-static bc_offset_t current_break_address;
+static p_int current_break_address;
   /* If != 0, the compiler is in a break-able environment and this
    * variable points to the first offset-part of a series of LBRANCHes
    * which implement the break statement. Stored in every offset-part
@@ -1241,26 +1241,24 @@ static bc_offset_t current_break_address;
    *
    * There are a few special values/flags for this variable:
    */
-#define BREAK_ADDRESS_MASK   0x0003ffff
-  /* Mask for the offset-address part of the variable.
-   */
-#define BREAK_ON_STACK        (0x04000000)
-  /* Bitflag: true when the break-address is stored on the break stack,
-   * and therefore the BREAK instruction has to be used.
-   */
-#define BREAK_FROM_SWITCH     (0x08000000)
-  /* TODO: We are compiling a switch instruction.
-   */
-#define CASE_LABELS_ENABLED   (0x10000000)
-  /* The "case" and "default" statements are allowed since we're
-   * compiling a switch(). This flag is turned off for loops or
-   * conditions embedded in a switch().
-   */
+#if SIZEOF_PINT >= 8
+  /* 64-bit build: address occupies the full low 32 bits; control bits are
+   * spread into distinct high zones for clarity. */
+#define BREAK_ADDRESS_MASK    ((p_int)0x00000000ffffffff)  /* bits 0-31: address */
+#define BREAK_ON_STACK        ((p_int)0x0000000100000000)  /* bit 32 */
+#define BREAK_FROM_SWITCH     ((p_int)0x0000000200000000)  /* bit 33 */
+#define CASE_LABELS_ENABLED   ((p_int)0x0000000400000000)  /* bit 34 */
+#define BREAK_DELIMITER       (-(p_int)0x4000000000000000) /* negative sentinel: no break yet */
+#else
+  /* 32-bit build: unchanged legacy layout (18-bit address). */
+#define BREAK_ADDRESS_MASK    0x0003ffff
+#define BREAK_ON_STACK        0x04000000
+#define BREAK_FROM_SWITCH     0x08000000
+#define CASE_LABELS_ENABLED   0x10000000
 #define BREAK_DELIMITER       (-0x20000000)
-  /* Special value: no break encountered (yet).
-   */
+#endif
 
-static bc_offset_t current_continue_address;
+static p_int current_continue_address;
   /* If != 0, the compiler is in a continue-able environment and this
    * variable points to the first offset-part of a series of  FBRANCHes
    * which implement the continue statement. Stored in every offset-part
@@ -1273,19 +1271,19 @@ static bc_offset_t current_continue_address;
    * also encodes the switch()-nesting depth in the top bits of the
    * variable.
    */
-#define CONTINUE_ADDRESS_MASK   0x0003ffff
-  /* Mask for the offset-address part of the variable.
-   */
-#define SWITCH_DEPTH_UNIT       0x00040000
-  /* The switch depth is encoded in multiples of this value.
-   * This way we don't have to shift.
-   */
-#define SWITCH_DEPTH_MASK       0x3ffc0000
-  /* Mask for the switch-nesting depth part of the variable.
-   */
-#define CONTINUE_DELIMITER     -0x40000000
-  /* Special value: no continue encountered (yet).
-   */
+#if SIZEOF_PINT >= 8
+  /* 64-bit build: address in the low 32 bits; 16-bit switch depth up high. */
+#define CONTINUE_ADDRESS_MASK ((p_int)0x00000000ffffffff)  /* bits 0-31: address */
+#define SWITCH_DEPTH_UNIT     ((p_int)0x0000010000000000)  /* bit 40: depth unit */
+#define SWITCH_DEPTH_MASK     ((p_int)0x00ffff0000000000)  /* bits 40-55: depth */
+#define CONTINUE_DELIMITER    (-(p_int)0x4000000000000000) /* negative sentinel: no continue yet */
+#else
+  /* 32-bit build: unchanged legacy layout (18-bit address, 12-bit depth). */
+#define CONTINUE_ADDRESS_MASK 0x0003ffff
+#define SWITCH_DEPTH_UNIT     0x00040000
+#define SWITCH_DEPTH_MASK     0x3ffc0000
+#define CONTINUE_DELIMITER    (-0x40000000)
+#endif
 
 static int current_struct;
   /* Index of the current structure to be defined.
@@ -11554,10 +11552,18 @@ statement:
 
               ins_f_code(F_FBRANCH);
               ins_jump_offset(current_break_address & BREAK_ADDRESS_MASK);
-              current_break_address = CURRENT_PROGRAM_SIZE - sizeof(int32);
-              if (current_break_address > BREAK_ADDRESS_MASK)
-                  yyerrorf("Compiler limit: (L_BREAK) value too large: %"PRIdBcOffset
-                          , current_break_address);
+              if ((CURRENT_PROGRAM_SIZE - sizeof(int32)) > (p_uint)BREAK_ADDRESS_MASK
+               || (uint64_t)CURRENT_PROGRAM_SIZE >= (uint64_t)INT32_MAX)
+              {
+                  /* The program is too large to encode the break back-patch
+                   * address. Abort with a clean error and terminate the chain
+                   * so the (now doomed) compilation cannot walk a corrupted
+                   * offset. */
+                  yyerror("program too large: bytecode offset overflow");
+                  current_break_address = BREAK_DELIMITER;
+              }
+              else
+                  current_break_address = CURRENT_PROGRAM_SIZE - sizeof(int32);
           }
           $$ = (struct statement_s){ .may_return = false, .may_break = true, .may_continue = false, .may_finish = false, .is_empty = false, .warned_dead_code = false };
       }
@@ -11604,9 +11610,19 @@ statement:
 
           /* In either case, handle the list of continues alike */
           ins_jump_offset(current_continue_address & CONTINUE_ADDRESS_MASK);
-          current_continue_address =
-                        ( current_continue_address & SWITCH_DEPTH_MASK ) |
-                        ( CURRENT_PROGRAM_SIZE - sizeof(int32) );
+          if ((CURRENT_PROGRAM_SIZE - sizeof(int32)) > (p_uint)CONTINUE_ADDRESS_MASK
+           || (uint64_t)CURRENT_PROGRAM_SIZE >= (uint64_t)INT32_MAX)
+          {
+              /* The program is too large to encode the continue back-patch
+               * address. Abort with a clean error and terminate the chain so
+               * the (now doomed) compilation cannot walk a corrupted offset. */
+              yyerror("program too large: bytecode offset overflow");
+              current_continue_address = CONTINUE_DELIMITER;
+          }
+          else
+              current_continue_address =
+                            ( current_continue_address & SWITCH_DEPTH_MASK ) |
+                            ( CURRENT_PROGRAM_SIZE - sizeof(int32) );
 
           $$ = (struct statement_s){ .may_return = false, .may_break = false, .may_continue = true, .may_finish = false, .is_empty = false, .warned_dead_code = false };
       }
