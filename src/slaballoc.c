@@ -4263,9 +4263,14 @@ esbrk (word_t size, size_t * pExtra)
 
 {
     mdb_log_sbrk(size);
-    
+
+    /* heap_end may change below - take the next stack gap check through
+     * the slow path so it recomputes the fast-path limit.
+     */
+    stack_gap_fast_limit = NULL;
+
 #ifdef MALLOC_SBRK
-    
+
     *pExtra = 0;
     if (!heap_end)
     {
