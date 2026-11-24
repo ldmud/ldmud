@@ -33,6 +33,7 @@
 #include "structs.h"
 #include "mstrings.h"
 #include "interpret.h"
+#include "ptrtable.h"
 #include "simulate.h"
 #include "xalloc.h"
 
@@ -42,17 +43,47 @@
 #include <assert.h>
 #include <stdio.h>
 
+/* Maximum nesting depth accepted by json_serialize().
+ *
+ * The serializer recurses once per container level, and so do json-c's
+ * printer and its object destructor afterwards. Without a limit a
+ * sufficiently nested (but perfectly acyclic) value overflows the C stack:
+ * with the default 8 MB stack the recursion dies at a nesting depth of
+ * roughly 40000. The limit below keeps a wide margin to that, while still
+ * being far deeper than anything json-c can read back - its tokener
+ * defaults to a maximum nesting depth of 32.
+ */
+#define MAX_JSON_NESTING_DEPTH 1000
+
+/* Context for one json_serialize() call.
+ *
+ * <ptable> holds the containers on the current path from the root to the
+ * value being serialized, so that a container containing itself can be
+ * detected. <depth> is the length of that path.
+ */
+struct json_serialize_ctx {
+    struct pointer_table *ptable;
+    int                   depth;
+};
+
+/* Payload for walk_mapping(): the JSON object to fill and the context. */
+struct json_walk_ctx {
+    struct json_object        *parent;
+    struct json_serialize_ctx *ctx;
+};
+
 struct json_error_handler_s {
-    error_handler_t     head;
-    struct json_object *jobj;
+    error_handler_t       head;
+    struct json_object   *jobj;
+    struct pointer_table *ptable;
 };
 
 static void json_error_cleanup(error_handler_t *arg) __attribute__((nonnull(1)));
-static INLINE bool push_json_error_handler(struct json_object *jobj) __attribute__((nonnull(1)));
-static void ldmud_json_walker(svalue_t *key, svalue_t *val, void *parent) __attribute__((nonnull(1,2,3)));
+static INLINE bool push_json_error_handler(struct json_object *jobj, struct pointer_table *ptable) __attribute__((nonnull(1)));
+static void ldmud_json_walker(svalue_t *key, svalue_t *val, void *extra) __attribute__((nonnull(1,2,3)));
 static INLINE void ldmud_json_attach(struct json_object *parent, const char *key, struct json_object *val) __attribute__((nonnull(1,3)));
 svalue_t *ldmud_json_parse (svalue_t *sp, struct json_object *val) __attribute__((nonnull(1,2)));
-struct json_object *ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key) __attribute__((nonnull(1)));
+struct json_object *ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key, struct json_serialize_ctx *ctx) __attribute__((nonnull(1,4)));
 
 /*-------------------------------------------------------------------------*/
 /*                           EFUNS                                         */
@@ -98,7 +129,7 @@ f_json_parse (svalue_t *sp)
         errorf("json_parse(): could not parse string - probably illegal JSON format.\n");
     }
     // Push errorhandler with json object in case ldmud_json_parse calls errorf().
-    if (!push_json_error_handler(parsed))
+    if (!push_json_error_handler(parsed, NULL))
     {
         json_object_put(parsed);
         errorf("json_parse(): could not allocate memory for error handler.\n");
@@ -154,7 +185,8 @@ f_json_serialize (svalue_t *sp)
 {
     struct json_object *parent = NULL;
     struct json_object *jobj = NULL;
-    
+    struct json_serialize_ctx ctx = { NULL, 0 };
+
     // In case of simple types, this is straight-forward. But for 'container'
     // types like arrays, mappings, structs, it gets more complicated.
     switch(sp->type)
@@ -163,7 +195,7 @@ f_json_serialize (svalue_t *sp)
         case T_FLOAT:
         case T_STRING:
             // just create a json object containing the value.
-            jobj = ldmud_json_serialize(sp, NULL, NULL);
+            jobj = ldmud_json_serialize(sp, NULL, NULL, &ctx);
             parent = jobj;
             break;
         default:
@@ -181,18 +213,33 @@ f_json_serialize (svalue_t *sp)
         errorf("json_serialize(): could not create root JSON object (may be out of memory?).\n");
         return sp;  // not reached
     }
+    if (parent != jobj) // for container types
+    {
+        // The container may contain itself, directly or indirectly. The
+        // pointer table records the containers on the path from the root to
+        // the value currently being serialized, so that such a cycle is
+        // detected instead of recursing until the C stack is exhausted.
+        ctx.ptable = new_pointer_table();
+        if (!ctx.ptable)
+        {
+            json_object_put(parent);
+            errorf("json_serialize(): could not allocate memory for the pointer table.\n");
+        }
+    }
     // Push errorhandler with the json object in case there is a later call
     // to errorf().
-    if (!push_json_error_handler(parent))
+    if (!push_json_error_handler(parent, ctx.ptable))
     {
         json_object_put(parent);
+        if (ctx.ptable)
+            free_pointer_table(ctx.ptable);
         errorf("json_serialize(): could not allocate memory for error handler.\n");
     }
     if (parent != jobj) // for container types
     {
         // create the json object with the 'real' data. It will be attached to
         // parent for freeing in case of errors.
-        jobj = ldmud_json_serialize(sp, parent, NULL);
+        jobj = ldmud_json_serialize(sp, parent, NULL, &ctx);
     }
     // inter_sp now points to one value above our argument (sp).
     // We free the argument and let put_c_string() put the new string at that
@@ -217,9 +264,10 @@ f_json_serialize (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static INLINE bool
-push_json_error_handler(struct json_object * jobj)
+push_json_error_handler(struct json_object * jobj, struct pointer_table *ptable)
 /* An error handler is pushed onto the value stack so that the given json_object
- * is safely freed either by manually freeing the svalue on the stack or during
+ * and the given pointer table (which may be NULL) are safely freed either by
+ * manually freeing the svalue on the stack or during
  * stack unwinding during errorf().
  * inter_sp has to point to the top-of-stack before calling and is updated to
  * point to the error handler svalue!
@@ -233,6 +281,7 @@ push_json_error_handler(struct json_object * jobj)
         return false;
     }
     handler->jobj = jobj;
+    handler->ptable = ptable;
     /* now push error handler onto the value stack */
     push_error_handler(json_error_cleanup, &(handler->head));
     return true;
@@ -241,7 +290,8 @@ push_json_error_handler(struct json_object * jobj)
 /*-------------------------------------------------------------------------*/
 static void
 json_error_cleanup (error_handler_t *arg)
-/* Frees the json object contained in the error handler and the handler.
+/* Frees the json object contained in the error handler, the pointer table
+ * and the handler.
  * Called from free_svalue() (e.g. during stack unwinding in case of errors).
  */
 {
@@ -249,8 +299,62 @@ json_error_cleanup (error_handler_t *arg)
     // free the referenced jobj (decrease refcounter)
     if (info->jobj)
         json_object_put(info->jobj);
+    if (info->ptable)
+        free_pointer_table(info->ptable);
     xfree(info);
 }
+
+/*-------------------------------------------------------------------------*/
+static void
+json_enter_container (struct json_serialize_ctx *ctx, void *container)
+/* Note that <container> is entered, i.e. put onto the path of containers
+ * currently being serialized.
+ *
+ * Raises an error if <container> is already on that path (which means the
+ * value contains itself and the recursion would not terminate), or if the
+ * path has become too long.
+ *
+ * <container> may be NULL for container-like values without an identity of
+ * their own (e.g. a range of an array); those only count towards the depth.
+ */
+{
+    if (container != NULL)
+    {
+        struct pointer_record *prec;
+
+        prec = find_add_pointer(ctx->ptable, container, MY_TRUE);
+        if (prec == NULL)
+            errorf("json_serialize(): out of memory.\n");
+        if (prec->id_number)
+            errorf("json_serialize(): cyclic structure.\n");
+        prec->id_number = 1;
+    }
+
+    if (++ctx->depth > MAX_JSON_NESTING_DEPTH)
+        errorf("json_serialize(): nesting too deep, limit is %d.\n"
+              , MAX_JSON_NESTING_DEPTH);
+} /* json_enter_container() */
+
+/*-------------------------------------------------------------------------*/
+static void
+json_leave_container (struct json_serialize_ctx *ctx, void *container)
+/* Note that <container> has been serialized completely and is no longer on
+ * the path, so that it may legitimately appear again as a sibling.
+ *
+ * Not called when the serialization was aborted by an error - in that case
+ * the whole table is freed by the error handler anyway.
+ */
+{
+    if (container != NULL)
+    {
+        struct pointer_record *prec;
+
+        prec = lookup_pointer(ctx->ptable, container);
+        if (prec != NULL)
+            prec->id_number = 0;
+    }
+    ctx->depth--;
+} /* json_leave_container() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -356,9 +460,12 @@ ldmud_json_parse (svalue_t *sp, struct json_object *jobj)
 
 /*-------------------------------------------------------------------------*/
 static void
-ldmud_json_walker(svalue_t *key, svalue_t *val, void *parent)
+ldmud_json_walker(svalue_t *key, svalue_t *val, void *extra)
 /*
-   * Adds svalue <val> to json object <parent> under the key <key>.
+   * Adds svalue <val> to the json object in <extra> under the key <key>.
+   *
+   * <extra> points to a struct json_walk_ctx holding the JSON object to fill
+   * and the serialization context.
    * 
    * Note: <key> must be of type T_STRING.
    *       The mapping MUST have at least one value per key.
@@ -368,7 +475,7 @@ ldmud_json_walker(svalue_t *key, svalue_t *val, void *parent)
    * WARNING: might call errorf().
 */
 {
-    struct json_object *jobj = (struct json_object *)parent;
+    struct json_walk_ctx *walk = (struct json_walk_ctx *)extra;
     if (key->type != T_STRING)
     {
         errorf("json_serialize(): JSON supports only string keys, but got: %s\n",
@@ -376,7 +483,7 @@ ldmud_json_walker(svalue_t *key, svalue_t *val, void *parent)
         /* NOTREACHED */
         return;
     }
-    ldmud_json_serialize(val, jobj, get_txt(key->u.str));
+    ldmud_json_serialize(val, walk->parent, get_txt(key->u.str), walk->ctx);
 } // ldmud_json_walker
 
 /*-------------------------------------------------------------------------*/
@@ -403,10 +510,14 @@ ldmud_json_attach(struct json_object *parent, const char *key, struct json_objec
 
 /*-------------------------------------------------------------------------*/
 struct json_object *
-ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key)
+ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key, struct json_serialize_ctx *ctx)
 /*
    * Creates a JSON object containing the data of the svalue <sp> points to.
    * To do this, it calls itself recursively if needed (for container types).
+   *
+   * <ctx> carries the containers on the current path (for cycle detection)
+   * and the current nesting depth. Serializing a value that contains itself
+   * or is nested too deeply raises an error.
    * Only T_NUMBER, T_FLOAT, T_STRINGS, T_POINTER, T_MAPPING and T_STRUCT are 
    * serialized. All other LPC types cause a runtime error.
    *
@@ -460,42 +571,60 @@ ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key)
         break;
     
     case T_POINTER:
+        json_enter_container(ctx, val->u.vec);
+
         jobj = json_object_new_array();
         // the created object has to be attached to the parent immediately to
         // prevent any memory leaks in case there is a call to errorf() later.
         ldmud_json_attach(parent, key, jobj);
 
         for (int i = 0; i < VEC_SIZE(val->u.vec); ++i)
-            ldmud_json_serialize(&val->u.vec->item[i], jobj, NULL);
-        
+            ldmud_json_serialize(&val->u.vec->item[i], jobj, NULL, ctx);
+
+        json_leave_container(ctx, val->u.vec);
         break;
-    
+
     case T_MAPPING:
+    {
+        struct json_walk_ctx walk;
+
         if (val->u.map->num_values != 1)
           errorf("json_serialize(): can only serialize mappings with width 1, "
                  "but got mapping with width %"PRIdPINT".\n",
                  val->u.map->num_values);
-        
+
+        json_enter_container(ctx, val->u.map);
+
         jobj = json_object_new_object();
         // the created object has to be attached to the parent immediately to
         // prevent any memory leaks in case there is a call to errorf() later.
         ldmud_json_attach(parent, key, jobj);
 
-        walk_mapping(val->u.map, &ldmud_json_walker, jobj);
+        walk.parent = jobj;
+        walk.ctx = ctx;
+        walk_mapping(val->u.map, &ldmud_json_walker, &walk);
+
+        json_leave_container(ctx, val->u.map);
         break;
+    }
     case T_STRUCT:
     {
         struct_t  * st = val->u.strct;
+
+        json_enter_container(ctx, st);
+
         jobj = json_object_new_object();
         // the created object has to be attached to the parent immediately to
         // prevent any memory leaks in case there is a call to errorf() later.
         ldmud_json_attach(parent, key, jobj);
-        
+
         // Now loop over all members and assign the data
         for (int i  = 0; i < struct_size(st); ++i)
         {
-            ldmud_json_serialize(&(st->member[i]),jobj,get_txt(st->type->member[i].name));
+            ldmud_json_serialize(&(st->member[i]),jobj,get_txt(st->type->member[i].name), ctx);
         }
+
+        json_leave_container(ctx, st);
         break;
     }
 
@@ -521,6 +650,10 @@ ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key)
             if (!get_iterator(sp, &it, true))
                 fatal("Illegal lvalue type %d\n", sp->x.lvalue_type);
 
+            // A range has no identity of its own to register, but it still
+            // adds a level to the nesting depth.
+            json_enter_container(ctx, NULL);
+
             jobj = json_object_new_array();
             if (parent) ldmud_json_attach(parent, key, jobj);
 
@@ -529,8 +662,10 @@ ldmud_json_serialize (svalue_t *sp, struct json_object *parent, const char *key)
                 svalue_t *item = it.next_value(&it);
                 if (!item)
                     break;
-                ldmud_json_serialize(item, jobj, NULL);
+                ldmud_json_serialize(item, jobj, NULL, ctx);
             }
+
+            json_leave_container(ctx, NULL);
         }
         break;
     }
