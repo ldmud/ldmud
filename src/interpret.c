@@ -928,6 +928,22 @@ mark_end_evaluation (void)
 } /* mark_end_evaluation() */
 
 /*-------------------------------------------------------------------------*/
+
+enum instr_arg_frame_flags_e
+{
+    IAF_CHECK_ALWAYS  = 0x01, /* Unprefixed efun with a variable number of
+                               * arguments: check whenever it is executed. */
+    IAF_CHECK_WITH_AP = 0x02, /* Unprefixed efun: check when an argument
+                               * frame is in effect (use_ap). */
+};
+
+static unsigned char instr_arg_frame_flags[256];
+  /* For each base instruction code the conditions under which
+   * eval_instruction() has to verify the number of arguments on the
+   * argument frame, precomputed from instrs[] by init_interpret().
+   */
+
+/*-------------------------------------------------------------------------*/
 void
 init_interpret (void)
 
@@ -937,6 +953,22 @@ init_interpret (void)
 {
     call_cache_t invalid_entry;
     int i;
+
+    /* Precompute the argument-frame check conditions for all base
+     * instruction codes: instructions describing unprefixed efuns
+     * (.Default != -1) are checked when an argument frame is in effect,
+     * and always when they take a variable number of arguments.
+     */
+    for (i = 0; i < 256; i++)
+    {
+        instr_arg_frame_flags[i] = 0;
+        if (instrs[i].Default != -1)
+        {
+            instr_arg_frame_flags[i] |= IAF_CHECK_WITH_AP;
+            if (instrs[i].min_arg != instrs[i].max_arg)
+                instr_arg_frame_flags[i] |= IAF_CHECK_ALWAYS;
+        }
+    }
 
     /* The cache is inited to hold entries for 'functions' in a non-existing
      * program (id 0). The first real apply calls will thus see a (virtual)
@@ -10228,9 +10260,13 @@ again:
      * for unprefixed efuns, the compiler didn't check them in this case.
      * We have an argument frame when use_ap is set or the efun doesn't have
      * a fixed number of arguments.
+     *
+     * The conditions on the instruction are precomputed per opcode in
+     * instr_arg_frame_flags[], so the common case costs a single byte
+     * load instead of several loads from the instrs[] table.
      */
-    if (instrs[instruction].Default != -1
-     && (use_ap || instrs[instruction].min_arg != instrs[instruction].max_arg))
+    if (instr_arg_frame_flags[instruction] & (use_ap ? IAF_CHECK_WITH_AP
+                                                     : IAF_CHECK_ALWAYS))
     {
         int numarg = sp - ap + 1;
 
