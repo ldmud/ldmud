@@ -8324,59 +8324,125 @@ restore_mapping (svalue_t *svp, char **str)
 /* Restore a mapping from the text starting at *<str> (which points
  * just after the leading '([') and store it into *<svp>.
  * Return TRUE if the restore was successful, FALSE else (*<svp> is
- * set to const0 in that case).
+ * set to const0 resp. left with the partially restored mapping in
+ * that case).
  * On a successful return, *<str> is set to point after the mapping
  * restored.
  *
- * TODO: this function assumes that num_values and num_entries of mappings
- * TODO::are 'int'. Should be changed to p_int.
+ * Only the first entry is scanned ahead (to determine the width of
+ * the mapping); after that the entries are restored incrementally
+ * until the closing ']' is found. This way the mapping text - and
+ * the text of all nested containers - is parsed only once instead of
+ * once per nesting level.
  */
 
 {
     mapping_t *z;
     svalue_t key, *data;
-    int i;
-    struct rms_parameters tmp_par;
-    int siz;
+    p_int i;
+    p_int width;
+    char *pt = *str;
 
-    /* Determine the size and width of the mapping */
+    /* Empty mapping: "])" */
 
-    tmp_par.str = *str;
-    siz = restore_map_size(&tmp_par);
-    if (siz < 0)
+    if (pt[0] == ']')
     {
-        *svp = const0;
-        return MY_FALSE;
+        if (pt[1] != ')')
+        {
+            *svp = const0;
+            return MY_FALSE;
+        }
+        width = 1;
+        pt += 2;
     }
 
-    if (max_mapping_size && siz * (1+tmp_par.num_values) > (p_int)max_mapping_size)
+    /* Empty mapping with explicit width: ":<width>])" */
+
+    else if (pt[0] == ':')
     {
-        *svp = const0;
-        errorf("Illegal mapping size: %ld elements (%d x %d).\n"
-             , (long)siz * (1+tmp_par.num_values)
-             , siz
-             , 1+tmp_par.num_values );
-        return MY_FALSE;
+        width = atoi(pt+1);
+        pt = strchr(pt+1, ']');
+        if (!pt || pt[1] != ')' || width < 0)
+        {
+            *svp = const0;
+            return MY_FALSE;
+        }
+        pt += 2;
+    }
+    else
+        pt = NULL; /* There are entries to restore. */
+
+    if (pt)
+    {
+        z = allocate_mapping(0, width);
+        if (!z)
+        {
+            *svp = const0;
+            errorf("(restore) Out of memory: mapping[0, %ld]\n"
+                 , (long)width);
+            return MY_FALSE;
+        }
+
+        svp->type = T_MAPPING;
+        svp->u.map = z;
+        *str = pt;
+        return MY_TRUE;
     }
 
-    /* Allocate the mapping */
-    z = allocate_mapping(siz, tmp_par.num_values);
+    /* Determine the width of the mapping by scanning the first entry:
+     * skip the key, then count the ':'/';' separated values up to the
+     * ',' ending the entry.
+     */
+    {
+        char *tmp = *str;
+
+        if (!skip_element(&tmp))
+        {
+            *svp = const0;
+            return MY_FALSE;
+        }
+
+        width = 0;
+        if (*tmp == ':')
+        {
+            do
+            {
+                width++;
+                tmp++;
+                if (!skip_element(&tmp))
+                {
+                    *svp = const0;
+                    return MY_FALSE;
+                }
+            } while (*tmp == ';');
+        }
+
+        if (*tmp != ',')
+        {
+            *svp = const0;
+            return MY_FALSE;
+        }
+    }
+
+    /* Allocate the mapping. It grows as the entries are restored. */
+
+    z = allocate_mapping(0, width);
 
     if (!z)
     {
         *svp = const0;
-        errorf("(restore) Out of memory: mapping[%d, %d]\n"
-             , siz, tmp_par.num_values);
+        errorf("(restore) Out of memory: mapping[0, %ld]\n"
+             , (long)width);
         return MY_FALSE;
     }
 
     svp->type = T_MAPPING;
     svp->u.map = z;
 
-    /* Loop through size and width, restoring the values */
-    while (--siz >= 0)
+    /* Restore the entries until the closing '])' is found. */
+    while (MY_TRUE)
     {
-        i = tmp_par.num_values;
+        i = width;
         key.type = T_NUMBER;
         if (!restore_svalue(&key, str, (char)(i ? ':' : ',') ))
         {
@@ -8400,9 +8466,26 @@ restore_mapping (svalue_t *svp, char **str)
             if (!restore_svalue(data++, str, (char)(i ? ';' : ',') ))
                 return MY_FALSE;
         }
+
+        if (max_mapping_size
+         && z->num_entries * (1+width) > (p_int)max_mapping_size)
+        {
+            errorf("Illegal mapping size: %ld elements (%ld x %ld).\n"
+                 , (long)z->num_entries * (1+width)
+                 , (long)z->num_entries
+                 , (long)(1+width) );
+            return MY_FALSE;
+        }
+
+        pt = *str;
+        if (pt[0] == ']')
+        {
+            if (pt[1] != ')')
+                return MY_FALSE;
+            *str = pt + 2;
+            return MY_TRUE;
+        }
     }
-    *str = tmp_par.str;
-    return MY_TRUE;
 } /* restore_mapping() */
 
 /*-------------------------------------------------------------------------*/
@@ -10553,10 +10636,17 @@ static int nesting = 0;  /* Used to detect recursive calls */
              * not found in the shared string table or in the object.
              * That means we can eventually discard this line, but first
              * we have to parse it in case it contains the definition
-             * of a shared array some other variable might use.
-             *
-             * Therefore we create a dummy variable and initialize
-             * it to svalue-int, so that it can be freed without remorse.
+             * of a shared value some other variable might use. Shared
+             * value definitions and references are written as '<id>',
+             * so a line without any '<' character can't affect them
+             * and is skipped without parsing.
+             */
+
+            if (strchr(space+1, '<') == NULL)
+                break; /* Leaves v == NULL: skip the line. */
+
+            /* Create a dummy variable and initialize it to svalue-int,
+             * so that it can be freed without remorse.
              */
 
             {
@@ -10586,6 +10676,21 @@ static int nesting = 0;  /* Used to detect recursive calls */
             }
 
         } while (MY_FALSE);
+
+        /* Skip the line of an unknown variable whose value can't
+         * contain shared value definitions.
+         */
+        if (v == NULL)
+        {
+            if (!file)
+            {
+                char *nl = strchr(space+1, '\n');
+                if (!nl)
+                    break;
+                cur = nl+1;
+            }
+            continue;
+        }
 
         /* Get rid of the old value in v */
 
