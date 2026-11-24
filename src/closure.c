@@ -1364,9 +1364,12 @@ realloc_values (void)
 
 /* Double the size of the value block in the current workspace.
  * The function is called only when all values in the current block
- * have been assigned.
+ * have been assigned, i.e. with .values_left == 0.
  *
- * Raise an error when out of memory.
+ * Raise an error when out of memory. The caller must not have taken
+ * the new entry out of .values_left yet: on error lambda_error() walks
+ * the assigned values, and for that .valuep and .values_left have to
+ * agree (.valuep == .values + .values_left).
  */
 
 {
@@ -1377,9 +1380,8 @@ realloc_values (void)
 
     new_values = xalloc(new_max * sizeof(*new_values));
     if (!new_values)
-        lambda_error("Out of memory (%"PRIdMPINT
-                     " bytes) for %"PRIdMPINT" new values\n",
-                     new_max, new_max * sizeof(*new_values));
+        lambda_error("Out of memory (%"PRIdMPINT" bytes) for new values\n",
+                     (mp_int)(new_max * sizeof(*new_values)));
 
     current.values_left += current.value_max;
     memcpy( (current.valuep = new_values + current.value_max)
@@ -1703,8 +1705,9 @@ insert_value_push (svalue_t *value)
     else
         lambda_error("Too many values in lambda()\n");
 
-    if (--current.values_left < 0)
+    if (current.values_left <= 0)
         realloc_values();
+    current.values_left--;
 
     /* Don't forget to copy the value itself */
     assign_svalue_no_free(--current.valuep, value);
@@ -3865,8 +3868,9 @@ compile_value (svalue_t *value, enum compile_value_input_flags opt_flags)
                                     );
                                 }
 
-                                if (--current.values_left < 0)
+                                if (current.values_left <= 0)
                                     realloc_values();
+                                current.values_left--;
                                 no_string = MY_FALSE;
                                 stmp.type = rlabel->type;
                                 stmp.u.str = make_tabled_from(rlabel->u.str);
