@@ -570,17 +570,27 @@ retry_alloc (size_t size MTRACE_DECL)
 
 /*-------------------------------------------------------------------------*/
 static INLINE Bool
-check_max_malloced (void)
+check_max_malloced_addition (size_t addition)
 
-/* If max_malloced is set, check if the allocated memory exceeds it.
+/* If max_malloced is set, check if the allocated memory would exceed it
+ * after <addition> more bytes have been allocated.
  * If not, return FALSE.
  * If yes, and malloc_privilege < MALLOC_SYSTEM: return TRUE.
  * If yes, and malloc_privilege == MALLOC_SYSTEM: abort.
+ *
+ * The check has to happen before the allocation: afterwards the caller
+ * can no longer be told "nothing happened", which is what a NULL result
+ * means to it.
  */
 
 {
 #ifndef NO_MEM_BLOCK_SIZE
-    if (max_malloced > 0 && (mp_int)xalloc_stat.size > max_malloced)
+    /* The comparison is written so that it cannot overflow: <addition>
+     * comes from a caller-supplied size and may be arbitrarily large.
+     */
+    if (max_malloced > 0
+     && (addition > (size_t)max_malloced
+      || xalloc_stat.size > (size_t)max_malloced - addition))
     {
         static const char mess[] = "HARD_MALLOC_LIMIT reached.\n";
         writes(2, mess);
@@ -594,9 +604,11 @@ check_max_malloced (void)
         fatal("Out of memory.\n");
         /* NOTREACHED */
     }
+#else
+    (void)addition;
 #endif
     return MY_FALSE;
-} /* check_max_malloced() */
+} /* check_max_malloced_addition() */
 
 /*-------------------------------------------------------------------------*/
 void *
@@ -627,6 +639,14 @@ xalloc_traced (size_t size MTRACE_DECL)
 #endif /* MALLOC_SBRK_TRACE */
 
     size += XM_OVERHEAD_SIZE + sizeof(word_t)*VALGRIND_REDZONE;
+
+#ifndef NO_MEM_BLOCK_SIZE
+    /* Check the limit before allocating: a block that has been allocated
+     * cannot be un-allocated without the caller noticing.
+     */
+    if (check_max_malloced_addition(size))
+        return NULL;
+#endif
 
     do {
         p = mem_alloc(size);
@@ -670,8 +690,6 @@ xalloc_traced (size_t size MTRACE_DECL)
     count_up(&xalloc_stat, XM_OVERHEAD_SIZE);
 #else
     count_up(&xalloc_stat, mem_block_size(p));
-    if (check_max_malloced())
-        return NULL;
 #endif
     return (void *)(p + XM_OVERHEAD);
 } /* xalloc_traced() */
@@ -819,6 +837,13 @@ rexalloc_traced (void * p, size_t size MTRACE_DECL
     if (old_size >= size)
         return p;
 
+    /* Check the limit before growing the block: on a limit hit we must
+     * leave <p> untouched, because that is what a NULL result promises
+     * the caller.
+     */
+    if (check_max_malloced_addition(size - old_size))
+        return NULL;
+
     t = mem_increment_size(block, size - old_size);
     if (t)
     {
@@ -826,8 +851,6 @@ rexalloc_traced (void * p, size_t size MTRACE_DECL
 
         count_back(&xalloc_stat, old_size);
         count_up(&xalloc_stat, mem_block_size(block));
-        if (check_max_malloced())
-            return NULL;
 
         /* Additional bytes if we round up to full words. */
         size_t remainder = ((size + sizeof(word_t) - 1) & ~(sizeof(word_t) - 1)) - size;
@@ -855,8 +878,6 @@ rexalloc_traced (void * p, size_t size MTRACE_DECL
 #ifndef NO_MEM_BLOCK_SIZE
         count_back(&xalloc_stat, old_size);
         count_up(&xalloc_stat, mem_block_size(t));
-        if (check_max_malloced())
-            return NULL;
 #endif
         t += XM_OVERHEAD;
         if (p == t)
