@@ -9876,6 +9876,37 @@ put_default_argument (svalue_t *sp, int instruction)
 } /* put_default_argument() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE int
+full_instruction_code (int instruction, bytecode_p pc)
+
+/* Return the full instruction code for <instruction>: for the multibyte
+ * efun instructions this includes the efun code byte at <pc> (which
+ * points just after the instruction byte), all other instruction codes
+ * are returned unchanged.
+ */
+
+{
+    /* The F_EFUN0..F_EFUNV prefix opcodes are consecutive, so a single
+     * range check covers them all and a small table supplies the offset
+     * for the efun code in the following byte.
+     */
+#if F_EFUN1 != F_EFUN0+1 || F_EFUN2 != F_EFUN0+2 || F_EFUN3 != F_EFUN0+3 \
+ || F_EFUN4 != F_EFUN0+4 || F_EFUNV != F_EFUN0+5
+#error "F_EFUN0..F_EFUNV are expected to be consecutive opcodes."
+#endif
+    if ((unsigned int)(instruction - F_EFUN0) <= F_EFUNV - F_EFUN0)
+    {
+        static const unsigned short efun_offset[F_EFUNV - F_EFUN0 + 1]
+          = { EFUN0_OFFSET, EFUN1_OFFSET, EFUN2_OFFSET
+            , EFUN3_OFFSET, EFUN4_OFFSET, EFUNV_OFFSET };
+
+        return GET_CODE(pc) + efun_offset[instruction - F_EFUN0];
+    }
+
+    return instruction;
+} /* full_instruction_code() */
+
+/*-------------------------------------------------------------------------*/
 Bool
 eval_instruction (bytecode_p first_instruction
                  , svalue_t *initial_sp)
@@ -9915,9 +9946,6 @@ eval_instruction (bytecode_p first_instruction
        */
     int num_arg;      /* Number of arguments given to the current instr */
     int instruction;  /* The current instruction code */
-    int full_instr;   /* The full instruction code; including any additional
-                       * code bytes (e.g. for efuns)
-                       */
 #ifdef DEBUG
     svalue_t *expected_stack; /* Expected stack at the instr end */
 #endif
@@ -10082,30 +10110,28 @@ eval_instruction (bytecode_p first_instruction
 again:
     /* Get the next instruction and increment the pc */
 
-    full_instr = instruction = LOAD_CODE(pc);
-    if (full_instr == F_EFUN0)
-        full_instr = GET_CODE(pc) + EFUN0_OFFSET;
-    else if (full_instr == F_EFUN1)
-        full_instr = GET_CODE(pc) + EFUN1_OFFSET;
-    else if (full_instr == F_EFUN2)
-        full_instr = GET_CODE(pc) + EFUN2_OFFSET;
-    else if (full_instr == F_EFUN3)
-        full_instr = GET_CODE(pc) + EFUN3_OFFSET;
-    else if (full_instr == F_EFUN4)
-        full_instr = GET_CODE(pc) + EFUN4_OFFSET;
-    else if (full_instr == F_EFUNV)
-        full_instr = GET_CODE(pc) + EFUNV_OFFSET;
+    instruction = LOAD_CODE(pc);
+      /* The full instruction code - including the efun code byte for
+       * the multibyte efun instructions - is not decoded here: the
+       * evaluator dispatches on <instruction> alone and the efun cases
+       * read their code byte themselves. The few (rare or conditionally
+       * compiled) consumers below get it via full_instruction_code().
+       */
 
 #if 0
-    if (full_instr != instruction)
-        printf("DEBUG: %p (%p): %3d %s %s\n"
-              , pc-1, sp
-              , full_instr, get_f_name(instruction), get_f_name(full_instr));
-    else
-        printf("DEBUG: %p (%p): %3d %s\n"
-              , pc-1, sp
-              , full_instr, get_f_name(full_instr));
-    fflush(stdout);
+    {
+        int full_instr = full_instruction_code(instruction, pc);
+
+        if (full_instr != instruction)
+            printf("DEBUG: %p (%p): %3d %s %s\n"
+                  , pc-1, sp
+                  , full_instr, get_f_name(instruction), get_f_name(full_instr));
+        else
+            printf("DEBUG: %p (%p): %3d %s\n"
+                  , pc-1, sp
+                  , full_instr, get_f_name(full_instr));
+        fflush(stdout);
+    }
 #endif
 
 #   ifdef TRACE_CODE
@@ -10130,7 +10156,7 @@ again:
 #endif
 
 #   ifdef OPCPROF
-        opcount[full_instr]++;
+        opcount[full_instruction_code(instruction, pc)]++;
 #   endif
 
     /* If requested, trace the instruction.
@@ -10141,7 +10167,7 @@ again:
         if (!++traceing_recursion)
         {
             inter_sp = sp;
-            do_trace("Exec ", get_f_name(full_instr), "\n");
+            do_trace("Exec ", get_f_name(full_instruction_code(instruction, pc)), "\n");
             instruction = EXTRACT_UCHAR(pc-1);
         }
         traceing_recursion--;
@@ -10149,7 +10175,7 @@ again:
 
 #ifdef USE_PYTHON
     if (current_prog != NULL)
-        python_call_instruction_hook(full_instr);
+        python_call_instruction_hook(full_instruction_code(instruction, pc));
 #endif
 
     /* Test the evaluation cost.
@@ -10185,6 +10211,8 @@ again:
     }
 
 #if defined(DEBUG)
+  {
+    int full_instr = full_instruction_code(instruction, pc);
 
     /* Get the expected number of arguments and determined the expected
      * stack setting.
@@ -10222,6 +10250,7 @@ again:
     {
         expected_stack = NULL;
     }
+  }
 #endif /* DEBUG */
 
     /* If an argument frame is in effect, check the number of arguments
