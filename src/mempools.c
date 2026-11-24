@@ -77,9 +77,7 @@
 
 #include "mempools.h"
 #include "gcollect.h"
-#ifdef DEBUG
 #include "simulate.h"
-#endif
 #include "strfuns.h"
 #include "svalue.h"
 #include "xalloc.h"
