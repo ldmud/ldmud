@@ -1974,8 +1974,8 @@ internal_assign_rvalue_no_free ( svalue_t *to, svalue_t *from )
 } /* internal_assign_rvalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
-INLINE void
-normalize_svalue (svalue_t *svp, bool collapse_lvalues)
+void
+normalize_lvalue (svalue_t *svp, bool collapse_lvalues)
 
 /* Checks whether <svp> is a protected lvalue (unprotected lvalues are not
  * allowed here). If so, the normalizing steps are applied:
