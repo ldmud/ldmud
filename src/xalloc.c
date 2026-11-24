@@ -22,6 +22,7 @@
 #include "backend.h"
 #include "gcollect.h"
 #include "interpret.h"
+#include "main.h"
 #include "simulate.h"
 
 #include "exec.h"
@@ -1059,7 +1060,7 @@ print_block (int d, word_t *block)
          && dispatch_table[i].line == line)
         {
             (*dispatch_table[i].func)(d, (char *)(block+XM_OVERHEAD), 0);
-            write(d, "\n", 1);
+            write_bytes(d, "\n", 1);
             return;
         }
     }
@@ -1092,7 +1093,7 @@ print_block (int d, word_t *block)
             for (i = 0; i < 16 && i < (int)size && i < limit; i++)
             {
                 if (isprint((unsigned char)cp[i]))
-                    write(d, cp+i, 1);
+                    write_bytes(d, cp+i, 1);
                 else
                     writes(d, ".");
             }
@@ -1655,7 +1656,6 @@ reallocate_reserved_areas (void)
  */
 
 {
-    char *p;
     malloc_privilege = MALLOC_USER;
     if (reserved_system_size && !reserved_system_area) {
         if ( !(reserved_system_area = xalloc((size_t)reserved_system_size)) ) {
@@ -1663,8 +1663,7 @@ reallocate_reserved_areas (void)
             return;
         }
         else {
-            p = "Reallocated System reserve.\n";
-            write(1, p, strlen(p));
+            writes(1, "Reallocated System reserve.\n");
         }
     }
     if (reserved_master_size && !reserved_master_area) {
@@ -1673,8 +1672,7 @@ reallocate_reserved_areas (void)
             return;
         }
         else {
-            p = "Reallocated Master reserve.\n";
-            write(1, p, strlen(p));
+            writes(1, "Reallocated Master reserve.\n");
         }
     }
     if (reserved_user_size && !reserved_user_area) {
@@ -1683,8 +1681,7 @@ reallocate_reserved_areas (void)
             return;
         }
         else {
-            p = "Reallocated User reserve.\n";
-            write(1, p, strlen(p));
+            writes(1, "Reallocated User reserve.\n");
         }
     }
     slow_shut_down_to_do = 0;

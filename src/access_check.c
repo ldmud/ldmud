@@ -346,7 +346,8 @@ read_access_file (void)
 
             for (;;) {
                 c = 'm';
-                fscanf(infp, "%c %1[=]", &c, c2);
+                if (fscanf(infp, "%c %1[=]", &c, c2) < 1)
+                    c = 'm';
                 switch(c)
                 {
                 case 'w':
@@ -366,7 +367,9 @@ read_access_file (void)
                             break;
                         if (*c2 == '-') {
                             k = 24;
-                            fscanf(infp, "%d %1[,:] ", &k, c2);
+                            if (fscanf(infp, "%d %1[,:] ", &k, c2) < 1)
+                                break;
+
                             if (j <= k) {
                                 mask |= (2 << k) - (1 << j);
                             } else {
@@ -393,7 +396,8 @@ read_access_file (void)
 
         /* The rest of the line is the message to print.
          */
-        fgets(message, (int)sizeof(message)-1, infp);
+        if (fgets(message, (int)sizeof(message)-1, infp) == NULL)
+            message[0] = '\0';
         message[sizeof(message) - 1] = '\0';
 
         /* Check if this rule creates a new class. If yes, allocate

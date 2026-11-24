@@ -2296,7 +2296,8 @@ load_ob_from_swap (object_t *ob)
             return result | -0x80;
         }
 
-        fread(block, size, 1, swap_file);
+        if (size > 0 && fread(block, size, 1, swap_file) != 1)
+            fatal("Couldn't read the swap file.\n");
 
         /* Prepare to restore */
         set_current_object(&dummy);
@@ -2406,8 +2407,9 @@ load_line_numbers_from_swap (program_t *prog)
 
     if (tmp_numbers.size > sizeof(tmp_numbers))
     {
-        fread(lines+1, tmp_numbers.size - sizeof(tmp_numbers)
-             , 1, swap_file);
+        if (fread(lines+1, tmp_numbers.size - sizeof(tmp_numbers),
+                  1, swap_file) != 1)
+            fatal("Couldn't read the swap file.\n");
     }
 
     prog->line_numbers = lines;

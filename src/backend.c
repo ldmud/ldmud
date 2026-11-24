@@ -836,7 +836,7 @@ backend (void)
                              , slow_shut_down_to_do
                              , (long)(time_now - time_last_gc)
                              );
-                  write(1, buf, strlen(buf));
+                  writes(1, buf);
                   command_giver = NULL;
                   clear_current_object();
                   /* if the GC was not requested by an efun call, low_memory()
@@ -855,7 +855,7 @@ backend (void)
                              , gc_request == gcEfun ? "efun" : "allocator"
                              , slow_shut_down_to_do
                              , (long)(time_now - time_last_gc));
-                  write(1, buf, strlen(buf));
+                  writes(1, buf);
                   reallocate_reserved_areas();
                 }
 
@@ -874,7 +874,7 @@ backend (void)
                         time_last_slow_shut = time_now;
                         malloc_privilege = MALLOC_MASTER;
                         sprintf(shut_msg, "%s slow_shut_down(%d)\n", time_stamp(), minutes);
-                        write(1, shut_msg, strlen(shut_msg));
+                        writes(1, shut_msg);
 
                         previous_ob = const0;
                         command_giver = NULL;
@@ -888,7 +888,7 @@ backend (void)
                         sprintf(buf, "%s Last slow_shut_down() still pending.\n"
                                    , time_stamp()
                                );
-                        write(1, buf, strlen(buf));
+                        writes(1, buf);
                     }
                 }
                 malloc_privilege = MALLOC_USER;

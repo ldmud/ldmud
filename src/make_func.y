@@ -2763,7 +2763,8 @@ yylex1 (void)
             int line;
             char file[MAXPATHLEN+1];
 
-            fgets(line_buffer, MAKE_FUNC_MAXLINE, fpr);
+            if (fgets(line_buffer, MAKE_FUNC_MAXLINE, fpr) == NULL)
+                yyerror("End of file after '#' directive");
             if ( sscanf(line_buffer, "%d \"%s\"",&line,file ) == 2 )
             {
                 current_line = line+1;
@@ -2798,7 +2799,8 @@ yylex1 (void)
                 return END;
             }
             send_end = 1;
-            fgets(line_buffer, MAKE_FUNC_MAXLINE, fpr);
+            if (fgets(line_buffer, MAKE_FUNC_MAXLINE, fpr) == NULL)
+                yyerror("End of file after '%' directive");
             current_line++;
             if (parsetype == PARSE_FUNC_SPEC)
             {
