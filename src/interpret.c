@@ -2761,7 +2761,12 @@ link_protected_lvalue (svalue_t *dest, svalue_t *lv)
             /* We create the entry and assign <lv>. */
             struct protected_mapentry_lvalue *e = dest->u.protected_mapentry_lvalue;
             svalue_t *val = get_map_lvalue(e->map, &(e->key));
-            svalue_t temp = *dest;
+            svalue_t temp;
+
+            if (val == NULL)
+                errorf("Out of memory when creating mapping entry.\n");
+
+            temp = *dest;
 
             /* Copy the lvalue into mapping. */
             assert(val->type == T_NUMBER && val->u.number == 0);
@@ -2864,6 +2869,31 @@ link_protected_lvalue (svalue_t *dest, svalue_t *lv)
 } /* link_protected_lvalue */
 
 /*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+get_current_mapentry_lvalue (void)
+
+/* Create the entry described by <current_unprotected_mapentry> and return
+ * a pointer to its first value. The caller adds .index to address the
+ * column it wants.
+ *
+ * The key is released in either case. If the entry could not be created
+ * because the driver is out of memory, an error is raised - the callers
+ * have no way to represent a missing entry.
+ */
+
+{
+    svalue_t *entry = get_map_lvalue(current_unprotected_mapentry.map
+                                    , &(current_unprotected_mapentry.key));
+
+    free_svalue(&(current_unprotected_mapentry.key));
+
+    if (entry == NULL)
+        errorf("Out of memory when creating mapping entry.\n");
+
+    return entry;
+} /* get_current_mapentry_lvalue() */
+
+/*-------------------------------------------------------------------------*/
 void
 assign_svalue (svalue_t *dest, svalue_t *v)
 
@@ -2939,13 +2969,11 @@ assign_svalue (svalue_t *dest, svalue_t *v)
         case LVALUE_UNPROTECTED_MAPENTRY:
             {
                 /* We create the entry to assign to. */
-                svalue_t *val = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key));
+                svalue_t *val = get_current_mapentry_lvalue();
 
                 /* The entry should not have existed. */
                 assert(val->type == T_NUMBER && val->u.number == 0);
                 dest = val + current_unprotected_mapentry.index;
-
-                free_svalue(&(current_unprotected_mapentry.key));
                 break;
             }
 
@@ -3027,7 +3055,12 @@ assign_svalue (svalue_t *dest, svalue_t *v)
             {
                 /* Let's create the entry if it doesn't exist already. */
                 struct protected_mapentry_lvalue *e = dest->u.protected_mapentry_lvalue;
-                dest = get_map_lvalue(e->map, &(e->key)) + e->index;
+                svalue_t *val = get_map_lvalue(e->map, &(e->key));
+
+                if (val == NULL)
+                    errorf("Out of memory when creating mapping entry.\n");
+
+                dest = val + e->index;
                 continue;
             }
 
@@ -3210,13 +3243,11 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
         case LVALUE_UNPROTECTED_MAPENTRY:
             {
                 /* We create the entry to transfer to. */
-                svalue_t *val = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key));
+                svalue_t *val = get_current_mapentry_lvalue();
 
                 /* The entry should not have existed. */
                 assert(val->type == T_NUMBER && val->u.number == 0);
                 dest = val + current_unprotected_mapentry.index;
-
-                free_svalue(&(current_unprotected_mapentry.key));
                 break;
             }
 
@@ -3299,7 +3330,12 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
             else
             {
                 struct protected_mapentry_lvalue *e = dest->u.protected_mapentry_lvalue;
-                dest = get_map_lvalue(e->map, &(e->key)) + e->index;
+                svalue_t *val = get_map_lvalue(e->map, &(e->key));
+
+                if (val == NULL)
+                    errorf("Out of memory when creating mapping entry.\n");
+
+                dest = val + e->index;
                 continue;
             }
 
@@ -4286,8 +4322,7 @@ add_number_to_lvalue (char* op, svalue_t *dest, int i, svalue_t *pre, svalue_t *
             }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
-                dest = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
-                free_svalue(&(current_unprotected_mapentry.key));
+                dest = get_current_mapentry_lvalue() + current_unprotected_mapentry.index;
                 break;
 
             case LVALUE_PROTECTED:
@@ -4310,7 +4345,12 @@ add_number_to_lvalue (char* op, svalue_t *dest, int i, svalue_t *pre, svalue_t *
             case LVALUE_PROTECTED_MAPENTRY:
             {
                 struct protected_mapentry_lvalue *e = dest->u.protected_mapentry_lvalue;
-                dest = get_map_lvalue(e->map, &(e->key)) + e->index;
+                svalue_t *val = get_map_lvalue(e->map, &(e->key));
+
+                if (val == NULL)
+                    errorf("Out of memory when creating mapping entry.\n");
+
+                dest = val + e->index;
                 continue;
             }
         } /* switch() */
@@ -14326,8 +14366,7 @@ again:
                 break; /* NOTREACHED */
 
             case LVALUE_UNPROTECTED_MAPENTRY:
-                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
-                free_svalue(&(current_unprotected_mapentry.key));
+                argp = get_current_mapentry_lvalue() + current_unprotected_mapentry.index;
                 break;
 
             case LVALUE_UNPROTECTED_MAP_RANGE:
@@ -14656,8 +14695,7 @@ again:
                 break; /* NOTREACHED */
 
             case LVALUE_UNPROTECTED_MAPENTRY:
-                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
-                free_svalue(&(current_unprotected_mapentry.key));
+                argp = get_current_mapentry_lvalue() + current_unprotected_mapentry.index;
                 break;
 
             case LVALUE_UNPROTECTED_MAP_RANGE:
@@ -14942,8 +14980,7 @@ again:
                 break; /* NOTREACHED */
 
             case LVALUE_UNPROTECTED_MAPENTRY:
-                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
-                free_svalue(&(current_unprotected_mapentry.key));
+                argp = get_current_mapentry_lvalue() + current_unprotected_mapentry.index;
                 break;
 
             case LVALUE_UNPROTECTED_MAP_RANGE:
@@ -15236,8 +15273,7 @@ again:
             }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
-                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
-                free_svalue(&(current_unprotected_mapentry.key));
+                argp = get_current_mapentry_lvalue() + current_unprotected_mapentry.index;
                 break;
         }
 
@@ -15401,8 +15437,7 @@ again:
             }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
-                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
-                free_svalue(&(current_unprotected_mapentry.key));
+                argp = get_current_mapentry_lvalue() + current_unprotected_mapentry.index;
                 break;
         }
 
@@ -15505,8 +15540,7 @@ again:
                 break; /* NOTREACHED */
 
             case LVALUE_UNPROTECTED_MAPENTRY:
-                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
-                free_svalue(&(current_unprotected_mapentry.key));
+                argp = get_current_mapentry_lvalue() + current_unprotected_mapentry.index;
                 break;
 
             case LVALUE_UNPROTECTED_MAP_RANGE:
@@ -15700,8 +15734,7 @@ again:
                 break; /* NOTREACHED */
 
             case LVALUE_UNPROTECTED_MAPENTRY:
-                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
-                free_svalue(&(current_unprotected_mapentry.key));
+                argp = get_current_mapentry_lvalue() + current_unprotected_mapentry.index;
                 break;
 
             case LVALUE_UNPROTECTED_MAP_RANGE:
@@ -15838,8 +15871,7 @@ again:
                 break; /* NOTREACHED */
 
             case LVALUE_UNPROTECTED_MAPENTRY:
-                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
-                free_svalue(&(current_unprotected_mapentry.key));
+                argp = get_current_mapentry_lvalue() + current_unprotected_mapentry.index;
                 break;
 
             case LVALUE_UNPROTECTED_MAP_RANGE:
@@ -15967,8 +15999,7 @@ again:
             }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
-                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
-                free_svalue(&(current_unprotected_mapentry.key));
+                argp = get_current_mapentry_lvalue() + current_unprotected_mapentry.index;
                 break;
         }
 
@@ -16072,8 +16103,7 @@ again:
             }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
-                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
-                free_svalue(&(current_unprotected_mapentry.key));
+                argp = get_current_mapentry_lvalue() + current_unprotected_mapentry.index;
                 break;
         }
 
@@ -16177,8 +16207,7 @@ again:
             }
 
             case LVALUE_UNPROTECTED_MAPENTRY:
-                argp = get_map_lvalue(current_unprotected_mapentry.map, &(current_unprotected_mapentry.key)) + current_unprotected_mapentry.index;
-                free_svalue(&(current_unprotected_mapentry.key));
+                argp = get_current_mapentry_lvalue() + current_unprotected_mapentry.index;
                 break;
         }
 
